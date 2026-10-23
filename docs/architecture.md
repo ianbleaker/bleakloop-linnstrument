@@ -72,7 +72,7 @@ tests/                 pytest, core only
 - **LED output.** One "light pad" call sends CC 20, 21 and 22 (S-3). The LED driver in section 3 is the only caller. v3's per-element send cache isn't relied on.
 - **All device output is sent unoptimised** (`_send_midi(..., optimized=False)`). Inside input callbacks Live buffers "optimized" messages and keeps only the last one per status byte and CC number. That collapses LED triples and NRPN sequences to a single message. This cost the spike several runs; it is a hard rule.
 - **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split (S-5, values in section 8), then enters Session Mode. NRPN 245 is sent on entering Session and Note Mode (S-1). On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 (S-6). The device confirms every User Firmware Mode change on channel 9 about 20 ms later (S-99). Drawing doesn't need to wait for it.
-- **Tick.** Driven by Live's display callback, which the spike measured at a steady 100 ms. Each tick reads a snapshot, renders a frame and sends the differences. **Open:** a 100 ms tick lets a tempo blink land up to 100 ms after the beat, which falls short of S-92's "never late". Look for a faster timer before the plan, or relax S-92.
+- **Tick.** Two clocks. Live's display callback (a steady 100 ms) reads a snapshot, renders a frame and sends the differences. A `Live.Base.Timer` at 10 ms (measured: about 12 ms on average, 32 ms at worst) checks the blink phases and triggers an extra render when one flips, so tempo blinks land within about one timer period of the beat (S-92). **Risk, first plan item:** the spike only timed the Timer. Sending MIDI and reading Live state from its callback is unverified. The fallback is Live's song-time listener, which fires about every 13 ms while playing.
 - **Session ring.** Live's session highlight is set from the core's window state (S-10).
 
 ## 6. Adapters: Live-specific mechanisms (proposed)
@@ -99,7 +99,8 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Control split setup NRPNs: 200 = 1 (split on), 202 = 2 (split point: left split is column 1), 0 = 0 (one channel), 1 = channel, 35 = 2 (CC Faders), 40–47 = 1–8 (faders send CC 1–8) | S-5 | Device protocol | Confirmed on device |
 | Off colour value: 7 | S-88 | Device protocol | Confirmed; 0 also dark |
 | Fast blink: about 200 ms on, 200 ms off | S-91 | Tuned | Verify on device |
-| Light refresh: Live's display callback, about 100 ms | S-92 | Mechanism | Measured; faster timer open |
+| Light refresh: Live's display callback, about 100 ms | S-92 | Mechanism | Measured |
+| Blink clock: `Live.Base.Timer` every 10 ms | S-90–S-92 | Mechanism | Timing measured; callback safety to verify |
 | Live volume control position for 0 dB: 0.85 (1.0 = +6 dB) | S-71, S-72 | Live behaviour | Confirmed |
 | Fader smoothing: max step about 1.8 % of range per update | S-72 | Tuned | Needed (spike); tune on device |
 | Fader smoothing: ignore changes under about 0.3 % of range | S-72 | Tuned | Needed (spike); tune on device |
@@ -124,9 +125,9 @@ Run on branch `spike/device-checks` (never merged) against a LinnStrument 128 an
 | --- | --- |
 | 1. Note Mode pass-through | Pass. Notes, MPE, Y and pressure reach tracks; column 1 CCs reach BleakLoop on channel 1. |
 | 2. LED output | Pass with raw sends, once sent unoptimised (section 5). Off is value 7; 0 is also dark. BleakLoop's colours show in the Note Mode control split (S-86). |
-| 3. Tick rate | About 100 ms, steady. Tempo blinks can be up to 100 ms late; open in section 5. |
+| 3. Tick rate | Display callback: about 100 ms, steady. `Live.Base.Timer` at 10 ms: about 12 ms average, 32 ms worst. Song-time listener: about 13 ms while playing. |
 | 4. Fixed Length | Pass: exactly one bar from a stopped transport, while playing, and with quantization None. |
-| 5. Unload | Before the change, the device went blank and unplayable. Now hands the device back (S-6); clearing column 1 to value 0 is still to verify. |
+| 5. Unload | Before the change, the device went blank and unplayable. Now hands the device back (S-6): playable, the split stays, and column 1 returns to the device's own colours. |
 | 6. Snapshot cost | About 0.5 ms average, 3 ms worst. Polling stays. |
 | 7. Mixer feel | Jumpy without smoothing: a slide gives only 4–10 Y reports, 10–30 steps apart, and every touch first reports 64. Smoothing needed; ignore the first report. 0.85 = 0 dB confirmed. |
 | 8. LED throughput | A full-grid flip leaves Live in under 1 ms but ripples visibly on the device, which applies changes one at a time (S-93 reworded). |
@@ -136,4 +137,4 @@ Also found:
 - **Pad orientation** matches S-2 for both presses and lights: channel 1 and CC 21 = 0 are the nearest row.
 - **Control split pads are momentary** (127 on press, 0 on release), not the alternating toggle the device docs describe (S-5, S-76).
 - **Column 0 is the hardware panel.** BleakLoop ignores it (S-11 removed, S-113).
-- **Pacing the split setup** (one NRPN per tick) was added while the real fault was optimised sending, so it may not be needed. Test sending the setup in one go before the plan relies on either.
+- **The split setup can be sent in one go.** Pacing (one NRPN per tick) was a workaround for the optimised-send fault and isn't needed: a burst changed the split point at once.
