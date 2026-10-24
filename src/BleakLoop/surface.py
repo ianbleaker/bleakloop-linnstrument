@@ -57,6 +57,8 @@ class BleakLoop(ControlSurface):
         self._timer = None
         self._phase = None
         self._ring = None  # the last session highlight sent
+        self._pending_clip = None  # the clip slot to show in the Detail view (S-32)
+        self._pending_fresh = False
         super().__init__(*a, specification=Specification, **k)
 
     @staticmethod
@@ -69,6 +71,7 @@ class BleakLoop(ControlSurface):
     def update_display(self):
         super().update_display()
         if self._started:
+            self._check_pending_clip()
             self._refresh()
         elif not self._setup_sent:
             self._setup_sent = True
@@ -157,16 +160,51 @@ class BleakLoop(ControlSurface):
         state, actions = engine.handle(self._state, event, self._snapshot())
         # Store first: EnterMode renders, and must render the new mode.
         self._state = state
-        for action in actions:
-            live_actions.apply(action, self.song, self)
+        follow_ups = [live_actions.apply(action, self.song, self) for action in actions]
+        # Follow-up events (Capture, S-47) go to the core once; theirs are dropped, so this
+        # never recurses.
+        for follow_up in follow_ups:
+            if follow_up is not None:
+                state, more = engine.handle(self._state, follow_up, self._snapshot())
+                self._state = state
+                for action in more:
+                    live_actions.apply(action, self.song, self)
         self._update_ring()
         self._refresh()
+
+    # Detail view (S-32)
+
+    def show_clip_when_ready(self, slot):
+        # Polled on the display tick: Live refuses changes made inside a listener callback.
+        self._pending_clip = slot
+        self._pending_fresh = True
+
+    def _check_pending_clip(self):
+        slot = self._pending_clip
+        if slot is None:
+            return
+        try:
+            if slot.has_clip:
+                self.song.view.detail_clip = slot.clip
+                Live.Application.get_application().view.show_view("Detail/Clip")
+                self._pending_clip = None
+            elif not self._pending_fresh and not slot.is_triggered and not slot.is_recording:
+                # The recording was cancelled: a clip landing here later mustn't take the view.
+                self._pending_clip = None
+            self._pending_fresh = False
+        except Exception:
+            # The slot's track or scene was deleted.
+            logger.exception("Detail view focus failed")
+            self._pending_clip = None
 
     # Output
 
     def _snapshot(self):
         return live_state.read(
-            self.song, Live.Application.get_application(), self._state.window
+            self.song,
+            Live.Application.get_application(),
+            self._state.window,
+            scene_clips=self._state.copy,
         )
 
     def _update_ring(self, force=False):

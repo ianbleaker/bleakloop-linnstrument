@@ -50,3 +50,20 @@ def test_short_session_stays_at_origin():
 def test_move_one_step():
     assert layout.move_window(layout.Window(2, 3), 1, 0, 20, 20) == layout.Window(3, 3)
     assert layout.move_window(layout.Window(2, 3), 0, 1, 20, 20) == layout.Window(2, 4)
+
+
+def test_scroll_to_scene_above_window():
+    assert layout.scroll_to_scene(layout.Window(2, 5), 3, 20, 20) == layout.Window(2, 3)
+
+
+def test_scroll_to_scene_below_window():
+    assert layout.scroll_to_scene(layout.Window(2, 0), 9, 20, 20) == layout.Window(2, 3)
+
+
+def test_scroll_to_scene_inside_window_stays():
+    assert layout.scroll_to_scene(layout.Window(2, 4), 10, 20, 20) == layout.Window(2, 4)
+
+
+def test_scroll_to_scene_below_window_near_end_is_clamped():
+    # Scene 9 is the last of 10; the window can't start past scene 3.
+    assert layout.scroll_to_scene(layout.Window(0, 0), 9, 20, 10) == layout.Window(0, 3)

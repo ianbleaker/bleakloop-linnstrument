@@ -51,7 +51,7 @@ src/BleakLoop/
     layout.py          geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping (S-47, S-58, S-65)
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Note, Note Mode pages, modifiers (S-7–S-16, S-100–S-108, S-112)
-    controls.py        shared Session and Note Mode behaviour: undo, metronome, Play/Stop and scene lights
+    controls.py        shared Session and Note Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights
     session.py         clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table (S-18–S-69)
     mixer.py           (planned, #5, #6) coarse steps, bands, smoothing (S-70–S-75)
     note_mode.py       (planned, #5, #6) column 1 CC handling (S-76–S-86)
@@ -74,17 +74,28 @@ tests/                 pytest, core only
 - **All device output is sent unoptimised** (`_send_midi(..., optimized=False)`). Inside input callbacks Live buffers "optimized" messages and keeps only the last one per status byte and CC number. That collapses LED triples and NRPN sequences to a single message. This cost the spike several runs; it is a hard rule.
 - **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split (S-5, values in section 8), then enters Session Mode. NRPN 245 is sent on entering Session and Note Mode (S-1). On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 (S-6). The device confirms every User Firmware Mode change on channel 9 about 20 ms later (S-99). Drawing doesn't need to wait for it.
 - **Tick.** Two clocks. Live's display callback (a steady 100 ms) reads a snapshot, renders a frame and sends the differences. A `Live.Base.Timer` at 10 ms (measured: about 12 ms on average, 32 ms at worst) checks the blink phases and triggers an extra render when one flips, so tempo blinks land within about one timer period of the beat (S-92). Sending MIDI and reading Live state from its callback was confirmed in #3. The timer reads only the transport to check the phases; the full snapshot is read only when a frame is drawn (#4).
+- **Follow-up events.** `live_actions.apply` may return an event, which `_handle` feeds to the core once after the action loop. The follow-up's own actions are applied, but any events they return are dropped, so this never recurses. Used by Capture (S-47): after `song.capture_and_insert_scene()` the adapter returns `SceneSelected` with the index of `song.view.selected_scene`, and the core scrolls the window the minimum distance. Confirmed on device (#10).
+- **Detail-view focus (S-32) is polled on the display tick.** Live refuses changes made inside a listener callback, and polling needs no listener lifecycle. The surface holds one pending clip slot, and a new `ShowClip` replaces it. On each tick:
+  - If the slot has a clip, the surface shows it and clears the pending slot.
+  - On any tick after the first, if the slot has no clip and is neither triggered nor recording, the recording was cancelled. The pending slot is cleared, so a clip that lands there later doesn't take the view.
+  - If reading the slot raises (its track or scene was deleted), the error is logged and the pending slot is cleared.
+
+  `highlighted_clip_slot` is never set, because that would change the selected track and, with auto-arm, which track is armed.
 - **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 7, False)` draws it from the core's window state whenever the window changes and on every Session entry (S-10, S-15); `(-1, -1, -1, -1, False)` removes it on Note entry and on unload. Confirmed on device (#4). Live picks the ring's colour (green on the test machine), not BleakLoop.
 
 ## 6. Adapters: Live-specific mechanisms (proposed)
 
 | Behaviour | Mechanism |
 | --- | --- |
-| Fixed Length (S-30) | `ClipSlot.fire(record_length=beats)`, with beats = N × numerator × 4 / denominator |
-| Detail view focus (S-32) | Listen for the target slot gaining a clip, then show it once |
-| Auto Note Mode (S-31) | The core decides from the snapshot (track type, slot state, record and overdub flags) and emits a mode-switch action |
+| Fixed Length (S-30) | `ClipSlot.fire(record_length=beats)`, with beats = N × numerator × 4 / denominator. Passed only for an empty slot on an armed track, the only case where Live starts a new recording (`fire` raises if the slot owns a clip). |
+| Detail view focus (S-32) | Poll the pending slot on the display tick; set `song.view.detail_clip` and show `Detail/Clip` (section 5) |
+| Auto Note Mode (S-31) | The core decides from the snapshot (track type, arm, slot state and Session Record) and emits a mode-switch action |
 | Launch quantization memory (S-51) | Core state, not Live |
 | Status bar messages (S-17) | `ShowMessage` action |
+| Clip copy (S-22, S-23) | `ClipSlot.duplicate_clip_to`. It raises on a MIDI/audio mismatch and on group slots, so the core refuses both first, using the track's `has_midi_input` and `is_foldable`. |
+| Scene copy (S-66, S-67) | Every track in `song.tracks` except group tracks, including folded group members. `live_state` reads "scene has a clip" across them only while Copy is held, when the window can't move. |
+| Quantize (S-48) | `clip.quantize(Live.Song.RecordingQuantization.rec_q_sixtenth, 1.0)`. Three candidates (highlighted slot's clip, `song.view.detail_clip`, the selected track's `playing_slot_index` clip), resolved by one helper, `live_state.candidate_clip`, used by both the snapshot and the action. |
+| Record pad (S-54, S-55) | Session View: toggle `song.session_record`. Arrangement View: clear `song.back_to_arranger` if set, then toggle `song.record_mode`. |
 
 ## 7. Requirement map (proposed)
 
@@ -114,7 +125,7 @@ Removed, to be re-added only if the device shows a need:
 | --- | --- | --- |
 | Full resend 0.2 s after entering Session Mode | S-8 | Contradicts sending only changed pads; delivery is trusted until proven otherwise. |
 | 1.5 s control-switch lockout after entering Session Mode | S-12 | No known cause. |
-| Detail-view focus retried over 1.5 s | S-32 | Replace with reacting to the clip appearing. |
+| Detail-view focus retried over 1.5 s | S-32 | Replaced by polling the pending slot on the display tick (section 5). |
 | Relaunch timer to end Fixed Length recordings | S-30 | Live's `ClipSlot.fire(record_length=…)` records a fixed length natively, including from a stopped transport and with quantization None (spike). |
 | "Start Play first" refusal | S-29 | Not needed: Fixed Length works from a stopped transport (spike). |
 
@@ -167,3 +178,27 @@ Also found:
   - **Legato** only shows with two clips that sound clearly different, quantization set to None, and the switch made mid-clip. With the defaults it looks like a normal launch.
   - **Describe the expected result, not its appearance:** Live draws the ring, and its colour isn't BleakLoop's.
   - **Ask once per check with the full list:** one restart, reported as a numbered list, worked well.
+
+### #10 device checks
+
+Run on a LinnStrument 128 and Live 12 against Session Mode recording, Copy and Delete (#10). Every mechanism below passed, and the filtered log showed no tracebacks.
+
+| Mechanism | Result |
+| --- | --- |
+| Fixed Length in 3/4: `ClipSlot.fire(record_length=6.0)` | Pass. The clip is exactly 2 bars, and playback continues. |
+| `ClipSlot.fire(force_legato=True, record_length=…)` in one call | Pass. No error, and the same result. |
+| Detail-view focus by polling | Pass. The new clip shows once recording starts, not before. A recording cancelled before it starts doesn't steal the view later. |
+| Auto Note Mode | Pass. MIDI tracks switch to Note Mode; audio tracks stay in Session Mode. |
+| Capture: `song.capture_and_insert_scene()`, then `song.view.selected_scene` | Pass. `selected_scene` is updated when the call returns; the window and ring scroll to it. |
+| Quantize: `clip.quantize(rec_q_sixtenth, 1.0)` | Pass. With nothing highlighted during a recording, the recording clip is found as a candidate. |
+| Clip copy: `ClipSlot.duplicate_clip_to` | Pass, MIDI to MIDI. MIDI to audio is refused with the message. |
+| Scene copy across `song.tracks` | Pass. It includes clips inside a folded group. |
+| Clip and scene delete: `ClipSlot.delete_clip()`, `song.delete_scene()` | Pass. After a scene delete with the window at the bottom, the window moves up one. |
+| Record pad: `song.session_record`, `song.back_to_arranger`, `song.record_mode` | Pass. In Arrangement View, one press clears Back to Arrangement and starts Arrangement Record. |
+| Copy and Delete hold, hints, refusals and S-112 inert pads | Pass. Fixed Length survives a Note Mode round trip. |
+
+Also found:
+
+- **The Session View record light counts MIDI Arrangement Overdub** (S-54). Live's Arrangement Overdub is often left on, and then the pad blinks all the time. This is kept on purpose.
+- **Group slots:** Live reports a group track's slot as having no clip. So a group slot can't be a copy source, and it stays dark when its members hold clips. Both are follow-ups.
+- **Lime (value 10) looks yellow on the device** (the Capture pad). Noted for #9.

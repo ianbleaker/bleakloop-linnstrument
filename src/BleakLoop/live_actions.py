@@ -2,15 +2,27 @@
 
 import Live
 
+from . import live_state
 from .core.model import (
     ArmExclusive,
+    CaptureAndInsertScene,
+    ClearBackToArrangement,
+    CopyClip,
+    CopyScene,
+    DeleteClip,
+    DeleteScene,
     EnterMode,
     FireScene,
     FireSlot,
+    QuantizeClip,
     Redo,
+    SceneSelected,
     SelectTrack,
+    SetArrangementRecord,
     SetLaunchQuantization,
+    SetSessionRecord,
     SetTempo,
+    ShowClip,
     ShowMessage,
     StopAllClips,
     StopTrackClips,
@@ -22,7 +34,12 @@ from .core.model import (
 )
 
 
+def _slot(song, track, scene):
+    return song.visible_tracks[track].clip_slots[scene]
+
+
 def apply(action, song, surface):
+    # Returns None, or a follow-up event for the core (Capture, S-47).
     if isinstance(action, ToggleMetronome):
         song.metronome = not song.metronome
     elif isinstance(action, TogglePlay):
@@ -33,11 +50,12 @@ def apply(action, song, surface):
     elif isinstance(action, EnterMode):
         surface.enter_mode(action.mode)
     elif isinstance(action, FireSlot):
-        slot = song.visible_tracks[action.track].clip_slots[action.scene]
+        options = {}
         if action.legato:
-            slot.fire(force_legato=True)
-        else:
-            slot.fire()
+            options["force_legato"] = True
+        if action.record_length is not None:
+            options["record_length"] = action.record_length
+        _slot(song, action.track, action.scene).fire(**options)
     elif isinstance(action, FireScene):
         song.scenes[action.scene].fire(force_legato=action.legato)
     elif isinstance(action, ToggleMute):
@@ -66,7 +84,35 @@ def apply(action, song, surface):
         song.tempo = action.bpm
     elif isinstance(action, SetLaunchQuantization):
         song.clip_trigger_quantization = Live.Song.Quantization.values[action.value]
+    elif isinstance(action, ShowClip):
+        surface.show_clip_when_ready(_slot(song, action.track, action.scene))
+    elif isinstance(action, CopyClip):
+        source = _slot(song, action.source_track, action.source_scene)
+        source.duplicate_clip_to(_slot(song, action.track, action.scene))
+    elif isinstance(action, CopyScene):
+        for track in song.tracks:
+            if not track.is_foldable and track.clip_slots[action.source].has_clip:
+                track.clip_slots[action.source].duplicate_clip_to(
+                    track.clip_slots[action.target]
+                )
+    elif isinstance(action, DeleteClip):
+        _slot(song, action.track, action.scene).delete_clip()
+    elif isinstance(action, DeleteScene):
+        song.delete_scene(action.scene)
+    elif isinstance(action, CaptureAndInsertScene):
+        song.capture_and_insert_scene()
+        return SceneSelected(list(song.scenes).index(song.view.selected_scene))
+    elif isinstance(action, QuantizeClip):
+        clip = live_state.candidate_clip(song, action.target)
+        clip.quantize(Live.Song.RecordingQuantization.rec_q_sixtenth, 1.0)
+    elif isinstance(action, SetSessionRecord):
+        song.session_record = action.on
+    elif isinstance(action, SetArrangementRecord):
+        song.record_mode = action.on
+    elif isinstance(action, ClearBackToArrangement):
+        song.back_to_arranger = False
     elif isinstance(action, ShowMessage):
         surface.show_message(action.text)
     else:
         raise TypeError(f"unknown action: {action!r}")
+    return None

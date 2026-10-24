@@ -1,5 +1,6 @@
 """Plain types passed between the plumbing, the adapters and the core."""
 
+import enum
 from dataclasses import dataclass
 
 from .leds import Light
@@ -23,7 +24,21 @@ class TrackView:
     can_be_armed: bool = True
     mute: bool = False
     solo: bool = False
+    has_midi_input: bool = False
+    is_foldable: bool = False  # a group track: its slots can't hold clips
     slots: tuple = ()  # one SlotView per window row that exists, top first
+
+
+@dataclass(frozen=True)
+class ClipView:
+    is_midi: bool
+
+
+class ClipTarget(enum.Enum):
+    # The quantize candidates, in S-48 order.
+    HIGHLIGHTED = enum.auto()
+    DETAIL = enum.auto()
+    PLAYING = enum.auto()
 
 
 @dataclass(frozen=True)
@@ -39,6 +54,18 @@ class Snapshot:
     can_undo: bool = False
     can_redo: bool = False
     launch_quantization: int = 4
+    signature_numerator: int = 4
+    signature_denominator: int = 4
+    session_record: bool = False
+    arrangement_overdub: bool = False
+    arrangement_record: bool = False
+    back_to_arranger: bool = False
+    highlighted_clip: ClipView | None = None
+    detail_clip: ClipView | None = None
+    playing_clip: ClipView | None = None
+    # One bool per window row that exists, true if any track in the Set has a clip there.
+    # Read only while Copy is held.
+    scene_clips: tuple = ()
 
 
 # Events
@@ -55,6 +82,12 @@ class PadPress:
 class ControlCC:
     cc: int
     value: int
+
+
+@dataclass(frozen=True)
+class SceneSelected:
+    # Fed back by the adapter after Capture (S-47).
+    scene: int
 
 
 # Actions
@@ -83,6 +116,7 @@ class FireSlot:
     track: int
     scene: int
     legato: bool
+    record_length: float | None = None  # beats
 
 
 @dataclass(frozen=True)
@@ -140,6 +174,62 @@ class SetTempo:
 @dataclass(frozen=True)
 class SetLaunchQuantization:
     value: int
+
+
+@dataclass(frozen=True)
+class ShowClip:
+    track: int
+    scene: int
+
+
+@dataclass(frozen=True)
+class CopyClip:
+    source_track: int
+    source_scene: int
+    track: int
+    scene: int
+
+
+@dataclass(frozen=True)
+class CopyScene:
+    source: int
+    target: int
+
+
+@dataclass(frozen=True)
+class DeleteClip:
+    track: int
+    scene: int
+
+
+@dataclass(frozen=True)
+class DeleteScene:
+    scene: int
+
+
+@dataclass(frozen=True)
+class CaptureAndInsertScene:
+    pass
+
+
+@dataclass(frozen=True)
+class QuantizeClip:
+    target: ClipTarget
+
+
+@dataclass(frozen=True)
+class SetSessionRecord:
+    on: bool
+
+
+@dataclass(frozen=True)
+class SetArrangementRecord:
+    on: bool
+
+
+@dataclass(frozen=True)
+class ClearBackToArrangement:
+    pass
 
 
 @dataclass(frozen=True)

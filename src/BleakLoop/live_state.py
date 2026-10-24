@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from .core import layout
-from .core.model import SlotView, Snapshot, TrackView
+from .core.model import ClipTarget, ClipView, SlotView, Snapshot, TrackView
 
 
 def read_transport(song, application):
@@ -17,7 +17,7 @@ def read_transport(song, application):
     )
 
 
-def read(song, application, window):
+def read(song, application, window, scene_clips=False):
     tracks = list(song.visible_tracks)
     scenes = list(song.scenes)
     rows = range(window.scene, min(window.scene + layout.WINDOW_SCENES, len(scenes)))
@@ -30,7 +30,45 @@ def read(song, application, window):
         can_undo=song.can_undo,
         can_redo=song.can_redo,
         launch_quantization=int(song.clip_trigger_quantization),
+        signature_numerator=song.signature_numerator,
+        signature_denominator=song.signature_denominator,
+        session_record=song.session_record,
+        arrangement_overdub=song.arrangement_overdub,
+        arrangement_record=song.record_mode,
+        back_to_arranger=song.back_to_arranger,
+        highlighted_clip=_clip(candidate_clip(song, ClipTarget.HIGHLIGHTED)),
+        detail_clip=_clip(candidate_clip(song, ClipTarget.DETAIL)),
+        playing_clip=_clip(candidate_clip(song, ClipTarget.PLAYING)),
+        # Costly with many tracks: only while Copy is held, when the window can't move.
+        scene_clips=_scene_clips(song, rows) if scene_clips else (),
     )
+
+
+def candidate_clip(song, target):
+    # S-48's quantize candidates. live_actions resolves QuantizeClip with this too, so the
+    # snapshot and the action can't disagree.
+    if target is ClipTarget.HIGHLIGHTED:
+        slot = song.view.highlighted_clip_slot
+        return slot.clip if slot is not None and slot.has_clip else None
+    if target is ClipTarget.DETAIL:
+        return song.view.detail_clip
+    # Master and return tracks aren't in song.tracks.
+    track = song.view.selected_track
+    if track not in list(song.tracks) or track.playing_slot_index < 0:
+        return None
+    slot = track.clip_slots[track.playing_slot_index]
+    return slot.clip if slot.has_clip else None
+
+
+def _clip(clip):
+    return None if clip is None else ClipView(is_midi=clip.is_midi_clip)
+
+
+def _scene_clips(song, rows):
+    # S-66, S-67: every track in the Set, including folded group members. Group tracks
+    # themselves are skipped: their slots can't hold clips.
+    tracks = [track for track in song.tracks if not track.is_foldable]
+    return tuple(any(track.clip_slots[scene].has_clip for track in tracks) for scene in rows)
 
 
 def _track(index, track, rows):
@@ -47,6 +85,8 @@ def _track(index, track, rows):
         can_be_armed=can_be_armed,
         mute=track.mute,
         solo=track.solo,
+        has_midi_input=track.has_midi_input,
+        is_foldable=track.is_foldable,
         slots=tuple(_slot(slots[scene]) for scene in rows),
     )
 

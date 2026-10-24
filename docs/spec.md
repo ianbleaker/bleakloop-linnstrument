@@ -126,7 +126,7 @@ Each column is one track in the window. Each of pads 1–7 is one scene in the w
 - **S-28** A slot outside the session (a track column past the last track, or a row past the last scene) does nothing when pressed.
 - **S-29** *(Removed: the refusal to start a Fixed Length recording while the transport is stopped. Live records the fixed length correctly from a stopped transport.)*
 - **S-30** When a Fixed Length recording starts, it stops by itself after N bars, so the clip is exactly N bars long whatever the launch quantization. A bar is the current time signature's bar (for example 3 quarter notes in 6/8). If the recording is stopped earlier by other means, BleakLoop does nothing further with it.
-- **S-31** Auto Note Mode: if pressing a slot starts a recording, BleakLoop switches to Note Mode, provided the track is a MIDI track. A recording here means an empty slot on an armed track, a slot that is already recording, or a playing clip while Session Record or Overdub is on. An audio track stays in Session Mode so audio looping isn't interrupted.
+- **S-31** Auto Note Mode: if pressing a slot starts a recording, BleakLoop switches to Note Mode, provided the track is a MIDI track. A recording here means an empty slot on an armed track, a slot that is already recording, or a playing clip on an armed track while Session Record (Live's Session Overdub button) is on. An audio track stays in Session Mode so audio looping isn't interrupted.
 - **S-32** Whenever a press starts or continues a recording (as in S-31, on any track type) or starts a Fixed Length recording, Live shows that clip in the Detail view as soon as the clip exists.
 
 Colours, highest priority first:
@@ -160,7 +160,7 @@ Each of these pads acts on its column's track. Which switch it is (Mute, Solo or
 - **S-51** Pad 5 with Shift: switch global launch quantization off and on. Switching it off sets it to None and remembers the previous value. Switching it on restores the remembered value, or 1 Bar if there is none. Shift colour: green when quantized, red when None.
 - **S-52** Pad 6: start the transport if stopped, stop it if playing. Colour: blue while stopped, green tempo blink while playing.
 - **S-53** *(Removed: Play/Stop protection. Pad 6 has no Shift function.)*
-- **S-54** Pad 7 (record), when Live's Session View is showing: toggle Session Record. Colour: red, or red tempo blink while Session Record or Overdub is on.
+- **S-54** Pad 7 (record), when Live's Session View is showing: toggle Session Record. Colour: red, or red tempo blink while Session Record or MIDI Arrangement Overdub is on.
 - **S-55** Pad 7 when Live's Arrangement View is showing: first turn off Back to Arrangement, then toggle Arrangement Record. Colour: red tempo blink while Arrangement Record is on. Otherwise orange tempo blink while Back to Arrangement is lit, otherwise red.
 - **S-56** Pad 8: switch to Note Mode. Colour: white.
 

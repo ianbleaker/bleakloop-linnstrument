@@ -14,12 +14,20 @@ WINDOW_SCENES = 7
 
 # (column, pad)
 UNDO = (1, 1)
+COPY = (1, 2)
+CAPTURE = (1, 3)
+QUANTIZE = CAPTURE  # pad 3's Shift function (S-48)
+DELETE = (1, 4)
 METRONOME = (1, 5)
 LAUNCH_QUANTIZATION = METRONOME  # pad 5's Shift function (S-51)
 PLAY_STOP = (1, 6)
+RECORD = (1, 7)
 MODE_PAD = (1, 8)
 STOP_ALL = (15, 5)
 SHIFT = (16, 8)
+
+# Column 15 pads 1-4: Fixed Length in bars (S-57).
+FIXED_LENGTH_PADS = {(15, 1): 1, (15, 2): 2, (15, 3): 4, (15, 4): 8}
 
 # Shift + column 15 pads 1-4: (track step, scene step) (S-58).
 WINDOW_MOVES = {(15, 1): (0, -1), (15, 2): (0, 1), (15, 3): (-1, 0), (15, 4): (1, 0)}
@@ -61,3 +69,13 @@ def move_window(window, track_step, scene_step, track_count, scene_count):
         clamp(window.track + track_step, track_count, WINDOW_TRACKS),
         clamp(window.scene + scene_step, scene_count, WINDOW_SCENES),
     )
+
+
+def scroll_to_scene(window, scene, track_count, scene_count):
+    # S-47: scroll the minimum distance to keep the scene in view, then clamp as S-58 does.
+    offset = window.scene
+    if scene < offset:
+        offset = scene
+    elif scene >= offset + WINDOW_SCENES:
+        offset = scene - WINDOW_SCENES + 1
+    return move_window(Window(window.track, offset), 0, 0, track_count, scene_count)
