@@ -23,6 +23,37 @@ class SceneSource:
     scene: int
 
 
+@dataclass(frozen=True)
+class Touch:
+    # One finger on a Mixer fader column (S-72).
+    column: int
+    track: int  # the track at the gesture's first press: a window move doesn't change it
+    pad: int
+    anchor: float  # the volume Y moves from
+    pressed_ms: float | None = None  # set by the first glide tick after the press
+    previous_ms: float | None = None  # when the slide's previous pad was pressed
+
+
+@dataclass(frozen=True)
+class Lift:
+    # A fader pad just released: the device ends a touch between pads, so a press on the
+    # next pad soon after continues the gesture (S-72).
+    column: int
+    track: int
+    pad: int
+    pressed_ms: float | None = None
+    expires_ms: float | None = None  # set by the first glide tick after the release
+
+
+@dataclass(frozen=True)
+class Glide:
+    # A track volume moving toward its fader target (S-72).
+    track: int
+    current: float
+    target: float
+    pace: float | None = None  # volume per ms during a slide; None for the normal glide
+
+
 class TrackControl(enum.Enum):
     MUTE = enum.auto()
     SOLO = enum.auto()
@@ -41,13 +72,30 @@ class State:
     delete: bool = False
     copy_source: ClipSource | SceneSource | None = None
     fixed_length: int | None = None  # bars; Note Mode's Record Clip uses it too (S-78)
+    touches: tuple = ()  # Touch per held fader column
+    lifts: tuple = ()  # Lift per fader column whose pad was just released
+    glides: tuple = ()  # Glide per track
+    glide_ms: float | None = None  # time of the last glide step, None when none is moving
+    undo_open: bool = False  # a fader gesture's undo step is open in Live
 
 
 def enter(state, mode):
-    # The only place mode-entry resets happen (S-9, S-13). The window, the launch
-    # quantization memory and Fixed Length survive both directions.
+    # The only place mode-entry resets happen (S-9, S-13, S-70), including the fader state.
+    # The window, the launch quantization memory and Fixed Length survive both directions.
+    # A caller leaving Mixer Mode closes an open undo step first (mixer.reset).
     state = replace(
-        state, mode=mode, mixer=False, shift=False, copy=False, delete=False, copy_source=None
+        state,
+        mode=mode,
+        mixer=False,
+        shift=False,
+        copy=False,
+        delete=False,
+        copy_source=None,
+        touches=(),
+        lifts=(),
+        glides=(),
+        glide_ms=None,
+        undo_open=False,
     )
     if mode is Mode.SESSION:
         state = replace(state, track_control=TrackControl.ARM)

@@ -24,6 +24,7 @@ PLAY_STOP = (1, 6)
 RECORD = (1, 7)
 MODE_PAD = (1, 8)
 STOP_ALL = (15, 5)
+MIXER = STOP_ALL  # the same pad: Mixer is its normal-layer function (S-59)
 SHIFT = (16, 8)
 
 # Column 15 pads 1-4: Fixed Length in bars (S-57).

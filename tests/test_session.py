@@ -300,10 +300,6 @@ def test_track_switch_without_track_does_nothing(track_control, shift):
 # Column 15
 
 
-def test_column_15_pad_5_does_nothing():
-    assert handle(SESSION, (15, 5)) == (SESSION, [])
-
-
 @pytest.mark.parametrize(
     "pad, window",
     [(1, Window(3, 2)), (2, Window(3, 4)), (3, Window(2, 3)), (4, Window(4, 3))],
@@ -988,7 +984,7 @@ def test_normal_layer_column_1_playing_with_metronome():
 def test_normal_layer_column_15(track_control, blinking):
     frame = session.render(mode(track_control), SNAP)
     assert all(frame[(15, p)] == Light(CYAN) for p in range(1, 5))
-    assert frame[(15, 5)] == Light(OFF)
+    assert frame[(15, 5)] == Light(WHITE)  # S-59
     colours = {6: ORANGE, 7: BLUE, 8: RED}
     for pad, colour in colours.items():
         blink = Blink.TEMPO if pad == blinking else Blink.STEADY

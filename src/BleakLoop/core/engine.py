@@ -1,6 +1,6 @@
 """handle() and render(): all behaviour, no side effects."""
 
-from . import layout, modes, session
+from . import layout, mixer, modes, session
 from .leds import OFF, WHITE, Light
 from .model import ControlCC, EnterMode
 from .modes import Mode
@@ -22,6 +22,13 @@ def _handle_note(state, event):
     if event.cc == SESSION_MODE_CC:
         return modes.enter(state, Mode.SESSION), [EnterMode(Mode.SESSION)]  # S-85
     return state, []
+
+
+def tick(state, now_ms):
+    # The fader glide on the 10 ms timer (S-72): no snapshot, and a redraw flag.
+    if not state.glides and not state.lifts:
+        return state, [], False
+    return mixer.tick(state, now_ms)
 
 
 def render(state, snapshot):

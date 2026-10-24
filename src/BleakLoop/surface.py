@@ -15,12 +15,13 @@ from ableton.v3.control_surface import (
 from . import device, live_actions, live_state
 from .core import engine, layout, values
 from .core.leds import Clock, phase_key
-from .core.model import ControlCC, PadPress
+from .core.model import ControlCC, PadPress, YAxis
 from .core.modes import Mode, State
 
 logger = logging.getLogger(__name__)
 
 CONTROL_CCS = range(1, 9)
+Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column (S-4)
 
 
 class Elements(ElementsBase):
@@ -31,6 +32,13 @@ class Elements(ElementsBase):
             for column in range(layout.COLUMNS):
                 self.add_button(
                     column, f"Pad {row} {column}", channel=row, msg_type=MIDI_NOTE_TYPE
+                )
+        # Y-axis values in Mixer Mode: CC 64 + column on the row's channel (S-4). Every
+        # column is claimed so stray Y reports outside the faders don't reach Live's tracks.
+        for row in range(layout.ROWS):
+            for column in range(layout.COLUMNS):
+                self.add_button(
+                    Y_AXIS_CC_BASE + column, f"Y {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
         # Note Mode control split: CC 1-8 on the control channel (S-5). Plain CC buttons:
         # encoders reset the device's toggles to 0 and Live drops their repeated values.
@@ -91,6 +99,8 @@ class BleakLoop(ControlSurface):
         if self._timer is not None:
             self._timer.stop()
             self._timer = None
+        if self._state.undo_open:
+            self.song.end_undo_step()
         # S-6: hand the device back for playing.
         self._send(
             device.y_axis(False)
@@ -104,6 +114,14 @@ class BleakLoop(ControlSurface):
 
     def _on_blink_timer(self):
         try:
+            if self._state.glides or self._state.lifts:
+                # S-72: the fader glide; a full redraw only when a lit height changes.
+                state, actions, redraw = engine.tick(self._state, time.monotonic() * 1000)
+                self._state = state
+                for action in actions:
+                    live_actions.apply(action, self.song, self)
+                if redraw:
+                    self._refresh()
             transport = live_state.read_transport(self.song, Live.Application.get_application())
             key = phase_key(self._clock(transport))
             if key != self._phase:
@@ -124,6 +142,11 @@ class BleakLoop(ControlSurface):
         self._driver.reset()  # S-94
         self._refresh()
 
+    def set_mixer(self, on):
+        # S-70: one burst, no driver reset; _handle's refresh sends only the changed pads.
+        self._send(device.y_axis(on))
+        self._listen_for(Mode.SESSION)
+
     def _listen_for(self, mode):
         self._remove_listeners()
         if mode is Mode.SESSION:
@@ -133,6 +156,13 @@ class BleakLoop(ControlSurface):
                     self._add_listener(
                         element, lambda v, c=column, r=row: self._on_pad(c, r, v)
                     )
+            if self._state.mixer:
+                for row in range(layout.ROWS):
+                    for column in range(layout.COLUMNS):
+                        element = getattr(self.elements, f"y_{row}_{column}")
+                        self._add_listener(
+                            element, lambda v, c=column, r=row: self._on_y_axis(c, r, v)
+                        )
         else:
             for number in CONTROL_CCS:
                 element = getattr(self.elements, f"control_{number}")
@@ -152,6 +182,11 @@ class BleakLoop(ControlSurface):
 
     def _on_pad(self, column, row, value):
         self._handle(PadPress(column, layout.pad_of(row), value > 0))
+
+    def _on_y_axis(self, column, row, value):
+        # Only the fader columns use Y; the rest are claimed and dropped.
+        if column in layout.GRID_COLUMNS:
+            self._handle(YAxis(column, layout.pad_of(row), value))
 
     def _on_control(self, number, value):
         self._handle(ControlCC(number, value))

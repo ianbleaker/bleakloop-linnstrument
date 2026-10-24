@@ -87,6 +87,7 @@ def _track(index, track, rows):
         solo=track.solo,
         has_midi_input=track.has_midi_input,
         is_foldable=track.is_foldable,
+        volume=track.mixer_device.volume.value,
         slots=tuple(_slot(slots[scene]) for scene in rows),
     )
 

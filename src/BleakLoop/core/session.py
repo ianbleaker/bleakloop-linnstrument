@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import controls, layout, modes
+from . import controls, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -42,6 +42,7 @@ from .model import (
     ToggleMute,
     TogglePlay,
     ToggleSolo,
+    YAxis,
 )
 from .modes import ClipSource, Mode, SceneSource, TrackControl
 from .values import TEMPO_MAX, TEMPO_MIN
@@ -86,6 +87,8 @@ def handle(state, event, snapshot):
             state.window, event.scene, snapshot.track_count, snapshot.scene_count
         )
         return replace(state, window=window), []
+    if isinstance(event, YAxis):
+        return mixer.y_axis(state, event)
     # Column 1 CCs are ignored in Session Mode (S-76).
     if not isinstance(event, PadPress):
         return state, []
@@ -104,6 +107,9 @@ def handle(state, event, snapshot):
         if state.mixer:
             return state, []  # S-104
         return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
+    if state.mixer and event.column in layout.GRID_COLUMNS:
+        # Every pad is the fader, pad 8 included; releases matter too (S-72).
+        return mixer.press(state, event, snapshot)
     if not event.pressed:
         return state, []
     # Copy over Delete over Shift (S-27, S-103).
@@ -150,7 +156,8 @@ def _column_1(state, pad, snapshot):
     if key == layout.RECORD:
         return state, controls.record(snapshot)  # S-54, S-55
     if key == layout.MODE_PAD:
-        return modes.enter(state, Mode.NOTE), [EnterMode(Mode.NOTE)]  # S-56
+        state, actions = mixer.reset(state)
+        return modes.enter(state, Mode.NOTE), actions + [EnterMode(Mode.NOTE)]  # S-56
     return state, []
 
 
@@ -326,6 +333,8 @@ def _column_15(state, key, snapshot):
         return state, []
     if key in layout.FIXED_LENGTH_PADS:
         return _fixed_length(state, layout.FIXED_LENGTH_PADS[key])  # S-57
+    if key == layout.MIXER:
+        return mixer.toggle(state)  # S-59
     if key in layout.TRACK_CONTROL_PADS:
         mode = TrackControl[layout.TRACK_CONTROL_PADS[key]]
         message = ShowMessage(f"Track Control: {TRACK_CONTROL_NAMES[mode]}")
@@ -364,6 +373,10 @@ def render(state, snapshot):
     }
     for column in layout.GRID_COLUMNS:
         track = _track(column, snapshot)
+        if state.mixer:
+            if not shift_layer:
+                _render_fader(frame, column, track)  # S-73; dark under Shift (S-104)
+            continue
         for pad in range(1, layout.ROWS):
             frame[(column, pad)] = _slot_light(track, pad - 1)
         frame[(column, layout.ROWS)] = _track_switch_light(state, shift_layer, track)
@@ -396,6 +409,14 @@ def _render_copy_source(frame, state):
         pad = source.scene - window.scene + 1
         if 1 <= pad < layout.ROWS:
             frame[(layout.SCENE_COLUMN, pad)] = Light(RED, Blink.FAST)
+
+
+def _render_fader(frame, column, track):
+    # S-73: a bar in the track's colour from pad 8 up to the pad nearest Live's volume.
+    if track is None:
+        return
+    for pad in range(mixer.lit_pad(track.volume), layout.ROWS + 1):
+        frame[(column, pad)] = Light(track_colour(track.colour))
 
 
 def _slot_light(track, row):
@@ -435,6 +456,7 @@ def _render_normal_layer(frame, state, snapshot):
     frame[layout.PLAY_STOP] = controls.play_light(snapshot)  # S-52
     frame[layout.RECORD] = controls.record_light(snapshot)  # S-54, S-55
     frame[layout.MODE_PAD] = Light(WHITE)  # S-56
+    frame[layout.MIXER] = Light(WHITE, Blink.FAST if state.mixer else Blink.STEADY)  # S-59, S-75
     for key, bars in layout.FIXED_LENGTH_PADS.items():
         blink = Blink.FAST if bars == state.fixed_length else Blink.STEADY
         frame[key] = Light(CYAN, blink)  # S-57

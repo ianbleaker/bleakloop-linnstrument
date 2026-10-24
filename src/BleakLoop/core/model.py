@@ -26,6 +26,7 @@ class TrackView:
     solo: bool = False
     has_midi_input: bool = False
     is_foldable: bool = False  # a group track: its slots can't hold clips
+    volume: float = 0.0  # Live's volume control position
     slots: tuple = ()  # one SlotView per window row that exists, top first
 
 
@@ -81,6 +82,14 @@ class PadPress:
 @dataclass(frozen=True)
 class ControlCC:
     cc: int
+    value: int
+
+
+@dataclass(frozen=True)
+class YAxis:
+    # Y position within a pressed pad, 0 at the near edge to 127 at the far edge (S-4).
+    column: int
+    pad: int
     value: int
 
 
@@ -229,6 +238,27 @@ class SetArrangementRecord:
 
 @dataclass(frozen=True)
 class ClearBackToArrangement:
+    pass
+
+
+@dataclass(frozen=True)
+class SetVolume:
+    track: int
+    value: float
+
+
+@dataclass(frozen=True)
+class SetMixer:
+    on: bool
+
+
+@dataclass(frozen=True)
+class BeginUndoStep:
+    pass
+
+
+@dataclass(frozen=True)
+class EndUndoStep:
     pass
 
 

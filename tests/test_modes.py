@@ -2,7 +2,16 @@ import pytest
 
 from BleakLoop.core import modes
 from BleakLoop.core.layout import Window
-from BleakLoop.core.modes import ClipSource, Mode, SceneSource, State, TrackControl
+from BleakLoop.core.modes import (
+    ClipSource,
+    Glide,
+    Lift,
+    Mode,
+    SceneSource,
+    State,
+    Touch,
+    TrackControl,
+)
 
 
 def test_entering_session_resets():
@@ -44,3 +53,22 @@ def test_entry_clears_copy_and_delete(start, target, source):
 @pytest.mark.parametrize("start, target", [(Mode.SESSION, Mode.NOTE), (Mode.NOTE, Mode.SESSION)])
 def test_entry_keeps_fixed_length(start, target):
     assert modes.enter(State(mode=start, fixed_length=4), target).fixed_length == 4
+
+
+@pytest.mark.parametrize("start, target", [(Mode.SESSION, Mode.NOTE), (Mode.NOTE, Mode.SESSION)])
+def test_entry_clears_fader_state(start, target):
+    state = State(
+        mode=start,
+        mixer=True,
+        touches=(Touch(2, 0, 3, 0.5),),
+        lifts=(Lift(3, 1, 4),),
+        glides=(Glide(0, 0.5, 0.6),),
+        glide_ms=123.0,
+        undo_open=True,
+    )
+    entered = modes.enter(state, target)
+    assert entered.touches == ()
+    assert entered.lifts == ()
+    assert entered.glides == ()
+    assert entered.glide_ms is None
+    assert not entered.undo_open

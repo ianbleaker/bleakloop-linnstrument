@@ -5,12 +5,14 @@ import Live
 from . import live_state
 from .core.model import (
     ArmExclusive,
+    BeginUndoStep,
     CaptureAndInsertScene,
     ClearBackToArrangement,
     CopyClip,
     CopyScene,
     DeleteClip,
     DeleteScene,
+    EndUndoStep,
     EnterMode,
     FireScene,
     FireSlot,
@@ -20,8 +22,10 @@ from .core.model import (
     SelectTrack,
     SetArrangementRecord,
     SetLaunchQuantization,
+    SetMixer,
     SetSessionRecord,
     SetTempo,
+    SetVolume,
     ShowClip,
     ShowMessage,
     StopAllClips,
@@ -111,6 +115,17 @@ def apply(action, song, surface):
         song.record_mode = action.on
     elif isinstance(action, ClearBackToArrangement):
         song.back_to_arranger = False
+    elif isinstance(action, SetVolume):
+        # The track list can change mid-glide: a track that's gone is skipped.
+        if action.track < len(song.visible_tracks):
+            param = song.visible_tracks[action.track].mixer_device.volume
+            param.value = min(max(action.value, param.min), param.max)
+    elif isinstance(action, BeginUndoStep):
+        song.begin_undo_step()
+    elif isinstance(action, EndUndoStep):
+        song.end_undo_step()
+    elif isinstance(action, SetMixer):
+        surface.set_mixer(action.on)
     elif isinstance(action, ShowMessage):
         surface.show_message(action.text)
     else:

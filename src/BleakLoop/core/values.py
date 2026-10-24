@@ -29,3 +29,19 @@ TRACK_COLOUR_REFERENCES = (
 # Tempo limits for Shift + column 15 pads 7 and 8 (S-62).
 TEMPO_MIN = 20
 TEMPO_MAX = 999
+
+# Live volume control position for 0 dB (S-71, S-72).
+VOLUME_ZERO_DB = 0.85
+
+# Top of Live's volume range, +6 dB (S-72).
+VOLUME_MAX = 1.0
+
+# Fader glide: max move of the volume range per 10 ms, scaled by elapsed time (S-72).
+GLIDE_STEP = 0.018
+
+# Fader glide dead band: 0.3 % of the volume range (S-72).
+GLIDE_DEAD_BAND = 0.003
+
+# Fader continuation: a press next to a just-released pad within this time continues the
+# gesture (S-72).
+CONTINUE_MS = 600
