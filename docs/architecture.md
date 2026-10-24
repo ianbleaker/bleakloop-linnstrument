@@ -159,7 +159,7 @@ Also found:
 - **Pad orientation** matches S-2 for both presses and lights: channel 1 and CC 21 = 0 are the nearest row.
 - **Control split pads are toggles** (S-5, S-76): each press sends one CC, alternating 127 and 0, and a release sends nothing (firmware 2.3.4, `ls_faders.ino`; confirmed on device in #7). The spike's "127 on press, 0 on release" was a misreading.
 - **Column 0 is the hardware panel.** BleakLoop ignores it (S-11 removed, S-113).
-- **The split setup can be sent in one go.** Pacing (one NRPN per tick) was a workaround for the optimised-send fault and isn't needed: a burst changed the split point at once.
+- **The split setup is paced, one NRPN per display tick.** A single burst changed the split point at once, but the device drops a block of about 16–19 messages from its middle: fader 5 then took NRPN 47's value (CC 8) and faders 6–8 kept their old CCs (#18).
 
 ### #4 device checks
 
@@ -249,4 +249,4 @@ Run on a LinnStrument 128 and Live 12 against Note Mode column 1 (#6). Every mec
 
 Also found:
 
-- **Pad 4 was assigned CC 8, the same as pad 1.** Pressing pad 4 then sent Undo's CC. The firmware also links fader rows that share a CC, so sliding on pad 1 moved pad 4 (`ls_faders.ino`). Fixing the assignment on the device with Live closed worked, but it was CC 8 again after Live started. `device.split_setup()` sends NRPN 44 = 5 for that row, and the firmware applies NRPNs 40–47 to rows 0–7 in that order, so the cause is still open (follow-up).
+- **Pad 4 was assigned CC 8, the same as pad 1.** Pressing pad 4 then sent Undo's CC. The firmware also links fader rows that share a CC, so sliding on pad 1 moved pad 4 (`ls_faders.ino`). Fixing the assignment on the device with Live closed worked, but it was CC 8 again after Live started. `device.split_setup()` sends NRPN 44 = 5 for that row, and the firmware applies NRPNs 40–47 to rows 0–7 in that order, Cause: the device dropped part of the setup burst, now paced (#18).

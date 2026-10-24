@@ -29,11 +29,11 @@ def test_y_axis_off_on_all_rows():
 
 
 def test_split_setup():
-    messages = device.split_setup()
-    assert len(messages) == 78
-    assert messages[:6] == device.nrpn(200, 1)
-    assert device.nrpn(1, 1) == messages[18:24]  # main channel 1
-    assert messages[-6:] == device.nrpn(47, 8)
+    steps = device.split_setup()
+    assert len(steps) == 13
+    assert steps[0] == device.nrpn(200, 1)
+    assert steps[3] == device.nrpn(1, 1)  # main channel 1
+    assert steps[-1] == device.nrpn(47, 8)
 
 
 def frame(mode_colour=WHITE):

@@ -60,7 +60,7 @@ class BleakLoop(ControlSurface):
         self._state = State()
         self._driver = device.LedDriver()
         self._listeners = []
-        self._setup_sent = False
+        self._setup = None  # NRPNs still to send, one per tick (S-5)
         self._started = False
         self._timer = None
         self._phase = None
@@ -81,12 +81,15 @@ class BleakLoop(ControlSurface):
         if self._started:
             self._check_pending_clip()
             self._refresh()
-        elif not self._setup_sent:
-            self._setup_sent = True
+        elif self._setup is None:
             logger.info("BleakLoop loaded")
-            self._send(device.user_firmware_mode(False) + device.split_setup())  # S-5
+            self._setup = [device.user_firmware_mode(False)] + device.split_setup()  # S-5
+            self._send(self._setup.pop(0))
+        elif self._setup:
+            # One NRPN per tick: the device drops a block from the middle of a burst (#18).
+            self._send(self._setup.pop(0))
         else:
-            # One tick after the split burst: the device drops what follows it at once.
+            # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
             self.enter_mode(Mode.SESSION)  # S-7
             # S-92: the display tick alone would land tempo blinks up to 100 ms late.

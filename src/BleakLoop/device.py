@@ -46,6 +46,7 @@ def y_axis(on):
 
 
 def split_setup():
+    # One message list per NRPN, for pacing (architecture section 9).
     settings = [
         (200, 1),  # split on
         (202, SPLIT_POINT),  # left split is column 1
@@ -53,7 +54,7 @@ def split_setup():
         (1, CONTROL_CHANNEL + 1),  # left split main channel
         (35, 2),  # left split special mode: CC Faders
     ] + [(40 + i, 1 + i) for i in range(8)]  # faders 1-8 send CC 1-8
-    return [m for number, value in settings for m in nrpn(number, value)]
+    return [nrpn(number, value) for number, value in settings]
 
 
 class LedDriver:
