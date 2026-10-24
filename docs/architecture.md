@@ -54,7 +54,7 @@ src/BleakLoop/
     controls.py        shared Session and Note Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights
     session.py         clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table (S-18–S-69)
     mixer.py           Mixer toggle, coarse steps, bands, smoothing (S-70–S-75)
-    note_mode.py       (planned, #5, #6) column 1 CC handling (S-76–S-86)
+    note_mode.py       column 1 controls page and scene page (S-76–S-86, S-106–S-108)
     leds.py            device colours, track colour matching, tempo and fast blink (S-87–S-91)
     values.py          every value in the register below, by name
     engine.py          handle() and render(), composing the modules above
@@ -100,6 +100,8 @@ tests/                 pytest, core only
 | Record pad (S-54, S-55) | Session View: toggle `song.session_record`. Arrangement View: clear `song.back_to_arranger` if set, then toggle `song.record_mode`. |
 | Track volume (S-71, S-72) | Read and set `track.mixer_device.volume.value`, clamped to the parameter's `min`/`max`. A glide for a track index that no longer exists is skipped. |
 | Fader gesture undo (S-72) | `song.begin_undo_step()` on the first coarse press and `song.end_undo_step()` once no touch, continuation window or glide is left, so one gesture is one undo step. The core tracks the open step (`State.undo_open`); leaving Mixer Mode and unload close it. |
+| Record Clip (S-78) | `live_state` reads the selected track (`song.view.selected_track`, only if it's in `song.visible_tracks`) and every scene of its slots, plus `song.view.selected_scene`, only in Note Mode. The core searches from the highlighted scene down, wrapping. When no slot is empty, `song.create_scene(-1)` runs before `FireSlot`: actions resolve their slot when applied, so the new scene exists by then. |
+| Capture MIDI (S-79) | `song.capture_midi()` with no argument, only when `song.can_capture_midi` is true; otherwise the core posts "Nothing to capture". |
 
 ## 7. Requirement map (proposed)
 
@@ -228,3 +230,23 @@ Device facts from the event log (one slow-slide session):
 - **Y is relative to the touch point.** Every press reports 64 first, after the note-on. Y swings to 127 or 0 over about half a pad and then stays there until the release (170–650 ms of saturation).
 - **Y is dense:** a report every 10–20 ms, 1–3 units apart. That isn't the spike's 4–10 reports per slide.
 - **A still finger rolls.** Y went from 64 to about 85 within 100 ms of a press, and drifted further over seconds.
+
+### #6 device checks
+
+Run on a LinnStrument 128 and Live 12 against Note Mode column 1 (#6). Every mechanism below passed, and the filtered log showed no tracebacks.
+
+| Mechanism | Result |
+| --- | --- |
+| Record Clip: search from `song.view.selected_scene`, `ClipSlot.fire(record_length=…)`, Detail view | Pass. Records into the next empty slot, Fixed Length applies, and Note Mode stays on. |
+| Record Clip, new scene: `song.create_scene(-1)` then `FireSlot` | Pass. The scene is added at the end and recording starts in it. |
+| Record Clip refusals | Pass: master, group track and unarmed audio track. |
+| Capture MIDI: `song.can_capture_midi`, `song.capture_midi()` | Pass. The no-argument call works: a clip with the played notes appears. |
+| Pad 6: `Track.stop_all_clips()` in Session View, transport in Arrangement View | Pass, including "No selected track" with master selected. |
+| Scene page: `Scene.fire()` from the Session window | Pass. Lights as S-68, a dark pad does nothing, and pad 8 returns without launching. |
+| Controls page lights | Pass. Lime (pad 3) looks yellow, and green (pad 6) looks lime, as noted in #10 for #9. |
+| Round trip and pass-through | Pass. Note Mode always starts on the controls page, and the instrument keeps playing. |
+| Capture MIDI with nothing to capture | Pass. A second press with nothing new played posts "Nothing to capture". |
+
+Also found:
+
+- **Pad 4 was assigned CC 8, the same as pad 1.** Pressing pad 4 then sent Undo's CC. The firmware also links fader rows that share a CC, so sliding on pad 1 moved pad 4 (`ls_faders.ino`). Fixing the assignment on the device with Live closed worked, but it was CC 8 again after Live started. `device.split_setup()` sends NRPN 44 = 5 for that row, and the firmware applies NRPNs 40–47 to rows 0–7 in that order, so the cause is still open (follow-up).

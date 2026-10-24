@@ -25,6 +25,17 @@ def test_pad_of_rejects_bad_row(row):
         layout.pad_of(row)
 
 
+def test_control_pad():
+    assert layout.control_pad(1) == 8
+    assert layout.control_pad(8) == 1
+
+
+@pytest.mark.parametrize("cc", [0, 9])
+def test_control_pad_rejects_bad_cc(cc):
+    with pytest.raises(ValueError):
+        layout.control_pad(cc)
+
+
 def test_move_up_and_left_from_origin_stays():
     origin = layout.Window()
     assert layout.move_window(origin, 0, -1, 20, 20) == origin

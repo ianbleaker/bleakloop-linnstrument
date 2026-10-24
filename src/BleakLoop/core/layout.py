@@ -15,9 +15,11 @@ WINDOW_SCENES = 7
 # (column, pad)
 UNDO = (1, 1)
 COPY = (1, 2)
+RECORD_CLIP = COPY  # pad 2's Note Mode function (S-78)
 CAPTURE = (1, 3)
 QUANTIZE = CAPTURE  # pad 3's Shift function (S-48)
 DELETE = (1, 4)
+SCENE_PAGE = DELETE  # pad 4's Note Mode function (S-106)
 METRONOME = (1, 5)
 LAUNCH_QUANTIZATION = METRONOME  # pad 5's Shift function (S-51)
 PLAY_STOP = (1, 6)
@@ -53,6 +55,11 @@ def pad_of(device_row):
     if not 0 <= device_row < ROWS:
         raise ValueError(f"device row out of range: {device_row}")
     return ROWS - device_row
+
+
+def control_pad(cc):
+    # Note Mode column 1: CC 1 is the nearest row, device row 0 (S-5).
+    return pad_of(cc - 1)
 
 
 @dataclass(frozen=True)

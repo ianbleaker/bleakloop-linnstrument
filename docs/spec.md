@@ -200,17 +200,17 @@ In Note Mode the device is an instrument again. BleakLoop only listens to column
 
 - **S-76** Each column 1 CC counts as one press of its pad, whatever its value (S-5). Because every value counts, the device's stored toggle values never matter. Column 1 CCs that arrive while in Session Mode are ignored.
 - **S-77** Pad 1 (CC 8): Undo. Colour: white.
-- **S-78** Pad 2 (CC 7): Record Clip. On the selected track, start recording into the next empty slot, searching from the highlighted scene downward and then wrapping to the top. If the track has no empty slot, a new scene is added at the end and used. Fixed Length applies (S-30), and the clip is shown in the Detail view. If the selected track is the master or a return track (not in the track list), nothing is recorded and BleakLoop posts "no selected track". Colour: magenta.
-- **S-79** Pad 3 (CC 6): Live's Capture MIDI. Colour: lime.
+- **S-78** Pad 2 (CC 7): Record Clip. On the selected track, start recording into the next empty slot, searching from the highlighted scene downward and then wrapping to the top (the highlighted scene itself is the first candidate). If the track has no empty slot, a new scene is added at the end and used. Fixed Length applies (S-30), and the clip is shown in the Detail view. If the selected track isn't in the track list (the master, a return track, or a track inside a folded group), nothing is recorded and BleakLoop posts "no selected track". If the selected track is a group track, BleakLoop posts "cannot record on a group track"; if it isn't armed (directly or by selection), it posts "track not armed". Neither records anything. Colour: magenta.
+- **S-79** Pad 3 (CC 6): Live's Capture MIDI. Colour: lime. If there is nothing to capture, BleakLoop posts "nothing to capture".
 - **S-80** *(Removed: Note Mode delete clip. Pad 4 opens the scene page instead (S-106). Clips can still be deleted from Session Mode.)*
 - **S-81** Pad 5 (CC 4): toggle the metronome. Colour: orange, fast blink while on.
-- **S-82** Pad 6 (CC 3), when Live's Session View is showing: stop all clips on the selected track. Colour: green.
+- **S-82** Pad 6 (CC 3), when Live's Session View is showing: stop all clips on the selected track. Colour: green. If the selected track isn't in the track list, BleakLoop posts "no selected track".
 - **S-83** Pad 6 when Live's Arrangement View is showing: start or stop the transport. Colour: blue while stopped, green tempo blink while playing.
 - **S-84** Pad 7 (CC 2): record, behaving and lit exactly as described in S-54 and S-55.
 - **S-85** Pad 8 (CC 1): switch to Session Mode. Colour: white.
 - **S-86** Column 1's lights keep updating in Note Mode, and both blink styles keep running there.
 - **S-106** Pad 4 (CC 5) on the controls page: switch column 1 to the scene page. Colour: pink. Every entry into Note Mode starts on the controls page.
-- **S-107** On the scene page, pads 1–7 launch the scenes on rows 1–7 of the Session Mode window, using Live's launch quantization. After a launch, column 1 returns to the controls page. Colours as S-68, without the copy-source state.
+- **S-107** On the scene page, pads 1–7 launch the scenes on rows 1–7 of the Session Mode window, using Live's launch quantization. After a launch, column 1 returns to the controls page. Colours as S-68, without the copy-source state. A pad past the end of the Set is dark and does nothing, and the page stays open.
 - **S-108** On the scene page, pad 8 (CC 1) returns to the controls page without launching anything. Colour: white.
 
 ## 8. LEDs and blinking

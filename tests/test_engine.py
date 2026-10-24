@@ -1,7 +1,6 @@
 import pytest
 
 from BleakLoop.core import engine, layout
-from BleakLoop.core.leds import OFF, WHITE, Light
 from BleakLoop.core.model import ControlCC, EnterMode, PadPress, Snapshot
 from BleakLoop.core.modes import Mode, State
 
@@ -43,10 +42,10 @@ def test_cc1_any_value_enters_session(value):
     assert actions == [EnterMode(Mode.SESSION)]
 
 
-@pytest.mark.parametrize("cc", range(2, 9))
-@pytest.mark.parametrize("value", [127, 0])
-def test_other_ccs_do_nothing(cc, value):
-    assert engine.handle(NOTE, ControlCC(cc, value), STOPPED) == (NOTE, [])
+def test_note_input_goes_to_note_module():
+    state, actions = engine.handle(NOTE, ControlCC(5, 0), STOPPED)
+    assert state.scene_page
+    assert actions == []
 
 
 @pytest.mark.parametrize("key", [layout.MODE_PAD, layout.METRONOME, (5, 5)])
@@ -63,11 +62,8 @@ def test_session_render_goes_to_session_module():
     }
 
 
-def test_note_frame():
-    frame = engine.render(NOTE, PLAYING)
-    assert set(frame) == {(1, p) for p in range(1, 9)}
-    assert frame[(1, 8)] == Light(WHITE)
-    assert all(frame[(1, p)] == Light(OFF) for p in range(1, 8))
+def test_note_render_goes_to_note_module():
+    assert set(engine.render(NOTE, PLAYING)) == {(1, p) for p in range(1, 9)}
 
 
 # Blink clock

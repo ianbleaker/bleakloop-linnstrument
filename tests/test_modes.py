@@ -72,3 +72,8 @@ def test_entry_clears_fader_state(start, target):
     assert entered.glides == ()
     assert entered.glide_ms is None
     assert not entered.undo_open
+
+
+@pytest.mark.parametrize("start, target", [(Mode.SESSION, Mode.NOTE), (Mode.NOTE, Mode.SESSION)])
+def test_entry_starts_on_controls_page(start, target):
+    assert modes.enter(State(mode=start, scene_page=True), target).scene_page is False

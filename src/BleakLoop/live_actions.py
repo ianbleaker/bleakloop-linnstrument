@@ -4,9 +4,11 @@ import Live
 
 from . import live_state
 from .core.model import (
+    AddScene,
     ArmExclusive,
     BeginUndoStep,
     CaptureAndInsertScene,
+    CaptureMidi,
     ClearBackToArrangement,
     CopyClip,
     CopyScene,
@@ -106,6 +108,10 @@ def apply(action, song, surface):
     elif isinstance(action, CaptureAndInsertScene):
         song.capture_and_insert_scene()
         return SceneSelected(list(song.scenes).index(song.view.selected_scene))
+    elif isinstance(action, CaptureMidi):
+        song.capture_midi()
+    elif isinstance(action, AddScene):
+        song.create_scene(-1)
     elif isinstance(action, QuantizeClip):
         clip = live_state.candidate_clip(song, action.target)
         clip.quantize(Live.Song.RecordingQuantization.rec_q_sixtenth, 1.0)

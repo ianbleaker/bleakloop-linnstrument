@@ -240,6 +240,7 @@ class BleakLoop(ControlSurface):
             Live.Application.get_application(),
             self._state.window,
             scene_clips=self._state.copy,
+            selected=self._state.mode is Mode.NOTE,
         )
 
     def _update_ring(self, force=False):

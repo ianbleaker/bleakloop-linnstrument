@@ -77,6 +77,7 @@ class State:
     glides: tuple = ()  # Glide per track
     glide_ms: float | None = None  # time of the last glide step, None when none is moving
     undo_open: bool = False  # a fader gesture's undo step is open in Live
+    scene_page: bool = False  # Note Mode column 1 shows the scene page (S-106)
 
 
 def enter(state, mode):
@@ -96,6 +97,7 @@ def enter(state, mode):
         glides=(),
         glide_ms=None,
         undo_open=False,
+        scene_page=False,
     )
     if mode is Mode.SESSION:
         state = replace(state, track_control=TrackControl.ARM)

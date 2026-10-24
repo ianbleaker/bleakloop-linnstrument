@@ -35,6 +35,16 @@ class ClipView:
     is_midi: bool
 
 
+@dataclass(frozen=True)
+class SelectedTrack:
+    # Live's selected track, which may be outside the window (S-78, S-82).
+    index: int  # position in the track list
+    name: str = ""
+    armed: bool = False  # can_be_armed and (arm or implicit_arm)
+    is_foldable: bool = False
+    clips: tuple = ()  # one bool per scene in the Set, true if that slot has a clip
+
+
 class ClipTarget(enum.Enum):
     # The quantize candidates, in S-48 order.
     HIGHLIGHTED = enum.auto()
@@ -67,6 +77,10 @@ class Snapshot:
     # One bool per window row that exists, true if any track in the Set has a clip there.
     # Read only while Copy is held.
     scene_clips: tuple = ()
+    # Read only in Note Mode. None when the selected track isn't in the track list.
+    selected_track: SelectedTrack | None = None
+    selected_scene: int = 0  # Live's highlighted scene
+    can_capture_midi: bool = False
 
 
 # Events
@@ -218,6 +232,17 @@ class DeleteScene:
 
 @dataclass(frozen=True)
 class CaptureAndInsertScene:
+    pass
+
+
+@dataclass(frozen=True)
+class CaptureMidi:
+    pass
+
+
+@dataclass(frozen=True)
+class AddScene:
+    # Adds a scene at the end of the Set.
     pass
 
 
