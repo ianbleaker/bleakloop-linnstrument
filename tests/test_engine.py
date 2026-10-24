@@ -1,15 +1,8 @@
 import pytest
 
 from BleakLoop.core import engine, layout
-from BleakLoop.core.leds import BLUE, GREEN, OFF, ORANGE, WHITE, Blink, Light
-from BleakLoop.core.model import (
-    ControlCC,
-    EnterMode,
-    PadPress,
-    Snapshot,
-    ToggleMetronome,
-    TogglePlay,
-)
+from BleakLoop.core.leds import OFF, WHITE, Light
+from BleakLoop.core.model import ControlCC, EnterMode, PadPress, Snapshot
 from BleakLoop.core.modes import Mode, State
 
 STOPPED = Snapshot(
@@ -34,44 +27,10 @@ def test_default_state_is_session():
     assert State().mode is Mode.SESSION
 
 
-def test_mode_pad_enters_note():
+def test_session_input_goes_to_session_module():
     state, actions = engine.handle(SESSION, press(layout.MODE_PAD), STOPPED)
     assert state.mode is Mode.NOTE
     assert actions == [EnterMode(Mode.NOTE)]
-
-
-def test_metronome_pad():
-    assert engine.handle(SESSION, press(layout.METRONOME), STOPPED) == (
-        SESSION,
-        [ToggleMetronome()],
-    )
-
-
-def test_play_stop_pad():
-    assert engine.handle(SESSION, press(layout.PLAY_STOP), STOPPED) == (
-        SESSION,
-        [TogglePlay()],
-    )
-
-
-@pytest.mark.parametrize("key", [layout.MODE_PAD, layout.METRONOME, layout.PLAY_STOP])
-def test_session_release_does_nothing(key):
-    assert engine.handle(SESSION, press(key, pressed=False), STOPPED) == (SESSION, [])
-
-
-@pytest.mark.parametrize("pad", range(1, 9))
-def test_column_0_does_nothing(pad):
-    assert engine.handle(SESSION, press((0, pad)), STOPPED) == (SESSION, [])
-
-
-@pytest.mark.parametrize("key", [(1, 1), (1, 7), (2, 1), (8, 8), (16, 8)])
-def test_other_pads_do_nothing(key):
-    assert engine.handle(SESSION, press(key), STOPPED) == (SESSION, [])
-
-
-@pytest.mark.parametrize("cc", range(1, 9))
-def test_session_ignores_control_cc(cc):
-    assert engine.handle(SESSION, ControlCC(cc, 127), STOPPED) == (SESSION, [])
 
 
 # Note Mode input
@@ -80,7 +39,7 @@ def test_session_ignores_control_cc(cc):
 @pytest.mark.parametrize("value", [127, 0])
 def test_cc1_any_value_enters_session(value):
     state, actions = engine.handle(NOTE, ControlCC(1, value), STOPPED)
-    assert state.mode is Mode.SESSION
+    assert state == State(mode=Mode.SESSION)
     assert actions == [EnterMode(Mode.SESSION)]
 
 
@@ -98,24 +57,10 @@ def test_note_ignores_pads(key):
 # Rendering
 
 
-def test_session_frame_keys():
-    frame = engine.render(SESSION, STOPPED)
-    assert set(frame) == {(c, p) for c in range(1, 17) for p in range(1, 9)}
-
-
-def test_session_frame_stopped():
-    frame = engine.render(SESSION, STOPPED)
-    assert frame[layout.METRONOME] == Light(ORANGE)
-    assert frame[layout.PLAY_STOP] == Light(BLUE)
-    assert frame[layout.MODE_PAD] == Light(WHITE)
-    lit = {layout.METRONOME, layout.PLAY_STOP, layout.MODE_PAD}
-    assert all(light == Light(OFF) for key, light in frame.items() if key not in lit)
-
-
-def test_session_frame_playing_with_metronome():
-    frame = engine.render(SESSION, PLAYING)
-    assert frame[layout.METRONOME] == Light(ORANGE, Blink.FAST)
-    assert frame[layout.PLAY_STOP] == Light(GREEN, Blink.TEMPO)
+def test_session_render_goes_to_session_module():
+    assert set(engine.render(SESSION, STOPPED)) == {
+        (c, p) for c in range(1, 17) for p in range(1, 9)
+    }
 
 
 def test_note_frame():

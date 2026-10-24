@@ -56,6 +56,7 @@ class BleakLoop(ControlSurface):
         self._started = False
         self._timer = None
         self._phase = None
+        self._ring = None  # the last session highlight sent
         super().__init__(*a, specification=Specification, **k)
 
     @staticmethod
@@ -94,11 +95,14 @@ class BleakLoop(ControlSurface):
             + self._driver.release_column_1()
         )
         self._remove_listeners()
+        # After the hand-back: if this raises, the device is already playable.
+        self._c_instance.set_session_highlight(-1, -1, -1, -1, False)  # S-10
         super().disconnect()
 
     def _on_blink_timer(self):
         try:
-            key = phase_key(self._clock(self._snapshot()))
+            transport = live_state.read_transport(self.song, Live.Application.get_application())
+            key = phase_key(self._clock(transport))
             if key != self._phase:
                 self._phase = key
                 self._refresh()
@@ -113,6 +117,7 @@ class BleakLoop(ControlSurface):
         else:
             self._send(device.y_axis(False) + device.user_firmware_mode(False))  # S-13, S-14
         self._listen_for(mode)
+        self._update_ring(force=True)  # S-10, S-15
         self._driver.reset()  # S-94
         self._refresh()
 
@@ -154,12 +159,26 @@ class BleakLoop(ControlSurface):
         self._state = state
         for action in actions:
             live_actions.apply(action, self.song, self)
+        self._update_ring()
         self._refresh()
 
     # Output
 
     def _snapshot(self):
-        return live_state.read(self.song, Live.Application.get_application())
+        return live_state.read(
+            self.song, Live.Application.get_application(), self._state.window
+        )
+
+    def _update_ring(self, force=False):
+        # S-10: the ring follows the window in Session Mode and is gone in Note Mode.
+        if self._state.mode is Mode.SESSION:
+            window = self._state.window
+            want = (window.track, window.scene, layout.WINDOW_TRACKS, layout.WINDOW_SCENES)
+        else:
+            want = (-1, -1, -1, -1)
+        if force or want != self._ring:
+            self._c_instance.set_session_highlight(*want, False)
+            self._ring = want
 
     def _clock(self, snapshot):
         now_ms = time.monotonic() * 1000

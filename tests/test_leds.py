@@ -1,8 +1,12 @@
 import pytest
 
 from BleakLoop.core.leds import (
+    BLUE,
     GREEN,
     OFF,
+    ORANGE,
+    RED,
+    WHITE,
     Blink,
     Clock,
     Light,
@@ -10,6 +14,7 @@ from BleakLoop.core.leds import (
     phase_key,
     resolve,
     tempo_on,
+    track_colour,
 )
 
 
@@ -49,3 +54,19 @@ def test_fast_blink():
 def test_phase_key():
     assert phase_key(LIT) == (True, True)
     assert phase_key(DARK) == (False, False)
+
+
+@pytest.mark.parametrize(
+    "rgb, colour", [(0xFF0000, RED), (0xFFFFFF, WHITE), (0xFF8000, ORANGE), (0x0000FF, BLUE)]
+)
+def test_track_colour_exact(rgb, colour):
+    assert track_colour(rgb) == colour
+
+
+def test_track_colour_nearest():
+    assert track_colour(0xEEEEEE) == WHITE
+
+
+def test_track_colour_tie_goes_to_earlier_entry():
+    # 0xFF4000 is 64 from both red and orange.
+    assert track_colour(0xFF4000) == RED

@@ -3,7 +3,7 @@
 import enum
 from dataclasses import dataclass
 
-from .values import FAST_BLINK_MS
+from .values import FAST_BLINK_MS, TRACK_COLOUR_REFERENCES
 
 # CC 22 colour values (S-87, S-88).
 DEVICE_DEFAULT = 0
@@ -36,6 +36,15 @@ class Light:
 class Clock:
     beats: float
     now_ms: float
+
+
+def track_colour(rgb):
+    # S-89: the nearest reference by squared RGB distance; a tie goes to the earlier entry.
+    r, g, b = (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF
+    return min(
+        TRACK_COLOUR_REFERENCES,
+        key=lambda ref: (ref[1][0] - r) ** 2 + (ref[1][1] - g) ** 2 + (ref[1][2] - b) ** 2,
+    )[0]
 
 
 def tempo_on(beats):

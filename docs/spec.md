@@ -146,7 +146,7 @@ Each of these pads acts on its column's track. Which switch it is (Mute, Solo or
 - **S-40** Mute mode: a press toggles the track's mute. Colour: orange while the track is audible (not muted), lime while muted.
 - **S-41** Mute mode with Shift held: a press stops all clips on that track instead. Shift colour: red.
 - **S-42** Solo mode: a press toggles the track's solo. It has no Shift function. Colour: blue when soloed, lime when not.
-- **S-43** Arm mode: a press selects the track in Live. If the track can be armed, every other armable track is disarmed and this track's arm is toggled. Pressing an armed track therefore disarms it and leaves nothing armed. A track that can't be armed (for example a group) is only selected. It has no Shift function. Colour: red when armed (directly or because selecting it auto-arms it), lime when not.
+- **S-43** Arm mode: a press selects the track in Live. If the track can be armed, every other armable track is disarmed and this track's arm is toggled. Pressing an armed track therefore disarms it and leaves nothing armed. A track that can't be armed (for example a group) is only selected. It has no Shift function. Colour: red when armed (directly or because selecting it auto-arms it), lime when not. The press toggles the track's own arm. A track Live arms because it's selected stays armed while selected, even after its own arm is cleared.
 - **S-44** A column with no track: the pad is off and does nothing.
 
 ### 5.3 Column 1: transport and editing

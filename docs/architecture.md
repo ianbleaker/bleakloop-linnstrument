@@ -1,6 +1,6 @@
 # BleakLoop architecture
 
-How BleakLoop implements `docs/spec.md`. This is the outline. Sections are marked **confirmed** (agreed with the user) or **proposed** (awaiting review). Section 9 records what the device spike found.
+How BleakLoop implements `docs/spec.md`. This is the outline. Sections are marked **confirmed** (agreed with the user) or **proposed** (awaiting review). Section 9 records what the device spike and later device checks found.
 
 ## 1. Constraints
 
@@ -51,9 +51,10 @@ src/BleakLoop/
     layout.py          geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping (S-47, S-58, S-65)
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Note, Note Mode pages, modifiers (S-7–S-16, S-100–S-108, S-112)
-    session.py         (planned, #4–#6) clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table (S-18–S-69)
-    mixer.py           (planned, #4–#6) coarse steps, bands, smoothing (S-70–S-75)
-    note_mode.py       (planned, #4–#6) column 1 CC handling (S-76–S-86)
+    controls.py        shared Session and Note Mode behaviour: undo, metronome, Play/Stop and scene lights
+    session.py         clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table (S-18–S-69)
+    mixer.py           (planned, #5, #6) coarse steps, bands, smoothing (S-70–S-75)
+    note_mode.py       (planned, #5, #6) column 1 CC handling (S-76–S-86)
     leds.py            device colours, track colour matching, tempo and fast blink (S-87–S-91)
     values.py          every value in the register below, by name
     engine.py          handle() and render(), composing the modules above
@@ -72,8 +73,8 @@ tests/                 pytest, core only
 - **LED output.** One "light pad" call sends CC 20, 21 and 22 (S-3). The LED driver in section 3 is the only caller. v3's per-element send cache isn't relied on.
 - **All device output is sent unoptimised** (`_send_midi(..., optimized=False)`). Inside input callbacks Live buffers "optimized" messages and keeps only the last one per status byte and CC number. That collapses LED triples and NRPN sequences to a single message. This cost the spike several runs; it is a hard rule.
 - **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split (S-5, values in section 8), then enters Session Mode. NRPN 245 is sent on entering Session and Note Mode (S-1). On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 (S-6). The device confirms every User Firmware Mode change on channel 9 about 20 ms later (S-99). Drawing doesn't need to wait for it.
-- **Tick.** Two clocks. Live's display callback (a steady 100 ms) reads a snapshot, renders a frame and sends the differences. A `Live.Base.Timer` at 10 ms (measured: about 12 ms on average, 32 ms at worst) checks the blink phases and triggers an extra render when one flips, so tempo blinks land within about one timer period of the beat (S-92). **Risk, first plan item:** the spike only timed the Timer. Sending MIDI and reading Live state from its callback is unverified. The fallback is Live's song-time listener, which fires about every 13 ms while playing.
-- **Session ring.** Live's session highlight is set from the core's window state (S-10).
+- **Tick.** Two clocks. Live's display callback (a steady 100 ms) reads a snapshot, renders a frame and sends the differences. A `Live.Base.Timer` at 10 ms (measured: about 12 ms on average, 32 ms at worst) checks the blink phases and triggers an extra render when one flips, so tempo blinks land within about one timer period of the beat (S-92). Sending MIDI and reading Live state from its callback was confirmed in #3. The timer reads only the transport to check the phases; the full snapshot is read only when a frame is drawn (#4).
+- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 7, False)` draws it from the core's window state whenever the window changes and on every Session entry (S-10, S-15); `(-1, -1, -1, -1, False)` removes it on Note entry and on unload. Confirmed on device (#4). Live picks the ring's colour (green on the test machine), not BleakLoop.
 
 ## 6. Adapters: Live-specific mechanisms (proposed)
 
@@ -105,7 +106,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Fader smoothing: max step about 1.8 % of range per update | S-72 | Tuned | Needed (spike); tune on device |
 | Fader smoothing: ignore changes under about 0.3 % of range | S-72 | Tuned | Needed (spike); tune on device |
 | Fader smoothing: keep moving for up to 3 refresh ticks across a pad gap, slowing | S-72 | Tuned | Needed (spike); tune on device |
-| Track colour reference RGB per device colour | S-89 | Tuned by eye | To be tuned on device |
+| Track colour reference RGB per device colour | S-89 | Tuned by eye | Nominal values; tuning is #9 |
 
 Removed, to be re-added only if the device shows a need:
 
@@ -117,7 +118,9 @@ Removed, to be re-added only if the device shows a need:
 | Relaunch timer to end Fixed Length recordings | S-30 | Live's `ClipSlot.fire(record_length=…)` records a fixed length natively, including from a stopped transport and with quantization None (spike). |
 | "Start Play first" refusal | S-29 | Not needed: Fixed Length works from a stopped transport (spike). |
 
-## 9. Spike results
+## 9. Device check results
+
+### Spike
 
 Run on branch `spike/device-checks` (never merged) against a LinnStrument 128 and Live 12.4.7.
 
@@ -138,3 +141,29 @@ Also found:
 - **Control split pads are toggles** (S-5, S-76): each press sends one CC, alternating 127 and 0, and a release sends nothing (firmware 2.3.4, `ls_faders.ino`; confirmed on device in #7). The spike's "127 on press, 0 on release" was a misreading.
 - **Column 0 is the hardware panel.** BleakLoop ignores it (S-11 removed, S-113).
 - **The split setup can be sent in one go.** Pacing (one NRPN per tick) was a workaround for the optimised-send fault and isn't needed: a burst changed the split point at once.
+
+### #4 device checks
+
+Run on a LinnStrument 128 and Live 12 against Session Mode play and navigate (#4). Every mechanism below passed and is safe for later plans to build on.
+
+| Mechanism | Result |
+| --- | --- |
+| Session ring: `c_instance.set_session_highlight` | Pass. Draws, follows window moves and is removed by `(-1, -1, -1, -1, False)`, including on unload. v3 draws no ring of its own. |
+| Status bar: v3 `ControlSurface.show_message` | Pass. Messages show as written, including the en dash. |
+| Legato clip launch: `ClipSlot.fire(force_legato=True)` | Pass. Undocumented in the LOM, but accepted. |
+| Legato scene launch: `Scene.fire(force_legato=...)` | Pass. |
+| Launch quantization: `song.clip_trigger_quantization = Live.Song.Quantization.values[n]`, read back with `int(...)` | Pass. Names in `session.QUANTIZATION_NAMES` match Live's dropdown. |
+| Track and scene stops: `Track.stop_all_clips()`, `Song.stop_all_clips()` | Pass. Both stop at the next launch quantization mark, like Live's own stop buttons. Kept on purpose. |
+| Exclusive arm: disarm the others in `song.tracks`, then set `track.arm` | Pass, including with auto-arm on (the selected track can stay red, S-43). Group tracks are only selected. |
+| Track list: `song.visible_tracks` | Pass. Folded group members are skipped, and unfolding shifts the columns. |
+| Track colours: nearest nominal reference | Pass, roughly. Tuning is #9. |
+| Polling cost with a full 13 × 7 snapshot | No lag or blink drift. The 10 ms blink timer reads only the transport (`live_state.read_transport`); the full snapshot is read only when a frame is drawn. |
+
+Also found:
+
+- **Precautions, not observed failures:** `live_state` reads `arm` and `implicit_arm` only when `can_be_armed` is true, because Live is expected to raise on arm state for unarmable tracks such as groups. `ArmExclusive` compares tracks with `!=`, not `is`, because `song.tracks` and `song.visible_tracks` may return different wrappers for one track. Both passed with a folded group in the Set. Neither was tried without the guard.
+- **Read the log before restarting Live.** `Log.txt` keeps earlier sessions, but the clean-room filter starts at the latest `BleakLoop loaded` marker, so a restart hides the previous session's tracebacks from it. That includes unload, which only runs when Live quits.
+- **Designing device checks:**
+  - **Legato** only shows with two clips that sound clearly different, quantization set to None, and the switch made mid-clip. With the defaults it looks like a normal launch.
+  - **Describe the expected result, not its appearance:** Live draws the ring, and its colour isn't BleakLoop's.
+  - **Ask once per check with the full list:** one restart, reported as a numbered list, worked well.
