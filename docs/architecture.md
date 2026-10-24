@@ -44,16 +44,16 @@ The core starts coarse and a module is split when it grows.
 src/BleakLoop/
   __init__.py          create_instance
   surface.py           plumbing: ControlSurface subclass, elements, MIDI routing per mode, tick
-  device.py            plumbing: NRPN and LED message building (pure functions), send helpers
+  device.py            pure: NRPN, split setup and LED message building, LED driver (S-93)
   live_state.py        adapter: Live -> Snapshot
   live_actions.py      adapter: Action -> Live calls
   core/
     layout.py          geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping (S-47, S-58, S-65)
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Note, Note Mode pages, modifiers (S-7–S-16, S-100–S-108, S-112)
-    session.py         clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table (S-18–S-69)
-    mixer.py           coarse steps, bands, smoothing (S-70–S-75)
-    note_mode.py       column 1 CC handling (S-76–S-86)
+    session.py         (planned, #4–#6) clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table (S-18–S-69)
+    mixer.py           (planned, #4–#6) coarse steps, bands, smoothing (S-70–S-75)
+    note_mode.py       (planned, #4–#6) column 1 CC handling (S-76–S-86)
     leds.py            device colours, track colour matching, tempo and fast blink (S-87–S-91)
     values.py          every value in the register below, by name
     engine.py          handle() and render(), composing the modules above
@@ -62,12 +62,12 @@ tests/                 pytest, core only
 
 `__init__.py` imports nothing from `ableton` or `Live` at module level; `create_instance` imports `surface` inside the function. This keeps `BleakLoop.core` importable by pytest outside Live. Tests run on Python 3.11 (`uvx --python 3.11 pytest`) to match Live's runtime.
 
-## 5. Plumbing (proposed, spike-tested)
+## 5. Plumbing (confirmed)
 
 - **Elements in User Firmware Mode:**
   - Pad presses: notes 0–16 on channels 1–8 (S-2).
   - Y-axis values: CC 66–78 (columns 2–14) on channels 1–8 (S-4), claimed only in Mixer Mode.
-- **Elements in Note Mode:** CC 1–8 on the control split's channel only (S-5).
+- **Elements in Note Mode:** CC 1–8 on the control split's channel only (S-5), as plain CC buttons, never encoders. Encoders send CC 1–8 = 0 back to the device on every Note Mode entry, which resets its stored toggle values, and Live appears to drop a mapped CC that repeats the encoder's last value. Together that lost every other press (#7).
 - **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Note Mode, only the eight control CCs are listened; everything else reaches Live's tracks. Confirmed by the spike.
 - **LED output.** One "light pad" call sends CC 20, 21 and 22 (S-3). The LED driver in section 3 is the only caller. v3's per-element send cache isn't relied on.
 - **All device output is sent unoptimised** (`_send_midi(..., optimized=False)`). Inside input callbacks Live buffers "optimized" messages and keeps only the last one per status byte and CC number. That collapses LED triples and NRPN sequences to a single message. This cost the spike several runs; it is a hard rule.
@@ -100,7 +100,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Off colour value: 7 | S-88 | Device protocol | Confirmed; 0 also dark |
 | Fast blink: about 200 ms on, 200 ms off | S-91 | Tuned | Verify on device |
 | Light refresh: Live's display callback, about 100 ms | S-92 | Mechanism | Measured |
-| Blink clock: `Live.Base.Timer` every 10 ms | S-90–S-92 | Mechanism | Timing measured; callback safety to verify |
+| Blink clock: `Live.Base.Timer` every 10 ms | S-90–S-92 | Mechanism | Confirmed |
 | Live volume control position for 0 dB: 0.85 (1.0 = +6 dB) | S-71, S-72 | Live behaviour | Confirmed |
 | Fader smoothing: max step about 1.8 % of range per update | S-72 | Tuned | Needed (spike); tune on device |
 | Fader smoothing: ignore changes under about 0.3 % of range | S-72 | Tuned | Needed (spike); tune on device |
@@ -135,6 +135,6 @@ Run on branch `spike/device-checks` (never merged) against a LinnStrument 128 an
 Also found:
 
 - **Pad orientation** matches S-2 for both presses and lights: channel 1 and CC 21 = 0 are the nearest row.
-- **Control split pads are momentary** (127 on press, 0 on release), not the alternating toggle the device docs describe (S-5, S-76).
+- **Control split pads are toggles** (S-5, S-76): each press sends one CC, alternating 127 and 0, and a release sends nothing (firmware 2.3.4, `ls_faders.ino`; confirmed on device in #7). The spike's "127 on press, 0 on release" was a misreading.
 - **Column 0 is the hardware panel.** BleakLoop ignores it (S-11 removed, S-113).
 - **The split setup can be sent in one go.** Pacing (one NRPN per tick) was a workaround for the optimised-send fault and isn't needed: a burst changed the split point at once.
