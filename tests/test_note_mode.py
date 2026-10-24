@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import controls, layout, note_mode
+from BleakLoop.core import controls, layout, note_mode, values
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import BLUE, GREEN, LIME, MAGENTA, OFF, PINK, WHITE, Blink, Light
 from BleakLoop.core.model import (
@@ -43,8 +43,8 @@ ARMED = SelectedTrack(index=2, name="Keys", armed=True, clips=(F, F, F, F))
 
 
 def cc(key, value=127):
-    # CC 1 is pad 8 (S-5).
-    return ControlCC(layout.ROWS + 1 - key[1], value)
+    # CC 102 is pad 8 (S-5).
+    return ControlCC(values.CONTROL_CC_BASE + layout.ROWS - key[1], value)
 
 
 def with_track(snapshot=BASE, **k):
@@ -72,7 +72,7 @@ def test_any_value_is_a_press(key):
     assert note_mode.handle(NOTE, cc(key, 0), snap) == note_mode.handle(NOTE, cc(key, 127), snap)
 
 
-@pytest.mark.parametrize("number", [0, 9])
+@pytest.mark.parametrize("number", [1, 101, 110])
 def test_ignores_ccs_outside_column_1(number):
     assert note_mode.handle(NOTE, ControlCC(number, 127), BASE) == (NOTE, [])
 

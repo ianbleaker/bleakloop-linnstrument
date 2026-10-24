@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import layout, session
+from BleakLoop.core import layout, session, values
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -99,7 +99,7 @@ def with_track(snapshot, column, **k):
 # Common rules
 
 
-@pytest.mark.parametrize("cc", range(1, 9))
+@pytest.mark.parametrize("cc", range(values.CONTROL_CC_BASE, values.CONTROL_CC_BASE + 8))
 def test_ignores_control_cc(cc):
     assert session.handle(SESSION, ControlCC(cc, 127), SNAP) == (SESSION, [])
 

@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import controls, layout, modes
+from . import controls, layout, modes, values
 from .leds import GREEN, LIME, MAGENTA, PINK, WHITE, Light
 from .model import (
     AddScene,
@@ -20,7 +20,9 @@ from .modes import Mode
 
 
 def handle(state, event, snapshot):
-    if not isinstance(event, ControlCC) or not 1 <= event.cc <= layout.ROWS:
+    if not isinstance(event, ControlCC) or not (
+        values.CONTROL_CC_BASE <= event.cc < values.CONTROL_CC_BASE + layout.ROWS
+    ):
         return state, []
     # Any value is a press: column 1 pads are toggles and send nothing on release (S-76).
     key = (1, layout.control_pad(event.cc))

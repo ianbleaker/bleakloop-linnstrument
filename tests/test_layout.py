@@ -26,11 +26,11 @@ def test_pad_of_rejects_bad_row(row):
 
 
 def test_control_pad():
-    assert layout.control_pad(1) == 8
-    assert layout.control_pad(8) == 1
+    assert layout.control_pad(102) == 8
+    assert layout.control_pad(109) == 1
 
 
-@pytest.mark.parametrize("cc", [0, 9])
+@pytest.mark.parametrize("cc", [101, 110])
 def test_control_pad_rejects_bad_cc(cc):
     with pytest.raises(ValueError):
         layout.control_pad(cc)

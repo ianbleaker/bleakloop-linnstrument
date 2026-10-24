@@ -2,7 +2,7 @@
 
 from .core import layout
 from .core.leds import DEVICE_DEFAULT, resolve
-from .core.values import CONTROL_CHANNEL, SPLIT_POINT
+from .core.values import CONTROL_CC_BASE, CONTROL_CHANNEL, SPLIT_POINT
 
 CC_STATUS = 0xB0
 
@@ -53,7 +53,7 @@ def split_setup():
         (0, 0),  # left split MIDI mode: one channel
         (1, CONTROL_CHANNEL + 1),  # left split main channel
         (35, 2),  # left split special mode: CC Faders
-    ] + [(40 + i, 1 + i) for i in range(8)]  # faders 1-8 send CC 1-8
+    ] + [(40 + i, CONTROL_CC_BASE + i) for i in range(8)]  # faders 1-8 send CC 102-109
     return [nrpn(number, value) for number, value in settings]
 
 

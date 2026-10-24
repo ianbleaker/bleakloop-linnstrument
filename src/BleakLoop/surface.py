@@ -20,7 +20,7 @@ from .core.modes import Mode, State
 
 logger = logging.getLogger(__name__)
 
-CONTROL_CCS = range(1, 9)
+CONTROL_CCS = range(values.CONTROL_CC_BASE, values.CONTROL_CC_BASE + layout.ROWS)
 Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column (S-4)
 
 
@@ -40,7 +40,7 @@ class Elements(ElementsBase):
                 self.add_button(
                     Y_AXIS_CC_BASE + column, f"Y {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
-        # Note Mode control split: CC 1-8 on the control channel (S-5). Plain CC buttons:
+        # Note Mode control split: CC 102-109 on the control channel (S-5). Plain CC buttons:
         # encoders reset the device's toggles to 0 and Live drops their repeated values.
         for number in CONTROL_CCS:
             self.add_button(

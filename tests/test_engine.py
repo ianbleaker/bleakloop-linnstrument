@@ -36,14 +36,14 @@ def test_session_input_goes_to_session_module():
 
 
 @pytest.mark.parametrize("value", [127, 0])
-def test_cc1_any_value_enters_session(value):
-    state, actions = engine.handle(NOTE, ControlCC(1, value), STOPPED)
+def test_pad_8_any_value_enters_session(value):
+    state, actions = engine.handle(NOTE, ControlCC(102, value), STOPPED)
     assert state == State(mode=Mode.SESSION)
     assert actions == [EnterMode(Mode.SESSION)]
 
 
 def test_note_input_goes_to_note_module():
-    state, actions = engine.handle(NOTE, ControlCC(5, 0), STOPPED)
+    state, actions = engine.handle(NOTE, ControlCC(106, 0), STOPPED)
     assert state.scene_page
     assert actions == []
 

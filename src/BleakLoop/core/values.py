@@ -6,6 +6,9 @@ CONTROL_CHANNEL = 0
 # Control split setup NRPNs: split point, left split is column 1.
 SPLIT_POINT = 2
 
+# Control split CCs: faders 1-8 send CC 102-109, nearest row first.
+CONTROL_CC_BASE = 102
+
 # Fast blink: about 200 ms on, 200 ms off.
 FAST_BLINK_MS = 200
 

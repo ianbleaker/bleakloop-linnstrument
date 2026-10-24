@@ -68,7 +68,7 @@ tests/                 pytest, core only
 - **Elements in User Firmware Mode:**
   - Pad presses: notes 0–16 on channels 1–8 (S-2).
   - Y-axis values: CC 64 + column on channels 1–8 (S-4), claimed only in Mixer Mode. Columns 2–14 (CC 66–78) become fader input; the other columns are claimed and dropped, because Y reporting is per row and their reports would otherwise reach Live's tracks.
-- **Elements in Note Mode:** CC 1–8 on the control split's channel only (S-5), as plain CC buttons, never encoders. Encoders send CC 1–8 = 0 back to the device on every Note Mode entry, which resets its stored toggle values, and Live appears to drop a mapped CC that repeats the encoder's last value. Together that lost every other press (#7).
+- **Elements in Note Mode:** CC 102–109 on the control split's channel only (S-5), as plain CC buttons, never encoders. Encoders send the control CCs = 0 back to the device on every Note Mode entry, which resets its stored toggle values, and Live appears to drop a mapped CC that repeats the encoder's last value. Together that lost every other press (#7).
 - **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Note Mode, only the eight control CCs are listened; everything else reaches Live's tracks. Confirmed by the spike.
 - **LED output.** One "light pad" call sends CC 20, 21 and 22 (S-3). The LED driver in section 3 is the only caller. v3's per-element send cache isn't relied on.
 - **All device output is sent unoptimised** (`_send_midi(..., optimized=False)`). Inside input callbacks Live buffers "optimized" messages and keeps only the last one per status byte and CC number. That collapses LED triples and NRPN sequences to a single message. This cost the spike several runs; it is a hard rule.
@@ -114,7 +114,8 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Value | Used by | Source | Status |
 | --- | --- | --- | --- |
 | Control split channel | S-5 | Named constant edited by the player | Default channel 1, confirmed |
-| Control split setup NRPNs: 200 = 1 (split on), 202 = 2 (split point: left split is column 1), 0 = 0 (one channel), 1 = channel, 35 = 2 (CC Faders), 40–47 = 1–8 (faders send CC 1–8) | S-5 | Device protocol | Confirmed on device |
+| Control split setup NRPNs: 200 = 1 (split on), 202 = 2 (split point: left split is column 1), 0 = 0 (one channel), 1 = channel, 35 = 2 (CC Faders), 40–47 = 102–109 (faders send CC 102–109) | S-5 | Device protocol | Confirmed on device |
+| Control split CCs: 102–109, nearest row first | S-5 | Chosen: undefined in General MIDI, clear of CC 1–8, LED CCs 20–22 and Y-axis CCs 64–80 | Confirmed on device |
 | Off colour value: 7 | S-88 | Device protocol | Confirmed; 0 also dark |
 | Fast blink: about 200 ms on, 200 ms off | S-91 | Tuned | Verify on device |
 | Light refresh: Live's display callback, about 100 ms | S-92 | Mechanism | Measured |

@@ -33,7 +33,8 @@ def test_split_setup():
     assert len(steps) == 13
     assert steps[0] == device.nrpn(200, 1)
     assert steps[3] == device.nrpn(1, 1)  # main channel 1
-    assert steps[-1] == device.nrpn(47, 8)
+    assert steps[5] == device.nrpn(40, 102)
+    assert steps[-1] == device.nrpn(47, 109)
 
 
 def frame(mode_colour=WHITE):
