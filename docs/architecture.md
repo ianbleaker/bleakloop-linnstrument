@@ -126,7 +126,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | `GLIDE_DEAD_BAND = 0.003`: Y reports moving the target less than 0.3 % of range are ignored, and a glide this close snaps to its target | S-72 | Tuned | Tune on device |
 | `CONTINUE_MS = 600`: a press next to a pad released within this time continues the slide (device gaps measured 160–460 ms) | S-72 | Tuned | Tune on device |
 | Slide pace: during a continued slide the glide moves one step per press-to-press period of the last pad crossed, never faster than `GLIDE_STEP` | S-72 | Derived | Tune on device |
-| Track colour reference RGB per device colour | S-89 | Tuned by eye | Nominal values; tuning is #9 |
+| Track colour reference RGB per device colour, fitted to Live 12's 70-colour palette (pinned in `tests/test_leds.py`) | S-89 | Tuned by eye | Tuned on device; refine if a swatch looks wrong |
 
 Removed, to be re-added only if the device shows a need:
 

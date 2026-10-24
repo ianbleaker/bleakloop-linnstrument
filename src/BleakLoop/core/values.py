@@ -16,17 +16,19 @@ FAST_BLINK_MS = 200
 BLINK_TIMER_MS = 10
 
 # Track colour reference RGB per device colour, in S-87 order: (colour value, (r, g, b)).
+# Fitted on the device to Live 12's 70-colour palette, so they don't look like the LED
+# colours: white sits mid-palette so every grey lands on it.
 TRACK_COLOUR_REFERENCES = (
-    (1, (255, 0, 0)),  # red
-    (2, (255, 255, 0)),  # yellow
-    (3, (0, 255, 0)),  # green
-    (4, (0, 255, 255)),  # cyan
-    (5, (0, 0, 255)),  # blue
-    (6, (255, 0, 255)),  # magenta
-    (8, (255, 255, 255)),  # white
-    (9, (255, 128, 0)),  # orange
-    (10, (128, 255, 0)),  # lime
-    (11, (255, 128, 192)),  # pink
+    (1, (255, 86, 113)),  # red
+    (2, (255, 253, 76)),  # yellow
+    (3, (112, 252, 106)),  # green
+    (4, (71, 255, 184)),  # cyan
+    (5, (92, 139, 249)),  # blue
+    (6, (184, 91, 219)),  # magenta
+    (8, (207, 140, 175)),  # white
+    (9, (238, 153, 105)),  # orange
+    (10, (200, 240, 91)),  # lime
+    (11, (225, 129, 158)),  # pink
 )
 
 # Tempo limits for Shift + column 15 pads 7 and 8 (S-62).
