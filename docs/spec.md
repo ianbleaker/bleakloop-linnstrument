@@ -1,14 +1,12 @@
 # BleakLoop behaviour spec
 
+Frozen at v0.1.0. Current behaviour: [manual](manual.md).
+
 ## 1. Purpose and scope
 
-This document says what BleakLoop does, from the player's side: what each pad does when pressed, held or combined with Shift, and what each pad shows. It is the target for the first release. Every behaviour is a numbered requirement (`S-<n>`) so plans and reviews can track progress against it. IDs are permanent: new requirements get new numbers, and removed ones are marked as removed rather than renumbered.
+This document says what BleakLoop does, from the player's side: what each pad does when pressed, held or combined with Shift, and what each pad shows. It was the target for the first release, v0.1.0, and is now frozen as the record of that release: later behaviour changes are not written back here. Every behaviour is a numbered requirement (`S-<n>`), and code, tests and plans cite these IDs. Gaps in the numbering are requirements removed before the release.
 
 The spec describes observable behaviour only. How it is achieved, and every tuned value (timings, smoothing amounts, colour references), lives in `docs/architecture.md`.
-
-Section 9 collects ideas that are not needed for the first release.
-
-Requirements marked **(verify on device)** describe intent where an exact detail still needs confirming on a real LinnStrument and Live 12.
 
 ## 2. Terms and orientation
 
@@ -89,7 +87,7 @@ There are three modes: **Session**, **Mixer** (a sub-mode of Session) and **Note
 - **S-8** Entering Session Mode puts the device into User Firmware Mode and draws every pad.
 - **S-9** On every entry into Session Mode, Mixer Mode is off and the Track Control mode (section 5.2) resets to Arm.
 - **S-10** While in Session Mode, Live shows a ring around the 13 × 7 region of the session grid that the pads control, and the ring follows grid navigation. The ring is removed when entering Note Mode and when BleakLoop is unloaded.
-- **S-11** *(Removed: BleakLoop ignores the column 0 hardware buttons. Note Mode is entered from column 1, pad 8 (S-56). Remapping them is S-113.)*
+- **S-11** *(Removed: BleakLoop ignores the column 0 hardware buttons. Note Mode is entered from column 1, pad 8 (S-56).)*
 - **S-12** *(Removed: the control-switch lockout after entering Session Mode had no known cause. Re-add only if the device shows a bounce back into Note Mode.)*
 - **S-13** Entering Note Mode turns Y-axis reporting off, leaves User Firmware Mode and removes the session ring. It ends Mixer Mode, Delete, Copy (including any chosen copy source) and Shift. Releases of held pads are only seen in Session Mode, so a pad held while switching to Note Mode must not stay latched on return. Column 1 starts on its controls page (S-106).
 - **S-14** Asking for Note Mode while already in Note Mode just repeats the "leave User Firmware Mode" message and has no other effect.
@@ -103,8 +101,8 @@ There are three modes: **Session**, **Mixer** (a sub-mode of Session) and **Note
 - **S-101** While Shift is held, each pad performs its Shift function (the Shift layer table in section 2), or does nothing if it has none. The modifier pads themselves always act as modifiers.
 - **S-102** While Shift is held, every pad shows its Shift-layer colour, or is dark if it has no Shift function. A Shift function that is a variant of the pad's normal action (legato launch, Redo) keeps the normal colour. The Copy and Delete pads keep their normal colours.
 - **S-103** When modifiers are held together, Copy takes precedence over Delete, and Delete over Shift, unless a requirement defines that combination. No combinations are defined yet.
-- **S-104** In Mixer Mode, Copy and Delete do nothing, and the fader columns do nothing while Shift is held. These are reserved for later use (S-111).
-- **S-105** Note Mode has no modifiers. Column 1 reports presses only, never releases (S-5), so it can't hold a modifier (S-114 removed).
+- **S-104** In Mixer Mode, Copy and Delete do nothing, and the fader columns do nothing while Shift is held. These are reserved for later use.
+- **S-105** Note Mode has no modifiers. Column 1 reports presses only, never releases (S-5), so it can't hold a modifier.
 - **S-112** While Copy or Delete is held, only the pads it targets respond: clip slots (pads 1–7 of columns 2–14), scene pads, and the other modifier pads. Every other pad does nothing.
 
 ## 5. Session Mode
@@ -224,17 +222,3 @@ In Note Mode the device is an instrument again. BleakLoop only listens to column
 - **S-93** All tempo-blinking pads switch together, as closely as the device allows. The device applies light changes one at a time, so a full-grid change shows a slight ripple. BleakLoop sends each change once and in one pass, and never adds to the ripple by spreading changes across refreshes.
 - **S-94** After any switch between Session, Mixer and Note Mode, every pad shows its correct colour, regardless of what was lit before.
 
-## 9. Later
-
-Ideas not needed for the first release. None of these are reachable from any pad today.
-
-- **S-95** Launch quantization pads: one pad each for global launch quantization of a bar, a quarter, an eighth or a sixteenth, with the active choice blinking.
-- **S-96** Duplicate clip: copy the most recently pressed clip (or the highlighted or playing one) into the next free slot below it on the same track, adding a scene if needed.
-- **S-97** Duplicate scene: duplicate the selected scene in place and select the copy.
-- **S-98** A latching scene-copy mode, separate from the held Copy pad, toggled on and off by a pad.
-- **S-99** Notice when the player leaves User Firmware Mode from the device's Global Settings (the device reports every User Firmware Mode change as NRPN 245 on channel 9, about 20 ms after the switch), and treat it as switching to Note Mode.
-- **S-109** FX view: a third view of columns 2–14 alongside the clip grid and Mixer. It offers mixer-style faders for effects the player sets up, plus pads that recall FX scenes. Column 16 and the view switches stay as in Session Mode, and Copy and Delete act on FX scenes. Open: where its view switch goes (column 15 has no free pad), and what the faders are mapped to.
-- **S-110** FX scenes (name to be decided): a stored snapshot of effect parameter values that can be recalled later. Each FX scene stores a transition length, and recalling it morphs the parameters from their current values to the stored ones over that length. Snapshots live in a Max for Live device in the Set. The concept comes from the Neuzeit Drop; the player will describe the intended behaviour.
-- **S-111** Reserved combinations: Copy and Delete in Mixer Mode, Shift on the Mixer faders, and Shift combined with Copy or Delete (S-103, S-104).
-- **S-113** Remap the column 0 hardware buttons in Session Mode to BleakLoop functions. In User Firmware Mode they report presses like any pad (S-2).
-- **S-114** Removed: column 1 can't report holds (S-5).

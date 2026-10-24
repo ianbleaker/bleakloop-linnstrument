@@ -1,4 +1,7 @@
-"""Plain types passed between the plumbing, the adapters and the core."""
+"""Plain types passed between the plumbing, the adapters and the core.
+
+Track and scene indexes are positions in the track list and Live's scene list.
+"""
 
 import enum
 from dataclasses import dataclass
@@ -16,7 +19,7 @@ class SlotView:
 
 @dataclass(frozen=True)
 class TrackView:
-    index: int  # position in the track list
+    index: int
     name: str = ""
     colour: int = 0
     arm: bool = False
@@ -37,8 +40,8 @@ class ClipView:
 
 @dataclass(frozen=True)
 class SelectedTrack:
-    # Live's selected track, which may be outside the window (S-78, S-82).
-    index: int  # position in the track list
+    # Live's selected track, which may be outside the window.
+    index: int
     name: str = ""
     armed: bool = False  # can_be_armed and (arm or implicit_arm)
     is_foldable: bool = False
@@ -46,7 +49,7 @@ class SelectedTrack:
 
 
 class ClipTarget(enum.Enum):
-    # The quantize candidates, in S-48 order.
+    # The quantize candidates, in the order Quantize tries them.
     HIGHLIGHTED = enum.auto()
     DETAIL = enum.auto()
     PLAYING = enum.auto()
@@ -101,7 +104,7 @@ class ControlCC:
 
 @dataclass(frozen=True)
 class YAxis:
-    # Y position within a pressed pad, 0 at the near edge to 127 at the far edge (S-4).
+    # Y position within a pressed pad, 0 at the near edge to 127 at the far edge.
     column: int
     pad: int
     value: int
@@ -109,7 +112,7 @@ class YAxis:
 
 @dataclass(frozen=True)
 class SceneSelected:
-    # Fed back by the adapter after Capture (S-47).
+    # Fed back by the adapter after Capture.
     scene: int
 
 
@@ -129,9 +132,6 @@ class ToggleMetronome:
 @dataclass(frozen=True)
 class TogglePlay:
     pass
-
-
-# track and scene are indexes into the track list and Live's scene list.
 
 
 @dataclass(frozen=True)

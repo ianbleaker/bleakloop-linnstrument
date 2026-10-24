@@ -11,6 +11,7 @@ jobs:
         with: { python-version: "3.11" }
       - run: python -m compileall -q src/
       - run: pip install ruff==0.14.0
-      - run: ruff check src/ tests/
+      - run: ruff check src/ tests/ tools/
       - run: pip install pytest==8.3.3
       - run: python -m pytest -q
+      - run: PYTHONPATH=src python -m tools.manual --check

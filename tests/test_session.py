@@ -984,7 +984,7 @@ def test_normal_layer_column_1_playing_with_metronome():
 def test_normal_layer_column_15(track_control, blinking):
     frame = session.render(mode(track_control), SNAP)
     assert all(frame[(15, p)] == Light(CYAN) for p in range(1, 5))
-    assert frame[(15, 5)] == Light(WHITE)  # S-59
+    assert frame[(15, 5)] == Light(WHITE)
     colours = {6: ORANGE, 7: BLUE, 8: RED}
     for pad, colour in colours.items():
         blink = Blink.TEMPO if pad == blinking else Blink.STEADY

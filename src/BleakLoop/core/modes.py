@@ -1,4 +1,4 @@
-"""Modes and the core's state (S-7–S-16)."""
+"""Modes and the core's state."""
 
 import enum
 from dataclasses import dataclass, replace
@@ -25,7 +25,7 @@ class SceneSource:
 
 @dataclass(frozen=True)
 class Touch:
-    # One finger on a Mixer fader column (S-72).
+    # One finger on a Mixer fader column.
     column: int
     track: int  # the track at the gesture's first press: a window move doesn't change it
     pad: int
@@ -36,8 +36,7 @@ class Touch:
 
 @dataclass(frozen=True)
 class Lift:
-    # A fader pad just released: the device ends a touch between pads, so a press on the
-    # next pad soon after continues the gesture (S-72).
+    # A fader pad just released, which a press on the next pad can continue.
     column: int
     track: int
     pad: int
@@ -47,7 +46,7 @@ class Lift:
 
 @dataclass(frozen=True)
 class Glide:
-    # A track volume moving toward its fader target (S-72).
+    # A track volume moving toward its fader target.
     track: int
     current: float
     target: float
@@ -71,17 +70,17 @@ class State:
     copy: bool = False
     delete: bool = False
     copy_source: ClipSource | SceneSource | None = None
-    fixed_length: int | None = None  # bars; Note Mode's Record Clip uses it too (S-78)
+    fixed_length: int | None = None  # bars; Note Mode's Record Clip uses it too
     touches: tuple = ()  # Touch per held fader column
     lifts: tuple = ()  # Lift per fader column whose pad was just released
     glides: tuple = ()  # Glide per track
     glide_ms: float | None = None  # time of the last glide step, None when none is moving
     undo_open: bool = False  # a fader gesture's undo step is open in Live
-    scene_page: bool = False  # Note Mode column 1 shows the scene page (S-106)
+    scene_page: bool = False  # Note Mode column 1 shows the scene page
 
 
 def enter(state, mode):
-    # The only place mode-entry resets happen (S-9, S-13, S-70), including the fader state.
+    # The only place mode-entry resets happen, including the fader state.
     # The window, the launch quantization memory and Fixed Length survive both directions.
     # A caller leaving Mixer Mode closes an open undo step first (mixer.reset).
     state = replace(

@@ -14,11 +14,11 @@ from .model import (
 
 
 def metronome_light(snapshot):
-    return Light(ORANGE, Blink.FAST if snapshot.metronome else Blink.STEADY)  # S-50, S-81
+    return Light(ORANGE, Blink.FAST if snapshot.metronome else Blink.STEADY)
 
 
 def play_light(snapshot):
-    return Light(GREEN, Blink.TEMPO) if snapshot.is_playing else Light(BLUE)  # S-52, S-83
+    return Light(GREEN, Blink.TEMPO) if snapshot.is_playing else Light(BLUE)
 
 
 def metronome(snapshot):
@@ -41,7 +41,7 @@ def redo(snapshot):
 
 
 def record_length(bars, snapshot):
-    # S-30: a bar is the current time signature's bar, in beats (quarter notes).
+    # A bar is the current time signature's bar, in beats (quarter notes).
     if bars is None:
         return None
     return bars * snapshot.signature_numerator * 4 / snapshot.signature_denominator
@@ -49,24 +49,24 @@ def record_length(bars, snapshot):
 
 def record(snapshot):
     if snapshot.session_view:
-        return [SetSessionRecord(not snapshot.session_record)]  # S-54
+        return [SetSessionRecord(not snapshot.session_record)]
     actions = [ClearBackToArrangement()] if snapshot.back_to_arranger else []
-    return actions + [SetArrangementRecord(not snapshot.arrangement_record)]  # S-55
+    return actions + [SetArrangementRecord(not snapshot.arrangement_record)]
 
 
 def record_light(snapshot):
     if snapshot.session_view:
         on = snapshot.session_record or snapshot.arrangement_overdub
-        return Light(RED, Blink.TEMPO if on else Blink.STEADY)  # S-54
+        return Light(RED, Blink.TEMPO if on else Blink.STEADY)
     if snapshot.arrangement_record:
-        return Light(RED, Blink.TEMPO)  # S-55
+        return Light(RED, Blink.TEMPO)
     if snapshot.back_to_arranger:
         return Light(ORANGE, Blink.TEMPO)
     return Light(RED)
 
 
 def scene_light(snapshot, scene_offset, row):
-    # S-68 without the copy-source state; row is the window row 0-6.
+    # The scene light without the copy-source state; row is the window row 0-6.
     if scene_offset + row >= snapshot.scene_count:
         return Light(OFF)
     slots = [track.slots[row] for track in snapshot.tracks if len(track.slots) > row]

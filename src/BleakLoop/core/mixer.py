@@ -1,4 +1,4 @@
-"""Mixer Mode: the toggle, coarse steps, relative fine control and glide smoothing (S-70–S-75)."""
+"""Mixer Mode: the toggle, coarse steps, relative fine control and glide smoothing."""
 
 from dataclasses import replace
 
@@ -14,30 +14,30 @@ from .values import (
     VOLUME_ZERO_DB,
 )
 
-# Device Y (S-4): every press reports the centre first, and the full swing either way covers
+# Device Y: every press reports the centre first, and the full swing either way covers
 # about half a pad.
 Y_CENTRE = 64
 Y_PAD_TRAVEL = 63
 
 
 def step(pad):
-    # S-71: pad 1 is 0 dB, down to 1/8 of the 0 dB position at pad 8.
+    # Pad 1 is 0 dB, down to 1/8 of the 0 dB position at pad 8.
     return VOLUME_ZERO_DB * (layout.ROWS + 1 - pad) / layout.ROWS
 
 
 def y_to_volume(anchor, value):
-    # S-72: Y moves the volume from the touch's anchor, one step per pad of travel.
+    # Y moves the volume from the touch's anchor, one step per pad of travel.
     volume = anchor + (value - Y_CENTRE) / Y_PAD_TRAVEL * step(layout.ROWS)
     return min(max(volume, 0.0), VOLUME_MAX)
 
 
 def lit_pad(volume):
-    # S-73: the pad whose step is nearest; a tie goes to the smaller pad number.
+    # The pad whose step is nearest; a tie goes to the smaller pad number.
     return min(range(1, layout.ROWS + 1), key=lambda pad: abs(step(pad) - volume))
 
 
 def reset(state):
-    # S-70: fine-control state is reset on entry and exit; an open undo step is closed.
+    # Leaving Mixer: drop fine-control state and close an open undo step.
     state = replace(state, touches=(), lifts=(), glides=(), glide_ms=None)
     if not state.undo_open:
         return state, []
@@ -45,7 +45,6 @@ def reset(state):
 
 
 def toggle(state):
-    # S-70: column 15, pad 5.
     if not state.mixer:
         state = replace(state, mixer=True, copy_source=None)
         return state, [SetMixer(True), ShowMessage("Mixer Mode ON")]
@@ -54,7 +53,6 @@ def toggle(state):
 
 
 def press(state, event, snapshot):
-    # A press or release in columns 2-14 while Mixer is on (S-71, S-72, S-104).
     touch = _find(state.touches, event.column)
     if not event.pressed:
         # Releases count under Shift too, so no touch latches.
@@ -65,7 +63,7 @@ def press(state, event, snapshot):
         return _settle(state)
     if state.shift:
         return state, []
-    # S-72: the device ends a touch between pads, so a press next to a pad just released
+    # The device ends a touch between pads, so a press next to a pad just released
     # carries the gesture on from where it was.
     lift = _find(state.lifts, event.column)
     previous = touch or lift
@@ -84,7 +82,7 @@ def press(state, event, snapshot):
     track = _track(event.column, snapshot)
     if track is None:
         return state, []
-    # S-71: the coarse press sets the step at once.
+    # The coarse press sets the step at once.
     volume = step(event.pad)
     state = _put_lift(state, None, column=event.column)
     state = _put_touch(state, event.column, Touch(event.column, track.index, event.pad, volume))
@@ -97,7 +95,7 @@ def press(state, event, snapshot):
 
 
 def y_axis(state, event):
-    # S-72: a Y report moves the touch's glide target; only the tick moves the volume.
+    # A Y report moves the touch's glide target; only the tick moves the volume.
     touch = _find(state.touches, event.column)
     if not state.mixer or state.shift or touch is None or event.pad != touch.pad:
         return state, []
@@ -109,7 +107,7 @@ def y_axis(state, event):
 
 
 def tick(state, now_ms):
-    # S-72: on the 10 ms timer, each glide moves toward its target at a speed set by the
+    # On the 10 ms timer, each glide moves toward its target at a speed set by the
     # elapsed time, so timer jitter doesn't change it. Returns whether a lit height changed.
     state = _stamp_presses(state, now_ms)
     elapsed = BLINK_TIMER_MS if state.glide_ms is None else now_ms - state.glide_ms
@@ -130,7 +128,6 @@ def tick(state, now_ms):
             glide = replace(glide, current=current)
         glides.append(glide)
     moving = any(g.current != g.target for g in glides)
-    # A lift's window starts on the first tick after its release: events carry no time.
     lifts = tuple(
         replace(lift, expires_ms=now_ms + CONTINUE_MS) if lift.expires_ms is None else lift
         for lift in state.lifts
@@ -144,9 +141,8 @@ def tick(state, now_ms):
 
 
 def _stamp_presses(state, now_ms):
-    # Events carry no time, so a press is timed by the first tick after it. A continued
-    # slide's glide then moves one step per pad at the pace the finger crossed the last
-    # one, so it keeps moving while Y is saturated and through the gap between pads.
+    # A continued slide's glide moves one step per pad at the pace the finger crossed the
+    # last one, so it keeps moving while Y is saturated and through the gap between pads.
     touches = []
     for touch in state.touches:
         if touch.pressed_ms is None:
@@ -181,7 +177,6 @@ def _find(items, column):
 
 
 def _put_touch(state, column, touch):
-    # Replaces the column's touch, or removes it when touch is None.
     touches = tuple(t for t in state.touches if t.column != column)
     return replace(state, touches=touches if touch is None else touches + (touch,))
 

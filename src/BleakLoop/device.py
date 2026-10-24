@@ -1,4 +1,4 @@
-"""LinnStrument message building and the LED driver (spec section 3). Pure Python."""
+"""LinnStrument message building and the LED driver (architecture section 5). Pure Python."""
 
 from .core import layout
 from .core.leds import DEVICE_DEFAULT, resolve
@@ -6,7 +6,7 @@ from .core.values import CONTROL_CC_BASE, CONTROL_CHANNEL, SPLIT_POINT
 
 CC_STATUS = 0xB0
 
-# Device protocol numbers (spec section 3, architecture section 9).
+# Device protocol numbers.
 NRPN_USER_FIRMWARE_MODE = 245
 CC_Y_AXIS = 11
 CC_LIGHT_COLUMN = 20
@@ -46,7 +46,7 @@ def y_axis(on):
 
 
 def split_setup():
-    # One message list per NRPN, for pacing (architecture section 9).
+    # One message list per NRPN, for pacing.
     settings = [
         (200, 1),  # split on
         (202, SPLIT_POINT),  # left split is column 1
@@ -58,7 +58,7 @@ def split_setup():
 
 
 class LedDriver:
-    """Sends only the pads whose resolved colour changed (S-93)."""
+    """Sends only the pads whose resolved colour changed."""
 
     def __init__(self):
         self._sent = {}
@@ -73,9 +73,7 @@ class LedDriver:
         return messages
 
     def reset(self):
-        # S-94: forget what was sent so the next update repaints everything.
         self._sent = {}
 
     def release_column_1(self):
-        # S-6: hand column 1's lights back to the device.
         return [m for pad in range(1, layout.ROWS + 1) for m in light(1, pad, DEVICE_DEFAULT)]

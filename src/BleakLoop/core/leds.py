@@ -1,11 +1,11 @@
-"""Device colours and blinking (S-87, S-88, S-90, S-91)."""
+"""Device colours and blinking."""
 
 import enum
 from dataclasses import dataclass
 
 from .values import FAST_BLINK_MS, TRACK_COLOUR_REFERENCES
 
-# CC 22 colour values (S-87, S-88).
+# CC 22 colour values.
 DEVICE_DEFAULT = 0
 RED = 1
 YELLOW = 2
@@ -39,7 +39,7 @@ class Clock:
 
 
 def track_colour(rgb):
-    # S-89: the nearest reference by squared RGB distance; a tie goes to the earlier entry.
+    # The nearest reference by squared RGB distance; a tie goes to the earlier entry.
     r, g, b = (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF
     return min(
         TRACK_COLOUR_REFERENCES,

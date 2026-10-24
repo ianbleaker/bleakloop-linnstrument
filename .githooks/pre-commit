@@ -1,11 +1,15 @@
 #!/bin/sh
 # Block the commit if lint or tests fail. Live 12 runs Python 3.11 (see ruff.toml).
 cd "$(git rev-parse --show-toplevel)" || exit 1
-uvx ruff@0.14.0 check --output-format concise src/ tests/ || {
+uvx ruff@0.14.0 check --output-format concise src/ tests/ tools/ || {
     echo "pre-commit: ruff failed, commit blocked."
     exit 1
 }
 uvx --python 3.11 pytest@8.3.3 -q || {
     echo "pre-commit: pytest failed, commit blocked."
+    exit 1
+}
+PYTHONPATH=src uv run --python 3.11 --no-project python -m tools.manual --check || {
+    echo "pre-commit: manual is stale, run: PYTHONPATH=src python3 -m tools.manual"
     exit 1
 }

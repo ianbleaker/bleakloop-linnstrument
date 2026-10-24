@@ -45,7 +45,7 @@ def _slot(song, track, scene):
 
 
 def apply(action, song, surface):
-    # Returns None, or a follow-up event for the core (Capture, S-47).
+    # Returns None, or a follow-up event for the core (Capture).
     if isinstance(action, ToggleMetronome):
         song.metronome = not song.metronome
     elif isinstance(action, TogglePlay):

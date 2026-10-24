@@ -49,7 +49,7 @@ def read(song, application, window, scene_clips=False, selected=False):
 
 
 def candidate_clip(song, target):
-    # S-48's quantize candidates. live_actions resolves QuantizeClip with this too, so the
+    # The quantize candidates. live_actions resolves QuantizeClip with this too, so the
     # snapshot and the action can't disagree.
     if target is ClipTarget.HIGHLIGHTED:
         slot = song.view.highlighted_clip_slot
@@ -69,7 +69,7 @@ def _clip(clip):
 
 
 def _scene_clips(song, rows):
-    # S-66, S-67: every track in the Set, including folded group members. Group tracks
+    # Every track in the Set, including folded group members. Group tracks
     # themselves are skipped: their slots can't hold clips.
     tracks = [track for track in song.tracks if not track.is_foldable]
     return tuple(any(track.clip_slots[scene].has_clip for track in tracks) for scene in rows)
@@ -80,7 +80,6 @@ def _selected_track(song, tracks, scenes):
     track = song.view.selected_track
     if track not in tracks:
         return None
-    # Live raises on reading arm state from a track that can't be armed.
     can_be_armed = track.can_be_armed
     slots = track.clip_slots
     return SelectedTrack(
@@ -93,7 +92,6 @@ def _selected_track(song, tracks, scenes):
 
 
 def _track(index, track, rows):
-    # Some tracks (e.g. groups) have clip slots without being playable: read them as they are.
     slots = track.clip_slots
     # Live raises on reading arm state from a track that can't be armed.
     can_be_armed = track.can_be_armed

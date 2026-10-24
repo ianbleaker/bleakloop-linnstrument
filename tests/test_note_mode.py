@@ -43,7 +43,7 @@ ARMED = SelectedTrack(index=2, name="Keys", armed=True, clips=(F, F, F, F))
 
 
 def cc(key, value=127):
-    # CC 102 is pad 8 (S-5).
+    # CC 102 is pad 8.
     return ControlCC(values.CONTROL_CC_BASE + layout.ROWS - key[1], value)
 
 
@@ -93,7 +93,7 @@ def test_metronome(on):
     assert note_mode.handle(NOTE, cc(layout.METRONOME), snap) == (NOTE, controls.metronome(snap))
 
 
-# Record Clip (S-78)
+# Record Clip
 
 
 def record_clip(snapshot, state=NOTE):
@@ -151,7 +151,7 @@ def test_record_clip_uses_fixed_length(numerator, beats):
     assert actions[0] == FireSlot(2, 0, legato=False, record_length=beats)
 
 
-# Capture MIDI (S-79)
+# Capture MIDI
 
 
 def test_capture_midi_with_nothing_to_capture():
@@ -165,7 +165,7 @@ def test_capture_midi():
     assert note_mode.handle(NOTE, cc(layout.CAPTURE), snap) == (NOTE, actions)
 
 
-# Pad 6 (S-82, S-83)
+# Pad 6
 
 
 def test_pad_6_stops_selected_track_in_session_view():

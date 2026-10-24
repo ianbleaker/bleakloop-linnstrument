@@ -62,7 +62,7 @@ def test_phase_key():
     assert phase_key(DARK) == (False, False)
 
 
-# Live 12's track colour palette, row by row, and the device colour each was tuned to (S-89).
+# Live 12's track colour palette, row by row, and the device colour each was tuned to.
 PALETTE = [
     # Row 1
     (0xFF94A6, PINK),

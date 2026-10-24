@@ -21,26 +21,26 @@ from .core.modes import Mode, State
 logger = logging.getLogger(__name__)
 
 CONTROL_CCS = range(values.CONTROL_CC_BASE, values.CONTROL_CC_BASE + layout.ROWS)
-Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column (S-4)
+Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column
 
 
 class Elements(ElementsBase):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        # Pad presses: note = column, channel = device row (S-2).
+        # Pad presses: note = column, channel = device row.
         for row in range(layout.ROWS):
             for column in range(layout.COLUMNS):
                 self.add_button(
                     column, f"Pad {row} {column}", channel=row, msg_type=MIDI_NOTE_TYPE
                 )
-        # Y-axis values in Mixer Mode: CC 64 + column on the row's channel (S-4). Every
+        # Y-axis values in Mixer Mode: CC 64 + column on the row's channel. Every
         # column is claimed so stray Y reports outside the faders don't reach Live's tracks.
         for row in range(layout.ROWS):
             for column in range(layout.COLUMNS):
                 self.add_button(
                     Y_AXIS_CC_BASE + column, f"Y {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
-        # Note Mode control split: CC 102-109 on the control channel (S-5). Plain CC buttons:
+        # Note Mode control split: CC 102-109 on the control channel. Plain CC buttons:
         # encoders reset the device's toggles to 0 and Live drops their repeated values.
         for number in CONTROL_CCS:
             self.add_button(
@@ -50,8 +50,8 @@ class Elements(ElementsBase):
 
 class Specification(ControlSurfaceSpecification):
     elements_type = Elements
-    num_tracks = 13
-    num_scenes = 7
+    num_tracks = layout.WINDOW_TRACKS
+    num_scenes = layout.WINDOW_SCENES
     link_session_ring_to_track_selection = False
 
 
@@ -60,12 +60,12 @@ class BleakLoop(ControlSurface):
         self._state = State()
         self._driver = device.LedDriver()
         self._listeners = []
-        self._setup = None  # NRPNs still to send, one per tick (S-5)
+        self._setup = None  # NRPNs still to send, one per tick
         self._started = False
         self._timer = None
         self._phase = None
         self._ring = None  # the last session highlight sent
-        self._pending_clip = None  # the clip slot to show in the Detail view (S-32)
+        self._pending_clip = None  # the clip slot to show in the Detail view
         self._pending_fresh = False
         super().__init__(*a, specification=Specification, **k)
 
@@ -83,7 +83,7 @@ class BleakLoop(ControlSurface):
             self._refresh()
         elif self._setup is None:
             logger.info("BleakLoop loaded")
-            self._setup = [device.user_firmware_mode(False)] + device.split_setup()  # S-5
+            self._setup = [device.user_firmware_mode(False)] + device.split_setup()
             self._send(self._setup.pop(0))
         elif self._setup:
             # One NRPN per tick: the device drops a block from the middle of a burst (#18).
@@ -91,8 +91,8 @@ class BleakLoop(ControlSurface):
         else:
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
-            self.enter_mode(Mode.SESSION)  # S-7
-            # S-92: the display tick alone would land tempo blinks up to 100 ms late.
+            self.enter_mode(Mode.SESSION)
+            # The display tick alone would land tempo blinks up to 100 ms late.
             self._timer = Live.Base.Timer(
                 callback=self._on_blink_timer, interval=values.BLINK_TIMER_MS, repeat=True
             )
@@ -104,7 +104,7 @@ class BleakLoop(ControlSurface):
             self._timer = None
         if self._state.undo_open:
             self.song.end_undo_step()
-        # S-6: hand the device back for playing.
+        # Hand the device back for playing.
         self._send(
             device.y_axis(False)
             + device.user_firmware_mode(False)
@@ -112,13 +112,12 @@ class BleakLoop(ControlSurface):
         )
         self._remove_listeners()
         # After the hand-back: if this raises, the device is already playable.
-        self._c_instance.set_session_highlight(-1, -1, -1, -1, False)  # S-10
+        self._c_instance.set_session_highlight(-1, -1, -1, -1, False)
         super().disconnect()
 
     def _on_blink_timer(self):
         try:
             if self._state.glides or self._state.lifts:
-                # S-72: the fader glide; a full redraw only when a lit height changes.
                 state, actions, redraw = engine.tick(self._state, time.monotonic() * 1000)
                 self._state = state
                 for action in actions:
@@ -137,16 +136,16 @@ class BleakLoop(ControlSurface):
 
     def enter_mode(self, mode):
         if mode is Mode.SESSION:
-            self._send(device.user_firmware_mode(True))  # S-8, S-15
+            self._send(device.user_firmware_mode(True))
         else:
-            self._send(device.y_axis(False) + device.user_firmware_mode(False))  # S-13, S-14
+            self._send(device.y_axis(False) + device.user_firmware_mode(False))
         self._listen_for(mode)
-        self._update_ring(force=True)  # S-10, S-15
-        self._driver.reset()  # S-94
+        self._update_ring(force=True)
+        self._driver.reset()
         self._refresh()
 
     def set_mixer(self, on):
-        # S-70: one burst, no driver reset; _handle's refresh sends only the changed pads.
+        # One burst, no driver reset; _handle's refresh sends only the changed pads.
         self._send(device.y_axis(on))
         self._listen_for(Mode.SESSION)
 
@@ -187,7 +186,6 @@ class BleakLoop(ControlSurface):
         self._handle(PadPress(column, layout.pad_of(row), value > 0))
 
     def _on_y_axis(self, column, row, value):
-        # Only the fader columns use Y; the rest are claimed and dropped.
         if column in layout.GRID_COLUMNS:
             self._handle(YAxis(column, layout.pad_of(row), value))
 
@@ -199,7 +197,7 @@ class BleakLoop(ControlSurface):
         # Store first: EnterMode renders, and must render the new mode.
         self._state = state
         follow_ups = [live_actions.apply(action, self.song, self) for action in actions]
-        # Follow-up events (Capture, S-47) go to the core once; theirs are dropped, so this
+        # Follow-up events (Capture) go to the core once; theirs are dropped, so this
         # never recurses.
         for follow_up in follow_ups:
             if follow_up is not None:
@@ -210,7 +208,7 @@ class BleakLoop(ControlSurface):
         self._update_ring()
         self._refresh()
 
-    # Detail view (S-32)
+    # Detail view
 
     def show_clip_when_ready(self, slot):
         # Polled on the display tick: Live refuses changes made inside a listener callback.
@@ -247,7 +245,6 @@ class BleakLoop(ControlSurface):
         )
 
     def _update_ring(self, force=False):
-        # S-10: the ring follows the window in Session Mode and is gone in Note Mode.
         if self._state.mode is Mode.SESSION:
             window = self._state.window
             want = (window.track, window.scene, layout.WINDOW_TRACKS, layout.WINDOW_SCENES)

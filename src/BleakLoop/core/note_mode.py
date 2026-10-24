@@ -1,4 +1,4 @@
-"""Note Mode: column 1's controls page and scene page (S-76–S-86, S-106–S-108)."""
+"""Note Mode: column 1's controls page and scene page."""
 
 from dataclasses import replace
 
@@ -24,36 +24,36 @@ def handle(state, event, snapshot):
         values.CONTROL_CC_BASE <= event.cc < values.CONTROL_CC_BASE + layout.ROWS
     ):
         return state, []
-    # Any value is a press: column 1 pads are toggles and send nothing on release (S-76).
+    # Any value is a press: column 1 pads are toggles and send nothing on release.
     key = (1, layout.control_pad(event.cc))
     if state.scene_page:
         return _scene_page(state, key, snapshot)
     if key == layout.UNDO:
-        return state, controls.undo(snapshot)  # S-77
+        return state, controls.undo(snapshot)
     if key == layout.RECORD_CLIP:
-        return state, _record_clip(state, snapshot)  # S-78
+        return state, _record_clip(state, snapshot)
     if key == layout.CAPTURE:
-        return state, _capture_midi(snapshot)  # S-79
+        return state, _capture_midi(snapshot)
     if key == layout.SCENE_PAGE:
-        return replace(state, scene_page=True), []  # S-106
+        return replace(state, scene_page=True), []
     if key == layout.METRONOME:
-        return state, controls.metronome(snapshot)  # S-81
+        return state, controls.metronome(snapshot)
     if key == layout.PLAY_STOP:
-        return state, _play_stop(snapshot)  # S-82, S-83
+        return state, _play_stop(snapshot)
     if key == layout.RECORD:
-        return state, controls.record(snapshot)  # S-84
+        return state, controls.record(snapshot)
     if key == layout.MODE_PAD:
-        return modes.enter(state, Mode.SESSION), [EnterMode(Mode.SESSION)]  # S-85
+        return modes.enter(state, Mode.SESSION), [EnterMode(Mode.SESSION)]
     return state, []
 
 
 def _scene_page(state, key, snapshot):
     if key == layout.MODE_PAD:
-        return replace(state, scene_page=False), []  # S-108
+        return replace(state, scene_page=False), []
     scene = state.window.scene + key[1] - 1
     if scene >= snapshot.scene_count:
         return state, []  # past the end of the Set: nothing launched, the page stays
-    return replace(state, scene_page=False), [FireScene(scene, legato=False)]  # S-107
+    return replace(state, scene_page=False), [FireScene(scene, legato=False)]
 
 
 def _record_clip(state, snapshot):
@@ -92,31 +92,31 @@ def _capture_midi(snapshot):
 
 def _play_stop(snapshot):
     if not snapshot.session_view:
-        return [TogglePlay()]  # S-83
+        return [TogglePlay()]
     track = snapshot.selected_track
     if track is None:
         return [ShowMessage("No selected track")]
-    return [StopTrackClips(track.index), ShowMessage(f"Stop clips: {track.name}")]  # S-82
+    return [StopTrackClips(track.index), ShowMessage(f"Stop clips: {track.name}")]
 
 
 def render(state, snapshot):
-    # Column 1 only: the rest of the surface is the instrument (S-5).
+    # Column 1 only: the rest of the surface is the instrument.
     if state.scene_page:
         frame = {
             (1, pad): controls.scene_light(snapshot, state.window.scene, pad - 1)
             for pad in range(1, layout.ROWS)
-        }  # S-107
-        frame[layout.MODE_PAD] = Light(WHITE)  # S-108
+        }
+        frame[layout.MODE_PAD] = Light(WHITE)
         return frame
     return {
-        layout.UNDO: Light(WHITE),  # S-77
-        layout.RECORD_CLIP: Light(MAGENTA),  # S-78
-        layout.CAPTURE: Light(LIME),  # S-79
-        layout.SCENE_PAGE: Light(PINK),  # S-106
-        layout.METRONOME: controls.metronome_light(snapshot),  # S-81
+        layout.UNDO: Light(WHITE),
+        layout.RECORD_CLIP: Light(MAGENTA),
+        layout.CAPTURE: Light(LIME),
+        layout.SCENE_PAGE: Light(PINK),
+        layout.METRONOME: controls.metronome_light(snapshot),
         layout.PLAY_STOP: (
             Light(GREEN) if snapshot.session_view else controls.play_light(snapshot)
-        ),  # S-82, S-83
-        layout.RECORD: controls.record_light(snapshot),  # S-84
-        layout.MODE_PAD: Light(WHITE),  # S-85
+        ),
+        layout.RECORD: controls.record_light(snapshot),
+        layout.MODE_PAD: Light(WHITE),
     }
