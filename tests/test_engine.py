@@ -1,7 +1,7 @@
 import pytest
 
 from BleakLoop.core import engine, layout
-from BleakLoop.core.model import ControlCC, EnterMode, PadPress, Snapshot
+from BleakLoop.core.model import EnterMode, PadPress, Snapshot
 from BleakLoop.core.modes import Mode, State
 
 STOPPED = Snapshot(
@@ -35,21 +35,24 @@ def test_session_input_goes_to_session_module():
 # Note Mode input
 
 
-@pytest.mark.parametrize("value", [127, 0])
-def test_pad_8_any_value_enters_session(value):
-    state, actions = engine.handle(NOTE, ControlCC(102, value), STOPPED)
+def test_pad_8_press_enters_session():
+    state, actions = engine.handle(NOTE, PadPress(1, 8, True), STOPPED)
     assert state == State(mode=Mode.SESSION)
     assert actions == [EnterMode(Mode.SESSION)]
 
 
+def test_pad_8_release_is_ignored():
+    assert engine.handle(NOTE, PadPress(1, 8, False), STOPPED) == (NOTE, [])
+
+
 def test_note_input_goes_to_note_module():
-    state, actions = engine.handle(NOTE, ControlCC(106, 0), STOPPED)
+    state, actions = engine.handle(NOTE, PadPress(1, 4, True), STOPPED)
     assert state.scene_page
     assert actions == []
 
 
-@pytest.mark.parametrize("key", [layout.MODE_PAD, layout.METRONOME, (5, 5)])
-def test_note_ignores_pads(key):
+@pytest.mark.parametrize("key", [(2, 8), (5, 5), layout.SHIFT])
+def test_note_ignores_pads_outside_column_1(key):
     assert engine.handle(NOTE, press(key), STOPPED) == (NOTE, [])
 
 

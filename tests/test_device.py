@@ -1,3 +1,5 @@
+import pytest
+
 from BleakLoop import device
 from BleakLoop.core.leds import BLUE, DEVICE_DEFAULT, OFF, WHITE, Clock, Light
 
@@ -28,29 +30,245 @@ def test_y_axis_off_on_all_rows():
     assert device.y_axis(False) == [(0xB0 + ch, 11, 0) for ch in range(8)]
 
 
-def test_split_setup():
-    steps = device.split_setup()
-    assert len(steps) == 13
-    assert steps[0] == device.query(200) + device.nrpn(200, 1)
-    assert steps[3][-6:] == device.nrpn(1, 1)  # main channel 1
-    assert steps[5] == device.query(40) + device.nrpn(40, 102)
-    assert steps[-1] == device.query(47) + device.nrpn(47, 109)
-
-
 def test_query():
     assert device.query(35) == device.nrpn(299, 35)
 
 
-def test_split_restore_follows_setup_order():
-    assert device.split_restore({35: 0, 200: 0}) == [device.nrpn(200, 0), device.nrpn(35, 0)]
+# Column 1's notes
+
+
+def steps(start, offset):
+    return tuple(start + r * offset for r in range(8))
+
+
+def custom(value):
+    return {227: 12, 253: value}
+
+
+GUITAR = (30, 35, 40, 45, 50, 55, 59, 64)
+
+
+@pytest.mark.parametrize(
+    ("reads", "notes"),
+    [
+        ({227: 3}, steps(30, 3)),
+        ({227: 4}, steps(30, 4)),
+        ({227: 5}, (30, 35, 40, 45, 50, 55, 60, 65)),
+        ({227: 6}, steps(30, 6)),
+        ({227: 7}, steps(30, 7)),
+        ({227: 127}, (30,) * 8),
+        (custom(28), steps(18, 12)),  # Octave
+        (custom(23), steps(30, 7)),
+        (custom(32), steps(18, 16)),
+        (custom(13), steps(65, -3)),
+        (custom(9), steps(65, -7)),
+        (custom(0), steps(130, -16)),
+        ({227: 13, **dict(zip(range(263, 271), GUITAR))}, GUITAR),
+        ({227: 0}, steps(30, 1)),  # No Overlap
+        (custom(33), (64, 59, 55, 50, 45, 40, 35, 30)),  # inverted guitar
+    ],
+)
+def test_row_notes(reads, notes):
+    assert device.row_notes(reads) == notes
+
+
+@pytest.mark.parametrize("reads", [{}, {227: 8}, {227: 12}, {227: 13, 263: 30}])
+def test_row_notes_unknown(reads):
+    assert device.row_notes(reads) is None
+
+
+@pytest.mark.parametrize(
+    ("notes", "octave"),
+    [
+        ((30, 35, 40, 45, 50, 55, 60, 65), 5),
+        (steps(18, 16), 4),  # 130 needs an octave down
+        (steps(130, -16), 4),
+        (steps(0, 17), 5),  # a tuning spanning 0-119 fits unshifted
+    ],
+)
+def test_fit_octave(notes, octave):
+    assert device.fit_octave(notes) == octave
+
+
+def test_control_map_refuses_repeats():
+    assert device.control_map({227: 127}) == (None, 5, device.REFUSE_DUPLICATES)
+
+
+def test_control_map_refuses_unknown_offset():
+    assert device.control_map({227: 8}) == (None, 5, device.REFUSE_ROW_OFFSET)
+
+
+def test_control_map_fourths():
+    notes = {30: 8, 35: 7, 40: 6, 45: 5, 50: 4, 55: 3, 60: 2, 65: 1}
+    assert device.control_map({227: 5}) == (notes, 5, None)
+
+
+def test_control_map_shifts_by_octave():
+    note_to_pad, octave, _ = device.control_map(custom(32))
+    assert octave == 4
+    assert note_to_pad[6] == 8 and note_to_pad[118] == 1
+
+
+# The control channel
+
+
+def per_note(channels, main, mode=1):
+    reads = {100: mode, 101: main}
+    reads.update({101 + c: int(c in channels) for c in range(1, 17)})
+    return reads
+
+
+FACTORY = per_note(range(9, 16), main=16)
+
+
+def test_factory_split_channels():
+    assert device.right_split_channels(FACTORY) == set(range(9, 17))
+
+
+def test_factory_split_takes_channel_8():
+    assert device.control_channel(FACTORY) == (7, [])
+
+
+def test_one_channel_on_1():
+    assert device.control_channel({100: 0, 101: 1}) == (15, [])
+
+
+def test_per_row_wraps():
+    reads = {100: 2, 101: 1, 118: 12}
+    assert device.right_split_channels(reads) == {1, 2, 3, 12, 13, 14, 15, 16}
+    assert device.control_channel(reads) == (10, [])
+
+
+def test_all_channels_used_borrows_highest_per_note():
+    assert device.control_channel(per_note(range(2, 17), main=1)) == (15, [(117, 0)])
+
+
+def test_borrow_skips_main_channel():
+    assert device.control_channel(per_note(range(1, 16), main=16)) == (14, [(116, 0)])
+
+
+@pytest.mark.parametrize(
+    "reads", [{100: 0}, {101: 1}, {100: 1, 101: 1}, {100: 2, 101: 1}]
+)
+def test_right_split_unread(reads):
+    assert device.right_split_channels(reads) is None
+    assert device.control_channel(reads) == (15, [])
+
+
+# Setup, poll and restore steps
+
+
+def queries(*numbers):
+    return [m for number in numbers for m in device.query(number)]
+
+
+def test_read_steps_two_queries_each():
+    read = device.read_steps()
+    assert len(read) == 15
+    assert read[0] == queries(227, 253)
+    assert read[-1] == queries(118)  # 29 numbers: the last step holds one
+
+
+def test_read_numbers():
+    assert device.READ_NUMBERS == [227, 253, *range(263, 271), 100, 101, *range(102, 119)]
+
+
+def test_fixed_steps():
+    fixed = device.fixed_steps()
+    assert len(fixed) == 11
+    assert fixed[0] == device.query(200) + device.nrpn(200, 1)
+    assert fixed[1] == device.query(202) + device.nrpn(202, 2)
+    assert fixed[-1] == device.query(38) + device.nrpn(38, 7)
+
+
+def test_computed_settings_factory():
+    settings, channel, note_to_pad, refusal = device.computed_settings({227: 5, **FACTORY})
+    assert settings == [(1, 8), (36, 5)]
+    assert channel == 7
+    assert note_to_pad[30] == 8
+    assert refusal is None
+
+
+def test_computed_settings_borrow():
+    settings, channel, _, _ = device.computed_settings({227: 5, **per_note(range(2, 17), 1)})
+    assert settings == [(1, 16), (36, 5), (117, 0)]
+    assert channel == 15
+
+
+def test_computed_settings_refuses_unread_right_split():
+    settings, channel, note_to_pad, refusal = device.computed_settings({227: 5})
+    assert settings == [(1, 16), (36, 5)]
+    assert (channel, note_to_pad, refusal) == (15, None, device.REFUSE_RIGHT_SPLIT)
+
+
+def test_computed_settings_row_offset_refusal():
+    _, _, note_to_pad, refusal = device.computed_settings({227: 127, **FACTORY})
+    assert (note_to_pad, refusal) == (None, device.REFUSE_DUPLICATES)
+
+
+def test_computed_steps():
+    assert device.computed_steps([(1, 8)]) == [device.query(1) + device.nrpn(1, 8)]
+
+
+@pytest.mark.parametrize(
+    ("offset", "numbers"),
+    [
+        (5, [227, 36, 37, 38]),
+        (12, [227, 36, 37, 38, 253]),
+        (13, [227, 36, 37, 38, *range(263, 271)]),
+    ],
+)
+def test_poll_numbers(offset, numbers):
+    assert device.poll_numbers({227: offset}) == numbers
+
+
+def test_poll_steps():
+    assert device.poll_steps([227, 36, 37]) == [queries(227, 36), queries(37)]
+
+
+SENT = {36: 5, 37: 7, 38: 7}
+
+
+def test_realign_unchanged():
+    note_to_pad, refusal, settings, changed = device.realign({227: 5, **SENT}, SENT)
+    assert note_to_pad[65] == 1
+    assert (refusal, settings, changed) == (None, [], False)
+
+
+def test_realign_player_octave():
+    _, _, settings, changed = device.realign({227: 5, 36: 7, 37: 7, 38: 7}, SENT)
+    assert (settings, changed) == ([(36, 5)], True)
+
+
+def test_realign_offset_change():
+    note_to_pad, _, settings, changed = device.realign({227: 0, **SENT}, SENT)
+    assert note_to_pad == {30 + r: 8 - r for r in range(8)}
+    assert (settings, changed) == ([], False)
+
+
+def test_realign_new_octave_is_not_a_player_change():
+    _, _, settings, changed = device.realign({**custom(32), **SENT}, SENT)
+    assert (settings, changed) == ([(36, 4)], False)
+
+
+def test_realign_refused():
+    note_to_pad, refusal, settings, _ = device.realign({227: 127, **SENT}, SENT)
+    assert (note_to_pad, refusal, settings) == (None, device.REFUSE_DUPLICATES, [])
+
+
+def test_split_restore_follows_numbers_order():
+    assert device.split_restore({35: 0, 200: 0}, [200, 35]) == [
+        device.nrpn(200, 0),
+        device.nrpn(35, 0),
+    ]
 
 
 def test_split_restore_skips_missing():
-    assert device.split_restore({202: 5}) == [device.nrpn(202, 5)]
+    assert device.split_restore({202: 5}, [200, 202]) == [device.nrpn(202, 5)]
 
 
 def test_split_restore_empty():
-    assert device.split_restore({}) == []
+    assert device.split_restore({}, [200]) == []
 
 
 def feed_all(reader, messages):

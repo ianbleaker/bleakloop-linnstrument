@@ -207,7 +207,6 @@ flowchart TD
   core_engine --> core_modes
   core_engine --> core_note_mode
   core_engine --> core_session
-  core_layout --> core_values
   core_leds --> core_values
   core_mixer --> core_layout
   core_mixer --> core_model
@@ -220,7 +219,6 @@ flowchart TD
   core_note_mode --> core_leds
   core_note_mode --> core_model
   core_note_mode --> core_modes
-  core_note_mode --> core_values
   core_session --> core_controls
   core_session --> core_layout
   core_session --> core_leds
@@ -264,7 +262,12 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **Pad input** (User Firmware Mode): Note On for a press, Note Off (or Note On velocity 0) for a release. The channel is the device row (channel 1 = device row 0, the nearest) and the note number is the column. Column 0 reports like any pad and is ignored.
 - **Lights:** CC 20 (column, from 0), CC 21 (device row, from 0), CC 22 (colour value).
 - **Y-axis:** CC 11 = 1 on channels 1–8 turns reporting on per row, CC 11 = 0 off. Reports arrive as CC (64 + column) on the row's channel.
-- **Control split** (Note Mode): set up on load as column 1 only, CC Faders, one-channel mode on the control channel, faders sending CC 102–109 nearest row first (NRPNs in section 8). Before each setting is changed, it's read with an NRPN 299 query sent in the same step, and on unload the player's values are written back. The player's right split is left untouched. BleakLoop listens for CC 102–109 on the control channel only; everything else passes through to Live's tracks.
+- **Control split** (Note Mode): set up on load as a one-column note split, column 1 only, in one-channel mode on the control channel (NRPNs in section 8). The setup runs in three phases:
+  - **Reads:** Row Offset (227, 253, 263–270) and the right split's channels (100, 101, 102–117, 118), two NRPN 299 queries per step.
+  - **Fixed sets:** split on at column 1, one channel, Send X/Y/Z off, no Played colour (a pressed pad would light red over BleakLoop's colour), LowRow off, no special mode, Transpose at 0.
+  - **Computed sets:** the control channel and the Octave, worked out from the reads.
+
+  Each set is preceded by a query in the same step, and on unload the player's value is written back for every number BleakLoop set. The control channel is the highest one the right split doesn't use (its main channel, plus its per-note channels or its eight per-row channels). The right split is left untouched, unless it uses all 16: then its highest per-note channel other than the main one is turned off, borrowed and restored on unload. If the right split can't be read, channel 16 is used and the controls stay off. The Octave is the one closest to 0 that keeps all eight column-1 notes in 0–127. In Note Mode, BleakLoop polls Row Offset and the left split's Octave/Transpose every `POLL_MS`, rebuilds the note map and puts its own Octave/Transpose back if the player changed them. A Row Offset that repeats a note in column 1 turns the controls off, with a message, until it changes. BleakLoop listens for all 128 notes on the control channel; everything else passes through to Live's tracks.
 
 **Colour values** (CC 22): red 1, yellow 2, green 3, cyan 4, blue 5, magenta 6, off 7, white 8, orange 9, lime 10, pink 11. Value 0 ("as set in Note Lights") also shows dark, but means device default and is used only to hand column 1's lights back on unload. On the device, lime looks yellow and green looks lime.
 
@@ -277,9 +280,9 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **The device applies light changes one at a time.** A full-grid flip leaves Live in under 1 ms but ripples visibly; BleakLoop never adds to it by spreading changes across refreshes.
 
 > [!NOTE]
-> **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one query and one NRPN per display tick (about 1.4 s at startup). On unload, the restore appended to the 38-message hand-back burst lost its last 18 messages, so each restore NRPN is sent after a `RESTORE_GAP_MS` sleep.
+> **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one step per display tick: two queries, or one query and one NRPN (about 2.8 s at startup). On unload, the restore appended to the 38-message hand-back burst lost its last 18 messages, so each restore NRPN is sent after a `RESTORE_GAP_MS` sleep.
 
-- **Control split pads are toggles.** Each press sends one CC: 127 if the device's stored value for that CC is 0, otherwise 0. A release sends nothing. The stored value follows any CC 102–109 the device receives on the control channel. Rows that share a CC are linked by the firmware, so every row must get its own.
+- **Control split pads are notes.** Column 1 sends Note On for a press and Note Off for a release on the control channel. The note number follows "Note numbers in a playing split" below, with Transpose at 0 and BleakLoop's Octave.
 - **Y is relative and dense.** Every press reports 64 first, after the note-on. Y swings to 127 or 0 over about half a pad and then stays saturated until the release. Reports arrive every 10–20 ms, 1–3 units apart.
 - **A slide never overlaps pads.** The old pad's release comes first, then 160–460 ms of silence, then the next pad's press.
 - **A still finger rolls.** Y drifts from 64 to about 85 within 100 ms of a press, and further over seconds.
@@ -305,10 +308,10 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
   - Y-axis values: CC 64 + column on channels 1–8, claimed only in Mixer Mode. Columns 2–14 (CC 66–78) become fader input; the other columns are claimed and dropped, because Y reporting is per row and their reports would otherwise reach Live's tracks.
 
 > [!IMPORTANT]
-> **Elements in Note Mode:** CC 102–109 on the control channel only, as plain CC buttons, never encoders. Encoders send the control CCs = 0 back to the device on every Note Mode entry, which resets its stored toggle values, and Live appears to drop a mapped CC that repeats the encoder's last value. Together that lost every other press.
+> **Elements in Note Mode:** notes 0–127 on every channel, 16 × 128 = 2048 note buttons. The control channel is chosen from the right split after load, and elements must be declared before it is known. Only the chosen channel's 128 are listened. All 128, not only the eight that column 1 sends, so column 1 never plays Live's tracks, even between a Row Offset change and the next poll. The build time is logged at load (`BleakLoop elements built in`).
 
-- **NRPN replies:** CC 99, 98, 6, 38, 101 and 100 on channel 1, listened only during the setup, so the control split's queries can be read. Their listeners are removed when Session Mode is entered.
-- **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Note Mode, only the eight control CCs are listened; everything else reaches Live's tracks.
+- **NRPN replies:** CC 99, 98, 6, 38, 101 and 100 on channel 1, listened during the setup and in Note Mode, so the setup's queries and the Note Mode poll can be read. Their listeners are removed when Session Mode is entered. The cost: in Note Mode, any channel-1 RPN or NRPN the LinnStrument sends (for example, MPE configuration on a settings change) doesn't reach Live.
+- **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Note Mode, only the control channel's 128 notes and the NRPN replies are listened; everything else reaches Live's tracks.
 - **LED output.** One "light pad" call sends CC 20, 21 and 22. The LED driver (section 3) is the only caller. v3's per-element send cache isn't relied on.
 
 > [!IMPORTANT]
@@ -316,7 +319,7 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
 
 ### Device lifecycle
 
-- **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split (paced, section 5), then enters Session Mode. NRPN 245 is sent on entering Session and Note Mode. Each setup step queries a setting and then sets it; the device answers in order, so the reply is the player's own value. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each split setting that replied, one NRPN per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. A setting that never replied keeps BleakLoop's value.
+- **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Note Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
 
 ```mermaid
 sequenceDiagram
@@ -324,7 +327,11 @@ sequenceDiagram
   participant LinnStrument
   Note over BleakLoop,LinnStrument: Load, one message per display tick
   BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
-  loop split_setup(), one setting per tick
+  loop read_steps(), two queries per tick
+    BleakLoop->>LinnStrument: NRPN 299 = N, NRPN 299 = M
+    LinnStrument-->>BleakLoop: NRPN N, NRPN M = player's values, saved
+  end
+  loop fixed_steps(), then computed_steps(), one setting per tick
     BleakLoop->>LinnStrument: NRPN 299 = N (query), then NRPN N
     LinnStrument-->>BleakLoop: NRPN N = player's value, saved
   end
@@ -338,7 +345,7 @@ sequenceDiagram
   BleakLoop->>LinnStrument: y_axis(False), CC 11 = 0 on channels 1–8
   BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
   BleakLoop->>LinnStrument: release_column_1(), column 1 lights to value 0
-  loop split_restore(saved), RESTORE_GAP_MS sleep before each
+  loop split_restore(saved, set numbers), RESTORE_GAP_MS sleep before each
     BleakLoop->>LinnStrument: NRPN N = player's value
   end
   Note over BleakLoop: set_session_highlight(-1, -1, -1, -1, False)
@@ -439,11 +446,13 @@ Every tuned number lives here with its reason and status. Code reads them from `
 
 | Value | Used by | Source | Status |
 | --- | --- | --- | --- |
-| `CONTROL_CHANNEL`: control split channel | Note Mode controls | Named constant edited by the player | Default channel 1, confirmed |
-| Control split setup NRPNs: 200 = 1 (split on), 202 = `SPLIT_POINT` = 2 (left split is column 1), 0 = 0 (one channel), 1 = channel, 35 = 2 (CC Faders), 40–47 = 102–109 (faders send CC 102–109) | `device.split_setup`, each preceded by its query | Device protocol | Confirmed on device |
+| Control channel: the highest channel the right split doesn't use; with none free, its highest per-note channel other than the main one, turned off (101 + c = 0); channel 16 if the right split can't be read | `device.control_channel` | Chosen at load from reads 100, 101, 102–117 and 118 | Verify on device |
+| Fixed setup NRPNs: 200 = 1 (split on), 202 = `SPLIT_POINT` = 2 (left split is column 1), 0 = 0 (one channel), 20, 24, 27 = 0 (Send X/Y/Z off), 32 = 0 (Played colour off), 34 = 0 (LowRow off), 35 = 0 (no special mode), 37 = 38 = 7 (Transpose 0) | `device.fixed_steps`, each preceded by its query | Device protocol | Verify on device |
+| Computed setup NRPNs: 1 = control channel, 36 = the Octave fit, plus the borrowed per-note channel if any | `device.computed_steps`, each preceded by its query | Device protocol | Verify on device |
+| Octave fit: the NRPN 36 value in 0–10 closest to 5, ties lower, that keeps column 1's eight notes in 0–127 | `device.fit_octave` | Device protocol; every Row Offset spans at most 112, so one always fits | Verify on device |
 | NRPN 299 = N: query setting N, answered as NRPN N | `device.query` | Device protocol | Confirmed on device |
 | `RESTORE_GAP_MS = 20`: sleep before each unload restore NRPN | `surface.disconnect` | Tuned: 0 lost the last 18 messages, 20 restored all 13 | Confirmed on device |
-| `CONTROL_CC_BASE = 102`: control split CCs 102–109, nearest row first | Note Mode controls | Chosen: undefined in General MIDI, clear of CC 1–8, LED CCs 20–22 and Y-axis CCs 64–80 | Confirmed on device |
+| `POLL_MS = 1000`: Note Mode re-check of Row Offset and the left split's Octave/Transpose | `surface` | Chosen: shorter than a trip through Global Settings and back | Verify on device |
 | Off colour value: 7 | `leds` | Device protocol | Confirmed; 0 also dark |
 | `FAST_BLINK_MS = 200`: fast blink, 200 ms on, 200 ms off | `leds` | Tuned | Verify on device (#25) |
 | Light refresh: Live's display callback, about 100 ms | `surface` | Mechanism | Measured |

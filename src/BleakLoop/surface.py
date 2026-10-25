@@ -15,15 +15,13 @@ from ableton.v3.control_surface import (
 from . import device, live_actions, live_state
 from .core import engine, layout, values
 from .core.leds import Clock, phase_key
-from .core.model import ControlCC, PadPress, YAxis
+from .core.model import PadPress, YAxis
 from .core.modes import Mode, State
 
 logger = logging.getLogger(__name__)
 
-CONTROL_CCS = range(values.CONTROL_CC_BASE, values.CONTROL_CC_BASE + layout.ROWS)
 Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column
 NRPN_REPLY_CCS = (99, 98, 6, 38, 101, 100)
-SPLIT_NUMBERS = {number for number, _ in device.SPLIT_SETTINGS}
 
 
 class Elements(ElementsBase):
@@ -42,13 +40,14 @@ class Elements(ElementsBase):
                 self.add_button(
                     Y_AXIS_CC_BASE + column, f"Y {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
-        # Note Mode control split: CC 102-109 on the control channel. Plain CC buttons:
-        # encoders reset the device's toggles to 0 and Live drops their repeated values.
-        for number in CONTROL_CCS:
-            self.add_button(
-                number, f"Control {number}", channel=values.CONTROL_CHANNEL, msg_type=MIDI_CC_TYPE
-            )
-        # Device replies to NRPN 299 queries: listened only during the setup.
+        # Note Mode column 1: every note on every channel. The control channel is chosen
+        # from the right split after load, and elements must exist before it.
+        for channel in range(16):
+            for note in range(128):
+                self.add_button(
+                    note, f"Control {channel} {note}", channel=channel, msg_type=MIDI_NOTE_TYPE
+                )
+        # Device replies to NRPN 299 queries: listened during the setup and in Note Mode.
         for number in NRPN_REPLY_CCS:
             self.add_button(number, f"Nrpn {number}", channel=0, msg_type=MIDI_CC_TYPE)
 
@@ -66,15 +65,29 @@ class BleakLoop(ControlSurface):
         self._driver = device.LedDriver()
         self._listeners = []
         self._reader = device.NrpnReader()
-        self._saved_split = {}  # the player's split settings, read at load
+        self._saved_split = {}  # the first reply per NRPN: the player's settings
+        self._reads = {}  # the latest reply per NRPN
+        self._set_numbers = []  # NRPNs BleakLoop set, in setup order
         self._setup = None  # NRPNs still to send, one per tick
+        self._computed = False
+        self._control_channel = None  # 0-based, chosen at load
+        self._note_map = None  # column 1 note -> pad, None while refused
+        self._refusal = None
+        self._right_split_unread = False
+        self._sent = {}  # BleakLoop's last left split Octave/Transpose
+        self._poll = []  # Note Mode query steps still to send
+        self._pending_sets = []  # (number, value) sets from the last re-check
+        self._poll_due = 0
+        self._poll_wait = False
         self._started = False
         self._timer = None
         self._phase = None
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
         self._pending_fresh = False
+        start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
+        logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
 
     @staticmethod
     def _should_include_element_in_background(_):
@@ -87,22 +100,30 @@ class BleakLoop(ControlSurface):
         super().update_display()
         if self._started:
             self._check_pending_clip()
+            if self._state.mode is Mode.NOTE:
+                self._poll_tick()
             self._refresh()
         elif self._setup is None:
             logger.info("BleakLoop loaded")
-            for number in NRPN_REPLY_CCS:
-                element = getattr(self.elements, f"nrpn_{number}")
-                self._add_listener(element, lambda v, n=number: self._on_nrpn_reply(n, v))
+            self._listen_for_nrpn_replies()
             self.request_rebuild_midi_map()
-            self._setup = [device.user_firmware_mode(False)] + device.split_setup()
+            # Reads first, then the fixed sets: every read reply is in before the computed sets.
+            self._setup = (
+                [device.user_firmware_mode(False)] + device.read_steps() + device.fixed_steps()
+            )
+            self._set_numbers = [number for number, _ in device.FIXED_SETTINGS]
             self._send(self._setup.pop(0))
         elif self._setup:
-            # One NRPN per tick: the device drops a block from the middle of a burst (#18).
+            # One step per tick: the device drops a block from the middle of a burst (#18).
             self._send(self._setup.pop(0))
+        elif not self._computed:
+            self._compute_settings()
         else:
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
             self.enter_mode(Mode.SESSION)
+            if self._refusal is not None:
+                self.show_message(self._refusal)
             # The display tick alone would land tempo blinks up to 100 ms late.
             self._timer = Live.Base.Timer(
                 callback=self._on_blink_timer, interval=values.BLINK_TIMER_MS, repeat=True
@@ -122,13 +143,65 @@ class BleakLoop(ControlSurface):
             + self._driver.release_column_1()
         )
         # Paced: in one burst with the hand-back the device dropped the last 18 messages.
-        for step in device.split_restore(self._saved_split):
+        for step in device.split_restore(self._saved_split, self._set_numbers):
             time.sleep(values.RESTORE_GAP_MS / 1000)
             self._send(step)
         self._remove_listeners()
         # After the hand-back: if this raises, the device is already playable.
         self._c_instance.set_session_highlight(-1, -1, -1, -1, False)
         super().disconnect()
+
+    def _compute_settings(self):
+        settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
+        self._control_channel = channel
+        self._right_split_unread = self._refusal == device.REFUSE_RIGHT_SPLIT
+        self._sent = {
+            device.NRPN_OCTAVE: dict(settings)[device.NRPN_OCTAVE],
+            device.NRPN_TRANSPOSE_PITCH: device.TRANSPOSE_ZERO,
+            device.NRPN_TRANSPOSE_LIGHTS: device.TRANSPOSE_ZERO,
+        }
+        self._set_numbers += [number for number, _ in settings]
+        logger.info("BleakLoop control channel %d", channel + 1)
+        self._setup = device.computed_steps(settings)
+        self._computed = True
+        self._send(self._setup.pop(0))
+
+    def _poll_tick(self):
+        # Note Mode re-check of Row Offset and the left split's Octave/Transpose, one step
+        # per tick. Sets go out before the next poll starts.
+        now_ms = time.monotonic() * 1000
+        if self._pending_sets:
+            number, value = self._pending_sets.pop(0)
+            self._send(device.nrpn(number, value))
+            # A set gets no reply: without this the next re-check sees the same mismatch.
+            self._reads[number] = value
+        elif self._poll:
+            self._send(self._poll.pop(0))
+            self._poll_wait = not self._poll
+        elif self._poll_wait:
+            # One tick after the last query: its replies are in.
+            self._poll_wait = False
+            self._realign()
+            self._poll_due = now_ms + values.POLL_MS
+        elif now_ms >= self._poll_due:
+            self._poll = device.poll_steps(device.poll_numbers(self._reads))
+
+    def _realign(self):
+        was_refused = self._note_map is None
+        note_map, refusal, settings, player_changed = device.realign(self._reads, self._sent)
+        self._pending_sets = settings
+        self._sent = {number: self._reads.get(number) for number in self._sent} | dict(settings)
+        if self._right_split_unread:
+            # No channel is known to be free: the controls stay off for the session.
+            return
+        self._note_map = note_map
+        if player_changed:
+            self.show_message(device.OCTAVE_RESET)
+        if refusal is not None and refusal != self._refusal:
+            self.show_message(refusal)
+        elif refusal is None and was_refused:
+            self.show_message(device.CONTROLS_ON)
+        self._refusal = refusal
 
     def _on_blink_timer(self):
         try:
@@ -150,6 +223,9 @@ class BleakLoop(ControlSurface):
     # Modes
 
     def enter_mode(self, mode):
+        self._poll, self._pending_sets, self._poll_wait = [], [], False
+        if mode is Mode.NOTE:
+            self._poll_due = 0  # re-check at once
         if mode is Mode.SESSION:
             self._send(device.user_firmware_mode(True))
         else:
@@ -181,10 +257,18 @@ class BleakLoop(ControlSurface):
                             element, lambda v, c=column, r=row: self._on_y_axis(c, r, v)
                         )
         else:
-            for number in CONTROL_CCS:
-                element = getattr(self.elements, f"control_{number}")
-                self._add_listener(element, lambda v, n=number: self._on_control(n, v))
+            # All 128 notes, so column 1 never plays Live's tracks whatever Row Offset sends.
+            channel = self._control_channel
+            for note in range(128):
+                element = getattr(self.elements, f"control_{channel}_{note}")
+                self._add_listener(element, lambda v, n=note: self._on_control_note(n, v))
+            self._listen_for_nrpn_replies()
         self.request_rebuild_midi_map()
+
+    def _listen_for_nrpn_replies(self):
+        for number in NRPN_REPLY_CCS:
+            element = getattr(self.elements, f"nrpn_{number}")
+            self._add_listener(element, lambda v, n=number: self._on_nrpn_reply(n, v))
 
     def _add_listener(self, element, fn):
         element.add_value_listener(fn)
@@ -199,9 +283,10 @@ class BleakLoop(ControlSurface):
 
     def _on_nrpn_reply(self, number, value):
         reply = self._reader.feed(number, value)
-        if reply is not None and reply[0] in SPLIT_NUMBERS:
+        if reply is not None:
             parameter, setting = reply
-            self._saved_split[parameter] = setting
+            self._reads[parameter] = setting
+            self._saved_split.setdefault(parameter, setting)
 
     def _on_pad(self, column, row, value):
         self._handle(PadPress(column, layout.pad_of(row), value > 0))
@@ -210,8 +295,17 @@ class BleakLoop(ControlSurface):
         if column in layout.GRID_COLUMNS:
             self._handle(YAxis(column, layout.pad_of(row), value))
 
-    def _on_control(self, number, value):
-        self._handle(ControlCC(number, value))
+    def _on_control_note(self, note, value):
+        if self._note_map is None:
+            if value > 0:
+                self.show_message(self._refusal)
+            return
+        pad = self._note_map.get(note)
+        if pad is None:
+            # Row Offset changed since the last re-check: drop the press and re-check now.
+            self._poll_due = 0
+            return
+        self._handle(PadPress(1, pad, value > 0))
 
     def _handle(self, event):
         state, actions = engine.handle(self._state, event, self._snapshot())

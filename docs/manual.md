@@ -9,7 +9,7 @@ BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for
 1. Copy the `src/BleakLoop/` folder into Live's Remote Scripts folder.
 2. In Live's Control Surface preferences, choose **BleakLoop**, with the LinnStrument as Input and Output.
 
-BleakLoop starts in Session Mode. Its Note Mode controls use MIDI channel 1.
+BleakLoop starts in Session Mode. Its Note Mode controls use a MIDI channel that your right split doesn't use. Only if your right split uses all 16 does BleakLoop borrow one of its MPE channels, and it gives it back when Live closes.
 
 While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 its control split. When Live closes, or you choose another control surface, it puts your own split settings back.
 
@@ -101,7 +101,7 @@ Hold Shift for a second layer. The lists above give each pad's Shift function in
 
 The LinnStrument is your instrument again. Column 1 holds BleakLoop's controls and always opens on the controls page.
 
-> **Careful:** in Note Mode the LinnStrument's own panel buttons work again. Changing a setting there (Octave, Volume, Per-Split, Split and the like) saves BleakLoop's control split as your own. To undo that, close Live and set your split up again on the device.
+> **Careful:** in Note Mode the LinnStrument's own panel buttons work again. Changing a setting there (Octave, Volume, Per-Split, Split and the like) saves BleakLoop's control split as your own, along with any MPE channel it borrowed. To undo that, close Live and set your split up again on the device. If you change the left split's Octave or Transpose, BleakLoop puts them back, so select the right split first. BleakLoop follows a Row Offset change within about a second. A Row Offset that repeats notes in column 1 (zero offset, or a guitar tuning with repeated strings) turns column 1's controls off, with a message.
 
 ### Controls page
 

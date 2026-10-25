@@ -2,15 +2,15 @@
 
 from dataclasses import replace
 
-from . import controls, layout, modes, values
+from . import controls, layout, modes
 from .leds import GREEN, LIME, MAGENTA, PINK, WHITE, Light
 from .model import (
     AddScene,
     CaptureMidi,
-    ControlCC,
     EnterMode,
     FireScene,
     FireSlot,
+    PadPress,
     ShowClip,
     ShowMessage,
     StopTrackClips,
@@ -20,12 +20,9 @@ from .modes import Mode
 
 
 def handle(state, event, snapshot):
-    if not isinstance(event, ControlCC) or not (
-        values.CONTROL_CC_BASE <= event.cc < values.CONTROL_CC_BASE + layout.ROWS
-    ):
+    if not isinstance(event, PadPress) or event.column != 1 or not event.pressed:
         return state, []
-    # Any value is a press: column 1 pads are toggles and send nothing on release.
-    key = (1, layout.control_pad(event.cc))
+    key = (event.column, event.pad)
     if state.scene_page:
         return _scene_page(state, key, snapshot)
     if key == layout.UNDO:

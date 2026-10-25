@@ -97,12 +97,6 @@ class PadPress:
 
 
 @dataclass(frozen=True)
-class ControlCC:
-    cc: int
-    value: int
-
-
-@dataclass(frozen=True)
 class YAxis:
     # Y position within a pressed pad, 0 at the near edge to 127 at the far edge.
     column: int

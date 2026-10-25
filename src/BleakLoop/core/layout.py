@@ -2,8 +2,6 @@
 
 from dataclasses import dataclass
 
-from . import values
-
 ROWS = 8
 COLUMNS = 17  # column 0 is the device's hardware buttons
 
@@ -54,11 +52,6 @@ def pad_of(device_row):
     if not 0 <= device_row < ROWS:
         raise ValueError(f"device row out of range: {device_row}")
     return ROWS - device_row
-
-
-def control_pad(cc):
-    # Note Mode column 1: CC 102 is the nearest row, device row 0.
-    return pad_of(cc - values.CONTROL_CC_BASE)
 
 
 @dataclass(frozen=True)
