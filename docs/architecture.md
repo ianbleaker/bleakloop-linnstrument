@@ -284,6 +284,18 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **A slide never overlaps pads.** The old pad's release comes first, then 160–460 ms of silence, then the next pad's press.
 - **A still finger rolls.** Y drifts from 64 to about 85 within 100 ms of a press, and further over seconds.
 
+**Note numbers in a playing split.** Outside User Firmware Mode, a pad sends its row note + (column − 1) + 12 × (Octave NRPN 36 − 5) + (Transpose Pitch NRPN 37 − 7) − (Transpose Lights NRPN 38 − 7). Rows count from the nearest, row 0. Notes above 127 aren't sent. The row note comes from the global Row Offset (NRPN 227). Source: `determineRowOffsetNote` in the [firmware](https://github.com/rogerlinndesign/linnstrument-firmware/blob/master/ls_handleTouches.ino). Note names below are Live's (C3 = 60).
+
+| Row Offset (227) | Row note, row r | Measured, column 1, nearest pad first |
+| --- | --- | --- |
+| +3 to +7 (3–7) | 30 + r × offset | +3: F#0 A0 C1 D#1 F#1 A1 C2 D#2; +4: F#0 A#0 D1 F#1 A#1 D2 F#2 A#2; +5: F#0 B0 E1 A1 D2 G2 C3 F3; +6: F#0 C1 F#1 C2 F#2 C3 F#3 C4; +7: F#0 C#1 G#1 D#2 A#2 F3 C4 G4 |
+| Zero (127) | 30 for every row | F#0 on every pad |
+| No Overlap (0) | 30 + r × the split's width in columns; the right split's row note also drops by the left split's width | Split off (width 16): F#0 A#1 D3 F#4 A#5 D7 F#8, the farthest pad silent |
+| Octave / custom (12) | Custom Row Offset (253) − 16 = offset: 30 + r × offset from 0 to +11, 18 + r × offset from +12, 65 + r × offset from −1 to −11, 18 − 7 × offset + r × offset from −12 | Octave = custom +12: F#-1 F#0 F#1 F#2 F#3 F#4 F#5 F#6; custom +7 = +7; custom +16: F#-1 A#0 D2 F#3 A#4 D6 F#7, the farthest pad silent; custom −3: F3 D3 B2 G#2 F2 D2 B1 G#1; custom −7: F3 A#2 D#2 G#1 C#1 F#0 B-1 E-1; custom −16: the nearest pad silent, then F#7 D6 A#4 F#3 D2 A#0 F#-1 |
+| Guitar (13) | Guitar tuning (263–270), 263 the nearest row; set per row by the player | Default: F#0 B0 E1 A1 D2 G2 B2 E3 |
+
+Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lower on the nearest two rows. The panel doesn't offer it. Measured 2026-10-25 with Octave and Transpose at 0.
+
 ## 6. Plumbing
 
 ### Elements and routing
