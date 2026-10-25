@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 CONTROL_CCS = range(values.CONTROL_CC_BASE, values.CONTROL_CC_BASE + layout.ROWS)
 Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column
+NRPN_REPLY_CCS = (99, 98, 6, 38, 101, 100)
+SPLIT_NUMBERS = {number for number, _ in device.SPLIT_SETTINGS}
 
 
 class Elements(ElementsBase):
@@ -46,6 +48,9 @@ class Elements(ElementsBase):
             self.add_button(
                 number, f"Control {number}", channel=values.CONTROL_CHANNEL, msg_type=MIDI_CC_TYPE
             )
+        # Device replies to NRPN 299 queries: listened only during the setup.
+        for number in NRPN_REPLY_CCS:
+            self.add_button(number, f"Nrpn {number}", channel=0, msg_type=MIDI_CC_TYPE)
 
 
 class Specification(ControlSurfaceSpecification):
@@ -60,6 +65,8 @@ class BleakLoop(ControlSurface):
         self._state = State()
         self._driver = device.LedDriver()
         self._listeners = []
+        self._reader = device.NrpnReader()
+        self._saved_split = {}  # the player's split settings, read at load
         self._setup = None  # NRPNs still to send, one per tick
         self._started = False
         self._timer = None
@@ -83,6 +90,10 @@ class BleakLoop(ControlSurface):
             self._refresh()
         elif self._setup is None:
             logger.info("BleakLoop loaded")
+            for number in NRPN_REPLY_CCS:
+                element = getattr(self.elements, f"nrpn_{number}")
+                self._add_listener(element, lambda v, n=number: self._on_nrpn_reply(n, v))
+            self.request_rebuild_midi_map()
             self._setup = [device.user_firmware_mode(False)] + device.split_setup()
             self._send(self._setup.pop(0))
         elif self._setup:
@@ -104,12 +115,16 @@ class BleakLoop(ControlSurface):
             self._timer = None
         if self._state.undo_open:
             self.song.end_undo_step()
-        # Hand the device back for playing.
+        # Hand the device back for playing, with the player's own split.
         self._send(
             device.y_axis(False)
             + device.user_firmware_mode(False)
             + self._driver.release_column_1()
         )
+        # Paced: in one burst with the hand-back the device dropped the last 18 messages.
+        for step in device.split_restore(self._saved_split):
+            time.sleep(values.RESTORE_GAP_MS / 1000)
+            self._send(step)
         self._remove_listeners()
         # After the hand-back: if this raises, the device is already playable.
         self._c_instance.set_session_highlight(-1, -1, -1, -1, False)
@@ -181,6 +196,12 @@ class BleakLoop(ControlSurface):
             element.remove_value_listener(fn)
 
     # Input
+
+    def _on_nrpn_reply(self, number, value):
+        reply = self._reader.feed(number, value)
+        if reply is not None and reply[0] in SPLIT_NUMBERS:
+            parameter, setting = reply
+            self._saved_split[parameter] = setting
 
     def _on_pad(self, column, row, value):
         self._handle(PadPress(column, layout.pad_of(row), value > 0))

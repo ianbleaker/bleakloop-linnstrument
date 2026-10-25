@@ -3,6 +3,7 @@
 CONTROL_CHANNEL = 0  # MIDI channel 1
 SPLIT_POINT = 2  # left split is column 1
 CONTROL_CC_BASE = 102
+RESTORE_GAP_MS = 20  # before each unload restore NRPN: the device drops the end of a burst
 
 FAST_BLINK_MS = 200
 BLINK_TIMER_MS = 10

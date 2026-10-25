@@ -264,7 +264,7 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **Pad input** (User Firmware Mode): Note On for a press, Note Off (or Note On velocity 0) for a release. The channel is the device row (channel 1 = device row 0, the nearest) and the note number is the column. Column 0 reports like any pad and is ignored.
 - **Lights:** CC 20 (column, from 0), CC 21 (device row, from 0), CC 22 (colour value).
 - **Y-axis:** CC 11 = 1 on channels 1–8 turns reporting on per row, CC 11 = 0 off. Reports arrive as CC (64 + column) on the row's channel.
-- **Control split** (Note Mode): set up on load as column 1 only, CC Faders, one-channel mode on the control channel, faders sending CC 102–109 nearest row first (NRPNs in section 8). The player's right split is left untouched. BleakLoop listens for CC 102–109 on the control channel only; everything else passes through to Live's tracks.
+- **Control split** (Note Mode): set up on load as column 1 only, CC Faders, one-channel mode on the control channel, faders sending CC 102–109 nearest row first (NRPNs in section 8). Before each setting is changed, it's read with an NRPN 299 query sent in the same step, and on unload the player's values are written back. The player's right split is left untouched. BleakLoop listens for CC 102–109 on the control channel only; everything else passes through to Live's tracks.
 
 **Colour values** (CC 22): red 1, yellow 2, green 3, cyan 4, blue 5, magenta 6, off 7, white 8, orange 9, lime 10, pink 11. Value 0 ("as set in Note Lights") also shows dark, but means device default and is used only to hand column 1's lights back on unload. On the device, lime looks yellow and green looks lime.
 
@@ -272,10 +272,12 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 
 **Device behaviour BleakLoop depends on:**
 
+- **NRPN changes are RAM only.** Flash is written only when the player commits a change on the panel (releasing Per-Split, Octave, Volume, Preset and the like), and each commit saves the whole config as it is in RAM. Checked on the device: an unload that doesn't restore leaves BleakLoop's split until a power cycle (E1). Panel buttons do nothing in User Firmware Mode (E2), but a commit in Note Mode saves BleakLoop's split to flash (E2′). BleakLoop never makes the device save.
+- **NRPN 299 = N reads setting N.** The reply is a normal NRPN (CC 99 / 98 / 6 / 38, then 101 / 100 = 127) on the query's channel minus one, clamped to channel 1. BleakLoop queries on channel 1, so replies arrive there. NRPN 35 doesn't reply when its combination of special modes is unusual; that setting is then not restored.
 - **The device applies light changes one at a time.** A full-grid flip leaves Live in under 1 ms but ripples visibly; BleakLoop never adds to it by spreading changes across refreshes.
 
 > [!NOTE]
-> **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one NRPN per display tick (about 1.4 s at startup).
+> **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one query and one NRPN per display tick (about 1.4 s at startup). On unload, the restore appended to the 38-message hand-back burst lost its last 18 messages, so each restore NRPN is sent after a `RESTORE_GAP_MS` sleep.
 
 - **Control split pads are toggles.** Each press sends one CC: 127 if the device's stored value for that CC is 0, otherwise 0. A release sends nothing. The stored value follows any CC 102–109 the device receives on the control channel. Rows that share a CC are linked by the firmware, so every row must get its own.
 - **Y is relative and dense.** Every press reports 64 first, after the note-on. Y swings to 127 or 0 over about half a pad and then stays saturated until the release. Reports arrive every 10–20 ms, 1–3 units apart.
@@ -293,6 +295,7 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 > [!IMPORTANT]
 > **Elements in Note Mode:** CC 102–109 on the control channel only, as plain CC buttons, never encoders. Encoders send the control CCs = 0 back to the device on every Note Mode entry, which resets its stored toggle values, and Live appears to drop a mapped CC that repeats the encoder's last value. Together that lost every other press.
 
+- **NRPN replies:** CC 99, 98, 6, 38, 101 and 100 on channel 1, listened only during the setup, so the control split's queries can be read. Their listeners are removed when Session Mode is entered.
 - **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Note Mode, only the eight control CCs are listened; everything else reaches Live's tracks.
 - **LED output.** One "light pad" call sends CC 20, 21 and 22. The LED driver (section 3) is the only caller. v3's per-element send cache isn't relied on.
 
@@ -301,7 +304,7 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 
 ### Device lifecycle
 
-- **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split (paced, section 5), then enters Session Mode. NRPN 245 is sent on entering Session and Note Mode. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0. The device is then playable, and column 1 stays the control split.
+- **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split (paced, section 5), then enters Session Mode. NRPN 245 is sent on entering Session and Note Mode. Each setup step queries a setting and then sets it; the device answers in order, so the reply is the player's own value. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each split setting that replied, one NRPN per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. A setting that never replied keeps BleakLoop's value.
 
 ```mermaid
 sequenceDiagram
@@ -309,8 +312,9 @@ sequenceDiagram
   participant LinnStrument
   Note over BleakLoop,LinnStrument: Load, one message per display tick
   BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
-  loop split_setup(), one NRPN per tick
-    BleakLoop->>LinnStrument: NRPN 200, 202, 0, 1, 35, 40–47
+  loop split_setup(), one setting per tick
+    BleakLoop->>LinnStrument: NRPN 299 = N (query), then NRPN N
+    LinnStrument-->>BleakLoop: NRPN N = player's value, saved
   end
   Note over BleakLoop: enter_mode(SESSION)
   BleakLoop->>LinnStrument: user_firmware_mode(True), NRPN 245 = 1
@@ -322,6 +326,9 @@ sequenceDiagram
   BleakLoop->>LinnStrument: y_axis(False), CC 11 = 0 on channels 1–8
   BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
   BleakLoop->>LinnStrument: release_column_1(), column 1 lights to value 0
+  loop split_restore(saved), RESTORE_GAP_MS sleep before each
+    BleakLoop->>LinnStrument: NRPN N = player's value
+  end
   Note over BleakLoop: set_session_highlight(-1, -1, -1, -1, False)
 ```
 ### Clocks
@@ -421,7 +428,9 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Value | Used by | Source | Status |
 | --- | --- | --- | --- |
 | `CONTROL_CHANNEL`: control split channel | Note Mode controls | Named constant edited by the player | Default channel 1, confirmed |
-| Control split setup NRPNs: 200 = 1 (split on), 202 = `SPLIT_POINT` = 2 (left split is column 1), 0 = 0 (one channel), 1 = channel, 35 = 2 (CC Faders), 40–47 = 102–109 (faders send CC 102–109) | `device.split_setup` | Device protocol | Confirmed on device |
+| Control split setup NRPNs: 200 = 1 (split on), 202 = `SPLIT_POINT` = 2 (left split is column 1), 0 = 0 (one channel), 1 = channel, 35 = 2 (CC Faders), 40–47 = 102–109 (faders send CC 102–109) | `device.split_setup`, each preceded by its query | Device protocol | Confirmed on device |
+| NRPN 299 = N: query setting N, answered as NRPN N | `device.query` | Device protocol | Confirmed on device |
+| `RESTORE_GAP_MS = 20`: sleep before each unload restore NRPN | `surface.disconnect` | Tuned: 0 lost the last 18 messages, 20 restored all 13 | Confirmed on device |
 | `CONTROL_CC_BASE = 102`: control split CCs 102–109, nearest row first | Note Mode controls | Chosen: undefined in General MIDI, clear of CC 1–8, LED CCs 20–22 and Y-axis CCs 64–80 | Confirmed on device |
 | Off colour value: 7 | `leds` | Device protocol | Confirmed; 0 also dark |
 | `FAST_BLINK_MS = 200`: fast blink, 200 ms on, 200 ms off | `leds` | Tuned | Verify on device (#25) |

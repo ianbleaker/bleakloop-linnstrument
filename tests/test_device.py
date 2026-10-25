@@ -31,10 +31,50 @@ def test_y_axis_off_on_all_rows():
 def test_split_setup():
     steps = device.split_setup()
     assert len(steps) == 13
-    assert steps[0] == device.nrpn(200, 1)
-    assert steps[3] == device.nrpn(1, 1)  # main channel 1
-    assert steps[5] == device.nrpn(40, 102)
-    assert steps[-1] == device.nrpn(47, 109)
+    assert steps[0] == device.query(200) + device.nrpn(200, 1)
+    assert steps[3][-6:] == device.nrpn(1, 1)  # main channel 1
+    assert steps[5] == device.query(40) + device.nrpn(40, 102)
+    assert steps[-1] == device.query(47) + device.nrpn(47, 109)
+
+
+def test_query():
+    assert device.query(35) == device.nrpn(299, 35)
+
+
+def test_split_restore_follows_setup_order():
+    assert device.split_restore({35: 0, 200: 0}) == [device.nrpn(200, 0), device.nrpn(35, 0)]
+
+
+def test_split_restore_skips_missing():
+    assert device.split_restore({202: 5}) == [device.nrpn(202, 5)]
+
+
+def test_split_restore_empty():
+    assert device.split_restore({}) == []
+
+
+def feed_all(reader, messages):
+    return [r for _, number, value in messages if (r := reader.feed(number, value)) is not None]
+
+
+def test_reader_decodes_reply():
+    assert feed_all(device.NrpnReader(), device.nrpn(202, 2)) == [(202, 2)]
+
+
+def test_reader_decodes_value_msb():
+    assert feed_all(device.NrpnReader(), device.nrpn(40, 300)) == [(40, 300)]
+
+
+def test_reader_needs_whole_reply():
+    assert device.NrpnReader().feed(38, 1) is None
+
+
+def test_reader_resets_mid_reply():
+    reader = device.NrpnReader()
+    for _, number, value in device.nrpn(202, 2)[:3]:
+        reader.feed(number, value)
+    reader.feed(101, 127)
+    assert reader.feed(38, 2) is None
 
 
 def frame(mode_colour=WHITE):

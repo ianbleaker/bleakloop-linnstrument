@@ -8,10 +8,20 @@ CC_STATUS = 0xB0
 
 # Device protocol numbers.
 NRPN_USER_FIRMWARE_MODE = 245
+NRPN_QUERY = 299
 CC_Y_AXIS = 11
 CC_LIGHT_COLUMN = 20
 CC_LIGHT_ROW = 21
 CC_LIGHT_COLOUR = 22
+
+# The control split, in setup order.
+SPLIT_SETTINGS = [
+    (200, 1),  # split on
+    (202, SPLIT_POINT),  # left split is column 1
+    (0, 0),  # left split MIDI mode: one channel
+    (1, CONTROL_CHANNEL + 1),  # left split main channel
+    (35, 2),  # left split special mode: CC Faders
+] + [(40 + i, CONTROL_CC_BASE + i) for i in range(8)]  # faders 1-8 send CC 102-109
 
 
 def cc(channel, number, value):
@@ -27,6 +37,10 @@ def nrpn(number, value):
         (CC_STATUS, 101, 127),
         (CC_STATUS, 100, 127),
     ]
+
+
+def query(number):
+    return nrpn(NRPN_QUERY, number)
 
 
 def light(column, pad, colour):
@@ -46,15 +60,30 @@ def y_axis(on):
 
 
 def split_setup():
+    # One message list per NRPN, for pacing. Each query is answered before its set.
+    return [query(number) + nrpn(number, value) for number, value in SPLIT_SETTINGS]
+
+
+def split_restore(saved):
     # One message list per NRPN, for pacing.
-    settings = [
-        (200, 1),  # split on
-        (202, SPLIT_POINT),  # left split is column 1
-        (0, 0),  # left split MIDI mode: one channel
-        (1, CONTROL_CHANNEL + 1),  # left split main channel
-        (35, 2),  # left split special mode: CC Faders
-    ] + [(40 + i, CONTROL_CC_BASE + i) for i in range(8)]  # faders 1-8 send CC 102-109
-    return [nrpn(number, value) for number, value in settings]
+    return [nrpn(number, saved[number]) for number, _ in SPLIT_SETTINGS if number in saved]
+
+
+class NrpnReader:
+    """Decodes incoming NRPNs (query replies) from single CCs."""
+
+    def __init__(self):
+        self._seen = {}
+
+    def feed(self, number, value):
+        if number in (101, 100) and value == 127:
+            self._seen = {}
+        elif number in (99, 98, 6):
+            self._seen[number] = value
+        elif number == 38 and len(self._seen) == 3:
+            seen = self._seen
+            return (seen[99] << 7) | seen[98], (seen[6] << 7) | value
+        return None
 
 
 class LedDriver:

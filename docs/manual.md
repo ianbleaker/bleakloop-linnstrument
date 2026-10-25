@@ -11,6 +11,8 @@ BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for
 
 BleakLoop starts in Session Mode. Its Note Mode controls use MIDI channel 1.
 
+While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 its control split. When Live closes, or you choose another control surface, it puts your own split settings back.
+
 ## 2. Finding your way
 
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
@@ -98,6 +100,8 @@ Hold Shift for a second layer. The lists above give each pad's Shift function in
 ## 7. Note Mode
 
 The LinnStrument is your instrument again. Column 1 holds BleakLoop's controls and always opens on the controls page.
+
+> **Careful:** in Note Mode the LinnStrument's own panel buttons work again. Changing a setting there (Octave, Volume, Per-Split, Split and the like) saves BleakLoop's control split as your own. To undo that, close Live and set your split up again on the device.
 
 ### Controls page
 
