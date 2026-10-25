@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="104" viewBox="0 0 920 104" font-family="Helvetica, Arial, sans-serif">
+<title>Colour values</title>
+<rect x="0" y="0" width="920" height="104" rx="8" fill="#141418"/>
+<rect x="44" y="20" width="40" height="40" rx="4" fill="#ff2a2a"/>
+<text x="64" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">1 red</text>
+<rect x="116" y="20" width="40" height="40" rx="4" fill="#ffe600"/>
+<text x="136" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">2 yellow</text>
+<rect x="188" y="20" width="40" height="40" rx="4" fill="#22d43a"/>
+<text x="208" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">3 green</text>
+<rect x="260" y="20" width="40" height="40" rx="4" fill="#19e0e6"/>
+<text x="280" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">4 cyan</text>
+<rect x="332" y="20" width="40" height="40" rx="4" fill="#2a5bff"/>
+<text x="352" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">5 blue</text>
+<rect x="404" y="20" width="40" height="40" rx="4" fill="#e82ae8"/>
+<text x="424" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">6 magenta</text>
+<rect x="476" y="20" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<text x="496" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">7 off</text>
+<rect x="548" y="20" width="40" height="40" rx="4" fill="#f2f2f2"/>
+<text x="568" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">8 white</text>
+<rect x="620" y="20" width="40" height="40" rx="4" fill="#ff8a1a"/>
+<text x="640" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">9 orange</text>
+<rect x="692" y="20" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<text x="712" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">10 lime</text>
+<rect x="764" y="20" width="40" height="40" rx="4" fill="#ff7ab8"/>
+<text x="784" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">11 pink</text>
+<rect x="836" y="20" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<text x="856" y="82" font-size="11" fill="#e8e8ec" text-anchor="middle">0 default</text>
+</svg>

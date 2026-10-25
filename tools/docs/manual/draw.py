@@ -3,27 +3,23 @@
 from xml.sax.saxutils import escape
 
 from BleakLoop.core import engine, layout
-from BleakLoop.core.leds import (
-    BLUE,
-    CYAN,
-    GREEN,
-    LIME,
-    MAGENTA,
-    OFF,
-    ORANGE,
-    PINK,
-    RED,
-    WHITE,
-    YELLOW,
-    Blink,
-)
+from BleakLoop.core.leds import OFF, Blink
 
+from ..svg import (
+    BACKGROUND,
+    GAP,
+    INSTRUMENT,
+    MUTED,
+    PAD,
+    STEP,
+    SWATCHES,
+    TEXT,
+    rect,
+    text,
+)
 from .pads import DIMMED, blocks, labels
 from .scenes import SCENES, Layer
 
-PAD = 40
-GAP = 6
-STEP = PAD + GAP
 MARGIN = 16
 GRID_TOP = 40
 GRID_WIDTH = 16 * STEP - GAP
@@ -31,26 +27,8 @@ GRID_HEIGHT = layout.ROWS * STEP - GAP
 WIDTH = 2 * MARGIN + GRID_WIDTH
 HEIGHT = GRID_TOP + GRID_HEIGHT + 56
 
-BACKGROUND = "#141418"
-TEXT = "#e8e8ec"
-MUTED = "#9a9aa4"
-INSTRUMENT = "#3a3a40"
 BUBBLE = "#000000"
 BUBBLE_OPACITY = "0.72"
-
-SWATCHES = {
-    RED: "#ff2a2a",
-    YELLOW: "#ffe600",
-    GREEN: "#22d43a",
-    CYAN: "#19e0e6",
-    BLUE: "#2a5bff",
-    MAGENTA: "#e82ae8",
-    WHITE: "#f2f2f2",
-    ORANGE: "#ff8a1a",
-    LIME: "#a6ff1a",
-    PINK: "#ff7ab8",
-    OFF: "#2a2a2e",
-}
 
 RINGS = {Blink.TEMPO: "6 4", Blink.FAST: "2 3"}
 
@@ -73,9 +51,9 @@ def map_svg(layer):
         light = frame[key]
         x, y = _pad_xy(*key)
         if key[0] in DIMMED.get(layer, ()):
-            lines.append(_rect(x, y, PAD, PAD, SWATCHES[light.colour], opacity="0.18"))
+            lines.append(rect(x, y, PAD, PAD, SWATCHES[light.colour], opacity="0.18"))
             continue
-        lines.append(_rect(x, y, PAD, PAD, SWATCHES[light.colour]))
+        lines.append(rect(x, y, PAD, PAD, SWATCHES[light.colour]))
         if light.blink in RINGS:
             lines.append(_ring(x - 2, y - 2, PAD + 4, RINGS[light.blink]))
     for key, label in sorted(labels(layer).items()):
@@ -97,33 +75,18 @@ def _open(title):
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}" '
         f'viewBox="0 0 {WIDTH} {HEIGHT}" font-family="Helvetica, Arial, sans-serif">',
         f"<title>{escape(title)}</title>",
-        _rect(0, 0, WIDTH, HEIGHT, BACKGROUND, radius=8),
+        rect(0, 0, WIDTH, HEIGHT, BACKGROUND, radius=8),
     ]
     for column in range(1, 17):
         x, _ = _pad_xy(column, 1)
-        lines.append(_text(x + PAD // 2, GRID_TOP - 12, str(column), 11, MUTED))
+        lines.append(text(x + PAD // 2, GRID_TOP - 12, str(column), 11, MUTED))
     return lines
-
-
-def _rect(x, y, width, height, fill, radius=4, opacity=None):
-    faded = f' fill-opacity="{opacity}"' if opacity else ""
-    return (
-        f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="{radius}" '
-        f'fill="{fill}"{faded}/>'
-    )
 
 
 def _ring(x, y, size, dash):
     return (
         f'<rect x="{x}" y="{y}" width="{size}" height="{size}" rx="5" fill="none" '
         f'stroke="#ffffff" stroke-width="1.5" stroke-dasharray="{dash}"/>'
-    )
-
-
-def _text(x, y, text, size, fill):
-    return (
-        f'<text x="{x}" y="{y}" font-size="{size}" fill="{fill}" '
-        f'text-anchor="middle">{escape(text)}</text>'
     )
 
 
@@ -134,7 +97,7 @@ def _bubble(cx, cy, label, size, width):
         f'<rect x="{cx - width // 2}" y="{cy - height // 2}" width="{width}" '
         f'height="{height}" rx="{height // 2}" fill="{BUBBLE}" '
         f'fill-opacity="{BUBBLE_OPACITY}"/>',
-        _text(cx, cy + size // 2 - 1, label, size, "#ffffff"),
+        text(cx, cy + size // 2 - 1, label, size, "#ffffff"),
     ]
 
 
@@ -157,8 +120,8 @@ def _instrument(frame):
     x, y = _pad_xy(INSTRUMENT_COLUMNS[0], 1)
     width = len(INSTRUMENT_COLUMNS) * STEP - GAP
     return [
-        _rect(x, y, width, GRID_HEIGHT, INSTRUMENT),
-        _text(x + width // 2, y + GRID_HEIGHT // 2 + 5, "Your instrument", 14, TEXT),
+        rect(x, y, width, GRID_HEIGHT, INSTRUMENT),
+        text(x + width // 2, y + GRID_HEIGHT // 2 + 5, "Your instrument", 14, TEXT),
     ]
 
 
@@ -166,7 +129,7 @@ def _legend(y):
     x = MARGIN
     lines = []
     for blink, label in ((Blink.TEMPO, "Tempo blink"), (Blink.FAST, "Fast blink")):
-        lines.append(_rect(x, y, 16, 16, SWATCHES[OFF], radius=2))
+        lines.append(rect(x, y, 16, 16, SWATCHES[OFF], radius=2))
         lines.append(_ring(x - 2, y - 2, 20, RINGS[blink]))
         lines.append(
             f'<text x="{x + 26}" y="{y + 12}" font-size="12" fill="{TEXT}">'

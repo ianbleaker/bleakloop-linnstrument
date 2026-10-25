@@ -2,15 +2,76 @@
 
 How BleakLoop works today. This is a living document: any change to the structure, a device or Live mechanism, or a tuned value updates it in the same PR as the code.
 
+## At a glance
+
+```mermaid
+flowchart LR
+  linnstrument["LinnStrument"]
+  subgraph Plumbing
+    surface["surface"]
+    device["device: LED driver"]
+  end
+  subgraph Core
+    handle["handle"]
+    render["render"]
+  end
+  subgraph Adapters
+    live_state["live_state: reads"]
+    live_actions["live_actions: writes"]
+  end
+  live["Live"]
+  linnstrument -->|"pad, Y-axis, CC"| surface
+  surface -->|"event"| handle
+  live --> live_state
+  live_state -->|"snapshot"| handle
+  live_state -->|"snapshot"| render
+  handle -->|"actions"| live_actions
+  live_actions --> live
+  render -->|"frame"| device
+  device -->|"changed pads"| linnstrument
+```
+
+**Where to look:**
+
+| To change… | Look in |
+| --- | --- |
+| `create_instance` | `__init__.py` |
+| Plumbing: `ControlSurface` subclass, elements, MIDI routing per mode, tick | `surface.py` |
+| NRPN, split setup and LED message building, LED driver | `device.py` |
+| Reading Live into a `Snapshot` | `live_state.py` |
+| Carrying out an `Action` as Live calls | `live_actions.py` |
+| Geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping | `core/layout.py` |
+| Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
+| Session / Mixer / Note, Note Mode pages, modifiers | `core/modes.py` |
+| Shared Session and Note Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights | `core/controls.py` |
+| Clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table | `core/session.py` |
+| Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
+| Column 1 controls page and scene page | `core/note_mode.py` |
+| Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
+| Tuned numbers: every value in section 8, by name | `core/values.py` |
+| `handle()` and `render()`, composing the core modules | `core/engine.py` |
+| The generated manual pad maps and architecture figures | `tools/docs/` |
+
+Read sections 2–4 for structure, 5–7 for device and Live details, and 8 for numbers.
+
 ## 1. Constraints
 
 - Runs on Python 3.11, Live's embedded runtime. The folder `src/BleakLoop/` is the control-surface name and is never renamed.
 - Built on an `ableton.v3` `ControlSurface`. `ableton.v3` is undocumented and ships only as `.pyc`, so BleakLoop uses as little of it as possible and only its widely used parts.
-- Clean room: BleakLoop is an independent implementation and never draws on the code of the script that inspired it.
 
 ## 2. Layers
 
 BleakLoop has three layers. Each may only import from the layers below it.
+
+```mermaid
+flowchart TB
+  plumbing["Plumbing: imports Live / ableton"]
+  adapters["Adapters: imports Live / ableton"]
+  core["Core: pure Python, tested by pytest"]
+  plumbing --> adapters
+  plumbing --> core
+  adapters --> core
+```
 
 | Layer | Contents | Imports Live or `ableton`? | Tested by |
 | --- | --- | --- | --- |
@@ -28,9 +89,39 @@ The core is a state machine plus a renderer, with no side effects of its own.
   - `event` is a pad press or release, a Y-axis value, a Note Mode CC, or a tick.
   - `snapshot` is a plain, read-only view of the Live state the decision needs.
   - `actions` are plain values such as `FireSlot(track, scene, legato, record_length)`, `Undo()`, `SetVolume(track, value)` or `ShowMessage(text)`. The adapters carry them out.
-- **Output:** `render(state, snapshot, clock) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, column 1 in Note Mode. `clock` gives the tempo-blink and fast-blink phase.
+- **Output:** `render(state, snapshot) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, column 1 in Note Mode. A pad may blink; the LED driver resolves blinking pads with a `clock` that gives the tempo-blink and fast-blink phase.
 - **Sending:** the LED driver compares each frame with the last frame sent and sends only the pads that differ, all in one pass, so blinking pads switch together. Clearing the remembered frame on a mode switch makes every pad correct after the switch.
 - **Shift layer:** while Shift is held, `handle` looks up the Shift table and `render` draws the Shift layer. There's no per-element modifier wiring.
+
+```mermaid
+sequenceDiagram
+  participant LinnStrument
+  participant surface
+  participant live_state
+  participant engine
+  participant live_actions
+  participant Live
+  LinnStrument->>surface: pad press
+  surface->>live_state: read
+  live_state-->>surface: snapshot
+  surface->>engine: handle(state, event, snapshot)
+  engine-->>surface: (state, actions)
+  surface->>live_actions: apply(action)
+  live_actions->>Live: Live calls
+  opt follow-up
+    live_actions-->>surface: follow-up event
+    surface->>engine: handle(state, follow-up, snapshot), once
+    engine-->>surface: (state, actions)
+    surface->>live_actions: apply(action), events it returns are dropped
+  end
+  Note over surface: tick
+  surface->>live_state: read
+  live_state-->>surface: snapshot
+  surface->>engine: render(state, snapshot)
+  engine-->>surface: Frame
+  Note over surface: LED driver compares the frame with the last one sent
+  surface->>LinnStrument: only the pads that differ
+```
 
 Snapshots are read fresh on each tick and each event. Polling is chosen for simplicity: 91 clip slots with several properties each, plus 13 tracks, 7 scenes and transport state, a few times a second. A full snapshot costs about 0.5 ms (3 ms at worst).
 
@@ -56,25 +147,116 @@ src/BleakLoop/
     leds.py            device colours, track colour matching, tempo and fast blink
     values.py          every value in section 8, by name
     engine.py          handle() and render(), composing the modules above
-tests/                 pytest: the core, and the manual generator
-  test_manual.py       every lit pad in the manual's example Sets is labelled; maps are current
+tests/                 pytest: the core, the docs generators and the layering
+  test_manual.py       every lit pad in the manual's example Sets is labelled; generated docs are current
+  test_architecture.py core imports only core; adapters import no plumbing
 tools/
-  manual/              the player's manual generator (standard library only)
-    scenes.py          one example Set per manual layer
-    pads.py            pad labels and callout items, by manual section; each map joins its sections
-    draw.py            one SVG pad map per layer: labels over the example lights
-    __main__.py        writes docs/manual/*.svg and the callout lists in docs/manual.md; --check
+  docs/                generated docs (standard library only)
+    __main__.py        writes every generated file below; --check
+    markers.py         rewrites generated text between marker comments
+    svg.py             shared SVG palette and drawing primitives
+    manual/            the player's manual
+      scenes.py        one example Set per manual layer
+      pads.py          pad labels and callout items, by manual section; each map joins its sections
+      draw.py          one SVG pad map per layer: labels over the example lights
+      generate.py      docs/manual/*.svg and the callout lists in docs/manual.md
+    architecture/      this document
+      imports.py       the module import graph, from the real imports
+      figures.py       the section 5 orientation and colour figures
+      generate.py      docs/architecture/*.svg and the import graph in docs/architecture.md
 ```
 
-The manual's pad maps and callout lists are generated from `core/layout.py` and `render()`, and CI and the pre-commit hook fail when the committed output is stale.
+The manual's pad maps and callout lists are generated from `core/layout.py` and `render()`, and this document's import graph and section 5 figures from the code. `PYTHONPATH=src python3 -m tools.docs` writes them all, and CI and the pre-commit hook fail when the committed output is stale.
 
 `__init__.py` imports nothing from `ableton` or `Live` at module level; `create_instance` imports `surface` inside the function. This keeps `BleakLoop.core` importable by pytest outside Live. Tests run on Python 3.11 (`uvx --python 3.11 pytest`) to match Live's runtime.
+
+The import graph below is generated from the real imports, and `tests/test_architecture.py` fails if `core/` imports anything outside `core/`.
+
+<!-- generated:imports -->
+```mermaid
+flowchart TD
+  subgraph Plumbing
+    __init__["__init__"]
+    device["device"]
+    surface["surface"]
+  end
+  subgraph Adapters
+    live_actions["live_actions"]
+    live_state["live_state"]
+  end
+  subgraph Core
+    core_controls["controls"]
+    core_engine["engine"]
+    core_layout["layout"]
+    core_leds["leds"]
+    core_mixer["mixer"]
+    core_model["model"]
+    core_modes["modes"]
+    core_note_mode["note_mode"]
+    core_session["session"]
+    core_values["values"]
+  end
+  subgraph External
+    Live["Live"]
+    ableton_v3["ableton.v3"]
+  end
+  __init__ -.->|lazy| surface
+  core_controls --> core_leds
+  core_controls --> core_model
+  core_engine --> core_mixer
+  core_engine --> core_modes
+  core_engine --> core_note_mode
+  core_engine --> core_session
+  core_layout --> core_values
+  core_leds --> core_values
+  core_mixer --> core_layout
+  core_mixer --> core_model
+  core_mixer --> core_modes
+  core_mixer --> core_values
+  core_model --> core_leds
+  core_modes --> core_layout
+  core_note_mode --> core_controls
+  core_note_mode --> core_layout
+  core_note_mode --> core_leds
+  core_note_mode --> core_model
+  core_note_mode --> core_modes
+  core_note_mode --> core_values
+  core_session --> core_controls
+  core_session --> core_layout
+  core_session --> core_leds
+  core_session --> core_mixer
+  core_session --> core_model
+  core_session --> core_modes
+  core_session --> core_values
+  device --> core_layout
+  device --> core_leds
+  device --> core_values
+  live_actions --> Live
+  live_actions --> core_model
+  live_actions --> live_state
+  live_state --> core_layout
+  live_state --> core_model
+  surface --> Live
+  surface --> ableton_v3
+  surface --> core_engine
+  surface --> core_layout
+  surface --> core_leds
+  surface --> core_model
+  surface --> core_modes
+  surface --> core_values
+  surface --> device
+  surface --> live_actions
+  surface --> live_state
+```
+<!-- /generated:imports -->
 
 ## 5. Device interface
 
 Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinndesign/linnstrument-firmware/blob/master/user_firmware_mode.md), [MIDI input and colour values](https://github.com/rogerlinndesign/linnstrument-firmware/blob/master/midi.md), [Panel settings: CC Faders](https://www.rogerlinndesign.com/support/linnstrument-support-panel-settings), [Tips & tricks: one-column CC Faders split](https://www.rogerlinndesign.com/support/support-linnstrument-linnstrument-tips-tricks).
 
 **Orientation.** Columns are counted from the player's left: column 0 is the device's own control switches, columns 1–16 the playing surface. Pads within a column run 1 (farthest row) to 8 (nearest). The device counts rows the other way, so device row = 8 − pad.
+
+![Orientation](architecture/orientation.svg)
 
 **Messages:**
 
@@ -86,10 +268,15 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 
 **Colour values** (CC 22): red 1, yellow 2, green 3, cyan 4, blue 5, magenta 6, off 7, white 8, orange 9, lime 10, pink 11. Value 0 ("as set in Note Lights") also shows dark, but means device default and is used only to hand column 1's lights back on unload. On the device, lime looks yellow and green looks lime.
 
+![Colour values](architecture/colours.svg)
+
 **Device behaviour BleakLoop depends on:**
 
 - **The device applies light changes one at a time.** A full-grid flip leaves Live in under 1 ms but ripples visibly; BleakLoop never adds to it by spreading changes across refreshes.
-- **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one NRPN per display tick (about 1.4 s at startup).
+
+> [!NOTE]
+> **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one NRPN per display tick (about 1.4 s at startup).
+
 - **Control split pads are toggles.** Each press sends one CC: 127 if the device's stored value for that CC is 0, otherwise 0. A release sends nothing. The stored value follows any CC 102–109 the device receives on the control channel. Rows that share a CC are linked by the firmware, so every row must get its own.
 - **Y is relative and dense.** Every press reports 64 first, after the note-on. Y swings to 127 or 0 over about half a pad and then stays saturated until the release. Reports arrive every 10–20 ms, 1–3 units apart.
 - **A slide never overlaps pads.** The old pad's release comes first, then 160–460 ms of silence, then the next pad's press.
@@ -97,24 +284,110 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 
 ## 6. Plumbing
 
+### Elements and routing
+
 - **Elements in User Firmware Mode:**
   - Pad presses: notes 0–16 on channels 1–8.
   - Y-axis values: CC 64 + column on channels 1–8, claimed only in Mixer Mode. Columns 2–14 (CC 66–78) become fader input; the other columns are claimed and dropped, because Y reporting is per row and their reports would otherwise reach Live's tracks.
-- **Elements in Note Mode:** CC 102–109 on the control channel only, as plain CC buttons, never encoders. Encoders send the control CCs = 0 back to the device on every Note Mode entry, which resets its stored toggle values, and Live appears to drop a mapped CC that repeats the encoder's last value. Together that lost every other press.
+
+> [!IMPORTANT]
+> **Elements in Note Mode:** CC 102–109 on the control channel only, as plain CC buttons, never encoders. Encoders send the control CCs = 0 back to the device on every Note Mode entry, which resets its stored toggle values, and Live appears to drop a mapped CC that repeats the encoder's last value. Together that lost every other press.
+
 - **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Note Mode, only the eight control CCs are listened; everything else reaches Live's tracks.
 - **LED output.** One "light pad" call sends CC 20, 21 and 22. The LED driver (section 3) is the only caller. v3's per-element send cache isn't relied on.
-- **All device output is sent unoptimised** (`_send_midi(..., optimized=False)`). Inside input callbacks Live buffers "optimized" messages and keeps only the last one per status byte and CC number, which collapses LED triples and NRPN sequences to a single message. This is a hard rule.
+
+> [!IMPORTANT]
+> **All device output is sent unoptimised** (`_send_midi(..., optimized=False)`). Inside input callbacks Live buffers "optimized" messages and keeps only the last one per status byte and CC number, which collapses LED triples and NRPN sequences to a single message. This is a hard rule.
+
+### Device lifecycle
+
 - **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split (paced, section 5), then enters Session Mode. NRPN 245 is sent on entering Session and Note Mode. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0. The device is then playable, and column 1 stays the control split.
+
+```mermaid
+sequenceDiagram
+  participant BleakLoop
+  participant LinnStrument
+  Note over BleakLoop,LinnStrument: Load, one message per display tick
+  BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
+  loop split_setup(), one NRPN per tick
+    BleakLoop->>LinnStrument: NRPN 200, 202, 0, 1, 35, 40–47
+  end
+  Note over BleakLoop: enter_mode(SESSION)
+  BleakLoop->>LinnStrument: user_firmware_mode(True), NRPN 245 = 1
+  Note over BleakLoop: set_session_highlight(track, scene, 13, 7, False)
+  BleakLoop->>LinnStrument: LED driver reset, then the whole frame (CC 20, 21, 22)
+  Note over BleakLoop: start the Live.Base.Timer
+  Note over BleakLoop,LinnStrument: Unload, disconnect()
+  Note over BleakLoop: stop the timer, end_undo_step() if a step is open
+  BleakLoop->>LinnStrument: y_axis(False), CC 11 = 0 on channels 1–8
+  BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
+  BleakLoop->>LinnStrument: release_column_1(), column 1 lights to value 0
+  Note over BleakLoop: set_session_highlight(-1, -1, -1, -1, False)
+```
+### Clocks
+
 - **Tick.** Two clocks. Live's display callback (a steady 100 ms) reads a snapshot, renders a frame and sends the differences. A `Live.Base.Timer` at 10 ms (measured: about 12 ms on average, 32 ms at worst) checks the blink phases and triggers an extra render when one flips, so tempo blinks land within about one timer period of the beat. The timer reads only the transport (`live_state.read_transport`); the full snapshot is read only when a frame is drawn. Sending MIDI, reading Live state and setting volumes are all allowed from the timer callback.
+
+```mermaid
+flowchart LR
+  subgraph display["display callback (100 ms)"]
+    snapshot["snapshot"] --> draw["render"] --> send["send differences"]
+  end
+  subgraph timer["Live.Base.Timer (10 ms)"]
+    pending{"glide or continuation pending?"} -->|"yes"| tick["engine.tick"]
+    pending -->|"no"| transport["read_transport"]
+    tick --> transport
+    transport --> flipped{"blink phase flipped?"}
+    flipped -->|"yes"| extra["extra render"]
+  end
+```
+### Mixer
+
 - **Mixer toggle.** `SetMixer(on)` sends the Y-axis CCs and re-listens, with the Y elements only when on, in one burst with the repaint that follows. There's no LED driver reset: nothing else has touched the device's lights, so the diff is accurate and the burst stays smaller.
 - **Fader glide.** `engine.tick(state, now_ms)` runs from the 10 ms timer while any glide or pending continuation exists; it also expires continuation windows and times each press, since events carry no time. A press takes Y relative to its first report, and a press next to a pad released within `CONTINUE_MS` continues the slide, bridging the gap between pads. During a continued slide the glide moves at the measured pad pace (section 8). It needs no snapshot and moves each volume toward its target by an amount scaled by the elapsed time. The surface redraws only when a fader's lit height changes, since the fader shows only 8 heights.
+
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Touched: coarse press, BeginUndoStep
+  Touched --> Lifted: release
+  Lifted --> Touched: press (the next pad continues the slide, any other pad is a coarse step)
+  Lifted --> Gliding: CONTINUE_MS window expires, glide still moving
+  Lifted --> Idle: CONTINUE_MS window expires, glide done, EndUndoStep
+  Gliding --> Touched: press, coarse step
+  Gliding --> Idle: glide reaches its target, EndUndoStep
+  note right of Idle: leaving Mixer Mode or unload closes an open step
+```
+### Follow-up events
+
 - **Follow-up events.** `live_actions.apply` may return an event, which `_handle` feeds to the core once after the action loop. The follow-up's own actions are applied, but any events they return are dropped, so this never recurses. Used by Capture: after `song.capture_and_insert_scene()` the adapter returns `SceneSelected` with the index of `song.view.selected_scene` (already updated when the call returns), and the core scrolls the window the minimum distance.
+### Detail view
+
 - **Detail-view focus is polled on the display tick.** Live refuses changes made inside a listener callback, and polling needs no listener lifecycle. The surface holds one pending clip slot, and a new `ShowClip` replaces it. On each tick:
   - If the slot has a clip, the surface shows it and clears the pending slot.
   - On any tick after the first, if the slot has no clip and is neither triggered nor recording, the recording was cancelled. The pending slot is cleared, so a clip that lands there later doesn't take the view.
   - If reading the slot raises (its track or scene was deleted), the error is logged and the pending slot is cleared.
 
-  `highlighted_clip_slot` is never set, because that would change the selected track and, with auto-arm, which track is armed.
+> [!IMPORTANT]
+> `highlighted_clip_slot` is never set, because that would change the selected track and, with auto-arm, which track is armed.
+
+```mermaid
+stateDiagram-v2
+  state "pending slot" as Pending
+  state "clip shown, slot cleared" as Shown
+  state "slot cleared, recording cancelled" as Cancelled
+  state "slot cleared, error logged" as Failed
+  [*] --> Pending: ShowClip
+  Pending --> Pending: a new ShowClip replaces it
+  Pending --> Shown: slot has a clip
+  Pending --> Cancelled: no clip, not triggered or recording, on a tick after the first
+  Pending --> Failed: reading the slot raised
+  Shown --> [*]
+  Cancelled --> [*]
+  Failed --> [*]
+```
+### Session ring
+
 - **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 7, False)` draws it from the core's window state whenever the window changes and on every Session entry; `(-1, -1, -1, -1, False)` removes it on Note entry and on unload. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
 
 ## 7. Adapters: Live mechanisms

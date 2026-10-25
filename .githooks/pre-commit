@@ -9,7 +9,7 @@ uvx --python 3.11 pytest@8.3.3 -q || {
     echo "pre-commit: pytest failed, commit blocked."
     exit 1
 }
-PYTHONPATH=src uv run --python 3.11 --no-project python -m tools.manual --check || {
-    echo "pre-commit: manual is stale, run: PYTHONPATH=src python3 -m tools.manual"
+PYTHONPATH=src uv run --python 3.11 --no-project python -m tools.docs --check || {
+    echo "pre-commit: generated docs are stale, run: PYTHONPATH=src python3 -m tools.docs"
     exit 1
 }

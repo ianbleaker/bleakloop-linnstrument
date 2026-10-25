@@ -2,9 +2,9 @@ import pytest
 
 from BleakLoop.core import engine
 from BleakLoop.core.leds import OFF
-from tools.manual import __main__ as generator
-from tools.manual.pads import DIMMED, blocks, items, labels
-from tools.manual.scenes import SCENES, Layer
+from tools.docs import __main__ as generator
+from tools.docs.manual.pads import DIMMED, blocks, items, labels
+from tools.docs.manual.scenes import SCENES, Layer
 
 
 def frame(layer):
@@ -44,5 +44,5 @@ def test_no_pad_is_in_two_items(layer):
     assert len(keys) == len(set(keys))
 
 
-def test_manual_is_current():
+def test_generated_docs_are_current():
     assert generator.check() == []
