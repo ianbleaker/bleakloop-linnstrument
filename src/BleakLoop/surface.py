@@ -2,6 +2,7 @@
 
 import logging
 import time
+from dataclasses import replace
 
 import Live
 from ableton.v3.control_surface import (
@@ -13,7 +14,7 @@ from ableton.v3.control_surface import (
 )
 
 from . import device, live_actions, live_state
-from .core import engine, layout, values
+from .core import engine, fx, layout, values
 from .core.leds import Clock, phase_key
 from .core.model import PadPress, YAxis
 from .core.modes import Mode, State
@@ -87,6 +88,8 @@ class BleakLoop(ControlSurface):
         self._started = False
         self._timer = None
         self._phase = None
+        self._longest_tick_ms = 0.0  # of the running morph
+        self._fx_text = None  # the stored FX snapshots as last read
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
         self._pending_fresh = False
@@ -105,6 +108,7 @@ class BleakLoop(ControlSurface):
         super().update_display()
         if self._started:
             self._check_pending_clip()
+            self._load_fx()
             if self._state.mode is Mode.LINNSTRUMENT:
                 self._poll_tick()
             self._refresh()
@@ -128,6 +132,7 @@ class BleakLoop(ControlSurface):
         else:
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
+            self._load_fx()
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
                 self.show_message(self._refusal)
@@ -137,11 +142,26 @@ class BleakLoop(ControlSurface):
             )
             self._timer.start()
 
+    def _load_fx(self):
+        # At load, and on every display tick: Live's Undo and Redo change the stored text
+        # (each set_data is an Undo entry), so the slots follow it from wherever it came.
+        text = live_state.read_fx_store(self.song)
+        if text == self._fx_text:
+            return
+        self._fx_text = text
+        slots = fx.parse(text)
+        # A valid store round-trips; one with every slot cleared is valid too.
+        if text and fx.dump(slots) != text:
+            logger.warning("FX: stored snapshots unreadable, starting empty")
+        self._state = replace(self._state, fx_slots=slots)
+
     def disconnect(self):
         if self._timer is not None:
             self._timer.stop()
             self._timer = None
         if self._state.undo_open:
+            self.song.end_undo_step()
+        if self._state.fx_undo_open:
             self.song.end_undo_step()
         # Hand the device back for playing, with the player's own split.
         self._send(
@@ -256,12 +276,28 @@ class BleakLoop(ControlSurface):
                 if redraw:
                     self._refresh()
             transport = live_state.read_transport(self.song, Live.Application.get_application())
+            if self._state.morph is not None:
+                self._morph_tick(transport)
             key = phase_key(self._clock(transport))
             if key != self._phase:
                 self._phase = key
                 self._refresh()
         except Exception:
             logger.exception("blink timer failed")
+
+    def _morph_tick(self, transport):
+        start = time.monotonic()
+        macro_values = live_state.read_macro_values(self.song, self._state.morph)
+        state, actions, redraw = engine.fx_tick(self._state, transport, macro_values)
+        self._state = state
+        for action in actions:
+            live_actions.apply(action, self.song, self)
+        if redraw:
+            self._refresh()
+        self._longest_tick_ms = max(self._longest_tick_ms, (time.monotonic() - start) * 1000)
+        if state.morph is None:
+            logger.info("FX: morph landed, longest tick %.1f ms", self._longest_tick_ms)
+            self._longest_tick_ms = 0.0
 
     # Modes
 

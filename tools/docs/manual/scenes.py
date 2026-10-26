@@ -4,7 +4,7 @@ import enum
 from dataclasses import replace
 
 from BleakLoop.core.model import SelectedTrack, SlotView, Snapshot, TrackView
-from BleakLoop.core.modes import Mode, State
+from BleakLoop.core.modes import FxRack, Mode, State
 
 
 class Layer(enum.Enum):
@@ -12,6 +12,7 @@ class Layer(enum.Enum):
     SIDE = "side"
     SESSION_SHIFT = "session-shift"
     MIXER = "mixer"
+    FX = "fx"
     LINNSTRUMENT = "linnstrument"
     LINNSTRUMENT_SHIFT = "linnstrument-shift"
     LINNSTRUMENT_SCENES = "linnstrument-scenes"
@@ -74,11 +75,16 @@ MIXER_SNAPSHOT = replace(
     ),
 )
 
+# Five stored snapshots, slot 2 the last to land, with the 4-bar length held.
+_STORED = (FxRack("Drums", "FX Rack", 0, (0.0,) * 8),)
+FX_SLOTS = tuple(_STORED if slot in (0, 1, 2, 8, 9) else None for slot in range(16))
+
 SCENES = {
     Layer.SESSION: (State(fixed_length=2), SNAPSHOT),
     Layer.SIDE: (State(fixed_length=2), SNAPSHOT),
     Layer.SESSION_SHIFT: (State(fixed_length=2, shift=True), SNAPSHOT),
     Layer.MIXER: (State(mixer=True), MIXER_SNAPSHOT),
+    Layer.FX: (State(fx=True, fx_slots=FX_SLOTS, fx_landed=1, fx_length=4), SNAPSHOT),
     Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
     Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
     Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),

@@ -47,6 +47,7 @@ flowchart LR
 | Clip slots, copy and delete rules, bottom row, columns 15, 16, Shift layer table | `core/session.py` |
 | Column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/column_1.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
+| FX Mode: snapshot storage format, rack identity, store, recall, morph timing and tick, FX lights | `core/fx.py` |
 | Linnstrument Mode: column 1 only, handed to `column_1` | `core/linnstrument_mode.py` |
 | Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
 | Tuned numbers: every value in section 8, by name | `core/values.py` |
@@ -190,6 +191,7 @@ flowchart TD
     core_column_1["column_1"]
     core_controls["controls"]
     core_engine["engine"]
+    core_fx["fx"]
     core_layout["layout"]
     core_leds["leds"]
     core_linnstrument_mode["linnstrument_mode"]
@@ -212,10 +214,18 @@ flowchart TD
   core_column_1 --> core_modes
   core_controls --> core_leds
   core_controls --> core_model
+  core_engine --> core_fx
   core_engine --> core_linnstrument_mode
   core_engine --> core_mixer
+  core_engine --> core_model
   core_engine --> core_modes
   core_engine --> core_session
+  core_fx --> core_layout
+  core_fx --> core_leds
+  core_fx --> core_mixer
+  core_fx --> core_model
+  core_fx --> core_modes
+  core_fx --> core_values
   core_leds --> core_values
   core_linnstrument_mode --> core_column_1
   core_linnstrument_mode --> core_model
@@ -227,6 +237,7 @@ flowchart TD
   core_modes --> core_layout
   core_session --> core_column_1
   core_session --> core_controls
+  core_session --> core_fx
   core_session --> core_layout
   core_session --> core_leds
   core_session --> core_mixer
@@ -238,12 +249,15 @@ flowchart TD
   device --> core_values
   live_actions --> Live
   live_actions --> core_model
+  live_actions --> core_values
   live_actions --> live_state
   live_state --> core_layout
   live_state --> core_model
+  live_state --> core_values
   surface --> Live
   surface --> ableton_v3
   surface --> core_engine
+  surface --> core_fx
   surface --> core_layout
   surface --> core_leds
   surface --> core_model
@@ -371,10 +385,15 @@ flowchart LR
     pending{"glide or continuation pending?"} -->|"yes"| tick["engine.tick"]
     pending -->|"no"| transport["read_transport"]
     tick --> transport
-    transport --> flipped{"blink phase flipped?"}
+    transport --> morphing{"morph running?"}
+    morphing -->|"yes"| fxtick["read_macro_values, engine.fx_tick"]
+    morphing -->|"no"| flipped
+    fxtick --> flipped{"blink phase flipped?"}
     flipped -->|"yes"| extra["extra render"]
   end
 ```
+
+- **FX morph.** While `State.morph` is set, in any mode, the timer reads the morphing macros' values (`live_state.read_macro_values`, resolving each rack by its path and name) and passes them with the transport to `engine.fx_tick`. It interpolates linearly in song beats to the bar line set at the recall, drops a macro whose value no longer matches BleakLoop's last write (a hand turn, `FX_TOUCH_TOLERANCE`) or can't be read, and lands every remaining target when the end beat is reached, the transport stops or song time goes backwards. Quantized macros switch only on landing. The surface redraws on landing and logs the longest tick of the morph. Measured with 6 racks: reading every rack for a store or recall takes 0.4–2.3 ms, and the longest morph tick 1.6–4.2 ms, well inside the 10 ms timer.
 ### Mixer
 
 - **Mixer toggle.** `SetMixer(on)` sends the Y-axis CCs and re-listens, with the Y elements only when on, in one burst with the repaint that follows. There's no LED driver reset: nothing else has touched the device's lights, so the diff is accurate and the burst stays smaller.
@@ -395,6 +414,7 @@ stateDiagram-v2
 ### Follow-up events
 
 - **Follow-up events.** `live_actions.apply` may return an event, which `_handle` feeds to the core once after the action loop. The follow-up's own actions are applied, but any events they return are dropped, so this never recurses. Used by Capture: after `song.capture_and_insert_scene()` the adapter returns `SceneSelected` with the index of `song.view.selected_scene` (already updated when the call returns), and the core scrolls the window the minimum distance.
+- **FX store and recall.** Reading every rack is too heavy for the per-tick snapshot, so `StoreFxSnapshot` and `RecallFxSnapshot` make the adapter read the racks (`live_state.read_racks`, timed in the log) and return `RacksRead`. `engine.handle` passes it to `fx.racks_read` in any mode, which stores the slot, jumps, or starts a morph.
 ### Detail view
 
 - **Detail-view focus is polled on the display tick.** Live refuses changes made inside a listener callback, and polling needs no listener lifecycle. The surface holds one pending clip slot, and a new `ShowClip` replaces it. On each tick:
@@ -447,6 +467,9 @@ stateDiagram-v2
 | Fader gesture undo | `song.begin_undo_step()` on the first coarse press and `song.end_undo_step()` once no touch, continuation window or glide is left, so one gesture is one undo step. The core tracks the open step (`State.undo_open`); leaving Mixer Mode and unload close it. |
 | Record Clip | `live_state` reads the selected track (`song.view.selected_track`, only if it's in `song.visible_tracks`) and every scene of its slots, plus `song.view.selected_scene`, only in Linnstrument Mode. The core searches from the highlighted scene down, wrapping. When no slot is empty, `song.create_scene(-1)` runs before `FireSlot`: actions resolve their slot when applied, so the new scene exists by then. |
 | Capture MIDI | `song.capture_midi()` with no argument, only when `song.can_capture_midi` is true; otherwise the core posts "Nothing to capture". |
+| FX snapshot storage | `song.set_data(FX_DATA_KEY, text)`, read with `song.get_data(FX_DATA_KEY, "")` at load and again on every display tick, reloading the slots when the text changed, so Live's Undo and Redo of a store or clear show on the pads. Confirmed on the device (Live 12.4.7) to survive save and reload, and the surface is recreated for each Set opened. Each write adds a "Changed Parameter List" Undo entry and marks the Set as changed; writes happen only on store and clear. The text is JSON, `{"v": 1, "slots": [null or [{"track", "rack", "n", "macros"}, ...] × 16]}`; anything unreadable loads as 16 empty slots, with a log warning. |
+| Rack identity | Top-level racks (`device.can_have_chains`) on `song.tracks`, `song.return_tracks` and `song.master_track`, in that order, devices left to right; nested racks are skipped. Macros are `device.parameters[1 : 1 + visible_macro_count]`. A snapshot keys each rack by (track name, rack name, n), n counting the earlier racks with both names, because the LOM has no stable device IDs. A morph addresses a rack by its path (kind, track index, device index) and checks the rack name before each read and write, so a moved or renamed rack drops out. |
+| Macro writes | `parameter.value`, clamped to `min`/`max`, as a knob turn: it overrides automation and lights Live's Re-Enable Automation button (#47). A jump is one undo step, and so is a whole morph (`State.fx_undo_open`): a new recall, a Mixer fader press and unload close an open morph step. |
 
 ## 8. Values
 
@@ -474,3 +497,5 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | `GLIDE_DEAD_BAND = 0.003`: Y reports moving the target less than 0.3 % of range are ignored, and a glide this close snaps to its target | `mixer` | Tuned | Fine on device; retuning stays in #15 |
 | `CONTINUE_MS = 600`: a press next to a pad released within this time continues the slide (device gaps 160–460 ms, section 5) | `mixer` | Tuned | Fine on device; retuning stays in #15 |
 | Slide pace: during a continued slide the glide moves one step per press-to-press period of the last pad crossed, never faster than `GLIDE_STEP` | `mixer` | Derived | Fine on device; retuning stays in #15 |
+| `FX_DATA_KEY = "BleakLoop.fx"`: the `song.set_data` key holding the FX snapshots | `live_state`, `live_actions` | Chosen | Confirmed on device: survives save and reload, per Set |
+| `FX_TOUCH_TOLERANCE = 0.005`: during a morph, a macro further than 0.5 % of its range from BleakLoop's last write was turned by hand and drops out | `fx` | Chosen | Fine on device: a hand-turned macro drops out, and BleakLoop's own writes never trip it |

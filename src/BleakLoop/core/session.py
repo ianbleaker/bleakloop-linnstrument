@@ -2,9 +2,10 @@
 
 from dataclasses import replace
 
-from . import column_1, controls, layout, mixer, modes
+from . import column_1, controls, fx, layout, mixer, modes
 from .leds import (
     BLUE,
+    CYAN,
     GREEN,
     LIME,
     MAGENTA,
@@ -71,6 +72,8 @@ def handle(state, event, snapshot):
             return replace(state, copy=False, copy_source=None), []
         if state.mixer:
             return state, []
+        if state.fx:
+            return replace(state, copy=True), [ShowMessage("Copy: press a slot to overwrite")]
         return replace(state, copy=True), [ShowMessage("Copy: pick a clip or scene")]
     if key == layout.DELETE and not (shift_layer and event.pressed):
         if not event.pressed:
@@ -81,6 +84,8 @@ def handle(state, event, snapshot):
     if state.mixer and event.column in layout.GRID_COLUMNS:
         # Every pad is the fader, pad 8 included; releases matter too.
         return mixer.press(state, event, snapshot)
+    if state.fx and event.column in layout.GRID_COLUMNS:
+        return fx.press(state, event, snapshot)
     if not event.pressed:
         return state, []
     # Copy over Delete over Shift.
@@ -244,9 +249,11 @@ def _column_15(state, key, snapshot):
             bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + layout.TEMPO_STEPS[key]))
             return state, [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
         return state, []
-    # Normal-layer 15/4 and 15/5 are reserved: no match here.
+    # Normal-layer 15/5 is reserved: no match here.
     if key == layout.MIXER:
         return mixer.toggle(state)
+    if key == layout.FX:
+        return fx.toggle(state)
     if key in layout.TRACK_CONTROL_PADS:
         mode = TrackControl[layout.TRACK_CONTROL_PADS[key]]
         message = ShowMessage(f"Track Control: {TRACK_CONTROL_NAMES[mode]}")
@@ -277,6 +284,8 @@ def render(state, snapshot):
     }
     for column in layout.GRID_COLUMNS:
         track = _track(column, snapshot)
+        if state.fx:
+            break
         if state.mixer:
             if not shift_layer:
                 _render_fader(frame, column, track)  # dark under Shift
@@ -284,6 +293,8 @@ def render(state, snapshot):
         for pad in range(1, layout.ROWS):
             frame[(column, pad)] = _slot_light(track, pad - 1)
         frame[(column, layout.ROWS)] = _track_switch_light(state, shift_layer, track)
+    if state.fx:
+        frame.update(fx.render(state))
     for pad in range(1, layout.ROWS):
         frame[(layout.SCENE_COLUMN, pad)] = controls.scene_light(
             snapshot, state.window.scene, pad - 1
@@ -355,6 +366,7 @@ def _render_normal_layer(frame, state):
     frame[layout.COPY] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
     frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
     frame[layout.MIXER] = Light(WHITE, Blink.FAST if state.mixer else Blink.STEADY)
+    frame[layout.FX] = Light(CYAN, Blink.FAST if state.fx else Blink.STEADY)
     for key, name in layout.TRACK_CONTROL_PADS.items():
         mode = TrackControl[name]
         blink = Blink.TEMPO if mode is state.track_control else Blink.STEADY

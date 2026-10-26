@@ -26,8 +26,14 @@ SHIFT = (1, 8)
 COPY = (15, 1)
 DELETE = (15, 2)
 MIXER = (15, 3)
-# Unlit and unused until FX (15/4), Drum (15/5) and Chord (16/8) are designed.
-RESERVED = ((15, 4), (15, 5), (16, 8))
+FX = (15, 4)
+# Unlit and unused until Drum (15/5) and Chord (16/8) are designed.
+RESERVED = ((15, 5), (16, 8))
+
+# FX Mode: slot N is FX_SLOTS[N - 1].
+FX_SLOTS = tuple((12, pad) for pad in range(1, 9)) + tuple((13, pad) for pad in range(1, 9))
+# Column 14: morph length in bars.
+FX_LENGTHS = {(14, 1): 1, (14, 2): 2, (14, 3): 4, (14, 4): 8, (14, 5): 16}
 
 # bars, in Fixed Length's cycle order
 FIXED_LENGTHS = (1, 2, 4, 8)

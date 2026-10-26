@@ -53,6 +53,36 @@ class Glide:
     pace: float | None = None  # volume per ms during a slide; None for the normal glide
 
 
+@dataclass(frozen=True)
+class FxRack:
+    # One rack's macros in a stored snapshot, keyed as fx.keys gives them.
+    track: str
+    rack: str
+    n: int
+    values: tuple
+
+
+@dataclass(frozen=True)
+class MorphMacro:
+    path: tuple
+    rack_name: str
+    index: int  # macro index, 0 for Macro 1
+    start: float
+    target: float
+    quantized: bool
+    written: float  # BleakLoop's last write, or the start value
+    span: float  # max - min
+
+
+@dataclass(frozen=True)
+class Morph:
+    slot: int
+    start_beats: float
+    end_beats: float
+    last_beats: float  # song time at the last tick
+    macros: tuple = ()  # MorphMacro per macro still morphing
+
+
 class TrackControl(enum.Enum):
     MUTE = enum.auto()
     SOLO = enum.auto()
@@ -77,6 +107,12 @@ class State:
     glide_ms: float | None = None  # time of the last glide step, None when none is moving
     undo_open: bool = False  # a fader gesture's undo step is open in Live
     scene_page: bool = False  # Linnstrument Mode column 1 shows the scene page
+    fx: bool = False
+    fx_length: int | None = None  # bars of the held FX length pad
+    fx_slots: tuple = (None,) * 16  # tuple of FxRack per stored slot, None when empty
+    morph: Morph | None = None  # runs in every mode
+    fx_undo_open: bool = False  # a recall's undo step is open in Live
+    fx_landed: int | None = None  # the slot of the last recall that landed
 
 
 def enter(state, mode):
@@ -86,6 +122,7 @@ def enter(state, mode):
     # Mode, and the firmware sends its release as a User Firmware note, not on the control
     # channel, so BleakLoop never sees it.
     # A caller leaving Mixer Mode closes an open undo step first (mixer.reset).
+    # FX Mode turns off, but a running morph, its undo step and the snapshots carry on.
     state = replace(
         state,
         mode=mode,
@@ -99,6 +136,8 @@ def enter(state, mode):
         glide_ms=None,
         undo_open=False,
         scene_page=False,
+        fx=False,
+        fx_length=None,
     )
     if mode is Mode.SESSION:
         state = replace(state, track_control=TrackControl.ARM)

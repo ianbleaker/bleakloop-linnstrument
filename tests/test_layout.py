@@ -84,5 +84,13 @@ def test_column_1_has_one_pad_per_role():
 
 
 def test_reserved_pads_have_no_normal_role():
-    used = {layout.COPY, layout.DELETE, layout.MIXER, *layout.TRACK_CONTROL_PADS}
+    used = {layout.COPY, layout.DELETE, layout.MIXER, layout.FX, *layout.TRACK_CONTROL_PADS}
     assert used.isdisjoint(layout.RESERVED)
+
+
+def test_fx_slots_are_columns_12_and_13():
+    assert layout.FX_SLOTS[0] == (12, 1)
+    assert layout.FX_SLOTS[7] == (12, 8)
+    assert layout.FX_SLOTS[8] == (13, 1)
+    assert layout.FX_SLOTS[15] == (13, 8)
+    assert len(set(layout.FX_SLOTS)) == 16

@@ -1,8 +1,12 @@
 """Adapter: carry out core actions on Live objects. No decisions."""
 
+import logging
+import time
+
 import Live
 
 from . import live_state
+from .core import values
 from .core.model import (
     AddScene,
     ArmExclusive,
@@ -19,11 +23,15 @@ from .core.model import (
     FireScene,
     FireSlot,
     QuantizeClip,
+    RacksRead,
+    RecallFxSnapshot,
     Redo,
+    SaveFxSnapshots,
     SceneSelected,
     SelectTrack,
     SetArrangementRecord,
     SetLaunchQuantization,
+    SetMacros,
     SetMixer,
     SetSessionRecord,
     SetTempo,
@@ -32,6 +40,7 @@ from .core.model import (
     ShowMessage,
     StopAllClips,
     StopTrackClips,
+    StoreFxSnapshot,
     ToggleMetronome,
     ToggleMute,
     TogglePlay,
@@ -39,13 +48,15 @@ from .core.model import (
     Undo,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def _slot(song, track, scene):
     return song.visible_tracks[track].clip_slots[scene]
 
 
 def apply(action, song, surface):
-    # Returns None, or a follow-up event for the core (Capture).
+    # Returns None, or a follow-up event for the core (Capture, FX store and recall).
     if isinstance(action, ToggleMetronome):
         song.metronome = not song.metronome
     elif isinstance(action, TogglePlay):
@@ -126,6 +137,22 @@ def apply(action, song, surface):
         if action.track < len(song.visible_tracks):
             param = song.visible_tracks[action.track].mixer_device.volume
             param.value = min(max(action.value, param.min), param.max)
+    elif isinstance(action, (StoreFxSnapshot, RecallFxSnapshot)):
+        start = time.monotonic()
+        racks = live_state.read_racks(song)
+        logger.info("FX: read %d racks in %.1f ms", len(racks), (time.monotonic() - start) * 1000)
+        recall = isinstance(action, RecallFxSnapshot)
+        return RacksRead(action.slot, racks, recall, action.bars if recall else None)
+    elif isinstance(action, SetMacros):
+        # The Set can change mid-morph: a rack that has moved or gone is skipped.
+        targets = live_state.macro_parameters(song, (write[:3] for write in action.writes))
+        for (path, rack_name, index, value), parameter in zip(action.writes, targets):
+            if parameter is None:
+                logger.info("FX: skipped %s macro %d of %r", path, index + 1, rack_name)
+                continue
+            parameter.value = min(max(value, parameter.min), parameter.max)
+    elif isinstance(action, SaveFxSnapshots):
+        song.set_data(values.FX_DATA_KEY, action.text)
     elif isinstance(action, BeginUndoStep):
         song.begin_undo_step()
     elif isinstance(action, EndUndoStep):

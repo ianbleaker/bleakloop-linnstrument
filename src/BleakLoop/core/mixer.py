@@ -46,7 +46,8 @@ def reset(state):
 
 def toggle(state):
     if not state.mixer:
-        state = replace(state, mixer=True, copy_source=None)
+        # FX and Mixer Mode replace each other.
+        state = replace(state, mixer=True, copy_source=None, fx=False, fx_length=None)
         return state, [SetMixer(True), ShowMessage("Mixer Mode ON")]
     state, actions = reset(state)
     return replace(state, mixer=False), actions + [SetMixer(False), ShowMessage("Mixer Mode OFF")]
@@ -91,6 +92,10 @@ def press(state, event, snapshot):
     if not state.undo_open:
         state = replace(state, undo_open=True)
         actions.insert(0, BeginUndoStep())
+        # A morph's undo step closes first; the morph carries on.
+        if state.fx_undo_open:
+            state = replace(state, fx_undo_open=False)
+            actions.insert(0, EndUndoStep())
     return state, actions
 
 

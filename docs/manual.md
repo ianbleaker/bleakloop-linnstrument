@@ -47,11 +47,11 @@ Recording on a MIDI track switches to Linnstrument Mode, so you can play straigh
 
 ## 4. Side columns
 
-Columns 1, 15 and 16 work the same in Session and Mixer Mode. Column 1 is also the same in Linnstrument Mode (section 7), where Record, Capture and Shift + Play act on the selected track.
+Columns 1, 15 and 16 work the same in Session, Mixer and FX Mode. Column 1 is also the same in Linnstrument Mode (section 8), where Record, Capture and Shift + Play act on the selected track.
 
 **Fixed Length** is one pad: its colour shows the length, white while off, then cyan, blue, magenta and pink. The length stays when you change mode.
 
-Pads 4 and 5 of column 15 and pad 8 of column 16 are dark and do nothing: they're kept for modes still to come.
+Pad 5 of column 15 and pad 8 of column 16 are dark and do nothing: they're kept for modes still to come.
 
 ![Side columns](manual/side.svg)
 
@@ -67,6 +67,7 @@ Pads 4 and 5 of column 15 and pad 8 of column 16 are dark and do nothing: they'r
 - **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
 - **Delete**: Hold, then press a clip or scene to delete it. *(Shift: Move the window down)*
 - **Mixer**: Mixer Mode on/off. Blinks while on. *(Shift: Move the window left)*
+- **FX**: FX Mode on/off. Blinks while on. *(Shift: Move the window right)*
 - **Track switch mode**: What the track switches do: Mute, Solo or Arm. The chosen one blinks. *(Shift: Tempo +1 BPM on Solo, -1 BPM on Arm)*
 - **Scenes**: Launch a scene. *(Shift: Launch with legato)*
 <!-- /callouts:side -->
@@ -81,7 +82,7 @@ Pads 4 and 5 of column 15 and pad 8 of column 16 are dark and do nothing: they'r
 
 ## 5. Shift
 
-Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a second layer. The lists above give each pad's Shift function in italics: Shift + Undo is Redo, Shift + Play stops all clips, and column 15's top four pads move the window. Unlit pads do nothing, and in Mixer Mode the faders go dark.
+Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a second layer. The lists above give each pad's Shift function in italics: Shift + Undo is Redo, Shift + Play stops all clips, and column 15's top four pads move the window. Unlit pads do nothing, and in Mixer and FX Mode the grid goes dark.
 
 ![Shift](manual/session-shift.svg)
 
@@ -101,7 +102,36 @@ Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a 
 - One slide is one undo.
 - Copy and Delete do nothing here.
 
-## 7. Linnstrument Mode
+## 7. FX Mode
+
+FX Mode stores snapshots of every rack's macros and brings them back, at once or as a morph over a number of bars. The snapshots are saved in the Set. Press FX (column 15, pad 4) to turn it on or off. FX and Mixer Mode replace each other.
+
+![FX Mode](manual/fx.svg)
+
+<!-- callouts:fx -->
+- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 12, 9–16 in column 13. Press an empty slot to store, a stored one to recall.
+- **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.
+<!-- /callouts:fx -->
+
+- A snapshot holds the visible macros of every rack on the Set's tracks, groups, returns and master. Racks inside other racks aren't included.
+- Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it.
+- Press a stored (cyan) slot to recall it at once.
+- Hold a Bars pad, then press a stored slot to morph to it. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
+- While the transport is stopped, a recall always happens at once.
+- Hold Delete and press a stored slot to clear it.
+- A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
+
+**During a morph:**
+
+- Its slot blinks fast. The last slot to land blinks with the beat.
+- A new recall takes over from where the macros are.
+- A macro you turn yourself drops out of the morph and keeps your value.
+- Stopping the transport, or jumping back in the song, lands the morph at once.
+- The morph carries on when you leave FX Mode.
+
+A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A recall is one undo, and so is a whole morph. Storing or clearing a snapshot is an undo of its own too, and the pads follow it.
+
+## 8. Linnstrument Mode
 
 The LinnStrument is your instrument again. Column 1 keeps the controls it has in Session Mode, so the pads are where you know them. You're playing the selected track, so Record records a new clip on it, Capture captures MIDI to it, and Shift + Play stops its clips. Column 1 always opens on the controls page.
 
@@ -141,7 +171,7 @@ Shift + Session Mode opens it. Press a scene to launch it, or press Shift again 
 - **Back**: Back to the controls without launching.
 <!-- /callouts:linnstrument-scenes -->
 
-## 8. Lights
+## 9. Lights
 
 - **Tempo blink** (dashed ring): on the beat while playing, and at the Set's tempo while stopped.
 - **Fast blink** (dotted ring): something held or chosen.

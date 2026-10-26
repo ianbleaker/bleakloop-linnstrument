@@ -983,7 +983,8 @@ def test_normal_layer_column_15(track_control, blinking):
     assert frame[layout.COPY] == Light(MAGENTA)
     assert frame[layout.DELETE] == Light(RED)
     assert frame[layout.MIXER] == Light(WHITE)
-    assert frame[(15, 4)] == frame[(15, 5)] == Light(OFF)
+    assert frame[layout.FX] == Light(CYAN)
+    assert frame[(15, 5)] == Light(OFF)
     colours = {6: ORANGE, 7: BLUE, 8: RED}
     for pad, colour in colours.items():
         blink = Blink.TEMPO if pad == blinking else Blink.STEADY

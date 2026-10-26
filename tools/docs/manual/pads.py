@@ -78,7 +78,7 @@ LAUNCH_QUANTIZATION = _one(
 REDO = _one("Redo", layout.UNDO, "Redo.")
 SHIFT_HELD = Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False)
 
-# Columns 1, 15 and 16: the same in Session and Mixer Mode.
+# Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
 _SIDE = (
     PLAY,
     _one(
@@ -104,6 +104,7 @@ _SIDE = (
     ),
     _one("Delete", layout.DELETE, "Hold, then press a clip or scene to delete it."),
     _one("Mixer", layout.MIXER, "Mixer Mode on/off. Blinks while on."),
+    _one("FX", layout.FX, "FX Mode on/off. Blinks while on."),
     Item(
         "Track switch mode",
         {key: name.title() for key, name in layout.TRACK_CONTROL_PADS.items()},
@@ -169,6 +170,22 @@ _MIXER = (
     ),
 )
 
+_FX = (
+    Block(
+        "Snapshots",
+        range(layout.FX_SLOTS[0][0], layout.FX_SLOTS[-1][0] + 1),
+        ALL_PADS,
+        "Sixteen snapshots of every rack's macros: slots 1–8 in column 12, 9–16 in column 13. "
+        "Press an empty slot to store, a stored one to recall.",
+    ),
+    Block(
+        "Bars",
+        range(min(layout.FX_LENGTHS)[0], min(layout.FX_LENGTHS)[0] + 1),
+        range(1, len(layout.FX_LENGTHS) + 1),
+        "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.",
+    ),
+)
+
 _LINNSTRUMENT = (
     PLAY,
     _one(
@@ -214,6 +231,7 @@ SECTIONS = {
     "session": _SESSION,
     "session-shift": _SESSION_SHIFT,
     "mixer": _MIXER,
+    "fx": _FX,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
     "linnstrument-scenes": _LINNSTRUMENT_SCENES,
@@ -224,6 +242,7 @@ LISTS = {
     "side": "side-shift",
     "session": "session-shift",
     "mixer": None,
+    "fx": None,
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,
 }
@@ -234,6 +253,7 @@ LAYERS = {
     Layer.SIDE: ("side",),
     Layer.SESSION_SHIFT: ("side-shift", "session-shift"),
     Layer.MIXER: ("side", "mixer"),
+    Layer.FX: ("side", "fx"),
     Layer.LINNSTRUMENT: ("linnstrument",),
     Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
     Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),

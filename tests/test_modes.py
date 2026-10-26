@@ -4,9 +4,11 @@ from BleakLoop.core import modes
 from BleakLoop.core.layout import Window
 from BleakLoop.core.modes import (
     ClipSource,
+    FxRack,
     Glide,
     Lift,
     Mode,
+    Morph,
     SceneSource,
     State,
     Touch,
@@ -88,3 +90,17 @@ def test_entry_clears_fader_state(start, target):
 @pytest.mark.parametrize("start, target", [(Mode.SESSION, Mode.LINNSTRUMENT), (Mode.LINNSTRUMENT, Mode.SESSION)])
 def test_entry_starts_on_controls_page(start, target):
     assert modes.enter(State(mode=start, scene_page=True), target).scene_page is False
+
+
+@pytest.mark.parametrize("target", [Mode.SESSION, Mode.LINNSTRUMENT])
+def test_entry_turns_fx_off_but_keeps_the_morph(target):
+    morph = Morph(slot=2, start_beats=0.0, end_beats=16.0, last_beats=1.0)
+    slots = (None,) * 3 + ((FxRack("A", "Rack", 0, (0.5,)),),) + (None,) * 12
+    state = State(fx=True, fx_length=4, fx_slots=slots, morph=morph, fx_undo_open=True, fx_landed=1)
+    entered = modes.enter(state, target)
+    assert not entered.fx
+    assert entered.fx_length is None
+    assert entered.morph == morph
+    assert entered.fx_undo_open
+    assert entered.fx_slots == slots
+    assert entered.fx_landed == 1

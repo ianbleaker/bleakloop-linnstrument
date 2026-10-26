@@ -86,6 +86,24 @@ class Snapshot:
     can_capture_midi: bool = False
 
 
+@dataclass(frozen=True)
+class MacroView:
+    value: float
+    min: float
+    max: float
+    is_quantized: bool = False  # on/off or chooser: switches, never glides
+
+
+@dataclass(frozen=True)
+class RackView:
+    # A top-level rack. path is (kind, track index, device index), kind "track", "return" or
+    # "master"; the track index is 0 for master.
+    path: tuple
+    track_name: str
+    rack_name: str
+    macros: tuple = ()  # MacroView per visible macro
+
+
 # Events
 
 
@@ -108,6 +126,15 @@ class YAxis:
 class SceneSelected:
     # Fed back by the adapter after Capture.
     scene: int
+
+
+@dataclass(frozen=True)
+class RacksRead:
+    # Fed back by the adapter after StoreFxSnapshot or RecallFxSnapshot.
+    slot: int  # 0-15
+    racks: tuple  # RackView per rack, in Set order
+    recall: bool
+    bars: int | None = None  # the morph length; None for a jump
 
 
 # Actions
@@ -279,6 +306,27 @@ class BeginUndoStep:
 @dataclass(frozen=True)
 class EndUndoStep:
     pass
+
+
+@dataclass(frozen=True)
+class StoreFxSnapshot:
+    slot: int
+
+
+@dataclass(frozen=True)
+class RecallFxSnapshot:
+    slot: int
+    bars: int | None  # None for a jump
+
+
+@dataclass(frozen=True)
+class SetMacros:
+    writes: tuple  # (path, rack name, macro index, value) per macro
+
+
+@dataclass(frozen=True)
+class SaveFxSnapshots:
+    text: str
 
 
 @dataclass(frozen=True)

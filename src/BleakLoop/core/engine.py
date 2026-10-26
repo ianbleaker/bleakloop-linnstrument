@@ -1,10 +1,14 @@
 """handle() and render(): all behaviour, no side effects."""
 
-from . import mixer, linnstrument_mode, session
+from . import fx, mixer, linnstrument_mode, session
+from .model import RacksRead
 from .modes import Mode
 
 
 def handle(state, event, snapshot):
+    if isinstance(event, RacksRead):
+        # A morph runs in every mode.
+        return fx.racks_read(state, event, snapshot)
     if state.mode is Mode.SESSION:
         return session.handle(state, event, snapshot)
     return linnstrument_mode.handle(state, event, snapshot)
@@ -22,6 +26,13 @@ def tick(state, now_ms):
     if not state.glides and not state.lifts:
         return state, [], False
     return mixer.tick(state, now_ms)
+
+
+def fx_tick(state, transport, values):
+    # The morph on the 10 ms timer, in every mode: values per morphing macro, and a redraw flag.
+    if state.morph is None:
+        return state, [], False
+    return fx.tick(state, transport, values)
 
 
 def render(state, snapshot):

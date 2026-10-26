@@ -2,8 +2,17 @@
 
 from dataclasses import replace
 
-from .core import layout
-from .core.model import ClipTarget, ClipView, SelectedTrack, SlotView, Snapshot, TrackView
+from .core import layout, values
+from .core.model import (
+    ClipTarget,
+    ClipView,
+    MacroView,
+    RackView,
+    SelectedTrack,
+    SlotView,
+    Snapshot,
+    TrackView,
+)
 
 
 def read_transport(song, application):
@@ -117,4 +126,81 @@ def _slot(slot):
         is_playing=slot.is_playing,
         is_triggered=slot.is_triggered,
         is_recording=slot.is_recording,
+    )
+
+
+def read_racks(song):
+    # Every top-level rack in Set order: tracks, returns, then master, devices left to right.
+    racks = []
+    for kind, index, track in _fx_tracks(song):
+        for position, device in enumerate(track.devices):
+            if device.can_have_chains:
+                views = tuple(_macro(parameter) for parameter in macros(device))
+                racks.append(RackView((kind, index, position), track.name, device.name, views))
+    return tuple(racks)
+
+
+def read_macro_values(song, morph):
+    # The live value per morphing macro, or None when its rack has moved or gone.
+    targets = macro_parameters(song, ((m.path, m.rack_name, m.index) for m in morph.macros))
+    return tuple(None if parameter is None else parameter.value for parameter in targets)
+
+
+def macro_parameters(song, macros_wanted):
+    # The parameter per (path, rack name, index), or None; each rack resolved once per call,
+    # since a morph tick touches every macro of every rack.
+    racks = {}
+    result = []
+    for path, rack_name, index in macros_wanted:
+        if (path, rack_name) not in racks:
+            device = rack_at(song, path, rack_name)
+            racks[path, rack_name] = macros(device) if device is not None else []
+        parameters = racks[path, rack_name]
+        result.append(parameters[index] if index < len(parameters) else None)
+    return result
+
+
+def read_fx_store(song):
+    return song.get_data(values.FX_DATA_KEY, "")
+
+
+def rack_at(song, path, rack_name):
+    # The device at path, if it's still a rack with that name.
+    kind, index, position = path
+    if kind == "track":
+        tracks = list(song.tracks)
+    elif kind == "return":
+        tracks = list(song.return_tracks)
+    else:
+        tracks = [song.master_track]
+    if index >= len(tracks):
+        return None
+    devices = list(tracks[index].devices)
+    if position >= len(devices):
+        return None
+    device = devices[position]
+    if not device.can_have_chains or device.name != rack_name:
+        return None
+    return device
+
+
+def _fx_tracks(song):
+    for index, track in enumerate(song.tracks):
+        yield "track", index, track
+    for index, track in enumerate(song.return_tracks):
+        yield "return", index, track
+    yield "master", 0, song.master_track
+
+
+def macros(device):
+    # Parameter 0 is Device On; the visible macros follow it.
+    return list(device.parameters)[1 : 1 + device.visible_macro_count]
+
+
+def _macro(parameter):
+    return MacroView(
+        value=parameter.value,
+        min=parameter.min,
+        max=parameter.max,
+        is_quantized=parameter.is_quantized,
     )

@@ -31,3 +31,6 @@ VOLUME_MAX = 1.0  # +6 dB
 GLIDE_STEP = 0.018  # per 10 ms, scaled by elapsed time
 GLIDE_DEAD_BAND = 0.003
 CONTINUE_MS = 600
+
+FX_DATA_KEY = "BleakLoop.fx"  # song.set_data key for the FX snapshots
+FX_TOUCH_TOLERANCE = 0.005  # of a macro's range: further from the last write is a hand turn
