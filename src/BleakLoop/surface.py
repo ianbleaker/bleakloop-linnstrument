@@ -71,7 +71,9 @@ class BleakLoop(ControlSurface):
         self._setup = None  # NRPNs still to send, one per tick
         self._loading = 0  # setup ticks sent: the loading rainbow's position
         self._computed = False
-        self._control_channel = None  # 0-based, chosen at load
+        self._control_channel = None  # 0-based, chosen at load, moved off a right split clash
+        self._rescan = False  # the next poll reads every right split channel
+        self._clash = False  # the right split uses every channel: controls off
         self._note_map = None  # column 1 note -> pad, None while refused
         self._refusal = None
         self._right_split_unread = False
@@ -175,8 +177,8 @@ class BleakLoop(ControlSurface):
         self._loading += 1
 
     def _poll_tick(self):
-        # Linnstrument Mode re-check of Row Offset and the left split's Octave/Transpose, one step
-        # per tick. Sets go out before the next poll starts.
+        # Linnstrument Mode re-check of Row Offset, the left split's Octave/Transpose and the
+        # right split's channels, one step per tick. Sets go out before the next poll starts.
         now_ms = time.monotonic() * 1000
         if self._pending_sets:
             number, value = self._pending_sets.pop(0)
@@ -189,10 +191,12 @@ class BleakLoop(ControlSurface):
         elif self._poll_wait:
             # One tick after the last query: its replies are in.
             self._poll_wait = False
-            self._realign()
+            # Before the re-check: a clash brings the next poll forward.
             self._poll_due = now_ms + values.POLL_MS
+            self._realign()
         elif now_ms >= self._poll_due:
-            self._poll = device.poll_steps(device.poll_numbers(self._reads))
+            numbers = device.poll_numbers(self._reads, self._control_channel, self._rescan)
+            self._poll = device.poll_steps(numbers)
 
     def _realign(self):
         was_refused = self._note_map is None
@@ -202,6 +206,9 @@ class BleakLoop(ControlSurface):
         if self._right_split_unread:
             # No channel is known to be free: the controls stay off for the session.
             return
+        self._recheck_channel()
+        if self._clash:
+            note_map, refusal = None, device.REFUSE_CHANNELS
         self._note_map = note_map
         if player_changed:
             self.show_message(device.OCTAVE_RESET)
@@ -210,6 +217,27 @@ class BleakLoop(ControlSurface):
         elif refusal is None and was_refused:
             self.show_message(device.CONTROLS_ON)
         self._refusal = refusal
+
+    def _recheck_channel(self):
+        # The right split took the control channel: rescan every channel, then move to the
+        # highest free one. With none free the controls go off, and the rescans go on until
+        # one frees up. The right split is never changed mid-session.
+        clash = device.channel_clash(self._reads, self._control_channel)
+        if not self._rescan:
+            if clash:
+                self._rescan, self._poll_due = True, 0
+            return
+        moved = False
+        if clash:
+            channel = device.free_channel(device.right_split_channels(self._reads))
+            if channel is not None:
+                self._pending_sets.append((device.NRPN_LEFT_MAIN_CHANNEL, channel + 1))
+                self._control_channel, clash, moved = channel, False, True
+                self.show_message(device.CONTROLS_MOVED.format(channel + 1))
+        self._rescan = clash
+        if moved or clash != self._clash:
+            self._clash = clash
+            self._listen_for(Mode.LINNSTRUMENT)
 
     def _on_blink_timer(self):
         try:
@@ -266,10 +294,12 @@ class BleakLoop(ControlSurface):
                         )
         else:
             # All 128 notes, so column 1 never plays Live's tracks whatever Row Offset sends.
+            # None while the right split uses the control channel: its notes are the player's.
             channel = self._control_channel
-            for note in range(128):
-                element = getattr(self.elements, f"control_{channel}_{note}")
-                self._add_listener(element, lambda v, n=note: self._on_control_note(n, v))
+            if not self._clash:
+                for note in range(128):
+                    element = getattr(self.elements, f"control_{channel}_{note}")
+                    self._add_listener(element, lambda v, n=note: self._on_control_note(n, v))
             self._listen_for_nrpn_replies()
         self.request_rebuild_midi_map()
 

@@ -25,6 +25,7 @@ CC_Y_AXIS = 11
 CC_LIGHT_COLUMN = 20
 CC_LIGHT_ROW = 21
 CC_LIGHT_COLOUR = 22
+NRPN_LEFT_MAIN_CHANNEL = 1  # left split main channel: the control channel
 NRPN_ROW_OFFSET = 227  # global Row Offset
 NRPN_CUSTOM_ROW_OFFSET = 253  # Row Offset when 227 = 12: offset + 16
 NRPN_GUITAR_TUNING = tuple(range(263, 271))  # Guitar Row Offset: each row's note, nearest first
@@ -67,7 +68,9 @@ READ_NUMBERS = [
 REFUSE_DUPLICATES = "Row Offset repeats notes in column 1: controls off"
 REFUSE_ROW_OFFSET = "Couldn't read Row Offset: controls off"
 REFUSE_RIGHT_SPLIT = "Couldn't read the right split: controls off"
+REFUSE_CHANNELS = "The right split uses every channel: controls off"
 CONTROLS_ON = "Column 1 controls on"
+CONTROLS_MOVED = "The right split took column 1's channel: controls moved to channel {}"
 OCTAVE_RESET = "Left split Octave/Transpose reset: select the right split to change yours"
 
 
@@ -199,15 +202,26 @@ def right_split_channels(reads):
     return used
 
 
+def free_channel(used):
+    # 0-based: the highest channel outside the right split's, or None.
+    return next((channel - 1 for channel in range(16, 0, -1) if channel not in used), None)
+
+
+def channel_clash(reads, channel):
+    # Whether the right split plays on the 0-based channel. False when it can't be read.
+    used = right_split_channels(reads)
+    return used is not None and channel + 1 in used
+
+
 def control_channel(reads):
     # (0-based channel, right split changes). The highest channel the right split leaves
     # free; with none free, its highest per-note channel other than the main one.
     used = right_split_channels(reads)
     if used is None:
         return 15, []
-    for channel in range(16, 0, -1):
-        if channel not in used:
-            return channel - 1, []
+    channel = free_channel(used)
+    if channel is not None:
+        return channel, []
     main = reads[NRPN_RIGHT_MAIN_CHANNEL]
     channel = max(channel for channel in used if channel != main)
     return channel - 1, [(NRPN_RIGHT_MAIN_CHANNEL + channel, 0)]
@@ -243,7 +257,7 @@ def computed_settings(reads):
     note_to_pad, octave, refusal = control_map(reads)
     if right_split_channels(reads) is None:
         note_to_pad, refusal = None, REFUSE_RIGHT_SPLIT
-    settings = [(1, channel + 1), (NRPN_OCTAVE, octave)] + changes
+    settings = [(NRPN_LEFT_MAIN_CHANNEL, channel + 1), (NRPN_OCTAVE, octave)] + changes
     return settings, channel, note_to_pad, refusal
 
 
@@ -251,12 +265,17 @@ def computed_steps(settings):
     return _set_steps(settings)
 
 
-def poll_numbers(reads):
+def poll_numbers(reads, channel, rescan):
+    # Row Offset, the left split's Octave/Transpose and enough of the right split to see it
+    # move onto the 0-based control channel. Every per-note channel only on a rescan,
+    # to pick a free channel: all 16 each poll would slow the Row Offset re-check.
     numbers = [NRPN_ROW_OFFSET, NRPN_OCTAVE, NRPN_TRANSPOSE_PITCH, NRPN_TRANSPOSE_LIGHTS]
     if reads.get(NRPN_ROW_OFFSET) == 12:
         numbers.append(NRPN_CUSTOM_ROW_OFFSET)
     elif reads.get(NRPN_ROW_OFFSET) == 13:
         numbers += NRPN_GUITAR_TUNING
+    numbers += [NRPN_RIGHT_MIDI_MODE, NRPN_RIGHT_MAIN_CHANNEL, NRPN_RIGHT_PER_ROW_LOWEST]
+    numbers += NRPN_RIGHT_PER_NOTE if rescan else [NRPN_RIGHT_PER_NOTE[channel]]
     return numbers
 
 

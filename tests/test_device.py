@@ -170,6 +170,25 @@ def test_right_split_unread(reads):
     assert device.control_channel(reads) == (15, [])
 
 
+def test_free_channel():
+    assert device.free_channel(set(range(9, 17))) == 7
+    assert device.free_channel(set(range(1, 17))) is None
+
+
+@pytest.mark.parametrize(
+    ("reads", "channel", "clash"),
+    [
+        (FACTORY, 7, False),
+        (FACTORY, 8, True),
+        ({100: 0, 101: 8}, 7, True),
+        ({100: 2, 101: 1, 118: 6}, 7, True),
+        ({100: 1, 101: 1}, 7, False),  # per-note channels unread
+    ],
+)
+def test_channel_clash(reads, channel, clash):
+    assert device.channel_clash(reads, channel) is clash
+
+
 # Setup, poll and restore steps
 
 
@@ -234,7 +253,11 @@ def test_computed_steps():
     ],
 )
 def test_poll_numbers(offset, numbers):
-    assert device.poll_numbers({227: offset}) == numbers
+    assert device.poll_numbers({227: offset}, 7, False) == [*numbers, 100, 101, 118, 109]
+
+
+def test_poll_numbers_rescan():
+    assert device.poll_numbers({227: 5}, 7, True) == [227, 36, 37, 38, 100, 101, 118, *range(102, 118)]
 
 
 def test_poll_steps():
