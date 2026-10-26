@@ -44,7 +44,7 @@ flowchart LR
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
 | Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers | `core/modes.py` |
 | Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights | `core/controls.py` |
-| Clip slots, copy and delete rules, bottom row, columns 15, 16, Shift layer table | `core/session.py` |
+| Clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table | `core/session.py` |
 | Column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/column_1.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
 | FX Mode: snapshot storage format, rack identity, store, recall, morph timing and tick, FX lights | `core/fx.py` |
@@ -125,7 +125,7 @@ sequenceDiagram
   surface->>LinnStrument: only the pads that differ
 ```
 
-Snapshots are read fresh on each tick and each event, except Mixer Mode Y reports (section 6, Fader glide). Polling is chosen for simplicity: 91 clip slots with several properties each, plus 13 tracks, 7 scenes and transport state, a few times a second. A full snapshot costs about 0.5 ms (3 ms at worst).
+Snapshots are read fresh on each tick and each event, except Mixer Mode Y reports (section 6, Fader glide). Polling is chosen for simplicity: 78 clip slots with several properties each, plus 13 tracks, 6 scenes and transport state, a few times a second. A full snapshot costs about 0.5 ms (3 ms at worst).
 
 ## 4. Module layout
 
@@ -143,7 +143,7 @@ src/BleakLoop/
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers
     controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights
-    session.py         clip slots, copy and delete rules, bottom row, columns 15, 16, Shift layer table
+    session.py         clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table
     column_1.py        column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page
     mixer.py           Mixer toggle, coarse steps, bands, smoothing
     linnstrument_mode.py  Linnstrument Mode: column 1 only, handed to column_1
@@ -207,6 +207,7 @@ flowchart TD
   end
   __init__ -.->|lazy| surface
   core_column_1 --> core_controls
+  core_column_1 --> core_fx
   core_column_1 --> core_layout
   core_column_1 --> core_leds
   core_column_1 --> core_mixer
@@ -397,7 +398,7 @@ flowchart LR
 ### Mixer
 
 - **Mixer toggle.** `SetMixer(on)` sends the Y-axis CCs and re-listens, with the Y elements only when on, in one burst with the repaint that follows. There's no LED driver reset: nothing else has touched the device's lights, so the diff is accurate and the burst stays smaller.
-- **Fader glide.** `engine.tick(state, now_ms)` runs from the 10 ms timer while any glide or pending continuation exists; it also expires continuation windows and times each press, since events carry no time. A press takes Y relative to its first report, and a press next to a pad released within `CONTINUE_MS` continues the slide, bridging the gap between pads. During a continued slide the glide moves at the measured pad pace (section 8). It needs no snapshot and moves each volume toward its target by an amount scaled by the elapsed time. The surface redraws only when a fader's lit height changes, since the fader shows only 8 heights. A Y report only moves a glide target, so it goes to `engine.y_axis(state, event)` with no snapshot, actions or redraw: the device sends 50–100 a second per finger.
+- **Fader glide.** `engine.tick(state, now_ms)` runs from the 10 ms timer while any glide or pending continuation exists; it also expires continuation windows and times each press, since events carry no time. A press takes Y relative to its first report, and a press next to a pad released within `CONTINUE_MS` continues the slide, bridging the gap between pads. During a continued slide the glide moves at the measured pad pace (section 8). It needs no snapshot and moves each volume toward its target by an amount scaled by the elapsed time. The surface redraws only when a fader's lit height changes, since the fader shows only 6 heights. A Y report only moves a glide target, so it goes to `engine.y_axis(state, event)` with no snapshot, actions or redraw: the device sends 50–100 a second per finger.
 
 ```mermaid
 stateDiagram-v2

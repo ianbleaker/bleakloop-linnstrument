@@ -29,6 +29,7 @@ class TrackView:
     solo: bool = False
     has_midi_input: bool = False
     is_foldable: bool = False  # a group track: its slots can't hold clips
+    selected: bool = False  # Live's selected track
     volume: float = 0.0  # Live's volume control position
     slots: tuple = ()  # one SlotView per window row that exists, top first
 
@@ -84,6 +85,9 @@ class Snapshot:
     selected_track: SelectedTrack | None = None
     selected_scene: int = 0  # Live's highlighted scene
     can_capture_midi: bool = False
+    # Over every track and return track in the Set, not just the window.
+    any_muted: bool = False
+    any_soloed: bool = False
 
 
 @dataclass(frozen=True)
@@ -188,6 +192,25 @@ class SelectTrack:
 class ArmExclusive:
     track: int
     arm: bool
+
+
+@dataclass(frozen=True)
+class SetArm:
+    # Only this track's arm: the others are left as they are.
+    track: int
+    arm: bool
+
+
+@dataclass(frozen=True)
+class UnmuteAll:
+    # Every track and return track in the Set.
+    pass
+
+
+@dataclass(frozen=True)
+class UnsoloAll:
+    # Every track and return track in the Set.
+    pass
 
 
 @dataclass(frozen=True)

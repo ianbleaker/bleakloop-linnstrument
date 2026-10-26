@@ -9,7 +9,11 @@ GRID_COLUMNS = range(2, 15)
 SCENE_COLUMN = 16
 
 WINDOW_TRACKS = 13
-WINDOW_SCENES = 7
+WINDOW_SCENES = 6
+
+# Session and Mixer Mode grid rows below the clip slots or faders.
+MUTE_ROW = 7
+SELECT_ROW = 8
 
 # (column, pad)
 PLAY_STOP = (1, 1)
@@ -25,10 +29,13 @@ SCENE_PAGE = MODE_PAD  # pad 7's Shift function in Linnstrument Mode
 SHIFT = (1, 8)
 COPY = (15, 1)
 DELETE = (15, 2)
-MIXER = (15, 3)
-FX = (15, 4)
-# Unlit and unused until Drum (15/5) and Chord (16/8) are designed.
-RESERVED = ((15, 5), (16, 8))
+SESSION = (15, 3)
+MIXER = (15, 4)
+FX = (15, 5)
+# Unlit and unused until Drum (15/6), Chord (15/7) and Sequencer (15/8) are designed.
+RESERVED = ((15, 6), (15, 7), (15, 8))
+UNMUTE_ALL = (16, 7)
+STOP = (16, 8)
 
 # FX Mode: slot N is FX_SLOTS[N - 1].
 FX_SLOTS = tuple((12, pad) for pad in range(1, 9)) + tuple((13, pad) for pad in range(1, 9))
@@ -40,8 +47,6 @@ FIXED_LENGTHS = (1, 2, 4, 8)
 
 # Shift + column 15 pads 1-4: (track step, scene step).
 WINDOW_MOVES = {(15, 1): (0, -1), (15, 2): (0, 1), (15, 3): (-1, 0), (15, 4): (1, 0)}
-
-TRACK_CONTROL_PADS = {(15, 6): "MUTE", (15, 7): "SOLO", (15, 8): "ARM"}
 
 # Shift + column 15 pads 7 and 8: BPM step.
 TEMPO_STEPS = {(15, 7): 1, (15, 8): -1}

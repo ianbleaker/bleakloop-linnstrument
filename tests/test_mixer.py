@@ -3,17 +3,22 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, layout, mixer, session
-from BleakLoop.core.leds import LIME, OFF, RED, WHITE, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, PINK, RED, Light
 from BleakLoop.core.model import (
+    ArmExclusive,
     BeginUndoStep,
     EndUndoStep,
     EnterMode,
     PadPress,
+    SelectTrack,
+    SetArm,
     SetMixer,
     SetVolume,
     ShowMessage,
     Snapshot,
     StopAllClips,
+    ToggleMute,
+    ToggleSolo,
     TrackView,
     YAxis,
 )
@@ -25,12 +30,14 @@ from BleakLoop.core.values import (
     VOLUME_MAX,
 )
 
-STEP = mixer.step(8)  # one pad of travel
+STEP = mixer.SPACING  # one pad of travel
 
 
 def test_steps():
     assert mixer.step(1) == 0.85
-    assert mixer.step(8) == 0.10625
+    assert mixer.step(6) == pytest.approx(0.10625)
+    assert STEP == pytest.approx(0.14875)
+    assert list(mixer.FADER_PADS) == [1, 2, 3, 4, 5, 6]
 
 
 @pytest.mark.parametrize("anchor", [0.2, 0.5, 0.85])
@@ -46,17 +53,17 @@ def test_y_is_clamped_to_live_range():
 
 
 @pytest.mark.parametrize(
-    "volume, pad", [(0.0, 8), (0.85, 1), (0.5, 4), (1.0, 1), (mixer.step(8), 8)]
+    "volume, pad", [(0.0, 6), (0.85, 1), (0.5, 3), (1.0, 1), (mixer.step(6), 6)]
 )
 def test_lit_pad(volume, pad):
     assert mixer.lit_pad(volume) == pad
 
 
 def test_lit_pad_tie_goes_to_the_smaller_pad():
-    # Exactly halfway between pads 3 and 4 in floating point.
-    middle = (mixer.step(3) + mixer.step(4)) / 2
-    assert abs(middle - mixer.step(3)) == abs(middle - mixer.step(4))
-    assert mixer.lit_pad(middle) == 3
+    # Exactly halfway between pads 2 and 3 in floating point.
+    middle = (mixer.step(2) + mixer.step(3)) / 2
+    assert abs(middle - mixer.step(2)) == abs(middle - mixer.step(3))
+    assert mixer.lit_pad(middle) == 2
 
 
 # Toggle and reset
@@ -160,7 +167,7 @@ def lifted(column=2, pad=3, target=None):
     return state
 
 
-@pytest.mark.parametrize("pad", [1, 8])
+@pytest.mark.parametrize("pad", [1, 6])
 def test_coarse_press(pad):
     state, actions = handle(MIXER, press(4, pad))
     assert actions == [BeginUndoStep(), SetVolume(2, mixer.step(pad))]
@@ -256,9 +263,127 @@ def test_no_track_column_is_inert():
     assert handle(MIXER, press(6, 3), snap) == (MIXER, [])
 
 
-def test_pad_8_is_part_of_the_fader():
-    _, actions = handle(MIXER, press(2, 8))
-    assert actions == [BeginUndoStep(), SetVolume(0, mixer.step(8))]
+def test_pad_6_is_the_quietest_fader_pad():
+    _, actions = handle(MIXER, press(2, 6))
+    assert actions == [BeginUndoStep(), SetVolume(0, pytest.approx(mixer.QUIETEST))]
+
+
+# Rows 7 and 8
+
+
+def test_mute_row_in_mixer():
+    assert handle(MIXER, press(3, 7)) == (MIXER, [ToggleMute(1)])
+
+
+def test_shift_mute_row_in_mixer_solos():
+    state = replace(MIXER, shift=True)
+    assert handle(state, press(3, 7)) == (state, [ToggleSolo(1)])
+
+
+def test_select_row_in_mixer():
+    assert handle(MIXER, press(3, 8)) == (MIXER, [SelectTrack(1), ArmExclusive(1, True)])
+
+
+def test_shift_select_row_in_mixer_arms_alone():
+    state = replace(MIXER, shift=True)
+    assert handle(state, press(3, 8)) == (state, [SetArm(1, True)])
+
+
+@pytest.mark.parametrize("pad", [7, 8])
+def test_row_release_in_mixer_starts_a_dead_slide(pad):
+    state, actions = handle(MIXER, press(3, pad, pressed=False))
+    assert actions == []
+    assert state == replace(MIXER, dead=(Lift(3, 1, pad),))
+
+
+def tapped_mute(column=2):
+    state, _ = handle(MIXER, press(column, 7))
+    state, _ = handle(state, press(column, 7, pressed=False))
+    return state
+
+
+def test_slide_from_mute_onto_the_fader_is_ignored():
+    state = tapped_mute()
+    state, actions = handle(state, press(2, 6))
+    assert actions == []
+    assert state.dead == (Lift(2, 0, 6),)
+    state, _ = handle(state, press(2, 6, pressed=False))
+    state, actions = handle(state, press(2, 5))
+    assert actions == []
+    assert state.touches == state.glides == ()
+
+
+def test_fader_press_not_next_to_the_dead_slide_works():
+    state = tapped_mute()
+    _, actions = handle(state, press(2, 3))
+    assert actions == [BeginUndoStep(), SetVolume(0, mixer.step(3))]
+
+
+def test_dead_slide_is_per_column():
+    _, actions = handle(tapped_mute(column=2), press(3, 6))
+    assert actions == [BeginUndoStep(), SetVolume(1, mixer.step(6))]
+
+
+def test_fader_press_after_the_dead_window_works():
+    state = tapped_mute()
+    state, _, _ = engine.tick(state, 0.0)
+    state, _, _ = engine.tick(state, CONTINUE_MS)
+    assert state.dead == ()
+    _, actions = handle(state, press(2, 6))
+    assert actions == [BeginUndoStep(), SetVolume(0, mixer.step(6))]
+
+
+def test_dead_window_restarts_on_each_release():
+    state = tapped_mute()
+    state, _, _ = engine.tick(state, 0.0)
+    state, _ = handle(state, press(2, 6))
+    state, _, _ = engine.tick(state, CONTINUE_MS - 1)  # the finger rests on pad 6
+    state, _ = handle(state, press(2, 6, pressed=False))
+    state, _, _ = engine.tick(state, CONTINUE_MS + 100)
+    _, actions = handle(state, press(2, 5))
+    assert actions == []
+
+
+def test_overshoot_release_on_a_row_starts_no_dead_slide():
+    # Slid off the fader onto pad 7 and back: the fader slide carries on.
+    state = lifted(pad=6, target=0.2)
+    state, _ = handle(state, press(2, 7))
+    state, _ = handle(state, press(2, 7, pressed=False))
+    assert state.dead == ()
+
+
+def test_leaving_mixer_drops_dead_slides():
+    state, _ = handle(tapped_mute(), press(*layout.MIXER))
+    assert state.dead == ()
+
+
+@pytest.mark.parametrize("pad", [7, 8])
+def test_slide_onto_rows_after_a_release_is_ignored(pad):
+    state = lifted(pad=6)
+    assert handle(state, press(2, pad)) == (state, [])
+
+
+@pytest.mark.parametrize("pad", [7, 8])
+def test_press_on_rows_while_the_fader_is_held_is_ignored(pad):
+    state = touched(pad=6)
+    assert handle(state, press(2, pad)) == (state, [])
+
+
+def test_row_press_after_a_release_higher_up_works():
+    state = lifted(pad=3)
+    assert handle(state, press(2, 7)) == (state, [ToggleMute(0)])
+
+
+def test_row_press_in_another_column_still_works():
+    state = lifted(column=2, pad=6)
+    assert handle(state, press(3, 7)) == (state, [ToggleMute(1)])
+
+
+def test_row_tap_after_the_slide_window_works():
+    state = lifted(pad=6)
+    state, _, _ = engine.tick(state, 0.0)
+    state, _, _ = engine.tick(state, CONTINUE_MS)
+    assert handle(state, press(2, 7)) == (state, [ToggleMute(0)])
 
 
 # Y reports
@@ -470,6 +595,7 @@ def test_slide_across_pads_moves_monotonically():
         state = report(state, 2, pad, 127)
         state, _ = handle(state, press(2, pad, pressed=False))
         state = run(state, 300)  # the gap between pads
+    state = run(state, 300)  # the last pad's glide lands
     assert volumes == sorted(volumes)
     assert max(b - a for a, b in zip(volumes, volumes[1:])) <= GLIDE_STEP + 1e-9
     assert volumes[-1] == pytest.approx(mixer.step(6) + 4 * STEP)
@@ -485,11 +611,13 @@ def with_volume(snap, column, volume):
     return replace(snap, tracks=tuple(tracks))
 
 
-@pytest.mark.parametrize("volume, top", [(0.0, 8), (0.5, 4), (0.85, 1), (1.0, 1)])
+@pytest.mark.parametrize("volume, top", [(0.0, 6), (0.5, 3), (0.85, 1), (1.0, 1)])
 def test_fader_height(volume, top):
     frame = session.render(MIXER, with_volume(SNAP, 3, volume))
-    for pad in range(1, 9):
+    for pad in range(1, 7):
         assert frame[(3, pad)] == (Light(RED) if pad >= top else Light(OFF))
+    assert frame[(3, 7)] == Light(PINK)
+    assert frame[(3, 8)] == Light(LIME)
 
 
 def test_no_track_column_is_off():
@@ -499,16 +627,19 @@ def test_no_track_column_is_off():
 
 def test_faders_dark_under_shift():
     frame = session.render(replace(MIXER, shift=True), with_volume(SNAP, 3, 0.85))
-    assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))
+    assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 7))
+    assert frame[(3, 7)] == Light(CYAN)
+    assert frame[(3, 8)] == Light(LIME)
     assert frame[layout.PLAY_STOP] == Light(RED)
 
 
-@pytest.mark.parametrize("state, blink", [(State(), Blink.STEADY), (MIXER, Blink.FAST)])
-def test_mixer_pad_light(state, blink):
-    assert session.render(state, SNAP)[layout.MIXER] == Light(WHITE, blink)
+@pytest.mark.parametrize("state, colour", [(State(), CYAN), (MIXER, BLUE)])
+def test_mixer_pad_light(state, colour):
+    assert session.render(state, SNAP)[layout.MIXER] == Light(colour)
 
 
 def test_mixer_off_draws_the_grid():
     frame = session.render(State(), with_volume(SNAP, 2, 0.85))
-    assert all(frame[(2, pad)] == Light(OFF) for pad in range(1, 8))
-    assert frame[(2, 8)] == Light(LIME)  # the track switch, Arm mode
+    assert all(frame[(2, pad)] == Light(OFF) for pad in range(1, 7))
+    assert frame[(2, 7)] == Light(PINK)
+    assert frame[(2, 8)] == Light(LIME)

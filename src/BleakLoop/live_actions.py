@@ -29,6 +29,7 @@ from .core.model import (
     SaveFxSnapshots,
     SceneSelected,
     SelectTrack,
+    SetArm,
     SetArrangementRecord,
     SetLaunchQuantization,
     SetMacros,
@@ -46,6 +47,8 @@ from .core.model import (
     TogglePlay,
     ToggleSolo,
     Undo,
+    UnmuteAll,
+    UnsoloAll,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +56,11 @@ logger = logging.getLogger(__name__)
 
 def _slot(song, track, scene):
     return song.visible_tracks[track].clip_slots[scene]
+
+
+def _mixable(song):
+    # Every track that has mute and solo: the tracks and return tracks, not master.
+    return list(song.tracks) + list(song.return_tracks)
 
 
 def apply(action, song, surface):
@@ -79,8 +87,13 @@ def apply(action, song, surface):
         track = song.visible_tracks[action.track]
         track.mute = not track.mute
     elif isinstance(action, ToggleSolo):
-        track = song.visible_tracks[action.track]
-        track.solo = not track.solo
+        target = song.visible_tracks[action.track]
+        # Live's Exclusive Solo preference: soloing one unsolos the rest, as Live's button does.
+        if not target.solo and song.exclusive_solo:
+            for track in _mixable(song):
+                if track != target and track.solo:
+                    track.solo = False
+        target.solo = not target.solo
     elif isinstance(action, SelectTrack):
         song.view.selected_track = song.visible_tracks[action.track]
     elif isinstance(action, ArmExclusive):
@@ -89,6 +102,16 @@ def apply(action, song, surface):
             if track != target and track.can_be_armed and track.arm:
                 track.arm = False
         target.arm = action.arm
+    elif isinstance(action, SetArm):
+        song.visible_tracks[action.track].arm = action.arm
+    elif isinstance(action, UnmuteAll):
+        for track in _mixable(song):
+            if track.mute:
+                track.mute = False
+    elif isinstance(action, UnsoloAll):
+        for track in _mixable(song):
+            if track.solo:
+                track.solo = False
     elif isinstance(action, StopTrackClips):
         song.visible_tracks[action.track].stop_all_clips()
     elif isinstance(action, StopAllClips):

@@ -31,11 +31,13 @@ def read(song, application, window, scene_clips=False, selected=False):
     scenes = list(song.scenes)
     rows = range(window.scene, min(window.scene + layout.WINDOW_SCENES, len(scenes)))
     columns = range(window.track, min(window.track + layout.WINDOW_TRACKS, len(tracks)))
+    selected_track = song.view.selected_track
+    mixable = list(song.tracks) + list(song.return_tracks)
     return replace(
         read_transport(song, application),
         track_count=len(tracks),
         scene_count=len(scenes),
-        tracks=tuple(_track(i, tracks[i], rows) for i in columns),
+        tracks=tuple(_track(i, tracks[i], rows, selected_track) for i in columns),
         can_undo=song.can_undo,
         can_redo=song.can_redo,
         launch_quantization=int(song.clip_trigger_quantization),
@@ -54,6 +56,8 @@ def read(song, application, window, scene_clips=False, selected=False):
         selected_track=_selected_track(song, tracks, scenes) if selected else None,
         selected_scene=scenes.index(song.view.selected_scene) if selected else 0,
         can_capture_midi=song.can_capture_midi,
+        any_muted=any(track.mute for track in mixable),
+        any_soloed=any(track.solo for track in mixable),
     )
 
 
@@ -100,7 +104,7 @@ def _selected_track(song, tracks, scenes):
     )
 
 
-def _track(index, track, rows):
+def _track(index, track, rows, selected_track):
     slots = track.clip_slots
     # Live raises on reading arm state from a track that can't be armed.
     can_be_armed = track.can_be_armed
@@ -115,6 +119,7 @@ def _track(index, track, rows):
         solo=track.solo,
         has_midi_input=track.has_midi_input,
         is_foldable=track.is_foldable,
+        selected=track == selected_track,
         volume=track.mixer_device.volume.value,
         slots=tuple(_slot(slots[scene]) for scene in rows),
     )

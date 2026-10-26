@@ -9,28 +9,37 @@ from BleakLoop.core.modes import (
     Lift,
     Mode,
     Morph,
+    Origin,
     SceneSource,
     State,
     Touch,
-    TrackControl,
 )
 
 
 def test_entering_session_resets():
-    state = State(mode=Mode.LINNSTRUMENT, track_control=TrackControl.MUTE, mixer=True, shift=True)
+    state = State(mode=Mode.LINNSTRUMENT, mixer=True, shift=True)
     entered = modes.enter(state, Mode.SESSION)
     assert entered.mode is Mode.SESSION
-    assert entered.track_control is TrackControl.ARM
     assert not entered.mixer
 
 
-def test_entering_linnstrument_keeps_track_control():
-    state = State(mixer=True, shift=True, track_control=TrackControl.SOLO)
-    entered = modes.enter(state, Mode.LINNSTRUMENT)
+@pytest.mark.parametrize(
+    "state, origin",
+    [(State(), Origin.SESSION), (State(mixer=True), Origin.MIXER), (State(fx=True), Origin.FX)],
+)
+def test_entering_linnstrument_records_the_origin(state, origin):
+    assert modes.enter(state, Mode.LINNSTRUMENT).came_from is origin
+
+
+def test_entering_session_keeps_the_origin():
+    state = State(mode=Mode.LINNSTRUMENT, came_from=Origin.FX)
+    assert modes.enter(state, Mode.SESSION).came_from is Origin.FX
+
+
+def test_entering_linnstrument_turns_mixer_off():
+    entered = modes.enter(State(mixer=True), Mode.LINNSTRUMENT)
     assert entered.mode is Mode.LINNSTRUMENT
     assert not entered.mixer
-    assert not entered.shift
-    assert entered.track_control is TrackControl.SOLO
 
 
 @pytest.mark.parametrize("start, target", [(Mode.SESSION, Mode.LINNSTRUMENT), (Mode.LINNSTRUMENT, Mode.SESSION)])

@@ -37,18 +37,27 @@ TRACKS = (
         index=1, name="Bass", colour=0x70FC6A, slots=(CLIP, PLAYING, EMPTY, EMPTY)
     ),
     TrackView(
-        index=2, name="Keys", colour=0x5C8BF9, slots=(TRIGGERED, CLIP, CLIP, EMPTY)
+        index=2,
+        name="Keys",
+        colour=0x5C8BF9,
+        solo=True,
+        slots=(TRIGGERED, CLIP, CLIP, EMPTY),
     ),
     TrackView(
         index=3,
         name="Lead",
         colour=0xB85BDB,
         arm=True,
+        selected=True,
         has_midi_input=True,
         slots=(CLIP, RECORDING, EMPTY, EMPTY),
     ),
     TrackView(
-        index=4, name="Pads", colour=0xFFFD4C, slots=(EMPTY, CLIP, EMPTY, PLAYING)
+        index=4,
+        name="Pads",
+        colour=0xFFFD4C,
+        mute=True,
+        slots=(EMPTY, CLIP, EMPTY, PLAYING),
     ),
 )
 
@@ -63,6 +72,8 @@ SNAPSHOT = Snapshot(
     track_count=len(TRACKS),
     scene_count=4,
     tracks=TRACKS,
+    any_muted=True,
+    any_soloed=True,
     selected_track=SelectedTrack(
         index=3, name="Lead", armed=True, clips=(True, True, False, False)
     ),

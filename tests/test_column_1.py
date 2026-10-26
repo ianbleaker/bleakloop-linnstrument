@@ -30,6 +30,7 @@ from BleakLoop.core.model import (
     QuantizeClip,
     SelectedTrack,
     SetLaunchQuantization,
+    SetMixer,
     ShowClip,
     ShowMessage,
     SlotView,
@@ -311,6 +312,31 @@ def test_mode_pad_enters_session():
     assert actions == [EnterMode(Mode.SESSION)]
 
 
+@pytest.mark.parametrize(
+    "start, mixer, fx, more",
+    [
+        (SESSION, False, False, []),
+        (State(mixer=True), True, False, [SetMixer(True), ShowMessage("Mixer Mode ON")]),
+        (State(fx=True), False, True, [ShowMessage("FX Mode ON")]),
+    ],
+)
+def test_back_returns_to_the_mode_left(start, mixer, fx, more):
+    state, _ = handle(start, layout.MODE_PAD)
+    assert state.mode is Mode.LINNSTRUMENT
+    state, actions = handle(state, layout.MODE_PAD)
+    assert state.mode is Mode.SESSION
+    assert (state.mixer, state.fx) == (mixer, fx)
+    assert actions == [EnterMode(Mode.SESSION)] + more
+
+
+def test_back_after_scene_page_still_returns_to_mixer():
+    state, _ = handle(State(mixer=True), layout.MODE_PAD)
+    state = replace(state, scene_page=True)
+    state, _ = handle(state, layout.SHIFT)
+    state, _ = handle(state, layout.MODE_PAD)
+    assert state.mixer
+
+
 # Session-only empty Shift slots, and Shift + Fixed Length in both modes.
 EMPTY_SHIFT = [
     (SESSION, layout.RECORD),
@@ -357,10 +383,16 @@ def test_scene_page_closes_on_a_shift_press():
     assert handle(SCENES, layout.SHIFT) == (LINNSTRUMENT, [])
 
 
-@pytest.mark.parametrize("pad", range(1, 8))
+@pytest.mark.parametrize("pad", range(1, 7))
 def test_scene_page_launches_and_closes(pad):
     snap = replace(BASE, scene_count=10)
     assert handle(SCENES, (1, pad), snap) == (LINNSTRUMENT, [FireScene(pad - 1, legato=False)])
+
+
+def test_scene_page_pad_7_is_dark_and_does_nothing():
+    snap = replace(BASE, scene_count=10)
+    assert handle(SCENES, layout.MODE_PAD, snap) == (SCENES, [])
+    assert column_1.render(SCENES, snap)[layout.MODE_PAD] == Light(OFF)
 
 
 def test_scene_page_launches_from_the_window():
@@ -404,9 +436,9 @@ def test_normal_lights(state):
         ),
         layout.CAPTURE: Light(LIME),
         layout.METRONOME: controls.metronome_light(BASE),
-        layout.FIXED_LENGTH: Light(WHITE),
+        layout.FIXED_LENGTH: Light(OFF),
         layout.UNDO: Light(WHITE),
-        layout.MODE_PAD: Light(WHITE),
+        layout.MODE_PAD: Light(MAGENTA),
         layout.SHIFT: Light(WHITE),
     }
 
@@ -431,7 +463,7 @@ def test_normal_lights_follow_live(state, snapshot):
 
 @pytest.mark.parametrize("state", MODES)
 @pytest.mark.parametrize(
-    "bars, colour", [(None, WHITE), (1, CYAN), (2, BLUE), (4, MAGENTA), (8, PINK)]
+    "bars, colour", [(None, OFF), (1, CYAN), (2, BLUE), (4, MAGENTA), (8, PINK)]
 )
 def test_fixed_length_colour(state, bars, colour):
     frame = column_1.render(replace(state, fixed_length=bars), BASE)

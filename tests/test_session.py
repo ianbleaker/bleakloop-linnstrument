@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import layout, session
+from BleakLoop.core import column_1, layout, session
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -29,6 +29,7 @@ from BleakLoop.core.model import (
     CopyScene,
     DeleteClip,
     DeleteScene,
+    EndUndoStep,
     EnterMode,
     FireScene,
     FireSlot,
@@ -37,8 +38,10 @@ from BleakLoop.core.model import (
     Redo,
     SceneSelected,
     SelectTrack,
+    SetArm,
     SetArrangementRecord,
     SetLaunchQuantization,
+    SetMixer,
     SetSessionRecord,
     SetTempo,
     ShowClip,
@@ -53,13 +56,15 @@ from BleakLoop.core.model import (
     ToggleSolo,
     TrackView,
     Undo,
+    UnmuteAll,
+    UnsoloAll,
 )
-from BleakLoop.core.modes import ClipSource, Mode, SceneSource, State, TrackControl
+from BleakLoop.core.modes import ClipSource, Mode, SceneSource, State
 
 
 def session_snapshot(track_count=20, scene_count=10, window=Window(), **k):
     visible = range(window.track, min(window.track + 13, track_count))
-    rows = range(window.scene, min(window.scene + 7, scene_count))
+    rows = range(window.scene, min(window.scene + layout.WINDOW_SCENES, scene_count))
     tracks = tuple(
         TrackView(index=i, name=f"T{i + 1}", slots=tuple(SlotView() for _ in rows))
         for i in visible
@@ -181,9 +186,9 @@ def test_play_stop():
 
 
 def test_mode_pad_enters_linnstrument():
-    state = State(shift=False, track_control=TrackControl.SOLO, window=Window(2, 1))
+    state = State(shift=False, window=Window(2, 1))
     new, actions = handle(state, layout.MODE_PAD)
-    assert new == State(mode=Mode.LINNSTRUMENT, track_control=TrackControl.SOLO, window=Window(2, 1))
+    assert new == State(mode=Mode.LINNSTRUMENT, window=Window(2, 1))
     assert actions == [EnterMode(Mode.LINNSTRUMENT)]
 
 
@@ -201,7 +206,7 @@ def test_shift_record_pad_does_nothing():
 
 def test_slot_launch():
     assert handle(SESSION, (2, 1)) == (SESSION, [FireSlot(0, 0, legato=False)])
-    assert handle(SESSION, (14, 7)) == (SESSION, [FireSlot(12, 6, legato=False)])
+    assert handle(SESSION, (14, 6)) == (SESSION, [FireSlot(12, 5, legato=False)])
 
 
 def test_shift_slot_launch_is_legato():
@@ -233,63 +238,77 @@ def test_slot_past_last_scene_with_offset():
     assert handle(state, (2, 6), snapshot) == (state, [])
 
 
-# Per-track switches
+# Mute and select rows
 
 
-def mode(track_control, shift=False):
-    return State(track_control=track_control, shift=shift)
+def test_mute_row_toggles_mute():
+    assert handle(SESSION, (3, 7)) == (SESSION, [ToggleMute(1)])
 
 
-def test_mute_toggles():
-    state = mode(TrackControl.MUTE)
-    assert handle(state, (3, 8)) == (state, [ToggleMute(1)])
+def test_shift_mute_row_toggles_solo():
+    assert handle(SHIFT, (3, 7)) == (SHIFT, [ToggleSolo(1)])
 
 
-def test_shift_mute_stops_track_clips():
-    state = mode(TrackControl.MUTE, shift=True)
-    assert handle(state, (3, 8)) == (state, [StopTrackClips(1), ShowMessage("Stop clips: T2")])
-
-
-def test_solo_toggles():
-    state = mode(TrackControl.SOLO)
-    assert handle(state, (3, 8)) == (state, [ToggleSolo(1)])
-
-
-def test_arm_selects_and_arms():
+def test_select_row_selects_and_arms_exclusively():
     assert handle(SESSION, (3, 8)) == (SESSION, [SelectTrack(1), ArmExclusive(1, True)])
 
 
-def test_arm_on_armed_track_disarms():
+def test_select_row_on_selected_armed_track_disarms_it():
+    snapshot = with_track(SNAP, 3, arm=True, selected=True)
+    assert handle(SESSION, (3, 8), snapshot) == (SESSION, [SetArm(1, False)])
+
+
+def test_select_row_on_armed_track_not_selected_selects_and_arms_exclusively():
     snapshot = with_track(SNAP, 3, arm=True)
     assert handle(SESSION, (3, 8), snapshot) == (
         SESSION,
-        [SelectTrack(1), ArmExclusive(1, False)],
+        [SelectTrack(1), ArmExclusive(1, True)],
     )
 
 
-def test_arm_on_unarmable_track_only_selects():
-    snapshot = with_track(SNAP, 3, can_be_armed=False)
+@pytest.mark.parametrize("track", [{"selected": True}, {"implicit_arm": True, "selected": True}])
+def test_select_row_on_selected_track_not_explicitly_armed_arms_it(track):
+    snapshot = with_track(SNAP, 3, **track)
+    assert handle(SESSION, (3, 8), snapshot) == (
+        SESSION,
+        [SelectTrack(1), ArmExclusive(1, True)],
+    )
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_select_row_on_unarmable_track_only_selects(selected):
+    snapshot = with_track(SNAP, 3, can_be_armed=False, selected=selected)
     assert handle(SESSION, (3, 8), snapshot) == (SESSION, [SelectTrack(1)])
 
 
-def test_arm_uses_track_list_index():
+@pytest.mark.parametrize(
+    "track, arm",
+    [({}, True), ({"arm": True}, False), ({"selected": True}, True),
+     ({"arm": True, "selected": True}, False), ({"implicit_arm": True}, True)],
+)
+def test_shift_select_row_toggles_arm_alone(track, arm):
+    snapshot = with_track(SNAP, 3, **track)
+    assert handle(SHIFT, (3, 8), snapshot) == (SHIFT, [SetArm(1, arm)])
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_shift_select_row_on_unarmable_track_does_nothing(selected):
+    snapshot = with_track(SNAP, 3, can_be_armed=False, selected=selected)
+    assert handle(SHIFT, (3, 8), snapshot) == (SHIFT, [])
+
+
+def test_rows_use_track_list_index():
     window = Window(5, 0)
     state = State(window=window)
     snapshot = session_snapshot(window=window)
+    assert handle(state, (2, 7), snapshot) == (state, [ToggleMute(5)])
     assert handle(state, (2, 8), snapshot) == (state, [SelectTrack(5), ArmExclusive(5, True)])
 
 
-@pytest.mark.parametrize("track_control", [TrackControl.SOLO, TrackControl.ARM])
-def test_shift_solo_and_arm_do_nothing(track_control):
-    state = mode(track_control, shift=True)
-    assert handle(state, (3, 8)) == (state, [])
-
-
-@pytest.mark.parametrize("track_control", list(TrackControl))
-@pytest.mark.parametrize("shift", [False, True])
-def test_track_switch_without_track_does_nothing(track_control, shift):
-    state = mode(track_control, shift)
-    assert handle(state, (5, 8), session_snapshot(track_count=3)) == (state, [])
+@pytest.mark.parametrize("pad", [layout.MUTE_ROW, layout.SELECT_ROW])
+@pytest.mark.parametrize("state", [SESSION, SHIFT])
+def test_rows_without_track_do_nothing(state, pad):
+    assert handle(state, (5, pad), session_snapshot(track_count=3)) == (state, [])
 
 
 # Column 15
@@ -308,13 +327,13 @@ def test_shift_moves_window(pad, window):
 def test_window_message():
     state = replace(SHIFT, window=Window(0, 0))
     _, actions = handle(state, (15, 4))
-    assert actions == [ShowMessage("Tracks 2–14, Scenes 1–7")]
+    assert actions == [ShowMessage("Tracks 2–14, Scenes 1–6")]
 
 
 def test_window_message_capped_at_counts():
     snapshot = session_snapshot(track_count=5, scene_count=9)
     _, actions = handle(SHIFT, (15, 2), snapshot)
-    assert actions == [ShowMessage("Tracks 1–5, Scenes 2–8")]
+    assert actions == [ShowMessage("Tracks 1–5, Scenes 2–7")]
 
 
 def test_window_at_edge_does_nothing():
@@ -329,22 +348,67 @@ def test_shift_stop_all_clips():
     )
 
 
+MIXING = State(mixer=True)
+FX_ON = State(fx=True)
+
+
 @pytest.mark.parametrize(
-    "pad, track_control, text",
+    "state, key, mixer, fx",
     [
-        (6, TrackControl.MUTE, "Track Control: Mute"),
-        (7, TrackControl.SOLO, "Track Control: Solo"),
-        (8, TrackControl.ARM, "Track Control: Arm"),
+        (SESSION, layout.MIXER, True, False),
+        (SESSION, layout.FX, False, True),
+        (MIXING, layout.SESSION, False, False),
+        (MIXING, layout.FX, False, True),
+        (MIXING, layout.MIXER, False, False),
+        (FX_ON, layout.SESSION, False, False),
+        (FX_ON, layout.MIXER, True, False),
+        (FX_ON, layout.FX, False, False),
     ],
 )
-def test_track_control_mode(pad, track_control, text):
-    state, actions = handle(SESSION, (15, pad))
-    assert state.track_control is track_control
-    assert actions == [ShowMessage(text)]
+def test_mode_pads_switch(state, key, mixer, fx):
+    new, _ = handle(state, key)
+    assert (new.mixer, new.fx) == (mixer, fx)
 
 
-def test_track_control_mode_already_selected_still_posts():
-    assert handle(SESSION, (15, 8)) == (SESSION, [ShowMessage("Track Control: Arm")])
+def test_session_pad_in_session_does_nothing():
+    assert handle(SESSION, layout.SESSION) == (SESSION, [])
+
+
+@pytest.mark.parametrize("key", [layout.SESSION, layout.FX, layout.MIXER])
+def test_leaving_mixer_closes_its_undo_step(key):
+    state = State(mixer=True, undo_open=True, touches=(), glides=())
+    new, actions = handle(state, key)
+    assert not new.mixer
+    assert not new.undo_open
+    assert actions[:2] == [EndUndoStep(), SetMixer(False)]
+
+
+@pytest.mark.parametrize(
+    "state, current", [(SESSION, layout.SESSION), (MIXING, layout.MIXER), (FX_ON, layout.FX)]
+)
+def test_mode_pad_lights(state, current):
+    frame = session.render(state, SNAP)
+    for key in (layout.SESSION, layout.MIXER, layout.FX):
+        assert frame[key] == Light(BLUE if key == current else CYAN)
+    assert all(frame[key] == Light(OFF) for key in layout.RESERVED)
+
+
+def test_normal_layer_column_15():
+    frame = session.render(SESSION, SNAP)
+    assert [frame[(15, p)] for p in range(1, 9)] == [
+        Light(MAGENTA), Light(RED), Light(BLUE), Light(CYAN),
+        Light(CYAN), Light(OFF), Light(OFF), Light(OFF),
+    ]
+
+
+@pytest.mark.parametrize("state", [SHIFT, replace(MIXING, shift=True), replace(FX_ON, shift=True)])
+def test_shift_column_15_keeps_window_moves_and_tempo(state):
+    state = replace(state, window=Window(3, 3))
+    snapshot = session_snapshot(scene_count=20)
+    assert handle(state, layout.SESSION, snapshot)[0].window == Window(2, 3)
+    assert handle(state, layout.MIXER, snapshot)[0].window == Window(4, 3)
+    assert handle(state, layout.FX, snapshot) == (state, [])
+    assert handle(state, (15, 7), snapshot)[1][0] == SetTempo(121.0)
 
 
 def test_shift_pad_6_does_nothing():
@@ -390,6 +454,99 @@ def test_scene_launch_with_offset():
 
 def test_scene_past_the_end_does_nothing():
     assert handle(SESSION, (16, 5), session_snapshot(scene_count=4)) == (SESSION, [])
+
+
+# Unmute all and Stop
+
+
+def test_unmute_all():
+    assert handle(SESSION, layout.UNMUTE_ALL) == (
+        SESSION,
+        [UnmuteAll(), ShowMessage("Unmute all")],
+    )
+
+
+def test_shift_unsolo_all():
+    assert handle(SHIFT, layout.UNMUTE_ALL) == (SHIFT, [UnsoloAll(), ShowMessage("Unsolo all")])
+
+
+@pytest.mark.parametrize("state", [State(mixer=True), State(fx=True)])
+def test_unmute_all_in_mixer_and_fx(state):
+    assert handle(state, layout.UNMUTE_ALL) == (state, [UnmuteAll(), ShowMessage("Unmute all")])
+
+
+STOPPING = State(stop=True)
+STOP_ALL = [StopAllClips(), ShowMessage("Stop all clips")]
+
+
+def test_stop_press_holds():
+    assert handle(SESSION, layout.STOP) == (STOPPING, [])
+
+
+@pytest.mark.parametrize("state", [SESSION, State(mixer=True), State(fx=True)])
+def test_stop_tap_does_nothing(state):
+    held, actions = handle(state, layout.STOP)
+    assert actions == []
+    assert handle(held, layout.STOP, pressed=False) == (state, [])
+
+
+@pytest.mark.parametrize("state", [SHIFT, State(mixer=True, shift=True), State(fx=True, shift=True)])
+def test_shift_stop_stops_all_clips(state):
+    assert handle(state, layout.STOP) == (state, STOP_ALL)
+    assert handle(state, layout.STOP, pressed=False) == (state, [])
+
+
+@pytest.mark.parametrize("pad", range(1, 9))
+def test_stop_held_with_track_pad_stops_the_track(pad):
+    state, actions = handle(STOPPING, (3, pad))
+    assert state == STOPPING
+    assert actions == [StopTrackClips(1), ShowMessage("Stop clips: T2")]
+
+
+def test_stop_held_with_shift_still_stops_the_track():
+    state = State(stop=True, shift=True)
+    _, actions = handle(state, (3, 1))
+    assert actions == [StopTrackClips(1), ShowMessage("Stop clips: T2")]
+
+
+def test_stop_held_stops_several_tracks_then_release_does_nothing():
+    state, first = handle(STOPPING, (3, 1))
+    state, second = handle(state, (4, 7))
+    assert (first[0], second[0]) == (StopTrackClips(1), StopTrackClips(2))
+    assert handle(state, layout.STOP, pressed=False) == (SESSION, [])
+
+
+def test_stop_held_track_pad_release_does_nothing():
+    assert handle(STOPPING, (3, 1), pressed=False) == (STOPPING, [])
+
+
+def test_stop_held_with_empty_column_does_nothing():
+    state = handle(STOPPING, (5, 1), session_snapshot(track_count=3))
+    assert state == (STOPPING, [])
+
+
+@pytest.mark.parametrize("pad", [1, 8])
+def test_stop_held_in_mixer_stops_the_track(pad):
+    state = State(mixer=True, stop=True)
+    new, actions = handle(state, (3, pad))
+    assert new == state
+    assert actions == [StopTrackClips(1), ShowMessage("Stop clips: T2")]
+
+
+def test_stop_held_in_fx_leaves_the_grid_to_fx():
+    state = State(fx=True, stop=True)
+    _, actions = handle(state, layout.FX_SLOTS[0])
+    assert all(not isinstance(action, StopTrackClips) for action in actions)
+    assert handle(state, layout.STOP, pressed=False) == (State(fx=True), [])
+
+
+def test_stop_release_without_press_does_nothing():
+    assert handle(SESSION, layout.STOP, pressed=False) == (SESSION, [])
+
+
+def test_stop_hold_ends_on_mode_entry():
+    state, _ = handle(STOPPING, layout.MODE_PAD)
+    assert not state.stop
 
 
 # Capture, record and quantize
@@ -562,6 +719,13 @@ def test_empty_unarmed_slot_plain_fire():
     )
 
 
+def test_back_after_auto_linnstrument_mode_returns_to_session():
+    state, _ = handle(SESSION, (2, 1), ARMED_MIDI)
+    state, actions = column_1.handle(state, press(layout.MODE_PAD), ARMED_MIDI)
+    assert (state.mode, state.mixer, state.fx) == (Mode.SESSION, False, False)
+    assert actions == [EnterMode(Mode.SESSION)]
+
+
 def test_fixed_length_survives_auto_linnstrument_mode():
     state, _ = handle(State(fixed_length=4), (2, 1), ARMED_MIDI)
     assert state.mode is Mode.LINNSTRUMENT
@@ -573,7 +737,7 @@ def test_fixed_length_survives_auto_linnstrument_mode():
 
 @pytest.mark.parametrize(
     "scene, window",
-    [(2, Window(1, 2)), (14, Window(1, 8)), (6, Window(1, 4))],
+    [(2, Window(1, 2)), (14, Window(1, 9)), (9, Window(1, 4))],
 )
 def test_scene_selected_scrolls_window(scene, window):
     state = State(window=Window(1, 4))
@@ -638,9 +802,9 @@ COPY = State(copy=True)
 DELETE = State(delete=True)
 
 INERT_WHILE_HELD = (
-    [(c, 8) for c in layout.GRID_COLUMNS]
+    [(c, p) for c in layout.GRID_COLUMNS for p in (layout.MUTE_ROW, layout.SELECT_ROW)]
     + [(15, p) for p in range(3, 9)]
-    + [(16, 8)]
+    + [layout.UNMUTE_ALL, layout.STOP]
     + [(1, p) for p in range(1, 8)]
 )
 
@@ -661,7 +825,7 @@ def slots_snapshot(*tracks, scene_count=10):
     views = []
     for i, k in enumerate(tracks):
         clips = k.pop("clips", ())
-        slots = tuple(SlotView(has_clip=row in clips) for row in range(7))
+        slots = tuple(SlotView(has_clip=row in clips) for row in range(layout.WINDOW_SCENES))
         views.append(TrackView(index=i, slots=slots, **k))
     return replace(SNAP, tracks=tuple(views), track_count=len(views), scene_count=scene_count)
 
@@ -848,10 +1012,10 @@ def test_delete_scene_past_the_end_does_nothing():
 
 
 def test_delete_scene_with_window_at_bottom_moves_up():
-    state = State(delete=True, window=Window(2, 3))
-    snapshot = session_snapshot(scene_count=10, window=Window(2, 3))
-    assert handle(state, (16, 7), snapshot) == (
-        replace(state, window=Window(2, 2)),
+    state = State(delete=True, window=Window(2, 4))
+    snapshot = session_snapshot(scene_count=10, window=Window(2, 4))
+    assert handle(state, (16, 6), snapshot) == (
+        replace(state, window=Window(2, 3)),
         [DeleteScene(9)],
     )
 
@@ -926,34 +1090,64 @@ def test_slots_are_the_same_on_the_shift_layer():
 
 
 @pytest.mark.parametrize(
-    "track_control, track, light",
-    [
-        (TrackControl.MUTE, {}, Light(ORANGE)),
-        (TrackControl.MUTE, {"mute": True}, Light(LIME)),
-        (TrackControl.SOLO, {}, Light(LIME)),
-        (TrackControl.SOLO, {"solo": True}, Light(BLUE)),
-        (TrackControl.ARM, {}, Light(LIME)),
-        (TrackControl.ARM, {"arm": True}, Light(RED)),
-        (TrackControl.ARM, {"implicit_arm": True}, Light(RED)),
-    ],
+    "track, light", [({}, Light(PINK)), ({"mute": True}, Light(ORANGE))]
 )
-def test_track_switch_light(track_control, track, light):
-    snapshot = with_track(SNAP, 2, **track)
-    assert session.render(mode(track_control), snapshot)[(2, 8)] == light
+def test_mute_row_light(track, light):
+    assert session.render(SESSION, with_track(SNAP, 2, **track))[(2, 7)] == light
+
+
+@pytest.mark.parametrize("track, light", [({}, Light(CYAN)), ({"solo": True}, Light(BLUE))])
+def test_shift_mute_row_light_shows_solo(track, light):
+    snapshot = with_track(SNAP, 2, mute=True, **track)
+    assert session.render(SHIFT, snapshot)[(2, 7)] == light
 
 
 @pytest.mark.parametrize(
-    "track_control, light",
-    [(TrackControl.MUTE, Light(RED)), (TrackControl.SOLO, Light(OFF)),
-     (TrackControl.ARM, Light(OFF))],
+    "track, light",
+    [
+        ({}, Light(LIME)),
+        ({"selected": True}, Light(WHITE)),
+        ({"arm": True}, Light(RED)),
+        ({"implicit_arm": True}, Light(RED)),
+        ({"arm": True, "selected": True}, Light(RED)),
+        ({"can_be_armed": False}, Light(OFF)),
+        ({"can_be_armed": False, "selected": True}, Light(WHITE)),
+    ],
 )
-def test_track_switch_shift_light(track_control, light):
-    assert session.render(mode(track_control, shift=True), SNAP)[(2, 8)] == light
+@pytest.mark.parametrize("state", [SESSION, SHIFT])
+def test_select_row_light(state, track, light):
+    assert session.render(state, with_track(SNAP, 2, **track))[(2, 8)] == light
 
 
 @pytest.mark.parametrize("state", [SESSION, SHIFT])
-def test_track_switch_without_track_is_off(state):
-    assert session.render(state, session_snapshot(track_count=3))[(5, 8)] == Light(OFF)
+def test_rows_without_track_are_off(state):
+    frame = session.render(state, session_snapshot(track_count=3))
+    assert frame[(5, 7)] == frame[(5, 8)] == Light(OFF)
+
+
+@pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
+def test_rows_show_normal_layer_while_copy_or_delete_held_with_shift(held):
+    frame = session.render(State(shift=True, **held), with_track(SNAP, 3, mute=True))
+    assert frame[(2, 7)] == Light(PINK)
+    assert frame[(3, 7)] == Light(ORANGE)
+
+
+@pytest.mark.parametrize("muted, light", [(False, Light(OFF)), (True, Light(ORANGE))])
+def test_unmute_all_light(muted, light):
+    snapshot = replace(SNAP, any_muted=muted, any_soloed=True)
+    assert session.render(SESSION, snapshot)[layout.UNMUTE_ALL] == light
+
+
+@pytest.mark.parametrize("soloed, light", [(False, Light(OFF)), (True, Light(BLUE))])
+def test_shift_unmute_all_light_shows_solo(soloed, light):
+    snapshot = replace(SNAP, any_muted=True, any_soloed=soloed)
+    assert session.render(SHIFT, snapshot)[layout.UNMUTE_ALL] == light
+
+
+@pytest.mark.parametrize("state", [SESSION, SHIFT, State(mixer=True), State(fx=True)])
+def test_stop_light(state):
+    assert session.render(state, SNAP)[layout.STOP] == Light(RED)
+    assert session.render(replace(state, stop=True), SNAP)[layout.STOP] == Light(RED, Blink.FAST)
 
 
 def test_normal_layer_column_1():
@@ -961,7 +1155,7 @@ def test_normal_layer_column_1():
     assert frame[layout.UNDO] == Light(WHITE)
     assert frame[layout.METRONOME] == Light(ORANGE)
     assert frame[layout.PLAY_STOP] == Light(BLUE)
-    assert frame[layout.MODE_PAD] == Light(WHITE)
+    assert frame[layout.MODE_PAD] == Light(MAGENTA)
     assert frame[layout.COPY] == Light(MAGENTA)
     assert frame[layout.CAPTURE] == Light(LIME)
     assert frame[layout.DELETE] == Light(RED)
@@ -972,23 +1166,6 @@ def test_normal_layer_column_1_playing_with_metronome():
     frame = session.render(SESSION, replace(SNAP, is_playing=True, metronome=True))
     assert frame[layout.METRONOME] == Light(ORANGE, Blink.FAST)
     assert frame[layout.PLAY_STOP] == Light(GREEN, Blink.TEMPO)
-
-
-@pytest.mark.parametrize(
-    "track_control, blinking", [(TrackControl.MUTE, 6), (TrackControl.SOLO, 7),
-                                (TrackControl.ARM, 8)]
-)
-def test_normal_layer_column_15(track_control, blinking):
-    frame = session.render(mode(track_control), SNAP)
-    assert frame[layout.COPY] == Light(MAGENTA)
-    assert frame[layout.DELETE] == Light(RED)
-    assert frame[layout.MIXER] == Light(WHITE)
-    assert frame[layout.FX] == Light(CYAN)
-    assert frame[(15, 5)] == Light(OFF)
-    colours = {6: ORANGE, 7: BLUE, 8: RED}
-    for pad, colour in colours.items():
-        blink = Blink.TEMPO if pad == blinking else Blink.STEADY
-        assert frame[(15, pad)] == Light(colour, blink)
 
 
 def test_normal_layer_column_16():
@@ -1056,7 +1233,7 @@ def test_record_light_in_arrangement_view():
 
 
 @pytest.mark.parametrize(
-    "bars, colour", [(None, WHITE), (1, CYAN), (2, BLUE), (4, MAGENTA), (8, PINK)]
+    "bars, colour", [(None, OFF), (1, CYAN), (2, BLUE), (4, MAGENTA), (8, PINK)]
 )
 def test_fixed_length_colour(bars, colour):
     assert session.render(State(fixed_length=bars), SNAP)[layout.FIXED_LENGTH] == Light(colour)
@@ -1069,12 +1246,10 @@ def test_shift_layer_hides_fixed_length():
 
 @pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
 def test_copy_or_delete_with_shift_draws_normal_layer(held):
-    state = State(shift=True, track_control=TrackControl.MUTE, **held)
+    state = State(shift=True, **held)
     frame = session.render(state, with_track(SNAP, 3, mute=True))
-    assert frame[(2, 8)] == Light(ORANGE)
-    assert frame[(3, 8)] == Light(LIME)
     assert frame[layout.COPY] == (Light(RED, Blink.FAST) if held.get("copy") else Light(MAGENTA))
-    assert frame[layout.MIXER] == Light(WHITE)
+    assert frame[layout.MIXER] == Light(CYAN)
     assert frame[layout.CAPTURE] == Light(LIME)
     assert frame[layout.RECORD] == Light(RED)
     assert frame[layout.SHIFT] == Light(WHITE, Blink.FAST)
@@ -1108,11 +1283,11 @@ def test_source_outside_window_not_drawn(source):
     )
 
 
-# Shift + 15/4 is the window move Right.
+# Shift + 15/7 and 15/8 are the tempo steps.
 @pytest.mark.parametrize(
     "state, key",
     [(state, key) for state in (SESSION, SHIFT) for key in layout.RESERVED
-     if not (state.shift and key in layout.WINDOW_MOVES)],
+     if not (state.shift and key in layout.TEMPO_STEPS)],
 )
 def test_reserved_pads(state, key):
     assert handle(state, key) == (state, [])

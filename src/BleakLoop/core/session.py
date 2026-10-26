@@ -1,4 +1,4 @@
-"""Session Mode: clip slots, the bottom row, columns 15 and 16, and the Shift layer."""
+"""Session Mode: clip slots, the mute and select rows, columns 15 and 16, and the Shift layer."""
 
 from dataclasses import replace
 
@@ -11,6 +11,7 @@ from .leds import (
     MAGENTA,
     OFF,
     ORANGE,
+    PINK,
     RED,
     WHITE,
     YELLOW,
@@ -30,28 +31,19 @@ from .model import (
     PadPress,
     SceneSelected,
     SelectTrack,
+    SetArm,
     SetTempo,
     ShowClip,
     ShowMessage,
+    StopAllClips,
     StopTrackClips,
     ToggleMute,
     ToggleSolo,
+    UnmuteAll,
+    UnsoloAll,
 )
-from .modes import ClipSource, Mode, SceneSource, TrackControl
+from .modes import ClipSource, Mode, SceneSource
 from .values import TEMPO_MAX, TEMPO_MIN
-
-TRACK_CONTROL_COLOURS = {
-    TrackControl.MUTE: ORANGE,
-    TrackControl.SOLO: BLUE,
-    TrackControl.ARM: RED,
-}
-
-TRACK_CONTROL_NAMES = {
-    TrackControl.MUTE: "Mute",
-    TrackControl.SOLO: "Solo",
-    TrackControl.ARM: "Arm",
-}
-
 
 def handle(state, event, snapshot):
     if isinstance(event, SceneSelected):
@@ -81,9 +73,20 @@ def handle(state, event, snapshot):
         if state.mixer:
             return state, []
         return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
+    if key == layout.STOP:
+        return _stop(state, event)
+    if state.stop and not state.fx and event.column in layout.GRID_COLUMNS and event.pressed:
+        # Held Stop takes a track's pads, faders and rows included, before anything else.
+        return _stop_track(state, _track(event.column, snapshot))
     if state.mixer and event.column in layout.GRID_COLUMNS:
-        # Every pad is the fader, pad 8 included; releases matter too.
-        return mixer.press(state, event, snapshot)
+        if event.pad in mixer.FADER_PADS:
+            # Releases matter too.
+            return mixer.press(state, event, snapshot)
+        if not event.pressed:
+            return mixer.row_release(state, event, snapshot), []
+        if mixer.sliding(state, event.column):
+            # A slide that runs off the fader moves nothing, not even the rows.
+            return state, []
     if state.fx and event.column in layout.GRID_COLUMNS:
         return fx.press(state, event, snapshot)
     if not event.pressed:
@@ -96,12 +99,18 @@ def handle(state, event, snapshot):
     if event.column == 1:
         return column_1.handle(state, event, snapshot)
     if event.column in layout.GRID_COLUMNS:
-        if event.pad == layout.ROWS:
-            return state, _track_switch(state, _track(event.column, snapshot))
+        if event.pad == layout.MUTE_ROW:
+            return state, _mute_row(state, _track(event.column, snapshot))
+        if event.pad == layout.SELECT_ROW:
+            return state, _select_row(state, _track(event.column, snapshot))
         return _slot(state, event, snapshot)
     if event.column == 15:
         return _column_15(state, key, snapshot)
-    if _is_scene(event):  # pad 8 is reserved
+    if key == layout.UNMUTE_ALL:
+        if state.shift:
+            return state, [UnsoloAll(), ShowMessage("Unsolo all")]
+        return state, [UnmuteAll(), ShowMessage("Unmute all")]
+    if _is_scene(event):
         scene = state.window.scene + event.pad - 1
         if scene < snapshot.scene_count:
             return state, [FireScene(scene, legato=state.shift)]
@@ -123,11 +132,11 @@ def _slot_at(state, event, snapshot):
 
 
 def _is_slot(event):
-    return event.column in layout.GRID_COLUMNS and event.pad < layout.ROWS
+    return event.column in layout.GRID_COLUMNS and event.pad <= layout.WINDOW_SCENES
 
 
 def _is_scene(event):
-    return event.column == layout.SCENE_COLUMN and event.pad < layout.ROWS
+    return event.column == layout.SCENE_COLUMN and event.pad <= layout.WINDOW_SCENES
 
 
 def _slot(state, event, snapshot):
@@ -224,21 +233,43 @@ def _delete(state, event, snapshot):
     return state, []
 
 
-def _track_switch(state, track):
+def _stop(state, event):
+    # A hold pad: hold it and press a track's pad to stop that track. Shift + Stop stops all.
+    if not event.pressed:
+        return replace(state, stop=False), []
+    if state.copy or state.delete:
+        return state, []
+    if state.shift:
+        return state, [StopAllClips(), ShowMessage("Stop all clips")]
+    return replace(state, stop=True), []
+
+
+def _stop_track(state, track):
+    if track is None:
+        return state, []
+    return state, [StopTrackClips(track.index), ShowMessage(f"Stop clips: {track.name}")]
+
+
+def _mute_row(state, track):
     if track is None:
         return []
-    if state.track_control is TrackControl.MUTE:
-        if state.shift:
-            return [StopTrackClips(track.index), ShowMessage(f"Stop clips: {track.name}")]
-        return [ToggleMute(track.index)]
     if state.shift:
-        return []
-    if state.track_control is TrackControl.SOLO:
         return [ToggleSolo(track.index)]
-    actions = [SelectTrack(track.index)]
-    if track.can_be_armed:
-        actions.append(ArmExclusive(track.index, not track.arm))
-    return actions
+    return [ToggleMute(track.index)]
+
+
+def _select_row(state, track):
+    # A plain press arms exclusively whatever Live's Exclusive Arm preference says.
+    if track is None:
+        return []
+    if state.shift:
+        # Arm or disarm this track alone; the selection stays.
+        return [SetArm(track.index, not track.arm)] if track.can_be_armed else []
+    if not track.can_be_armed:
+        return [SelectTrack(track.index)]
+    if track.selected and track.arm:
+        return [SetArm(track.index, False)]
+    return [SelectTrack(track.index), ArmExclusive(track.index, True)]
 
 
 def _column_15(state, key, snapshot):
@@ -249,15 +280,17 @@ def _column_15(state, key, snapshot):
             bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + layout.TEMPO_STEPS[key]))
             return state, [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
         return state, []
-    # Normal-layer 15/5 is reserved: no match here.
+    # The reserved pads have no match here. The current mode's pad goes back to Session.
+    if key == layout.SESSION:
+        if state.mixer:
+            return mixer.toggle(state)
+        if state.fx:
+            return fx.toggle(state)
+        return state, []
     if key == layout.MIXER:
         return mixer.toggle(state)
     if key == layout.FX:
         return fx.toggle(state)
-    if key in layout.TRACK_CONTROL_PADS:
-        mode = TrackControl[layout.TRACK_CONTROL_PADS[key]]
-        message = ShowMessage(f"Track Control: {TRACK_CONTROL_NAMES[mode]}")
-        return replace(state, track_control=mode), [message]
     return state, []
 
 
@@ -289,20 +322,24 @@ def render(state, snapshot):
         if state.mixer:
             if not shift_layer:
                 _render_fader(frame, column, track)  # dark under Shift
+            _render_rows(frame, column, track, shift_layer)
             continue
-        for pad in range(1, layout.ROWS):
+        for pad in range(1, layout.WINDOW_SCENES + 1):
             frame[(column, pad)] = _slot_light(track, pad - 1)
-        frame[(column, layout.ROWS)] = _track_switch_light(state, shift_layer, track)
+        _render_rows(frame, column, track, shift_layer)
     if state.fx:
         frame.update(fx.render(state))
-    for pad in range(1, layout.ROWS):
+    for pad in range(1, layout.WINDOW_SCENES + 1):
         frame[(layout.SCENE_COLUMN, pad)] = controls.scene_light(
             snapshot, state.window.scene, pad - 1
         )
     if shift_layer:
         _render_shift_layer(frame)
+        frame[layout.UNMUTE_ALL] = Light(BLUE if snapshot.any_soloed else OFF)
     else:
         _render_normal_layer(frame, state)
+        frame[layout.UNMUTE_ALL] = Light(ORANGE if snapshot.any_muted else OFF)
+    frame[layout.STOP] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
     frame.update(column_1.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame
@@ -315,19 +352,19 @@ def _render_copy_source(frame, state):
     if isinstance(source, ClipSource):
         column = source.track - window.track + layout.GRID_COLUMNS[0]
         pad = source.scene - window.scene + 1
-        if column in layout.GRID_COLUMNS and 1 <= pad < layout.ROWS:
+        if column in layout.GRID_COLUMNS and 1 <= pad <= layout.WINDOW_SCENES:
             frame[(column, pad)] = Light(RED, Blink.FAST)
     elif isinstance(source, SceneSource):
         pad = source.scene - window.scene + 1
-        if 1 <= pad < layout.ROWS:
+        if 1 <= pad <= layout.WINDOW_SCENES:
             frame[(layout.SCENE_COLUMN, pad)] = Light(RED, Blink.FAST)
 
 
 def _render_fader(frame, column, track):
-    # A bar in the track's colour from pad 8 up to the pad nearest Live's volume.
+    # A bar in the track's colour from the last fader pad up to the pad nearest Live's volume.
     if track is None:
         return
-    for pad in range(mixer.lit_pad(track.volume), layout.ROWS + 1):
+    for pad in range(mixer.lit_pad(track.volume), mixer.FADER_PADS[-1] + 1):
         frame[(column, pad)] = Light(track_colour(track.colour))
 
 
@@ -349,28 +386,38 @@ def _slot_light(track, row):
     return Light(OFF)
 
 
-def _track_switch_light(state, shift_layer, track):
+def _render_rows(frame, column, track, shift_layer):
+    frame[(column, layout.MUTE_ROW)] = _mute_light(track, shift_layer)
+    frame[(column, layout.SELECT_ROW)] = _select_light(track)
+
+
+def _mute_light(track, shift_layer):
     if track is None:
         return Light(OFF)
     if shift_layer:
-        return Light(RED if state.track_control is TrackControl.MUTE else OFF)
-    if state.track_control is TrackControl.MUTE:
-        return Light(LIME if track.mute else ORANGE)
-    if state.track_control is TrackControl.SOLO:
-        return Light(BLUE if track.solo else LIME)
-    return Light(RED if track.arm or track.implicit_arm else LIME)
+        return Light(BLUE if track.solo else CYAN)
+    return Light(ORANGE if track.mute else PINK)
+
+
+def _select_light(track):
+    # The same on both layers.
+    if track is None:
+        return Light(OFF)
+    if track.can_be_armed and (track.arm or track.implicit_arm):
+        return Light(RED)
+    if track.selected:
+        return Light(WHITE)
+    return Light(LIME if track.can_be_armed else OFF)
 
 
 def _render_normal_layer(frame, state):
     # Held Copy and Delete blink.
     frame[layout.COPY] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
     frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
-    frame[layout.MIXER] = Light(WHITE, Blink.FAST if state.mixer else Blink.STEADY)
-    frame[layout.FX] = Light(CYAN, Blink.FAST if state.fx else Blink.STEADY)
-    for key, name in layout.TRACK_CONTROL_PADS.items():
-        mode = TrackControl[name]
-        blink = Blink.TEMPO if mode is state.track_control else Blink.STEADY
-        frame[key] = Light(TRACK_CONTROL_COLOURS[mode], blink)
+    # Modes are cyan, the current one blue.
+    current = layout.MIXER if state.mixer else layout.FX if state.fx else layout.SESSION
+    for key in (layout.SESSION, layout.MIXER, layout.FX):
+        frame[key] = Light(BLUE if key == current else CYAN)
 
 
 def _render_shift_layer(frame):

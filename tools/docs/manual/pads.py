@@ -9,7 +9,7 @@ from .scenes import Layer
 
 @dataclass(frozen=True)
 class Item:
-    # One or more pads that share a callout: Scenes 1-7, the track switch modes.
+    # One or more pads that share a callout: Scenes 1-6, the tempo steps.
     name: str
     labels: dict  # (column, pad) -> label of at most 7 characters
     callout: str
@@ -34,8 +34,9 @@ class Block:
         return [(column, pad) for column in self.columns for pad in self.pads]
 
 
-SLOT_PADS = range(1, layout.ROWS)
-SWITCH_PADS = range(layout.ROWS, layout.ROWS + 1)
+SLOT_PADS = range(1, layout.WINDOW_SCENES + 1)
+MUTE_PADS = range(layout.MUTE_ROW, layout.MUTE_ROW + 1)
+SELECT_PADS = range(layout.SELECT_ROW, layout.SELECT_ROW + 1)
 ALL_PADS = range(1, layout.ROWS + 1)
 SCENE_PADS = range(1, layout.WINDOW_SCENES + 1)
 
@@ -103,14 +104,21 @@ _SIDE = (
         "Hold, press a clip, then an empty slot.",
     ),
     _one("Delete", layout.DELETE, "Hold, then press a clip or scene to delete it."),
-    _one("Mixer", layout.MIXER, "Mixer Mode on/off. Blinks while on."),
-    _one("FX", layout.FX, "FX Mode on/off. Blinks while on."),
-    Item(
-        "Track switch mode",
-        {key: name.title() for key, name in layout.TRACK_CONTROL_PADS.items()},
-        "What the track switches do: Mute, Solo or Arm. The chosen one blinks.",
-    ),
+    _one("Session", layout.SESSION, "Session Mode."),
+    _one("Mixer", layout.MIXER, "Mixer Mode. Press again for Session Mode."),
+    _one("FX", layout.FX, "FX Mode. Press again for Session Mode."),
     _scenes(layout.SCENE_COLUMN, "Launch a scene."),
+    _one(
+        "Unmute all",
+        layout.UNMUTE_ALL,
+        "Unmute every track and return track in the Set. Orange while any is muted.",
+        label="Unmute",
+    ),
+    _one(
+        "Stop",
+        layout.STOP,
+        "Hold, then press a track's pad to stop that track's clips.",
+    ),
 )
 
 _SIDE_SHIFT = (
@@ -127,13 +135,42 @@ _SIDE_SHIFT = (
         _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
         for key, name in {(15, 1): "Up", (15, 2): "Down", (15, 3): "Left", (15, 4): "Right"}.items()
     ),
-    Item(
-        "Tempo",
-        {(15, 7): "Tempo+", (15, 8): "Tempo-"},
-        "Tempo +1 BPM on Solo, -1 BPM on Arm.",
-    ),
+    Item("Tempo", {(15, 7): "Tempo+", (15, 8): "Tempo-"}, "Tempo +1 or -1 BPM."),
     _scenes(layout.SCENE_COLUMN, "Launch with legato."),
+    _one(
+        "Unsolo all",
+        layout.UNMUTE_ALL,
+        "Unsolo every track and return track in the Set. Blue while any is soloed.",
+        label="Unsolo",
+    ),
+    _one("Stop all", layout.STOP, "Stop all clips.", label="StopAll"),
     SHIFT_HELD,
+)
+
+MUTE = Block(
+    "Mute",
+    layout.GRID_COLUMNS,
+    MUTE_PADS,
+    "Mute or unmute the track: pink while audible, orange while muted.",
+)
+SELECT = Block(
+    "Select and arm",
+    layout.GRID_COLUMNS,
+    SELECT_PADS,
+    "Select the track and arm it alone. Press the selected, armed track to disarm it.",
+)
+SOLO = Block(
+    "Solo",
+    layout.GRID_COLUMNS,
+    MUTE_PADS,
+    "Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while "
+    "soloed.",
+)
+ARM = Block(
+    "Arm",
+    layout.GRID_COLUMNS,
+    SELECT_PADS,
+    "Arm or disarm the track alone, keeping the selection.",
 )
 
 _SESSION = (
@@ -143,32 +180,29 @@ _SESSION = (
         SLOT_PADS,
         "Launch a clip. On an armed track, an empty slot records.",
     ),
-    Block(
-        "Track switches",
-        layout.GRID_COLUMNS,
-        SWITCH_PADS,
-        "Mute, solo or arm the track, as set by the track switch mode.",
-    ),
+    MUTE,
+    SELECT,
 )
 
 _SESSION_SHIFT = (
     Block("Clip slots: legato", layout.GRID_COLUMNS, SLOT_PADS, "Launch with legato."),
-    Block(
-        "Track switches: stop",
-        layout.GRID_COLUMNS,
-        SWITCH_PADS,
-        "Stop the track's clips, in Mute mode.",
-    ),
+    SOLO,
+    ARM,
 )
 
 _MIXER = (
     Block(
         "Faders",
         layout.GRID_COLUMNS,
-        ALL_PADS,
+        SLOT_PADS,
         "One volume fader per track.",
     ),
+    MUTE,
+    SELECT,
 )
+
+# Not drawn: the Shift notes of Mixer Mode's list.
+_MIXER_SHIFT = (SOLO, ARM)
 
 _FX = (
     Block(
@@ -198,7 +232,7 @@ _LINNSTRUMENT = (
     METRONOME,
     FIXED_LENGTH,
     UNDO,
-    _one("Session Mode", layout.MODE_PAD, "Back to Session Mode.", label="Session"),
+    _one("Back", layout.MODE_PAD, "Back to the mode you came from: Session, Mixer or FX."),
     SHIFT,
 )
 
@@ -231,6 +265,7 @@ SECTIONS = {
     "session": _SESSION,
     "session-shift": _SESSION_SHIFT,
     "mixer": _MIXER,
+    "mixer-shift": _MIXER_SHIFT,
     "fx": _FX,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
@@ -241,7 +276,7 @@ SECTIONS = {
 LISTS = {
     "side": "side-shift",
     "session": "session-shift",
-    "mixer": None,
+    "mixer": "mixer-shift",
     "fx": None,
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,

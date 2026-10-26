@@ -11,6 +11,13 @@ class Mode(enum.Enum):
     LINNSTRUMENT = enum.auto()
 
 
+class Origin(enum.Enum):
+    # The Session Mode layer Linnstrument Mode was entered from, which Back returns to.
+    SESSION = enum.auto()
+    MIXER = enum.auto()
+    FX = enum.auto()
+
+
 @dataclass(frozen=True)
 class ClipSource:
     track: int
@@ -83,30 +90,26 @@ class Morph:
     macros: tuple = ()  # MorphMacro per macro still morphing
 
 
-class TrackControl(enum.Enum):
-    MUTE = enum.auto()
-    SOLO = enum.auto()
-    ARM = enum.auto()
-
-
 @dataclass(frozen=True)
 class State:
     mode: Mode = Mode.SESSION
     window: Window = Window()
     shift: bool = False
-    track_control: TrackControl = TrackControl.ARM
     mixer: bool = False
     quantization_memory: int | None = None
     copy: bool = False
     delete: bool = False
     copy_source: ClipSource | SceneSource | None = None
+    stop: bool = False  # Stop is held
     fixed_length: int | None = None  # bars; Linnstrument Mode's Record Clip uses it too
     touches: tuple = ()  # Touch per held fader column
     lifts: tuple = ()  # Lift per fader column whose pad was just released
+    dead: tuple = ()  # Lift per column whose slide started on rows 7-8: the fader ignores it
     glides: tuple = ()  # Glide per track
     glide_ms: float | None = None  # time of the last glide step, None when none is moving
     undo_open: bool = False  # a fader gesture's undo step is open in Live
     scene_page: bool = False  # Linnstrument Mode column 1 shows the scene page
+    came_from: Origin = Origin.SESSION  # where Linnstrument Mode's Back returns to
     fx: bool = False
     fx_length: int | None = None  # bars of the held FX length pad
     fx_slots: tuple = (None,) * 16  # tuple of FxRack per stored slot, None when empty
@@ -123,6 +126,9 @@ def enter(state, mode):
     # channel, so BleakLoop never sees it.
     # A caller leaving Mixer Mode closes an open undo step first (mixer.reset).
     # FX Mode turns off, but a running morph, its undo step and the snapshots carry on.
+    if mode is Mode.LINNSTRUMENT and state.mode is Mode.SESSION:
+        origin = Origin.MIXER if state.mixer else Origin.FX if state.fx else Origin.SESSION
+        state = replace(state, came_from=origin)
     state = replace(
         state,
         mode=mode,
@@ -130,8 +136,10 @@ def enter(state, mode):
         copy=False,
         delete=False,
         copy_source=None,
+        stop=False,
         touches=(),
         lifts=(),
+        dead=(),
         glides=(),
         glide_ms=None,
         undo_open=False,
@@ -139,8 +147,6 @@ def enter(state, mode):
         fx=False,
         fx_length=None,
     )
-    if mode is Mode.SESSION:
-        state = replace(state, track_control=TrackControl.ARM)
-    else:
+    if mode is not Mode.SESSION:
         state = replace(state, shift=False)
     return state

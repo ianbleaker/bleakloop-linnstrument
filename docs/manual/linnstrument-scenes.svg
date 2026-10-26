@@ -40,8 +40,6 @@
 <text x="36" y="247" font-size="9" fill="#ffffff" text-anchor="middle">Scene 5</text>
 <rect x="18" y="283" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="36" y="293" font-size="9" fill="#ffffff" text-anchor="middle">Scene 6</text>
-<rect x="18" y="329" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="36" y="339" font-size="9" fill="#ffffff" text-anchor="middle">Scene 7</text>
 <rect x="18" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="36" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Back</text>
 <rect x="62" y="40" width="684" height="362" rx="4" fill="#3a3a40"/>

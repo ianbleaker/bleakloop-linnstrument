@@ -6,7 +6,7 @@ Shift + Play/Stop act on it.
 
 from dataclasses import replace
 
-from . import controls, layout, mixer, modes
+from . import controls, fx, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -36,7 +36,7 @@ from .model import (
     StopTrackClips,
     TogglePlay,
 )
-from .modes import Mode
+from .modes import Mode, Origin
 
 # Live's launch quantization names, indexed by its value.
 QUANTIZATION_NAMES = (
@@ -58,7 +58,7 @@ QUANTIZATION_NAMES = (
 DEFAULT_QUANTIZATION = 4  # 1 Bar
 
 # One pad cycles through the lengths, so its colour shows the current one.
-FIXED_LENGTH_COLOURS = {None: WHITE, 1: CYAN, 2: BLUE, 4: MAGENTA, 8: PINK}
+FIXED_LENGTH_COLOURS = {None: OFF, 1: CYAN, 2: BLUE, 4: MAGENTA, 8: PINK}
 
 
 def handle(state, event, snapshot):
@@ -93,7 +93,7 @@ def _normal(state, key, snapshot):
         return state, controls.undo(snapshot)
     if key == layout.MODE_PAD:
         if linnstrument:
-            return modes.enter(state, Mode.SESSION), [EnterMode(Mode.SESSION)]
+            return _back(state)
         state, actions = mixer.reset(state)
         return (
             modes.enter(state, Mode.LINNSTRUMENT),
@@ -122,6 +122,19 @@ def _shift(state, key, snapshot):
     return state, []
 
 
+def _back(state):
+    # Back to the layer Linnstrument Mode was entered from, through its own entry path.
+    state = modes.enter(state, Mode.SESSION)
+    actions = [EnterMode(Mode.SESSION)]
+    if state.came_from is Origin.MIXER:
+        state, more = mixer.toggle(state)
+    elif state.came_from is Origin.FX:
+        state, more = fx.toggle(state)
+    else:
+        more = []
+    return state, actions + more
+
+
 def _scene_page(state, key, pressed, snapshot):
     # Opened while Shift is held: that hold's release mustn't close it, a new press does.
     if not pressed:
@@ -130,6 +143,8 @@ def _scene_page(state, key, pressed, snapshot):
         return state, []
     if key == layout.SHIFT:
         return replace(state, scene_page=False), []
+    if key[1] > layout.WINDOW_SCENES:
+        return state, []  # dark: the page shows the window's scenes only
     scene = state.window.scene + key[1] - 1
     if scene >= snapshot.scene_count:
         return state, []  # past the end of the Set: nothing launched, the page stays
@@ -220,8 +235,9 @@ def render(state, snapshot):
     if state.scene_page:
         frame = {
             (1, pad): controls.scene_light(snapshot, state.window.scene, pad - 1)
-            for pad in range(1, layout.ROWS)
+            for pad in range(1, layout.WINDOW_SCENES + 1)
         }
+        frame[layout.MODE_PAD] = Light(OFF)
         frame[layout.SHIFT] = shift_held
         return frame
     linnstrument = state.mode is Mode.LINNSTRUMENT
@@ -243,7 +259,7 @@ def render(state, snapshot):
             layout.METRONOME: controls.metronome_light(snapshot),
             layout.FIXED_LENGTH: Light(FIXED_LENGTH_COLOURS[state.fixed_length]),
             layout.UNDO: Light(WHITE),
-            layout.MODE_PAD: Light(WHITE),
+            layout.MODE_PAD: Light(MAGENTA),
         }
     frame[layout.SHIFT] = shift_held
     return frame

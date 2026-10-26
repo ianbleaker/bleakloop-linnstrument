@@ -4,8 +4,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.layout import Window
-from BleakLoop.core.leds import CYAN, OFF, WHITE, YELLOW, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, OFF, WHITE, Blink, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
     EndUndoStep,
@@ -151,12 +150,9 @@ def test_mixer_turns_fx_off():
     assert actions == [SetMixer(True), ShowMessage("Mixer Mode ON")]
 
 
-def test_shift_fx_pad_still_moves_the_window():
-    snapshot = replace(SNAP, track_count=20, scene_count=10)
-    state, actions = handle(replace(FX, shift=True), layout.FX, snapshot=snapshot)
-    assert state.fx
-    assert state.window == Window(1, 0)
-    assert actions == [ShowMessage("Tracks 2–14, Scenes 1–7")]
+def test_shift_fx_pad_does_nothing():
+    state = replace(FX, shift=True)
+    assert handle(state, layout.FX) == (state, [])
 
 
 @pytest.mark.parametrize("key, bars", list(layout.FX_LENGTHS.items()))
@@ -555,7 +551,7 @@ def test_session_render_in_fx_mode():
     snapshot = replace(SNAP, track_count=3, scene_count=2)
     state = with_slot(FX, 2)
     frame = session.render(state, snapshot)
-    assert frame[layout.FX] == Light(CYAN, Blink.FAST)
+    assert frame[layout.FX] == Light(BLUE)
     assert frame[SLOT_3] == Light(CYAN)
     for column in layout.GRID_COLUMNS:
         for pad in range(1, layout.ROWS + 1):
@@ -568,5 +564,5 @@ def test_session_render_fx_pad_off():
 
 def test_session_render_shift_layer_in_fx():
     frame = session.render(replace(with_slot(FX, 2), shift=True), SNAP)
-    assert frame[layout.FX] == Light(YELLOW)
+    assert frame[layout.FX] == Light(OFF)
     assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))

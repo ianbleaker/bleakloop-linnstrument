@@ -23,7 +23,7 @@ def y_axis(state, event):
 
 def tick(state, now_ms):
     # The fader glide on the 10 ms timer: no snapshot, and a redraw flag.
-    if not state.glides and not state.lifts:
+    if not state.glides and not state.lifts and not state.dead:
         return state, [], False
     return mixer.tick(state, now_ms)
 

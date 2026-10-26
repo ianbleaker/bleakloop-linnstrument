@@ -32,8 +32,8 @@ def test_move_up_and_left_from_origin_stays():
 
 
 def test_move_down_stops_at_last_full_window():
-    window = layout.Window(0, 13)
-    assert layout.move_window(window, 0, 1, 20, 20) == layout.Window(0, 13)
+    window = layout.Window(0, 14)
+    assert layout.move_window(window, 0, 1, 20, 20) == layout.Window(0, 14)
 
 
 def test_move_right_stops_at_last_full_window():
@@ -57,16 +57,16 @@ def test_scroll_to_scene_above_window():
 
 
 def test_scroll_to_scene_below_window():
-    assert layout.scroll_to_scene(layout.Window(2, 0), 9, 20, 20) == layout.Window(2, 3)
+    assert layout.scroll_to_scene(layout.Window(2, 0), 9, 20, 20) == layout.Window(2, 4)
 
 
 def test_scroll_to_scene_inside_window_stays():
-    assert layout.scroll_to_scene(layout.Window(2, 4), 10, 20, 20) == layout.Window(2, 4)
+    assert layout.scroll_to_scene(layout.Window(2, 4), 9, 20, 20) == layout.Window(2, 4)
 
 
 def test_scroll_to_scene_below_window_near_end_is_clamped():
-    # Scene 9 is the last of 10; the window can't start past scene 3.
-    assert layout.scroll_to_scene(layout.Window(0, 0), 9, 20, 10) == layout.Window(0, 3)
+    # Scene 9 is the last of 10; the window can't start past scene 4.
+    assert layout.scroll_to_scene(layout.Window(0, 0), 9, 20, 10) == layout.Window(0, 4)
 
 
 def test_column_1_has_one_pad_per_role():
@@ -84,8 +84,26 @@ def test_column_1_has_one_pad_per_role():
 
 
 def test_reserved_pads_have_no_normal_role():
-    used = {layout.COPY, layout.DELETE, layout.MIXER, layout.FX, *layout.TRACK_CONTROL_PADS}
+    used = {
+        layout.COPY,
+        layout.DELETE,
+        layout.SESSION,
+        layout.MIXER,
+        layout.FX,
+        layout.UNMUTE_ALL,
+        layout.STOP,
+    }
     assert used.isdisjoint(layout.RESERVED)
+
+
+def test_column_15_has_one_pad_per_role():
+    roles = [layout.COPY, layout.DELETE, layout.SESSION, layout.MIXER, layout.FX]
+    assert sorted(roles + list(layout.RESERVED)) == [(15, pad) for pad in range(1, 9)]
+
+
+def test_rows_7_and_8_follow_the_window():
+    assert layout.WINDOW_SCENES == 6
+    assert (layout.MUTE_ROW, layout.SELECT_ROW) == (7, 8)
 
 
 def test_fx_slots_are_columns_12_and_13():
