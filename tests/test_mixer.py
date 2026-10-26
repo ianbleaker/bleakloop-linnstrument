@@ -268,65 +268,61 @@ def y(column, pad, value):
     return YAxis(column, pad, value)
 
 
+def report(state, column, pad, value):
+    return engine.y_axis(state, y(column, pad, value))
+
+
 def target(state):
     return state.glides[0].target
 
 
 def test_first_report_is_a_no_op():
     state = touched(pad=3)
-    assert handle(state, y(2, 3, 64)) == (state, [])
+    assert report(state, 2, 3, 64) == state
 
 
 def test_report_moves_the_target_from_the_anchor():
-    state, actions = handle(touched(pad=3), y(2, 3, 66))
-    assert actions == []
+    state = report(touched(pad=3), 2, 3, 66)
     assert target(state) == mixer.y_to_volume(mixer.step(3), 66)
 
 
 def test_continued_touch_moves_from_its_anchor():
     state, _ = handle(lifted(pad=3, target=0.6), press(2, 2))
-    state, _ = handle(state, y(2, 2, 67))
+    state = report(state, 2, 2, 67)
     assert target(state) == mixer.y_to_volume(0.6, 67)
-
-
-def test_report_never_sets_volume():
-    _, actions = handle(touched(pad=3), y(2, 3, 120))
-    assert actions == []
 
 
 def test_report_ignored_with_mixer_off():
     state = replace(touched(pad=3), mixer=False)
-    assert handle(state, y(2, 3, 120)) == (state, [])
+    assert report(state, 2, 3, 120) == state
 
 
 def test_report_ignored_under_shift():
     state = replace(touched(pad=3), shift=True)
-    assert handle(state, y(2, 3, 120)) == (state, [])
+    assert report(state, 2, 3, 120) == state
 
 
 def test_report_ignored_without_a_touch():
-    assert handle(MIXER, y(2, 3, 120)) == (MIXER, [])
+    assert report(MIXER, 2, 3, 120) == MIXER
     state = lifted(pad=3)
-    assert handle(state, y(2, 3, 120)) == (state, [])
+    assert report(state, 2, 3, 120) == state
 
 
 def test_report_from_another_row_is_ignored():
     state = touched(pad=3)
-    assert handle(state, y(2, 4, 120)) == (state, [])
+    assert report(state, 2, 4, 120) == state
 
 
 def test_report_within_the_glide_dead_band_is_ignored():
-    state, _ = handle(touched(pad=3), y(2, 3, 100))
-    nudge = handle(state, y(2, 3, 101))
+    state = report(touched(pad=3), 2, 3, 100)
+    nudge = report(state, 2, 3, 101)
     assert abs(mixer.y_to_volume(mixer.step(3), 101) - target(state)) <= GLIDE_DEAD_BAND
-    assert nudge == (state, [])
+    assert nudge == state
 
 
-def test_report_drives_the_touch_track_after_a_window_move():
-    state = touched(pad=3)
-    moved = replace(SNAP, tracks=tuple(replace(t, index=t.index + 5) for t in SNAP.tracks))
-    state, _ = session.handle(state, y(2, 3, 120), moved)
-    assert state.glides[0].track == 0
+def test_report_ignored_outside_session_mode():
+    state = replace(touched(pad=3), mode=Mode.LINNSTRUMENT)
+    assert report(state, 2, 3, 120) == state
 
 
 # Glide tick
@@ -426,7 +422,7 @@ def test_continued_slide_glides_at_the_pad_pace():
     state, _ = handle(state, press(2, 3, pressed=False))
     state, _ = handle(state, press(2, 2))
     assert state.touches[0].previous_ms == 0.0
-    state, _ = handle(state, y(2, 2, 127))
+    state = report(state, 2, 2, 127)
     state, actions, _ = engine.tick(state, 800.0)
     assert state.glides[0].pace == pytest.approx(STEP / 800)
     assert actions == [SetVolume(0, pytest.approx(mixer.step(3) + STEP / 80))]
@@ -469,9 +465,9 @@ def test_slide_across_pads_moves_monotonically():
             state, actions = handle(state, press(2, pad))
             assert actions == []
         for value in range(64, 128, 3):
-            state, _ = handle(state, y(2, pad, value))
+            state = report(state, 2, pad, value)
             state = run(state, 20)
-        state, _ = handle(state, y(2, pad, 127))
+        state = report(state, 2, pad, 127)
         state, _ = handle(state, press(2, pad, pressed=False))
         state = run(state, 300)  # the gap between pads
     assert volumes == sorted(volumes)

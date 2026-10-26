@@ -35,7 +35,6 @@ from .model import (
     StopTrackClips,
     ToggleMute,
     ToggleSolo,
-    YAxis,
 )
 from .modes import ClipSource, Mode, SceneSource, TrackControl
 from .values import TEMPO_MAX, TEMPO_MIN
@@ -60,8 +59,6 @@ def handle(state, event, snapshot):
             state.window, event.scene, snapshot.track_count, snapshot.scene_count
         )
         return replace(state, window=window), []
-    if isinstance(event, YAxis):
-        return mixer.y_axis(state, event)
     if not isinstance(event, PadPress):
         return state, []
     key = (event.column, event.pad)

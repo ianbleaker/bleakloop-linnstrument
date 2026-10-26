@@ -10,6 +10,13 @@ def handle(state, event, snapshot):
     return linnstrument_mode.handle(state, event, snapshot)
 
 
+def y_axis(state, event):
+    # A Y report only moves a glide target: no snapshot, no actions and nothing to redraw.
+    if state.mode is not Mode.SESSION:
+        return state
+    return mixer.y_axis(state, event)
+
+
 def tick(state, now_ms):
     # The fader glide on the 10 ms timer: no snapshot, and a redraw flag.
     if not state.glides and not state.lifts:

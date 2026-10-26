@@ -98,12 +98,12 @@ def y_axis(state, event):
     # A Y report moves the touch's glide target; only the tick moves the volume.
     touch = _find(state.touches, event.column)
     if not state.mixer or state.shift or touch is None or event.pad != touch.pad:
-        return state, []
+        return state
     glide = _glide(state, touch.track)
     target = y_to_volume(touch.anchor, event.value)
     if glide is None or abs(target - glide.target) <= GLIDE_DEAD_BAND:
-        return state, []
-    return _put_glide(state, replace(glide, target=target)), []
+        return state
+    return _put_glide(state, replace(glide, target=target))
 
 
 def tick(state, now_ms):

@@ -300,8 +300,10 @@ class BleakLoop(ControlSurface):
         self._handle(PadPress(column, layout.pad_of(row), value > 0))
 
     def _on_y_axis(self, column, row, value):
+        # 50-100 reports a second per finger: no snapshot or refresh, since only the 10 ms
+        # tick moves a volume.
         if column in layout.GRID_COLUMNS:
-            self._handle(YAxis(column, layout.pad_of(row), value))
+            self._state = engine.y_axis(self._state, YAxis(column, layout.pad_of(row), value))
 
     def _on_control_note(self, note, value):
         if self._note_map is None:

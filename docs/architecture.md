@@ -87,7 +87,7 @@ The plumbing uses v3's elements, MIDI map handling and lifecycle. v3's behaviour
 The core is a state machine plus a renderer, with no side effects of its own.
 
 - **Input:** `handle(state, event, snapshot) -> (state, actions)`.
-  - `event` is a pad press or release, a Y-axis value, or a tick.
+  - `event` is a pad press or release, or a tick. A Y-axis value takes its own entry, `y_axis(state, event) -> state`.
   - `snapshot` is a plain, read-only view of the Live state the decision needs.
   - `actions` are plain values such as `FireSlot(track, scene, legato, record_length)`, `Undo()`, `SetVolume(track, value)` or `ShowMessage(text)`. The adapters carry them out.
 - **Output:** `render(state, snapshot) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, column 1 in Linnstrument Mode. A pad may blink; the LED driver resolves blinking pads with a `clock` that gives the tempo-blink and fast-blink phase.
@@ -124,7 +124,7 @@ sequenceDiagram
   surface->>LinnStrument: only the pads that differ
 ```
 
-Snapshots are read fresh on each tick and each event. Polling is chosen for simplicity: 91 clip slots with several properties each, plus 13 tracks, 7 scenes and transport state, a few times a second. A full snapshot costs about 0.5 ms (3 ms at worst).
+Snapshots are read fresh on each tick and each event, except Mixer Mode Y reports (section 6, Fader glide). Polling is chosen for simplicity: 91 clip slots with several properties each, plus 13 tracks, 7 scenes and transport state, a few times a second. A full snapshot costs about 0.5 ms (3 ms at worst).
 
 ## 4. Module layout
 
@@ -378,7 +378,7 @@ flowchart LR
 ### Mixer
 
 - **Mixer toggle.** `SetMixer(on)` sends the Y-axis CCs and re-listens, with the Y elements only when on, in one burst with the repaint that follows. There's no LED driver reset: nothing else has touched the device's lights, so the diff is accurate and the burst stays smaller.
-- **Fader glide.** `engine.tick(state, now_ms)` runs from the 10 ms timer while any glide or pending continuation exists; it also expires continuation windows and times each press, since events carry no time. A press takes Y relative to its first report, and a press next to a pad released within `CONTINUE_MS` continues the slide, bridging the gap between pads. During a continued slide the glide moves at the measured pad pace (section 8). It needs no snapshot and moves each volume toward its target by an amount scaled by the elapsed time. The surface redraws only when a fader's lit height changes, since the fader shows only 8 heights.
+- **Fader glide.** `engine.tick(state, now_ms)` runs from the 10 ms timer while any glide or pending continuation exists; it also expires continuation windows and times each press, since events carry no time. A press takes Y relative to its first report, and a press next to a pad released within `CONTINUE_MS` continues the slide, bridging the gap between pads. During a continued slide the glide moves at the measured pad pace (section 8). It needs no snapshot and moves each volume toward its target by an amount scaled by the elapsed time. The surface redraws only when a fader's lit height changes, since the fader shows only 8 heights. A Y report only moves a glide target, so it goes to `engine.y_axis(state, event)` with no snapshot, actions or redraw: the device sends 50–100 a second per finger.
 
 ```mermaid
 stateDiagram-v2
