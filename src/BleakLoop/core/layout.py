@@ -6,7 +6,8 @@ ROWS = 8
 COLUMNS = 17  # column 0 is the device's hardware buttons
 
 GRID_COLUMNS = range(2, 15)
-SCENE_COLUMN = 16
+SCENE_COLUMN = 15
+NAV_COLUMN = 16
 
 WINDOW_TRACKS = 13
 WINDOW_SCENES = 6
@@ -27,15 +28,15 @@ UNDO = (1, 6)
 MODE_PAD = (1, 7)
 SCENE_PAGE = MODE_PAD  # pad 7's Shift function in Linnstrument Mode
 SHIFT = (1, 8)
-COPY = (15, 1)
-DELETE = (15, 2)
-SESSION = (15, 3)
-MIXER = (15, 4)
-FX = (15, 5)
-# Unlit and unused until Drum (15/6), Chord (15/7) and Sequencer (15/8) are designed.
-RESERVED = ((15, 6), (15, 7), (15, 8))
-UNMUTE_ALL = (16, 7)
-STOP = (16, 8)
+COPY = (NAV_COLUMN, 1)
+DELETE = (NAV_COLUMN, 2)
+SESSION = (NAV_COLUMN, 3)
+MIXER = (NAV_COLUMN, 4)
+FX = (NAV_COLUMN, 5)
+# Unlit and unused until Drum (16/6), Chord (16/7) and Sequencer (16/8) are designed.
+RESERVED = ((NAV_COLUMN, 6), (NAV_COLUMN, 7), (NAV_COLUMN, 8))
+UNMUTE_ALL = (SCENE_COLUMN, 7)
+STOP = (SCENE_COLUMN, 8)
 
 # FX Mode: slot N is FX_SLOTS[N - 1].
 FX_SLOTS = tuple((12, pad) for pad in range(1, 9)) + tuple((13, pad) for pad in range(1, 9))
@@ -45,11 +46,16 @@ FX_LENGTHS = {(14, 1): 1, (14, 2): 2, (14, 3): 4, (14, 4): 8, (14, 5): 16}
 # bars, in Fixed Length's cycle order
 FIXED_LENGTHS = (1, 2, 4, 8)
 
-# Shift + column 15 pads 1-4: (track step, scene step).
-WINDOW_MOVES = {(15, 1): (0, -1), (15, 2): (0, 1), (15, 3): (-1, 0), (15, 4): (1, 0)}
+# Shift + column 16 pads 1-4: (track step, scene step).
+WINDOW_MOVES = {
+    (NAV_COLUMN, 1): (0, -1),
+    (NAV_COLUMN, 2): (0, 1),
+    (NAV_COLUMN, 3): (-1, 0),
+    (NAV_COLUMN, 4): (1, 0),
+}
 
-# Shift + column 15 pads 7 and 8: BPM step.
-TEMPO_STEPS = {(15, 7): 1, (15, 8): -1}
+# Shift + column 16 pads 7 and 8: BPM step.
+TEMPO_STEPS = {(NAV_COLUMN, 7): 1, (NAV_COLUMN, 8): -1}
 
 
 def device_row(pad):

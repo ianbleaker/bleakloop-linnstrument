@@ -54,17 +54,17 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 ## 4. Side columns
 
-Columns 1, 15 and 16 work the same in Session, Mixer and FX Mode. Column 1 is also the same in Linnstrument Mode (section 8), where Record, Capture and Shift + Play act on the selected track.
+Columns 1, 15 and 16 work the same in Session, Mixer and FX Mode. Column 1 is also the same in Linnstrument Mode (section 8), where Record, Capture and Shift + Play act on the selected track. Column 16, on the outer edge, holds Copy, Delete and the mode pads in every mode, and column 15, next to the grid, holds the scenes.
 
 **Fixed Length** is one pad: its colour shows the length, dark while off, then cyan, blue, magenta and pink. The length stays when you change mode.
 
-**Session, Mixer and FX** (column 15, pads 3–5) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode.
+**Session, Mixer and FX** (column 16, pads 3–5) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode.
 
-Pads 6–8 of column 15 are dark and do nothing: they're kept for Drum, Chord and Sequencer modes still to come.
+Pads 6–8 of column 16 are dark and do nothing: they're kept for Drum, Chord and Sequencer modes still to come.
 
-**Unmute all** (column 16, pad 7) acts on every track and return track in the Set, not just the window. With Shift held it's **Unsolo all**.
+**Unmute all** (column 15, pad 7) acts on every track and return track in the Set, not just the window. With Shift held it's **Unsolo all**.
 
-**Stop** (column 16, pad 8) is held like Copy and Delete. Hold it and press any pad in a track's column to stop that track's clips; a tap on its own does nothing. Shift + Stop stops all clips. In FX Mode, holding Stop leaves the grid alone.
+**Stop** (column 15, pad 8) is held like Copy and Delete. Hold it and press any pad in a track's column to stop that track's clips; a tap on its own does nothing. Shift + Stop stops all clips. In FX Mode, holding Stop leaves the grid alone.
 
 ![Side columns](manual/side.svg)
 
@@ -77,14 +77,14 @@ Pads 6–8 of column 15 are dark and do nothing: they're kept for Drum, Chord an
 - **Undo**: Undo. *(Shift: Redo)*
 - **Linnstrument Mode**: Switch to Linnstrument Mode.
 - **Shift**: Hold for the Shift layer.
+- **Scenes**: Launch a scene. *(Shift: Launch with legato)*
+- **Unmute all**: Unmute every track and return track in the Set. Orange while any is muted. *(Shift: Unsolo every track and return track in the Set. Blue while any is soloed)*
+- **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Stop all clips)*
 - **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
 - **Delete**: Hold, then press a clip or scene to delete it. *(Shift: Move the window down)*
 - **Session**: Session Mode. *(Shift: Move the window left)*
 - **Mixer**: Mixer Mode. Press again for Session Mode. *(Shift: Move the window right)*
 - **FX**: FX Mode. Press again for Session Mode.
-- **Scenes**: Launch a scene. *(Shift: Launch with legato)*
-- **Unmute all**: Unmute every track and return track in the Set. Orange while any is muted. *(Shift: Unsolo every track and return track in the Set. Blue while any is soloed)*
-- **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Stop all clips)*
 <!-- /callouts:side -->
 
 **Copying:**
@@ -97,7 +97,7 @@ Pads 6–8 of column 15 are dark and do nothing: they're kept for Drum, Chord an
 
 ## 5. Shift
 
-Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a second layer. The lists above give each pad's Shift function in italics: Shift + Undo is Redo, Shift + Play stops all clips, column 15's top four pads move the window, and its bottom two step the tempo by 1 BPM. Unlit pads do nothing. In Mixer Mode the faders go dark and pads 7 and 8 show their Shift layer; in FX Mode the grid goes dark.
+Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a second layer. The lists above give each pad's Shift function in italics: Shift + Undo is Redo, Shift + Play stops all clips, column 16's top four pads move the window, and its bottom two step the tempo by 1 BPM. Unlit pads do nothing. In Mixer Mode the faders go dark and pads 7 and 8 show their Shift layer; in FX Mode the grid goes dark.
 
 ![Shift](manual/session-shift.svg)
 
@@ -123,7 +123,7 @@ Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a 
 
 ## 7. FX Mode
 
-FX Mode stores snapshots of every rack's macros and brings them back, at once or as a morph over a number of bars. The snapshots are saved in the Set. Press FX (column 15, pad 5) to turn it on, and press it again, or Session, to turn it off. FX and Mixer Mode replace each other.
+FX Mode stores snapshots of every rack's macros and brings them back, at once or as a morph over a number of bars. The snapshots are saved in the Set. Press FX (column 16, pad 5) to turn it on, and press it again, or Session, to turn it off. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
 

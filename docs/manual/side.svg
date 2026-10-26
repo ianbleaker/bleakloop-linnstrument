@@ -130,25 +130,25 @@
 <rect x="614" y="270" width="40" height="40" rx="4" fill="#2a2a2e" fill-opacity="0.18"/>
 <rect x="614" y="316" width="40" height="40" rx="4" fill="#2a2a2e" fill-opacity="0.18"/>
 <rect x="614" y="362" width="40" height="40" rx="4" fill="#2a2a2e" fill-opacity="0.18"/>
-<rect x="660" y="40" width="40" height="40" rx="4" fill="#e82ae8"/>
-<rect x="660" y="86" width="40" height="40" rx="4" fill="#ff2a2a"/>
-<rect x="660" y="132" width="40" height="40" rx="4" fill="#2a5bff"/>
-<rect x="660" y="178" width="40" height="40" rx="4" fill="#19e0e6"/>
-<rect x="660" y="224" width="40" height="40" rx="4" fill="#19e0e6"/>
+<rect x="660" y="40" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="658" y="38" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="660" y="86" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="658" y="84" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="660" y="132" width="40" height="40" rx="4" fill="#f2f2f2"/>
+<rect x="660" y="178" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="658" y="176" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="660" y="224" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="660" y="270" width="40" height="40" rx="4" fill="#2a2a2e"/>
-<rect x="660" y="316" width="40" height="40" rx="4" fill="#2a2a2e"/>
-<rect x="660" y="362" width="40" height="40" rx="4" fill="#2a2a2e"/>
-<rect x="706" y="40" width="40" height="40" rx="4" fill="#a6ff1a"/>
-<rect x="704" y="38" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
-<rect x="706" y="86" width="40" height="40" rx="4" fill="#a6ff1a"/>
-<rect x="704" y="84" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
-<rect x="706" y="132" width="40" height="40" rx="4" fill="#f2f2f2"/>
-<rect x="706" y="178" width="40" height="40" rx="4" fill="#a6ff1a"/>
-<rect x="704" y="176" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
-<rect x="706" y="224" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<rect x="660" y="316" width="40" height="40" rx="4" fill="#ff8a1a"/>
+<rect x="660" y="362" width="40" height="40" rx="4" fill="#ff2a2a"/>
+<rect x="706" y="40" width="40" height="40" rx="4" fill="#e82ae8"/>
+<rect x="706" y="86" width="40" height="40" rx="4" fill="#ff2a2a"/>
+<rect x="706" y="132" width="40" height="40" rx="4" fill="#2a5bff"/>
+<rect x="706" y="178" width="40" height="40" rx="4" fill="#19e0e6"/>
+<rect x="706" y="224" width="40" height="40" rx="4" fill="#19e0e6"/>
 <rect x="706" y="270" width="40" height="40" rx="4" fill="#2a2a2e"/>
-<rect x="706" y="316" width="40" height="40" rx="4" fill="#ff8a1a"/>
-<rect x="706" y="362" width="40" height="40" rx="4" fill="#ff2a2a"/>
+<rect x="706" y="316" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<rect x="706" y="362" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="18" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="36" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Play</text>
 <rect x="18" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
@@ -166,31 +166,31 @@
 <rect x="18" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="36" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Shift</text>
 <rect x="662" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="680" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Copy</text>
+<text x="680" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
 <rect x="662" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="680" y="109" font-size="9" fill="#ffffff" text-anchor="middle">Delete</text>
+<text x="680" y="109" font-size="9" fill="#ffffff" text-anchor="middle">Scene 2</text>
 <rect x="662" y="145" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="680" y="155" font-size="9" fill="#ffffff" text-anchor="middle">Session</text>
+<text x="680" y="155" font-size="9" fill="#ffffff" text-anchor="middle">Scene 3</text>
 <rect x="662" y="191" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="680" y="201" font-size="9" fill="#ffffff" text-anchor="middle">Mixer</text>
+<text x="680" y="201" font-size="9" fill="#ffffff" text-anchor="middle">Scene 4</text>
 <rect x="662" y="237" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="680" y="247" font-size="9" fill="#ffffff" text-anchor="middle">FX</text>
+<text x="680" y="247" font-size="9" fill="#ffffff" text-anchor="middle">Scene 5</text>
+<rect x="662" y="283" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="680" y="293" font-size="9" fill="#ffffff" text-anchor="middle">Scene 6</text>
+<rect x="662" y="329" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="680" y="339" font-size="9" fill="#ffffff" text-anchor="middle">Unmute</text>
+<rect x="662" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="680" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Stop</text>
 <rect x="708" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
+<text x="726" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Copy</text>
 <rect x="708" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="109" font-size="9" fill="#ffffff" text-anchor="middle">Scene 2</text>
+<text x="726" y="109" font-size="9" fill="#ffffff" text-anchor="middle">Delete</text>
 <rect x="708" y="145" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="155" font-size="9" fill="#ffffff" text-anchor="middle">Scene 3</text>
+<text x="726" y="155" font-size="9" fill="#ffffff" text-anchor="middle">Session</text>
 <rect x="708" y="191" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="201" font-size="9" fill="#ffffff" text-anchor="middle">Scene 4</text>
+<text x="726" y="201" font-size="9" fill="#ffffff" text-anchor="middle">Mixer</text>
 <rect x="708" y="237" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="247" font-size="9" fill="#ffffff" text-anchor="middle">Scene 5</text>
-<rect x="708" y="283" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="293" font-size="9" fill="#ffffff" text-anchor="middle">Scene 6</text>
-<rect x="708" y="329" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="339" font-size="9" fill="#ffffff" text-anchor="middle">Unmute</text>
-<rect x="708" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Stop</text>
+<text x="726" y="247" font-size="9" fill="#ffffff" text-anchor="middle">FX</text>
 <rect x="16" y="422" width="16" height="16" rx="2" fill="#2a2a2e"/>
 <rect x="14" y="420" width="20" height="20" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
 <text x="42" y="434" font-size="12" fill="#e8e8ec">Tempo blink</text>

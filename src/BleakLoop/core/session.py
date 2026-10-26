@@ -104,8 +104,8 @@ def handle(state, event, snapshot):
         if event.pad == layout.SELECT_ROW:
             return state, _select_row(state, _track(event.column, snapshot))
         return _slot(state, event, snapshot)
-    if event.column == 15:
-        return _column_15(state, key, snapshot)
+    if event.column == layout.NAV_COLUMN:
+        return _nav_column(state, key, snapshot)
     if key == layout.UNMUTE_ALL:
         if state.shift:
             return state, [UnsoloAll(), ShowMessage("Unsolo all")]
@@ -272,7 +272,7 @@ def _select_row(state, track):
     return [SelectTrack(track.index), ArmExclusive(track.index, True)]
 
 
-def _column_15(state, key, snapshot):
+def _nav_column(state, key, snapshot):
     if state.shift:
         if key in layout.WINDOW_MOVES:
             return _move_window(state, layout.WINDOW_MOVES[key], snapshot)

@@ -96,9 +96,16 @@ def test_reserved_pads_have_no_normal_role():
     assert used.isdisjoint(layout.RESERVED)
 
 
-def test_column_15_has_one_pad_per_role():
+def test_column_16_has_one_pad_per_role():
     roles = [layout.COPY, layout.DELETE, layout.SESSION, layout.MIXER, layout.FX]
-    assert sorted(roles + list(layout.RESERVED)) == [(15, pad) for pad in range(1, 9)]
+    assert sorted(roles + list(layout.RESERVED)) == [(16, pad) for pad in range(1, 9)]
+
+
+def test_column_15_holds_scenes_unmute_and_stop():
+    assert layout.SCENE_COLUMN == 15
+    assert layout.UNMUTE_ALL == (15, 7)
+    assert layout.STOP == (15, 8)
+    assert all(column == 16 for column, _ in {**layout.WINDOW_MOVES, **layout.TEMPO_STEPS})
 
 
 def test_rows_7_and_8_follow_the_window():

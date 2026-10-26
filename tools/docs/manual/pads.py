@@ -98,15 +98,6 @@ _SIDE = (
     UNDO,
     _one("Linnstrument Mode", layout.MODE_PAD, "Switch to Linnstrument Mode.", label="Linn"),
     SHIFT,
-    _one(
-        "Copy",
-        layout.COPY,
-        "Hold, press a clip, then an empty slot.",
-    ),
-    _one("Delete", layout.DELETE, "Hold, then press a clip or scene to delete it."),
-    _one("Session", layout.SESSION, "Session Mode."),
-    _one("Mixer", layout.MIXER, "Mixer Mode. Press again for Session Mode."),
-    _one("FX", layout.FX, "FX Mode. Press again for Session Mode."),
     _scenes(layout.SCENE_COLUMN, "Launch a scene."),
     _one(
         "Unmute all",
@@ -119,6 +110,15 @@ _SIDE = (
         layout.STOP,
         "Hold, then press a track's pad to stop that track's clips.",
     ),
+    _one(
+        "Copy",
+        layout.COPY,
+        "Hold, press a clip, then an empty slot.",
+    ),
+    _one("Delete", layout.DELETE, "Hold, then press a clip or scene to delete it."),
+    _one("Session", layout.SESSION, "Session Mode."),
+    _one("Mixer", layout.MIXER, "Mixer Mode. Press again for Session Mode."),
+    _one("FX", layout.FX, "FX Mode. Press again for Session Mode."),
 )
 
 _SIDE_SHIFT = (
@@ -131,11 +131,6 @@ _SIDE_SHIFT = (
     QUANTIZE,
     LAUNCH_QUANTIZATION,
     REDO,
-    *(
-        _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
-        for key, name in {(15, 1): "Up", (15, 2): "Down", (15, 3): "Left", (15, 4): "Right"}.items()
-    ),
-    Item("Tempo", {(15, 7): "Tempo+", (15, 8): "Tempo-"}, "Tempo +1 or -1 BPM."),
     _scenes(layout.SCENE_COLUMN, "Launch with legato."),
     _one(
         "Unsolo all",
@@ -144,6 +139,15 @@ _SIDE_SHIFT = (
         label="Unsolo",
     ),
     _one("Stop all", layout.STOP, "Stop all clips.", label="StopAll"),
+    *(
+        _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
+        for key, name in zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))
+    ),
+    Item(
+        "Tempo",
+        {key: "Tempo+" if step > 0 else "Tempo-" for key, step in layout.TEMPO_STEPS.items()},
+        "Tempo +1 or -1 BPM.",
+    ),
     SHIFT_HELD,
 )
 
