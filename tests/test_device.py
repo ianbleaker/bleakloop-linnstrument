@@ -30,6 +30,21 @@ def test_y_axis_off_on_all_rows():
     assert device.y_axis(False) == [(0xB0 + ch, 11, 0) for ch in range(8)]
 
 
+def test_loading_column_lights_one_column_per_tick():
+    for tick, column in ((0, 1), (15, 16), (16, 1)):
+        messages = device.loading_column(tick)
+        assert len(messages) == 3 * 8
+        assert {m[2] for m in messages if m[1] == 20} == {column}
+        assert {m[2] for m in messages if m[1] == 22} <= set(device.RAINBOW)
+
+
+def test_loading_column_shifts_hues_each_sweep():
+    first = [m[2] for m in device.loading_column(0) if m[1] == 22]
+    second = [m[2] for m in device.loading_column(16) if m[1] == 22]
+    rainbow = device.RAINBOW
+    assert second == [rainbow[(rainbow.index(c) + 1) % len(rainbow)] for c in first]
+
+
 def test_query():
     assert device.query(35) == device.nrpn(299, 35)
 

@@ -287,7 +287,7 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **The device applies light changes one at a time.** A full-grid flip leaves Live in under 1 ms but ripples visibly; BleakLoop never adds to it by spreading changes across refreshes.
 
 > [!NOTE]
-> **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one step per display tick: two queries, or one query and one NRPN (about 2.8 s at startup). On unload, the restore appended to the 38-message hand-back burst lost its last 18 messages, so each restore NRPN is sent after a `RESTORE_GAP_MS` sleep.
+> **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one step per display tick: two queries, or one query and one NRPN (about 2.8 s at startup). Each step carries one column of the loading rainbow (24 light CCs). On unload, the restore appended to the 38-message hand-back burst lost its last 18 messages, so each restore NRPN is sent after a `RESTORE_GAP_MS` sleep.
 
 - **Control split pads are notes.** Column 1 sends Note On for a press and Note Off for a release on the control channel. The note number follows "Note numbers in a playing split" below, with Transpose at 0 and BleakLoop's Octave.
 - **Y is relative and dense.** Every press reports 64 first, after the note-on. Y swings to 127 or 0 over about half a pad and then stays saturated until the release. Reports arrive every 10–20 ms, 1–3 units apart.
@@ -326,14 +326,15 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
 
 ### Device lifecycle
 
-- **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Linnstrument Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
+- **Device setup and mode.** On load, BleakLoop enters User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Linnstrument Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. The setup runs in User Firmware Mode so the device shows a loading rainbow instead of its note lights: NRPNs are answered in either mode, and the device doesn't redraw its note lights over the User Firmware lights. Each step also paints one column (`device.loading_column`), sweeping columns 1–16 with the diagonal hues shifted by one per sweep, so the rainbow rolls. Entering Session Mode redraws every pad over it, and leaving User Firmware Mode clears it. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
 
 ```mermaid
 sequenceDiagram
   participant BleakLoop
   participant LinnStrument
   Note over BleakLoop,LinnStrument: Load, one message per display tick
-  BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
+  BleakLoop->>LinnStrument: user_firmware_mode(True), NRPN 245 = 1
+  Note over BleakLoop,LinnStrument: every step below also sends loading_column(tick)
   loop read_steps(), two queries per tick
     BleakLoop->>LinnStrument: NRPN 299 = N, NRPN 299 = M
     LinnStrument-->>BleakLoop: NRPN N, NRPN M = player's values, saved
@@ -343,7 +344,7 @@ sequenceDiagram
     LinnStrument-->>BleakLoop: NRPN N = player's value, saved
   end
   Note over BleakLoop: enter_mode(SESSION)
-  BleakLoop->>LinnStrument: user_firmware_mode(True), NRPN 245 = 1
+  BleakLoop->>LinnStrument: user_firmware_mode(True), NRPN 245 = 1, already on
   Note over BleakLoop: set_session_highlight(track, scene, 13, 7, False)
   BleakLoop->>LinnStrument: LED driver reset, then the whole frame (CC 20, 21, 22)
   Note over BleakLoop: start the Live.Base.Timer

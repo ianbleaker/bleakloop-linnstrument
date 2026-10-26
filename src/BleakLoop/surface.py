@@ -69,6 +69,7 @@ class BleakLoop(ControlSurface):
         self._reads = {}  # the latest reply per NRPN
         self._set_numbers = []  # NRPNs BleakLoop set, in setup order
         self._setup = None  # NRPNs still to send, one per tick
+        self._loading = 0  # setup ticks sent: the loading rainbow's position
         self._computed = False
         self._control_channel = None  # 0-based, chosen at load
         self._note_map = None  # column 1 note -> pad, None while refused
@@ -108,14 +109,16 @@ class BleakLoop(ControlSurface):
             self._listen_for_nrpn_replies()
             self.request_rebuild_midi_map()
             # Reads first, then the fixed sets: every read reply is in before the computed sets.
+            # In User Firmware Mode: the note lights go dark for the loading rainbow, and leaving
+            # it clears the rainbow.
             self._setup = (
-                [device.user_firmware_mode(False)] + device.read_steps() + device.fixed_steps()
+                [device.user_firmware_mode(True)] + device.read_steps() + device.fixed_steps()
             )
             self._set_numbers = [number for number, _ in device.FIXED_SETTINGS]
-            self._send(self._setup.pop(0))
+            self._setup_step()
         elif self._setup:
             # One step per tick: the device drops a block from the middle of a burst (#18).
-            self._send(self._setup.pop(0))
+            self._setup_step()
         elif not self._computed:
             self._compute_settings()
         else:
@@ -164,7 +167,12 @@ class BleakLoop(ControlSurface):
         logger.info("BleakLoop control channel %d", channel + 1)
         self._setup = device.computed_steps(settings)
         self._computed = True
-        self._send(self._setup.pop(0))
+        self._setup_step()
+
+    def _setup_step(self):
+        # Entering Session redraws every pad over the rainbow.
+        self._send(self._setup.pop(0) + device.loading_column(self._loading))
+        self._loading += 1
 
     def _poll_tick(self):
         # Linnstrument Mode re-check of Row Offset and the left split's Octave/Transpose, one step

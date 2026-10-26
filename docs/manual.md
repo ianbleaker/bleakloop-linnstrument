@@ -9,7 +9,7 @@ BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for
 1. Copy the `src/BleakLoop/` folder into Live's Remote Scripts folder.
 2. In Live's Control Surface preferences, choose **BleakLoop**, with the LinnStrument as Input and Output.
 
-BleakLoop starts in Session Mode. Its Linnstrument Mode controls use a MIDI channel that your right split doesn't use. Only if your right split uses all 16 does BleakLoop borrow one of its MPE channels, and it gives it back when Live closes.
+While BleakLoop loads, a rainbow rolls across the pads for about 3 seconds, and the pads don't play. Then BleakLoop starts in Session Mode. Its Linnstrument Mode controls use a MIDI channel that your right split doesn't use. Only if your right split uses all 16 does BleakLoop borrow one of its MPE channels, and it gives it back when Live closes.
 
 While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 its control split. When Live closes, or you choose another control surface, it puts your own split settings back.
 

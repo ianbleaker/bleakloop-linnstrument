@@ -1,7 +1,19 @@
 """LinnStrument message building and the LED driver (architecture section 5). Pure Python."""
 
 from .core import layout
-from .core.leds import DEVICE_DEFAULT, resolve
+from .core.leds import (
+    BLUE,
+    CYAN,
+    DEVICE_DEFAULT,
+    GREEN,
+    LIME,
+    MAGENTA,
+    ORANGE,
+    PINK,
+    RED,
+    YELLOW,
+    resolve,
+)
 from .core.values import SPLIT_POINT
 
 CC_STATUS = 0xB0
@@ -84,6 +96,22 @@ def light(column, pad, colour):
         + cc(0, CC_LIGHT_ROW, layout.device_row(pad))
         + cc(0, CC_LIGHT_COLOUR, colour)
     )
+
+
+# The loading rainbow's hues, in order.
+RAINBOW = (RED, ORANGE, YELLOW, LIME, GREEN, CYAN, BLUE, MAGENTA, PINK)
+
+
+def loading_column(tick):
+    # One column of the loading rainbow per setup tick, sweeping columns 1-16. Each sweep
+    # shifts the diagonal hues by one, so the rainbow rolls.
+    sweep, index = divmod(tick, layout.COLUMNS - 1)
+    column = index + 1
+    return [
+        m
+        for pad in range(1, layout.ROWS + 1)
+        for m in light(column, pad, RAINBOW[(column + pad + sweep) % len(RAINBOW)])
+    ]
 
 
 def user_firmware_mode(on):
