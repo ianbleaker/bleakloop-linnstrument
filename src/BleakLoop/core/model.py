@@ -81,6 +81,8 @@ class Snapshot:
     # One bool per window row that exists, true if any track in the Set has a clip there.
     # Read only while Copy is held.
     scene_clips: tuple = ()
+    # One bool per window row that exists, true while that scene waits to launch.
+    scene_triggered: tuple = ()
     # Read only in Linnstrument Mode. None when the selected track isn't in the track list.
     selected_track: SelectedTrack | None = None
     selected_scene: int = 0  # Live's highlighted scene

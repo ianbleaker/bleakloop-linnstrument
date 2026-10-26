@@ -16,12 +16,14 @@ def fake_track(name, mute=False, solo=False):
         has_midi_input=False,
         is_foldable=False,
         mixer_device=SimpleNamespace(volume=SimpleNamespace(value=0.85)),
-        clip_slots=[],
+        clip_slots=[SimpleNamespace(
+            has_clip=False, is_playing=False, is_triggered=False, is_recording=False
+        )] * 8,
         playing_slot_index=-1,
     )
 
 
-def fake_song(tracks, returns=(), selected=None):
+def fake_song(tracks, returns=(), selected=None, scenes=()):
     return SimpleNamespace(
         is_playing=False,
         current_song_time=0.0,
@@ -30,7 +32,7 @@ def fake_song(tracks, returns=(), selected=None):
         visible_tracks=list(tracks),
         tracks=list(tracks),
         return_tracks=list(returns),
-        scenes=[],
+        scenes=list(scenes),
         can_undo=False,
         can_redo=False,
         clip_trigger_quantization=4,
@@ -54,6 +56,12 @@ APPLICATION = SimpleNamespace(view=SimpleNamespace(is_view_visible=lambda name: 
 
 def read(song):
     return live_state.read(song, APPLICATION, Window())
+
+
+def test_scene_triggered_per_window_row():
+    scenes = [SimpleNamespace(is_triggered=i == 1) for i in range(8)]
+    snapshot = read(fake_song([fake_track("a")], scenes=scenes))
+    assert snapshot.scene_triggered == (False, True, False, False, False, False)
 
 
 def test_selected_track():

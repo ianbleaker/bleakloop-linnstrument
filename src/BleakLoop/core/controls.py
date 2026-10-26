@@ -66,9 +66,13 @@ def record_light(snapshot):
 
 
 def scene_light(snapshot, scene_offset, row):
-    # The scene light without the copy-source state; row is the window row 0-6.
+    # The scene light without the copy-source state; row is the window row 0-5.
     if scene_offset + row >= snapshot.scene_count:
         return Light(OFF)
+    triggered = snapshot.scene_triggered
+    if row < len(triggered) and triggered[row]:
+        # Launched, waiting for the quantization boundary: steady, unlike a playing scene.
+        return Light(LIME)
     slots = [track.slots[row] for track in snapshot.tracks if len(track.slots) > row]
     if any(slot.is_playing for slot in slots):
         return Light(LIME, Blink.TEMPO)

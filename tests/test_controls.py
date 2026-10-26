@@ -78,6 +78,19 @@ def test_scene_light_playing_beats_has_clip():
     assert controls.scene_light(snapshot, 0, 0) == Light(LIME, Blink.TEMPO)
 
 
+def test_scene_light_triggered_is_steady_lime():
+    snapshot = replace(with_tracks((CLIP,), (PLAYING,)), scene_triggered=(True, False))
+    assert controls.scene_light(snapshot, 0, 0) == Light(LIME)
+    assert controls.scene_light(replace(snapshot, scene_triggered=(False,)), 0, 0) == Light(
+        LIME, Blink.TEMPO
+    )
+
+
+def test_scene_light_triggered_empty_scene():
+    snapshot = replace(with_tracks((EMPTY,)), scene_triggered=(True,))
+    assert controls.scene_light(snapshot, 0, 0) == Light(LIME)
+
+
 def test_scene_light_has_clip():
     snapshot = with_tracks((EMPTY,), (CLIP,))
     assert controls.scene_light(snapshot, 0, 0) == Light(WHITE)

@@ -93,7 +93,7 @@ Pads 6–8 of column 15 are dark and do nothing: they're kept for Drum, Chord an
 - To copy a scene, press it, then press an empty scene.
 - Keep holding Copy to make more copies.
 
-**Scenes** are lime and blinking while playing, and white if they hold clips.
+**Scenes** are lime and blinking while playing, steady lime once launched until they start at the next quantization boundary, and white if they hold clips.
 
 ## 5. Shift
 

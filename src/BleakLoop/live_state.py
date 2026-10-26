@@ -52,6 +52,7 @@ def read(song, application, window, scene_clips=False, selected=False):
         playing_clip=_clip(candidate_clip(song, ClipTarget.PLAYING)),
         # Costly with many tracks: only while Copy is held, when the window can't move.
         scene_clips=_scene_clips(song, rows) if scene_clips else (),
+        scene_triggered=tuple(scenes[scene].is_triggered for scene in rows),
         # Every scene of one track: only in Linnstrument Mode, which is the only reader.
         selected_track=_selected_track(song, tracks, scenes) if selected else None,
         selected_scene=scenes.index(song.view.selected_scene) if selected else 0,
