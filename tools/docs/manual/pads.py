@@ -9,7 +9,7 @@ from .scenes import Layer
 
 @dataclass(frozen=True)
 class Item:
-    # One or more pads that share a callout: Scenes 1-7, the Fixed Length pads.
+    # One or more pads that share a callout: Scenes 1-7, the track switch modes.
     name: str
     labels: dict  # (column, pad) -> label of at most 7 characters
     callout: str
@@ -49,39 +49,60 @@ def _scenes(column, callout):
     return Item("Scenes", labels, callout)
 
 
-UNDO = _one("Undo", layout.UNDO, "Undo.")
+# Column 1: the same pads in every mode.
+PLAY = _one("Play", layout.PLAY_STOP, "Start/stop. Blinks on the beat while playing.")
 METRONOME = _one(
     "Metronome", layout.METRONOME, "Metronome on/off. Blinks while on.", label="Metro"
 )
-RECORD = _one(
-    "Record",
-    layout.RECORD,
-    "Session Record on/off (Arrangement Record in Arrangement View). Blinks while "
-    "recording.",
+FIXED_LENGTH = _one(
+    "Fixed Length",
+    layout.FIXED_LENGTH,
+    "Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, "
+    "then off.",
+    label="Length",
 )
+UNDO = _one("Undo", layout.UNDO, "Undo.")
+SHIFT = _one("Shift", layout.SHIFT, "Hold for the Shift layer.")
+QUANTIZE = _one(
+    "Quantize",
+    layout.QUANTIZE,
+    "Quantize the current MIDI clip to 1/16 notes.",
+    label="Quant",
+)
+LAUNCH_QUANTIZATION = _one(
+    "Launch quantization",
+    layout.LAUNCH_QUANTIZATION,
+    "Launch quantization on/off; red while off.",
+    label="LaunchQ",
+)
+REDO = _one("Redo", layout.UNDO, "Redo.")
+SHIFT_HELD = Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False)
 
 # Columns 1, 15 and 16: the same in Session and Mixer Mode.
 _SIDE = (
+    PLAY,
+    _one(
+        "Record",
+        layout.RECORD,
+        "Session Record on/off (Arrangement Record in Arrangement View). Blinks while "
+        "recording. In Linnstrument Mode, records a new clip on the selected track.",
+    ),
+    _one(
+        "Capture",
+        layout.CAPTURE,
+        "Capture and Insert Scene. In Linnstrument Mode, captures MIDI.",
+    ),
+    METRONOME,
+    FIXED_LENGTH,
     UNDO,
+    _one("Linnstrument Mode", layout.MODE_PAD, "Switch to Linnstrument Mode.", label="Linn"),
+    SHIFT,
     _one(
         "Copy",
         layout.COPY,
         "Hold, press a clip, then an empty slot.",
     ),
-    _one("Capture", layout.CAPTURE, "Capture and Insert Scene."),
     _one("Delete", layout.DELETE, "Hold, then press a clip or scene to delete it."),
-    METRONOME,
-    _one("Play", layout.PLAY_STOP, "Start/stop. Blinks on the beat while playing."),
-    RECORD,
-    _one("Note Mode", layout.MODE_PAD, "Switch to Note Mode.", label="Note"),
-    Item(
-        "Fixed Length",
-        {
-            key: f"{bars} bar" if bars == 1 else f"{bars} bars"
-            for key, bars in layout.FIXED_LENGTH_PADS.items()
-        },
-        "Record new clips at exactly 1, 2, 4 or 8 bars. Press again to clear.",
-    ),
     _one("Mixer", layout.MIXER, "Mixer Mode on/off. Blinks while on."),
     Item(
         "Track switch mode",
@@ -89,42 +110,29 @@ _SIDE = (
         "What the track switches do: Mute, Solo or Arm. The chosen one blinks.",
     ),
     _scenes(layout.SCENE_COLUMN, "Launch a scene."),
-    _one("Shift", layout.SHIFT, "Hold for the Shift layer."),
 )
 
 _SIDE_SHIFT = (
-    _one("Redo", layout.UNDO, "Redo."),
-    Item(
-        "Copy, Delete",
-        {layout.COPY: "Copy", layout.DELETE: "Delete"},
-        "As without Shift.",
-        variant=False,
-    ),
     _one(
-        "Quantize",
-        layout.QUANTIZE,
-        "Quantize the current MIDI clip to 1/16 notes.",
-        label="Quant",
+        "Stop all",
+        layout.PLAY_STOP,
+        "Stop all clips. In Linnstrument Mode, stops the selected track's clips.",
+        label="StopAll",
     ),
-    _one(
-        "Launch quantization",
-        layout.LAUNCH_QUANTIZATION,
-        "Launch quantization on/off; red while off.",
-        label="LaunchQ",
+    QUANTIZE,
+    LAUNCH_QUANTIZATION,
+    REDO,
+    *(
+        _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
+        for key, name in {(15, 1): "Up", (15, 2): "Down", (15, 3): "Left", (15, 4): "Right"}.items()
     ),
-    Item(
-        "Move the window",
-        {(15, 1): "Up", (15, 2): "Down", (15, 3): "Left", (15, 4): "Right"},
-        "Move the window up, down, left or right.",
-    ),
-    _one("Stop all", layout.STOP_ALL, "Stop all clips.", label="StopAll"),
     Item(
         "Tempo",
         {(15, 7): "Tempo+", (15, 8): "Tempo-"},
         "Tempo +1 BPM on Solo, -1 BPM on Arm.",
     ),
     _scenes(layout.SCENE_COLUMN, "Launch with legato."),
-    Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False),
+    SHIFT_HELD,
 )
 
 _SESSION = (
@@ -161,29 +169,42 @@ _MIXER = (
     ),
 )
 
-_NOTE = (
-    UNDO,
+_LINNSTRUMENT = (
+    PLAY,
     _one(
         "Record Clip",
-        layout.RECORD_CLIP,
+        layout.RECORD,
         "Record a new clip on the selected track.",
         label="RecClip",
     ),
     _one("Capture MIDI", layout.CAPTURE, "Capture MIDI.", label="CapMIDI"),
-    _one("Scene page", layout.SCENE_PAGE, "Show the scene page.", label="Scenes"),
     METRONOME,
-    _one(
-        "Stop",
-        layout.PLAY_STOP,
-        "Stop the selected track's clips. In Arrangement View: start/stop.",
-    ),
-    RECORD,
+    FIXED_LENGTH,
+    UNDO,
     _one("Session Mode", layout.MODE_PAD, "Back to Session Mode.", label="Session"),
+    SHIFT,
 )
 
-_NOTE_SCENES = (
+_LINNSTRUMENT_SHIFT = (
+    _one(
+        "Stop track", layout.PLAY_STOP, "Stop the selected track's clips.", label="StopTrk"
+    ),
+    _one(
+        "Record",
+        layout.RECORD,
+        "Session Record on/off (Arrangement Record in Arrangement View). Blinks while "
+        "recording.",
+    ),
+    QUANTIZE,
+    LAUNCH_QUANTIZATION,
+    REDO,
+    _one("Scene page", layout.SCENE_PAGE, "Show the scene page.", label="Scenes"),
+    SHIFT_HELD,
+)
+
+_LINNSTRUMENT_SCENES = (
     _scenes(1, "Launch a scene and go back to the controls."),
-    _one("Back", layout.MODE_PAD, "Back to the controls."),
+    _one("Back", layout.SHIFT, "Back to the controls without launching."),
 )
 
 # The manual's sections, by marker slug.
@@ -193,8 +214,9 @@ SECTIONS = {
     "session": _SESSION,
     "session-shift": _SESSION_SHIFT,
     "mixer": _MIXER,
-    "note": _NOTE,
-    "note-scenes": _NOTE_SCENES,
+    "linnstrument": _LINNSTRUMENT,
+    "linnstrument-shift": _LINNSTRUMENT_SHIFT,
+    "linnstrument-scenes": _LINNSTRUMENT_SCENES,
 }
 
 # The sections the manual lists, each with the section holding its Shift layer.
@@ -202,8 +224,8 @@ LISTS = {
     "side": "side-shift",
     "session": "session-shift",
     "mixer": None,
-    "note": None,
-    "note-scenes": None,
+    "linnstrument": "linnstrument-shift",
+    "linnstrument-scenes": None,
 }
 
 # The sections each map is drawn from.
@@ -212,8 +234,9 @@ LAYERS = {
     Layer.SIDE: ("side",),
     Layer.SESSION_SHIFT: ("side-shift", "session-shift"),
     Layer.MIXER: ("side", "mixer"),
-    Layer.NOTE: ("note",),
-    Layer.NOTE_SCENES: ("note-scenes",),
+    Layer.LINNSTRUMENT: ("linnstrument",),
+    Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
+    Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),
 }
 
 # Columns a map shows dimmed and unlabelled: the side columns map dims the grid.

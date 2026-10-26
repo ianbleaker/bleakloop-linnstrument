@@ -37,8 +37,9 @@ TITLES = {
     Layer.SIDE: "Side columns",
     Layer.SESSION_SHIFT: "Session Mode with Shift held",
     Layer.MIXER: "Mixer Mode",
-    Layer.NOTE: "Note Mode controls page",
-    Layer.NOTE_SCENES: "Note Mode scene page",
+    Layer.LINNSTRUMENT: "Linnstrument Mode controls page",
+    Layer.LINNSTRUMENT_SHIFT: "Linnstrument Mode with Shift held",
+    Layer.LINNSTRUMENT_SCENES: "Linnstrument Mode scene page",
 }
 
 INSTRUMENT_COLUMNS = range(2, 17)
@@ -114,7 +115,7 @@ def _block(label, columns, pads):
 
 
 def _instrument(frame):
-    # Note Mode owns column 1 only; the rest of the surface is the player's instrument.
+    # Linnstrument Mode owns column 1 only; the rest of the surface is the player's instrument.
     if any(key[0] in INSTRUMENT_COLUMNS for key in frame):
         return []
     x, y = _pad_xy(INSTRUMENT_COLUMNS[0], 1)

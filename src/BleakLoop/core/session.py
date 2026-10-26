@@ -1,11 +1,10 @@
-"""Session Mode: clip slots, the bottom row, columns 1, 15 and 16, and the Shift layer."""
+"""Session Mode: clip slots, the bottom row, columns 15 and 16, and the Shift layer."""
 
 from dataclasses import replace
 
-from . import controls, layout, mixer, modes
+from . import column_1, controls, layout, mixer, modes
 from .leds import (
     BLUE,
-    CYAN,
     GREEN,
     LIME,
     MAGENTA,
@@ -20,8 +19,6 @@ from .leds import (
 )
 from .model import (
     ArmExclusive,
-    CaptureAndInsertScene,
-    ClipTarget,
     CopyClip,
     CopyScene,
     DeleteClip,
@@ -30,41 +27,18 @@ from .model import (
     FireScene,
     FireSlot,
     PadPress,
-    QuantizeClip,
     SceneSelected,
     SelectTrack,
-    SetLaunchQuantization,
     SetTempo,
     ShowClip,
     ShowMessage,
-    StopAllClips,
     StopTrackClips,
     ToggleMute,
-    TogglePlay,
     ToggleSolo,
     YAxis,
 )
 from .modes import ClipSource, Mode, SceneSource, TrackControl
 from .values import TEMPO_MAX, TEMPO_MIN
-
-# Live's launch quantization names, indexed by its value.
-QUANTIZATION_NAMES = (
-    "None",
-    "8 Bars",
-    "4 Bars",
-    "2 Bars",
-    "1 Bar",
-    "1/2",
-    "1/2T",
-    "1/4",
-    "1/4T",
-    "1/8",
-    "1/8T",
-    "1/16",
-    "1/16T",
-    "1/32",
-)
-DEFAULT_QUANTIZATION = 4  # 1 Bar
 
 TRACK_CONTROL_COLOURS = {
     TrackControl.MUTE: ORANGE,
@@ -88,19 +62,20 @@ def handle(state, event, snapshot):
         return replace(state, window=window), []
     if isinstance(event, YAxis):
         return mixer.y_axis(state, event)
-    # Column 1 CCs are ignored in Session Mode.
     if not isinstance(event, PadPress):
         return state, []
     key = (event.column, event.pad)
     if key == layout.SHIFT:
-        return replace(state, shift=event.pressed), []
-    if key == layout.COPY:
+        return column_1.handle(state, event, snapshot)
+    # Under Shift, Copy and Delete's pads are window moves.
+    shift_layer = state.shift and not state.copy and not state.delete
+    if key == layout.COPY and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, copy=False, copy_source=None), []
         if state.mixer:
             return state, []
         return replace(state, copy=True), [ShowMessage("Copy: pick a clip or scene")]
-    if key == layout.DELETE:
+    if key == layout.DELETE and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, delete=False), []
         if state.mixer:
@@ -117,14 +92,14 @@ def handle(state, event, snapshot):
     if state.delete:
         return _delete(state, event, snapshot)
     if event.column == 1:
-        return _column_1(state, event.pad, snapshot)
+        return column_1.handle(state, event, snapshot)
     if event.column in layout.GRID_COLUMNS:
         if event.pad == layout.ROWS:
             return state, _track_switch(state, _track(event.column, snapshot))
         return _slot(state, event, snapshot)
     if event.column == 15:
         return _column_15(state, key, snapshot)
-    if event.column == layout.SCENE_COLUMN:
+    if _is_scene(event):  # pad 8 is reserved
         scene = state.window.scene + event.pad - 1
         if scene < snapshot.scene_count:
             return state, [FireScene(scene, legato=state.shift)]
@@ -134,58 +109,6 @@ def handle(state, event, snapshot):
 def _track(column, snapshot):
     i = column - layout.GRID_COLUMNS[0]
     return snapshot.tracks[i] if i < len(snapshot.tracks) else None
-
-
-def _column_1(state, pad, snapshot):
-    key = (1, pad)
-    if key == layout.UNDO:
-        return state, controls.redo(snapshot) if state.shift else controls.undo(snapshot)
-    if key == layout.METRONOME:
-        if state.shift:
-            return _launch_quantization(state, snapshot)
-        return state, controls.metronome(snapshot)
-    if key == layout.QUANTIZE and state.shift:
-        return state, _quantize(snapshot)
-    if state.shift:
-        return state, []
-    if key == layout.CAPTURE:
-        return state, [CaptureAndInsertScene(), ShowMessage("Capture and Insert Scene")]
-    if key == layout.PLAY_STOP:
-        return state, [TogglePlay()]
-    if key == layout.RECORD:
-        return state, controls.record(snapshot)
-    if key == layout.MODE_PAD:
-        state, actions = mixer.reset(state)
-        return modes.enter(state, Mode.NOTE), actions + [EnterMode(Mode.NOTE)]
-    return state, []
-
-
-def _quantize(snapshot):
-    candidates = [
-        (ClipTarget.HIGHLIGHTED, snapshot.highlighted_clip),
-        (ClipTarget.DETAIL, snapshot.detail_clip),
-        (ClipTarget.PLAYING, snapshot.playing_clip),
-    ]
-    found = [(target, clip) for target, clip in candidates if clip is not None]
-    if not found:
-        return [ShowMessage("No clip to quantize")]
-    target, clip = found[0]
-    if not clip.is_midi:
-        return [ShowMessage("Cannot quantize an audio clip")]
-    return [QuantizeClip(target), ShowMessage("Quantize 1/16")]
-
-
-def _launch_quantization(state, snapshot):
-    if snapshot.launch_quantization != 0:
-        state = replace(state, quantization_memory=snapshot.launch_quantization)
-        return state, [SetLaunchQuantization(0), ShowMessage("Launch Quantization: None")]
-    value = state.quantization_memory
-    if value is None:
-        value = DEFAULT_QUANTIZATION
-    return state, [
-        SetLaunchQuantization(value),
-        ShowMessage(f"Launch Quantization: {QUANTIZATION_NAMES[value]}"),
-    ]
 
 
 def _slot_at(state, event, snapshot):
@@ -223,8 +146,8 @@ def _slot(state, event, snapshot):
     if records:
         actions.append(ShowClip(track.index, scene))
         if track.has_midi_input:
-            state = modes.enter(state, Mode.NOTE)
-            actions.append(EnterMode(Mode.NOTE))
+            state = modes.enter(state, Mode.LINNSTRUMENT)
+            actions.append(EnterMode(Mode.LINNSTRUMENT))
     return state, actions
 
 
@@ -320,14 +243,11 @@ def _column_15(state, key, snapshot):
     if state.shift:
         if key in layout.WINDOW_MOVES:
             return _move_window(state, layout.WINDOW_MOVES[key], snapshot)
-        if key == layout.STOP_ALL:
-            return state, [StopAllClips(), ShowMessage("Stop all clips")]
         if key in layout.TEMPO_STEPS:
             bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + layout.TEMPO_STEPS[key]))
             return state, [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
         return state, []
-    if key in layout.FIXED_LENGTH_PADS:
-        return _fixed_length(state, layout.FIXED_LENGTH_PADS[key])
+    # Normal-layer 15/4 and 15/5 are reserved: no match here.
     if key == layout.MIXER:
         return mixer.toggle(state)
     if key in layout.TRACK_CONTROL_PADS:
@@ -335,13 +255,6 @@ def _column_15(state, key, snapshot):
         message = ShowMessage(f"Track Control: {TRACK_CONTROL_NAMES[mode]}")
         return replace(state, track_control=mode), [message]
     return state, []
-
-
-def _fixed_length(state, bars):
-    if state.fixed_length == bars:
-        return replace(state, fixed_length=None), [ShowMessage("Fixed Length OFF")]
-    message = ShowMessage(f"Fixed Length {bars} bar" + ("s" if bars > 1 else ""))
-    return replace(state, fixed_length=bars), [message]
 
 
 def _move_window(state, steps, snapshot):
@@ -379,13 +292,10 @@ def render(state, snapshot):
             snapshot, state.window.scene, pad - 1
         )
     if shift_layer:
-        _render_shift_layer(frame, snapshot)
+        _render_shift_layer(frame)
     else:
-        _render_normal_layer(frame, state, snapshot)
-    # Held modifier pads blink on both layers.
-    frame[layout.COPY] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
-    frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
-    frame[layout.SHIFT] = Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
+        _render_normal_layer(frame, state)
+    frame.update(column_1.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame
 
@@ -443,31 +353,19 @@ def _track_switch_light(state, shift_layer, track):
     return Light(RED if track.arm or track.implicit_arm else LIME)
 
 
-def _render_normal_layer(frame, state, snapshot):
-    frame[layout.UNDO] = Light(WHITE)
-    frame[layout.CAPTURE] = Light(LIME)
-    frame[layout.METRONOME] = controls.metronome_light(snapshot)
-    frame[layout.PLAY_STOP] = controls.play_light(snapshot)
-    frame[layout.RECORD] = controls.record_light(snapshot)
-    frame[layout.MODE_PAD] = Light(WHITE)
+def _render_normal_layer(frame, state):
+    # Held Copy and Delete blink.
+    frame[layout.COPY] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
+    frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
     frame[layout.MIXER] = Light(WHITE, Blink.FAST if state.mixer else Blink.STEADY)
-    for key, bars in layout.FIXED_LENGTH_PADS.items():
-        blink = Blink.FAST if bars == state.fixed_length else Blink.STEADY
-        frame[key] = Light(CYAN, blink)
     for key, name in layout.TRACK_CONTROL_PADS.items():
         mode = TrackControl[name]
         blink = Blink.TEMPO if mode is state.track_control else Blink.STEADY
         frame[key] = Light(TRACK_CONTROL_COLOURS[mode], blink)
 
 
-def _render_shift_layer(frame, snapshot):
-    frame[layout.UNDO] = Light(WHITE)
-    frame[layout.QUANTIZE] = Light(MAGENTA)
-    frame[layout.LAUNCH_QUANTIZATION] = Light(
-        GREEN if snapshot.launch_quantization != 0 else RED
-    )
+def _render_shift_layer(frame):
     for key in layout.WINDOW_MOVES:
         frame[key] = Light(YELLOW)
-    frame[layout.STOP_ALL] = Light(RED)
     for key in layout.TEMPO_STEPS:
         frame[key] = Light(GREEN)

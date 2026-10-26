@@ -80,7 +80,7 @@ class Snapshot:
     # One bool per window row that exists, true if any track in the Set has a clip there.
     # Read only while Copy is held.
     scene_clips: tuple = ()
-    # Read only in Note Mode. None when the selected track isn't in the track list.
+    # Read only in Linnstrument Mode. None when the selected track isn't in the track list.
     selected_track: SelectedTrack | None = None
     selected_scene: int = 0  # Live's highlighted scene
     can_capture_midi: bool = False

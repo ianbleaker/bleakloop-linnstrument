@@ -12,7 +12,7 @@ PLAYING = Snapshot(
 )
 
 SESSION = State(Mode.SESSION)
-NOTE = State(Mode.NOTE)
+LINNSTRUMENT = State(Mode.LINNSTRUMENT)
 
 
 def press(key, pressed=True):
@@ -28,32 +28,32 @@ def test_default_state_is_session():
 
 def test_session_input_goes_to_session_module():
     state, actions = engine.handle(SESSION, press(layout.MODE_PAD), STOPPED)
-    assert state.mode is Mode.NOTE
-    assert actions == [EnterMode(Mode.NOTE)]
+    assert state.mode is Mode.LINNSTRUMENT
+    assert actions == [EnterMode(Mode.LINNSTRUMENT)]
 
 
-# Note Mode input
+# Linnstrument Mode input
 
 
-def test_pad_8_press_enters_session():
-    state, actions = engine.handle(NOTE, PadPress(1, 8, True), STOPPED)
+def test_mode_pad_press_enters_session():
+    state, actions = engine.handle(LINNSTRUMENT, press(layout.MODE_PAD), STOPPED)
     assert state == State(mode=Mode.SESSION)
     assert actions == [EnterMode(Mode.SESSION)]
 
 
-def test_pad_8_release_is_ignored():
-    assert engine.handle(NOTE, PadPress(1, 8, False), STOPPED) == (NOTE, [])
+def test_mode_pad_release_is_ignored():
+    assert engine.handle(LINNSTRUMENT, press(layout.MODE_PAD, False), STOPPED) == (LINNSTRUMENT, [])
 
 
-def test_note_input_goes_to_note_module():
-    state, actions = engine.handle(NOTE, PadPress(1, 4, True), STOPPED)
-    assert state.scene_page
+def test_linnstrument_input_goes_to_linnstrument_module():
+    state, actions = engine.handle(LINNSTRUMENT, press(layout.SHIFT), STOPPED)
+    assert state.shift
     assert actions == []
 
 
-@pytest.mark.parametrize("key", [(2, 8), (5, 5), layout.SHIFT])
-def test_note_ignores_pads_outside_column_1(key):
-    assert engine.handle(NOTE, press(key), STOPPED) == (NOTE, [])
+@pytest.mark.parametrize("key", [(2, 8), (5, 5), (16, 8)])
+def test_linnstrument_ignores_pads_outside_column_1(key):
+    assert engine.handle(LINNSTRUMENT, press(key), STOPPED) == (LINNSTRUMENT, [])
 
 
 # Rendering
@@ -65,8 +65,8 @@ def test_session_render_goes_to_session_module():
     }
 
 
-def test_note_render_goes_to_note_module():
-    assert set(engine.render(NOTE, PLAYING)) == {(1, p) for p in range(1, 9)}
+def test_linnstrument_render_goes_to_linnstrument_module():
+    assert set(engine.render(LINNSTRUMENT, PLAYING)) == {(1, p) for p in range(1, 9)}
 
 
 # Blink clock

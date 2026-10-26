@@ -12,24 +12,25 @@ WINDOW_TRACKS = 13
 WINDOW_SCENES = 7
 
 # (column, pad)
-UNDO = (1, 1)
-COPY = (1, 2)
-RECORD_CLIP = COPY  # pad 2's Note Mode function
+PLAY_STOP = (1, 1)
+RECORD = (1, 2)
 CAPTURE = (1, 3)
 QUANTIZE = CAPTURE  # pad 3's Shift function
-DELETE = (1, 4)
-SCENE_PAGE = DELETE  # pad 4's Note Mode function
-METRONOME = (1, 5)
-LAUNCH_QUANTIZATION = METRONOME  # pad 5's Shift function
-PLAY_STOP = (1, 6)
-RECORD = (1, 7)
-MODE_PAD = (1, 8)
-STOP_ALL = (15, 5)
-MIXER = STOP_ALL  # the same pad: Mixer is its normal-layer function
-SHIFT = (16, 8)
+METRONOME = (1, 4)
+LAUNCH_QUANTIZATION = METRONOME  # pad 4's Shift function
+FIXED_LENGTH = (1, 5)
+UNDO = (1, 6)
+MODE_PAD = (1, 7)
+SCENE_PAGE = MODE_PAD  # pad 7's Shift function in Linnstrument Mode
+SHIFT = (1, 8)
+COPY = (15, 1)
+DELETE = (15, 2)
+MIXER = (15, 3)
+# Unlit and unused until FX (15/4), Drum (15/5) and Chord (16/8) are designed.
+RESERVED = ((15, 4), (15, 5), (16, 8))
 
-# bars
-FIXED_LENGTH_PADS = {(15, 1): 1, (15, 2): 2, (15, 3): 4, (15, 4): 8}
+# bars, in Fixed Length's cycle order
+FIXED_LENGTHS = (1, 2, 4, 8)
 
 # Shift + column 15 pads 1-4: (track step, scene step).
 WINDOW_MOVES = {(15, 1): (0, -1), (15, 2): (0, 1), (15, 3): (-1, 0), (15, 4): (1, 0)}
@@ -38,8 +39,6 @@ TRACK_CONTROL_PADS = {(15, 6): "MUTE", (15, 7): "SOLO", (15, 8): "ARM"}
 
 # Shift + column 15 pads 7 and 8: BPM step.
 TEMPO_STEPS = {(15, 7): 1, (15, 8): -1}
-
-NOTE_CONTROL_COLUMNS = (1,)
 
 
 def device_row(pad):

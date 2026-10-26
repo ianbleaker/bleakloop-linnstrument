@@ -12,6 +12,7 @@ from BleakLoop.core.leds import (
     MAGENTA,
     OFF,
     ORANGE,
+    PINK,
     RED,
     WHITE,
     YELLOW,
@@ -179,15 +180,15 @@ def test_play_stop():
     assert handle(SESSION, layout.PLAY_STOP) == (SESSION, [TogglePlay()])
 
 
-def test_mode_pad_enters_note():
+def test_mode_pad_enters_linnstrument():
     state = State(shift=False, track_control=TrackControl.SOLO, window=Window(2, 1))
     new, actions = handle(state, layout.MODE_PAD)
-    assert new == State(mode=Mode.NOTE, track_control=TrackControl.SOLO, window=Window(2, 1))
-    assert actions == [EnterMode(Mode.NOTE)]
+    assert new == State(mode=Mode.LINNSTRUMENT, track_control=TrackControl.SOLO, window=Window(2, 1))
+    assert actions == [EnterMode(Mode.LINNSTRUMENT)]
 
 
-@pytest.mark.parametrize("key", [layout.PLAY_STOP, layout.MODE_PAD])
-def test_shift_play_stop_and_mode_pad_do_nothing(key):
+@pytest.mark.parametrize("key", [layout.RECORD, layout.MODE_PAD])
+def test_shift_record_and_mode_pad_do_nothing(key):
     assert handle(SHIFT, key) == (SHIFT, [])
 
 
@@ -322,7 +323,7 @@ def test_window_at_edge_does_nothing():
 
 
 def test_shift_stop_all_clips():
-    assert handle(SHIFT, layout.STOP_ALL) == (
+    assert handle(SHIFT, layout.PLAY_STOP) == (
         SHIFT,
         [StopAllClips(), ShowMessage("Stop all clips")],
     )
@@ -451,26 +452,14 @@ def test_quantize_without_clip():
 
 
 @pytest.mark.parametrize(
-    "pad, bars, text",
-    [(1, 1, "Fixed Length 1 bar"), (2, 2, "Fixed Length 2 bars"), (3, 4, "Fixed Length 4 bars"),
-     (4, 8, "Fixed Length 8 bars")],
+    "bars, after, text",
+    [(None, 1, "Fixed Length 1 bar"), (1, 2, "Fixed Length 2 bars"),
+     (2, 4, "Fixed Length 4 bars"), (4, 8, "Fixed Length 8 bars"), (8, None, "Fixed Length OFF")],
 )
-def test_fixed_length_selects(pad, bars, text):
-    state, actions = handle(SESSION, (15, pad))
-    assert state.fixed_length == bars
+def test_fixed_length_cycles(bars, after, text):
+    state, actions = handle(State(fixed_length=bars), layout.FIXED_LENGTH)
+    assert state.fixed_length == after
     assert actions == [ShowMessage(text)]
-
-
-def test_fixed_length_switches():
-    state, actions = handle(State(fixed_length=2), (15, 4))
-    assert state.fixed_length == 8
-    assert actions == [ShowMessage("Fixed Length 8 bars")]
-
-
-def test_fixed_length_clears():
-    state, actions = handle(State(fixed_length=4), (15, 3))
-    assert state.fixed_length is None
-    assert actions == [ShowMessage("Fixed Length OFF")]
 
 
 def test_shift_fixed_length_pads_move_window():
@@ -523,10 +512,10 @@ def test_slot_with_clip_gets_no_record_length(slot):
     assert actions[0] == FireSlot(0, 0, legato=False)
 
 
-def test_midi_recording_enters_note_mode():
+def test_midi_recording_enters_linnstrument_mode():
     state, actions = handle(SESSION, (2, 1), ARMED_MIDI)
-    assert actions == [FireSlot(0, 0, legato=False), ShowClip(0, 0), EnterMode(Mode.NOTE)]
-    assert state.mode is Mode.NOTE
+    assert actions == [FireSlot(0, 0, legato=False), ShowClip(0, 0), EnterMode(Mode.LINNSTRUMENT)]
+    assert state.mode is Mode.LINNSTRUMENT
 
 
 def test_audio_recording_shows_clip_and_stays():
@@ -573,9 +562,9 @@ def test_empty_unarmed_slot_plain_fire():
     )
 
 
-def test_fixed_length_survives_auto_note_mode():
+def test_fixed_length_survives_auto_linnstrument_mode():
     state, _ = handle(State(fixed_length=4), (2, 1), ARMED_MIDI)
-    assert state.mode is Mode.NOTE
+    assert state.mode is Mode.LINNSTRUMENT
     assert state.fixed_length == 4
 
 
@@ -595,18 +584,31 @@ def test_scene_selected_scrolls_window(scene, window):
 # Copy and Delete pads
 
 
-@pytest.mark.parametrize("state", [SESSION, SHIFT])
-def test_copy_press(state):
-    new, actions = handle(state, layout.COPY)
-    assert new == replace(state, copy=True)
+def test_copy_press():
+    new, actions = handle(SESSION, layout.COPY)
+    assert new == State(copy=True)
     assert actions == [ShowMessage("Copy: pick a clip or scene")]
 
 
-@pytest.mark.parametrize("state", [SESSION, SHIFT])
-def test_delete_press(state):
-    new, actions = handle(state, layout.DELETE)
-    assert new == replace(state, delete=True)
+def test_delete_press():
+    new, actions = handle(SESSION, layout.DELETE)
+    assert new == State(delete=True)
     assert actions == [ShowMessage("Delete Mode ON")]
+
+
+@pytest.mark.parametrize("key", [layout.COPY, layout.DELETE])
+def test_copy_and_delete_pads_move_the_window_under_shift(key):
+    state = replace(SHIFT, window=Window(3, 3))
+    new, _ = handle(state, key, session_snapshot(scene_count=20))
+    assert new == replace(state, window=Window(3, layout.WINDOW_MOVES[key][1] + 3))
+
+
+@pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
+def test_copy_press_while_held_modifier_hides_shift(held):
+    state = State(shift=True, **held)
+    new, actions = handle(state, layout.COPY)
+    assert new == replace(state, copy=True)
+    assert actions == [ShowMessage("Copy: pick a clip or scene")]
 
 
 @pytest.mark.parametrize("key", [layout.COPY, layout.DELETE])
@@ -637,8 +639,9 @@ DELETE = State(delete=True)
 
 INERT_WHILE_HELD = (
     [(c, 8) for c in layout.GRID_COLUMNS]
-    + [(15, p) for p in range(1, 9)]
-    + [(1, p) for p in [1, 3, 5, 6, 7, 8]]
+    + [(15, p) for p in range(3, 9)]
+    + [(16, 8)]
+    + [(1, p) for p in range(1, 8)]
 )
 
 
@@ -977,8 +980,10 @@ def test_normal_layer_column_1_playing_with_metronome():
 )
 def test_normal_layer_column_15(track_control, blinking):
     frame = session.render(mode(track_control), SNAP)
-    assert all(frame[(15, p)] == Light(CYAN) for p in range(1, 5))
-    assert frame[(15, 5)] == Light(WHITE)
+    assert frame[layout.COPY] == Light(MAGENTA)
+    assert frame[layout.DELETE] == Light(RED)
+    assert frame[layout.MIXER] == Light(WHITE)
+    assert frame[(15, 4)] == frame[(15, 5)] == Light(OFF)
     colours = {6: ORANGE, 7: BLUE, 8: RED}
     for pad, colour in colours.items():
         blink = Blink.TEMPO if pad == blinking else Blink.STEADY
@@ -1004,19 +1009,18 @@ def test_scene_lights_follow_window_offset():
 @pytest.mark.parametrize("quantization, light", [(4, Light(GREEN)), (0, Light(RED))])
 def test_shift_layer_column_1(quantization, light):
     frame = session.render(SHIFT, replace(SNAP, launch_quantization=quantization))
+    assert frame[layout.PLAY_STOP] == Light(RED)
     assert frame[layout.UNDO] == Light(WHITE)
     assert frame[layout.LAUNCH_QUANTIZATION] == light
-    assert frame[layout.COPY] == Light(MAGENTA)
     assert frame[layout.QUANTIZE] == Light(MAGENTA)
-    assert frame[layout.DELETE] == Light(RED)
-    assert all(frame[(1, p)] == Light(OFF) for p in [6, 7, 8])
+    assert frame[layout.RECORD] == frame[layout.FIXED_LENGTH] == frame[layout.MODE_PAD] == Light(OFF)
 
 
 def test_shift_layer_column_15():
     frame = session.render(SHIFT, SNAP)
     assert [frame[(15, p)] for p in range(1, 9)] == [
         Light(YELLOW), Light(YELLOW), Light(YELLOW), Light(YELLOW),
-        Light(RED), Light(OFF), Light(GREEN), Light(GREEN),
+        Light(OFF), Light(OFF), Light(GREEN), Light(GREEN),
     ]
 
 
@@ -1050,11 +1054,11 @@ def test_record_light_in_arrangement_view():
     assert frame[layout.RECORD] == Light(ORANGE, Blink.TEMPO)
 
 
-def test_fixed_length_selected_blinks():
-    frame = session.render(State(fixed_length=4), SNAP)
-    assert [frame[(15, p)] for p in range(1, 5)] == [
-        Light(CYAN), Light(CYAN), Light(CYAN, Blink.FAST), Light(CYAN),
-    ]
+@pytest.mark.parametrize(
+    "bars, colour", [(None, WHITE), (1, CYAN), (2, BLUE), (4, MAGENTA), (8, PINK)]
+)
+def test_fixed_length_colour(bars, colour):
+    assert session.render(State(fixed_length=bars), SNAP)[layout.FIXED_LENGTH] == Light(colour)
 
 
 def test_shift_layer_hides_fixed_length():
@@ -1068,7 +1072,8 @@ def test_copy_or_delete_with_shift_draws_normal_layer(held):
     frame = session.render(state, with_track(SNAP, 3, mute=True))
     assert frame[(2, 8)] == Light(ORANGE)
     assert frame[(3, 8)] == Light(LIME)
-    assert all(frame[(15, p)] == Light(CYAN) for p in range(1, 5))
+    assert frame[layout.COPY] == (Light(RED, Blink.FAST) if held.get("copy") else Light(MAGENTA))
+    assert frame[layout.MIXER] == Light(WHITE)
     assert frame[layout.CAPTURE] == Light(LIME)
     assert frame[layout.RECORD] == Light(RED)
     assert frame[layout.SHIFT] == Light(WHITE, Blink.FAST)
@@ -1100,3 +1105,23 @@ def test_source_outside_window_not_drawn(source):
     assert session.render(replace(state, copy_source=source), snapshot) == session.render(
         state, snapshot
     )
+
+
+# Shift + 15/4 is the window move Right.
+@pytest.mark.parametrize(
+    "state, key",
+    [(state, key) for state in (SESSION, SHIFT) for key in layout.RESERVED
+     if not (state.shift and key in layout.WINDOW_MOVES)],
+)
+def test_reserved_pads(state, key):
+    assert handle(state, key) == (state, [])
+    assert session.render(state, SNAP)[key] == Light(OFF)
+
+
+def test_shift_midi_recording_enters_linnstrument_without_shift():
+    # A legato press that starts a MIDI recording still switches, and Shift ends.
+    snapshot = with_track(SNAP, 2, arm=True, has_midi_input=True)
+    state, actions = handle(SHIFT, (2, 1), snapshot)
+    assert state.mode is Mode.LINNSTRUMENT
+    assert not state.shift
+    assert actions == [FireSlot(0, 0, legato=True), ShowClip(0, 0), EnterMode(Mode.LINNSTRUMENT)]

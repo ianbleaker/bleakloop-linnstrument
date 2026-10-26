@@ -8,7 +8,7 @@ from .layout import Window
 
 class Mode(enum.Enum):
     SESSION = enum.auto()
-    NOTE = enum.auto()
+    LINNSTRUMENT = enum.auto()
 
 
 @dataclass(frozen=True)
@@ -70,24 +70,26 @@ class State:
     copy: bool = False
     delete: bool = False
     copy_source: ClipSource | SceneSource | None = None
-    fixed_length: int | None = None  # bars; Note Mode's Record Clip uses it too
+    fixed_length: int | None = None  # bars; Linnstrument Mode's Record Clip uses it too
     touches: tuple = ()  # Touch per held fader column
     lifts: tuple = ()  # Lift per fader column whose pad was just released
     glides: tuple = ()  # Glide per track
     glide_ms: float | None = None  # time of the last glide step, None when none is moving
     undo_open: bool = False  # a fader gesture's undo step is open in Live
-    scene_page: bool = False  # Note Mode column 1 shows the scene page
+    scene_page: bool = False  # Linnstrument Mode column 1 shows the scene page
 
 
 def enter(state, mode):
     # The only place mode-entry resets happen, including the fader state.
     # The window, the launch quantization memory and Fixed Length survive both directions.
+    # Entering Linnstrument Mode clears Shift: a Shift held then was pressed in User Firmware
+    # Mode, and the firmware sends its release as a User Firmware note, not on the control
+    # channel, so BleakLoop never sees it.
     # A caller leaving Mixer Mode closes an open undo step first (mixer.reset).
     state = replace(
         state,
         mode=mode,
         mixer=False,
-        shift=False,
         copy=False,
         delete=False,
         copy_source=None,
@@ -100,4 +102,6 @@ def enter(state, mode):
     )
     if mode is Mode.SESSION:
         state = replace(state, track_control=TrackControl.ARM)
+    else:
+        state = replace(state, shift=False)
     return state

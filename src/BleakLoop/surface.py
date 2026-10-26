@@ -40,14 +40,14 @@ class Elements(ElementsBase):
                 self.add_button(
                     Y_AXIS_CC_BASE + column, f"Y {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
-        # Note Mode column 1: every note on every channel. The control channel is chosen
+        # Linnstrument Mode column 1: every note on every channel. The control channel is chosen
         # from the right split after load, and elements must exist before it.
         for channel in range(16):
             for note in range(128):
                 self.add_button(
                     note, f"Control {channel} {note}", channel=channel, msg_type=MIDI_NOTE_TYPE
                 )
-        # Device replies to NRPN 299 queries: listened during the setup and in Note Mode.
+        # Device replies to NRPN 299 queries: listened during the setup and in Linnstrument Mode.
         for number in NRPN_REPLY_CCS:
             self.add_button(number, f"Nrpn {number}", channel=0, msg_type=MIDI_CC_TYPE)
 
@@ -75,7 +75,7 @@ class BleakLoop(ControlSurface):
         self._refusal = None
         self._right_split_unread = False
         self._sent = {}  # BleakLoop's last left split Octave/Transpose
-        self._poll = []  # Note Mode query steps still to send
+        self._poll = []  # Linnstrument Mode query steps still to send
         self._pending_sets = []  # (number, value) sets from the last re-check
         self._poll_due = 0
         self._poll_wait = False
@@ -100,7 +100,7 @@ class BleakLoop(ControlSurface):
         super().update_display()
         if self._started:
             self._check_pending_clip()
-            if self._state.mode is Mode.NOTE:
+            if self._state.mode is Mode.LINNSTRUMENT:
                 self._poll_tick()
             self._refresh()
         elif self._setup is None:
@@ -167,7 +167,7 @@ class BleakLoop(ControlSurface):
         self._send(self._setup.pop(0))
 
     def _poll_tick(self):
-        # Note Mode re-check of Row Offset and the left split's Octave/Transpose, one step
+        # Linnstrument Mode re-check of Row Offset and the left split's Octave/Transpose, one step
         # per tick. Sets go out before the next poll starts.
         now_ms = time.monotonic() * 1000
         if self._pending_sets:
@@ -224,7 +224,7 @@ class BleakLoop(ControlSurface):
 
     def enter_mode(self, mode):
         self._poll, self._pending_sets, self._poll_wait = [], [], False
-        if mode is Mode.NOTE:
+        if mode is Mode.LINNSTRUMENT:
             self._poll_due = 0  # re-check at once
         if mode is Mode.SESSION:
             self._send(device.user_firmware_mode(True))
@@ -356,7 +356,7 @@ class BleakLoop(ControlSurface):
             Live.Application.get_application(),
             self._state.window,
             scene_clips=self._state.copy,
-            selected=self._state.mode is Mode.NOTE,
+            selected=self._state.mode is Mode.LINNSTRUMENT,
         )
 
     def _update_ring(self, force=False):

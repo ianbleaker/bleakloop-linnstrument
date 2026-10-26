@@ -1,4 +1,4 @@
-"""Behaviour shared by Session and Note Mode: undo, metronome, Play/Stop, record, Fixed Length
+"""Behaviour shared by Session and Linnstrument Mode: undo, metronome, Play/Stop, record, Fixed Length
 and scene lights."""
 
 from .leds import BLUE, GREEN, LIME, OFF, ORANGE, RED, WHITE, Blink, Light

@@ -122,23 +122,23 @@ def test_toggle_off_resets_fader_state_and_closes_undo():
     assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("Mixer Mode OFF")]
 
 
-def test_shift_pad_5_in_mixer_stops_all():
-    state, actions = handle(replace(MIXER, shift=True), press(*layout.MIXER))
+def test_shift_play_stop_in_mixer_stops_all():
+    state, actions = handle(replace(MIXER, shift=True), press(*layout.PLAY_STOP))
     assert state.mixer
     assert actions == [StopAllClips(), ShowMessage("Stop all clips")]
 
 
 @pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
-def test_pad_5_with_copy_or_delete_held_does_not_toggle(held):
+def test_mixer_pad_with_copy_or_delete_held_does_not_toggle(held):
     state, actions = handle(State(**held), press(*layout.MIXER))
     assert not state.mixer
     assert actions == []
 
 
-def test_mode_pad_from_mixer_closes_undo_then_enters_note():
+def test_mode_pad_from_mixer_closes_undo_then_enters_linnstrument():
     state, actions = handle(replace(MIXER, undo_open=True), press(*layout.MODE_PAD))
-    assert actions == [EndUndoStep(), EnterMode(Mode.NOTE)]
-    assert state.mode is Mode.NOTE
+    assert actions == [EndUndoStep(), EnterMode(Mode.LINNSTRUMENT)]
+    assert state.mode is Mode.LINNSTRUMENT
     assert not state.mixer
     assert not state.undo_open
 
@@ -504,11 +504,11 @@ def test_no_track_column_is_off():
 def test_faders_dark_under_shift():
     frame = session.render(replace(MIXER, shift=True), with_volume(SNAP, 3, 0.85))
     assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))
-    assert frame[layout.STOP_ALL] == Light(RED)
+    assert frame[layout.PLAY_STOP] == Light(RED)
 
 
 @pytest.mark.parametrize("state, blink", [(State(), Blink.STEADY), (MIXER, Blink.FAST)])
-def test_pad_5_light(state, blink):
+def test_mixer_pad_light(state, blink):
     assert session.render(state, SNAP)[layout.MIXER] == Light(WHITE, blink)
 
 

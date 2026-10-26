@@ -1,13 +1,13 @@
 """handle() and render(): all behaviour, no side effects."""
 
-from . import mixer, note_mode, session
+from . import mixer, linnstrument_mode, session
 from .modes import Mode
 
 
 def handle(state, event, snapshot):
     if state.mode is Mode.SESSION:
         return session.handle(state, event, snapshot)
-    return note_mode.handle(state, event, snapshot)
+    return linnstrument_mode.handle(state, event, snapshot)
 
 
 def tick(state, now_ms):
@@ -20,7 +20,7 @@ def tick(state, now_ms):
 def render(state, snapshot):
     if state.mode is Mode.SESSION:
         return session.render(state, snapshot)
-    return note_mode.render(state, snapshot)
+    return linnstrument_mode.render(state, snapshot)
 
 
 def blink_beats(snapshot, now_ms):

@@ -12,8 +12,9 @@ class Layer(enum.Enum):
     SIDE = "side"
     SESSION_SHIFT = "session-shift"
     MIXER = "mixer"
-    NOTE = "note"
-    NOTE_SCENES = "note-scenes"
+    LINNSTRUMENT = "linnstrument"
+    LINNSTRUMENT_SHIFT = "linnstrument-shift"
+    LINNSTRUMENT_SCENES = "linnstrument-scenes"
 
     @property
     def slug(self):
@@ -78,6 +79,7 @@ SCENES = {
     Layer.SIDE: (State(fixed_length=2), SNAPSHOT),
     Layer.SESSION_SHIFT: (State(fixed_length=2, shift=True), SNAPSHOT),
     Layer.MIXER: (State(mixer=True), MIXER_SNAPSHOT),
-    Layer.NOTE: (State(mode=Mode.NOTE), SNAPSHOT),
-    Layer.NOTE_SCENES: (State(mode=Mode.NOTE, scene_page=True), SNAPSHOT),
+    Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
+    Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
+    Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),
 }

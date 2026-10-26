@@ -42,11 +42,12 @@ flowchart LR
 | Carrying out an `Action` as Live calls | `live_actions.py` |
 | Geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping | `core/layout.py` |
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
-| Session / Mixer / Note, Note Mode pages, modifiers | `core/modes.py` |
-| Shared Session and Note Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights | `core/controls.py` |
-| Clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table | `core/session.py` |
+| Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers | `core/modes.py` |
+| Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights | `core/controls.py` |
+| Clip slots, copy and delete rules, bottom row, columns 15, 16, Shift layer table | `core/session.py` |
+| Column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/column_1.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
-| Column 1 controls page and scene page | `core/note_mode.py` |
+| Linnstrument Mode: column 1 only, handed to `column_1` | `core/linnstrument_mode.py` |
 | Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
 | Tuned numbers: every value in section 8, by name | `core/values.py` |
 | `handle()` and `render()`, composing the core modules | `core/engine.py` |
@@ -86,12 +87,12 @@ The plumbing uses v3's elements, MIDI map handling and lifecycle. v3's behaviour
 The core is a state machine plus a renderer, with no side effects of its own.
 
 - **Input:** `handle(state, event, snapshot) -> (state, actions)`.
-  - `event` is a pad press or release, a Y-axis value, a Note Mode CC, or a tick.
+  - `event` is a pad press or release, a Y-axis value, or a tick.
   - `snapshot` is a plain, read-only view of the Live state the decision needs.
   - `actions` are plain values such as `FireSlot(track, scene, legato, record_length)`, `Undo()`, `SetVolume(track, value)` or `ShowMessage(text)`. The adapters carry them out.
-- **Output:** `render(state, snapshot) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, column 1 in Note Mode. A pad may blink; the LED driver resolves blinking pads with a `clock` that gives the tempo-blink and fast-blink phase.
+- **Output:** `render(state, snapshot) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, column 1 in Linnstrument Mode. A pad may blink; the LED driver resolves blinking pads with a `clock` that gives the tempo-blink and fast-blink phase.
 - **Sending:** the LED driver compares each frame with the last frame sent and sends only the pads that differ, all in one pass, so blinking pads switch together. Clearing the remembered frame on a mode switch makes every pad correct after the switch.
-- **Shift layer:** while Shift is held, `handle` looks up the Shift table and `render` draws the Shift layer. There's no per-element modifier wiring.
+- **Shift layer:** while Shift is held, `handle` looks up the Shift table and `render` draws the Shift layer. There's no per-element modifier wiring. Shift is column 1's pad 8 in every mode. Entering Session Mode keeps it held. Entering Linnstrument Mode clears it, because the firmware sends the release of a pad pressed in User Firmware Mode as a User Firmware note, which never reaches the control channel.
 
 ```mermaid
 sequenceDiagram
@@ -139,11 +140,12 @@ src/BleakLoop/
   core/
     layout.py          geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping
     model.py           Snapshot, Action and Frame types (plain dataclasses)
-    modes.py           Session / Mixer / Note, Note Mode pages, modifiers
-    controls.py        shared Session and Note Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights
-    session.py         clip slots, copy and delete rules, bottom row, columns 1, 15, 16, Shift layer table
+    modes.py           Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers
+    controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights
+    session.py         clip slots, copy and delete rules, bottom row, columns 15, 16, Shift layer table
+    column_1.py        column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page
     mixer.py           Mixer toggle, coarse steps, bands, smoothing
-    note_mode.py       column 1 controls page and scene page
+    linnstrument_mode.py  Linnstrument Mode: column 1 only, handed to column_1
     leds.py            device colours, track colour matching, tempo and fast blink
     values.py          every value in section 8, by name
     engine.py          handle() and render(), composing the modules above
@@ -185,14 +187,15 @@ flowchart TD
     live_state["live_state"]
   end
   subgraph Core
+    core_column_1["column_1"]
     core_controls["controls"]
     core_engine["engine"]
     core_layout["layout"]
     core_leds["leds"]
+    core_linnstrument_mode["linnstrument_mode"]
     core_mixer["mixer"]
     core_model["model"]
     core_modes["modes"]
-    core_note_mode["note_mode"]
     core_session["session"]
     core_values["values"]
   end
@@ -201,24 +204,28 @@ flowchart TD
     ableton_v3["ableton.v3"]
   end
   __init__ -.->|lazy| surface
+  core_column_1 --> core_controls
+  core_column_1 --> core_layout
+  core_column_1 --> core_leds
+  core_column_1 --> core_mixer
+  core_column_1 --> core_model
+  core_column_1 --> core_modes
   core_controls --> core_leds
   core_controls --> core_model
+  core_engine --> core_linnstrument_mode
   core_engine --> core_mixer
   core_engine --> core_modes
-  core_engine --> core_note_mode
   core_engine --> core_session
   core_leds --> core_values
+  core_linnstrument_mode --> core_column_1
+  core_linnstrument_mode --> core_model
   core_mixer --> core_layout
   core_mixer --> core_model
   core_mixer --> core_modes
   core_mixer --> core_values
   core_model --> core_leds
   core_modes --> core_layout
-  core_note_mode --> core_controls
-  core_note_mode --> core_layout
-  core_note_mode --> core_leds
-  core_note_mode --> core_model
-  core_note_mode --> core_modes
+  core_session --> core_column_1
   core_session --> core_controls
   core_session --> core_layout
   core_session --> core_leds
@@ -262,12 +269,12 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **Pad input** (User Firmware Mode): Note On for a press, Note Off (or Note On velocity 0) for a release. The channel is the device row (channel 1 = device row 0, the nearest) and the note number is the column. Column 0 reports like any pad and is ignored.
 - **Lights:** CC 20 (column, from 0), CC 21 (device row, from 0), CC 22 (colour value).
 - **Y-axis:** CC 11 = 1 on channels 1–8 turns reporting on per row, CC 11 = 0 off. Reports arrive as CC (64 + column) on the row's channel.
-- **Control split** (Note Mode): set up on load as a one-column note split, column 1 only, in one-channel mode on the control channel (NRPNs in section 8). The setup runs in three phases:
+- **Control split** (Linnstrument Mode): set up on load as a one-column note split, column 1 only, in one-channel mode on the control channel (NRPNs in section 8). The setup runs in three phases:
   - **Reads:** Row Offset (227, 253, 263–270) and the right split's channels (100, 101, 102–117, 118), two NRPN 299 queries per step.
   - **Fixed sets:** split on at column 1, one channel, Send X/Y/Z off, no Played colour (a pressed pad would light red over BleakLoop's colour), LowRow off, no special mode, Transpose at 0.
   - **Computed sets:** the control channel and the Octave, worked out from the reads.
 
-  Each set is preceded by a query in the same step, and on unload the player's value is written back for every number BleakLoop set. The control channel is the highest one the right split doesn't use (its main channel, plus its per-note channels or its eight per-row channels). The right split is left untouched, unless it uses all 16: then its highest per-note channel other than the main one is turned off, borrowed and restored on unload. If the right split can't be read, channel 16 is used and the controls stay off. The Octave is the one closest to 0 that keeps all eight column-1 notes in 0–127. In Note Mode, BleakLoop polls Row Offset and the left split's Octave/Transpose every `POLL_MS`, rebuilds the note map and puts its own Octave/Transpose back if the player changed them. A Row Offset that repeats a note in column 1 turns the controls off, with a message, until it changes. BleakLoop listens for all 128 notes on the control channel; everything else passes through to Live's tracks.
+  Each set is preceded by a query in the same step, and on unload the player's value is written back for every number BleakLoop set. The control channel is the highest one the right split doesn't use (its main channel, plus its per-note channels or its eight per-row channels). The right split is left untouched, unless it uses all 16: then its highest per-note channel other than the main one is turned off, borrowed and restored on unload. If the right split can't be read, channel 16 is used and the controls stay off. The Octave is the one closest to 0 that keeps all eight column-1 notes in 0–127. In Linnstrument Mode, BleakLoop polls Row Offset and the left split's Octave/Transpose every `POLL_MS`, rebuilds the note map and puts its own Octave/Transpose back if the player changed them. A Row Offset that repeats a note in column 1 turns the controls off, with a message, until it changes. BleakLoop listens for all 128 notes on the control channel; everything else passes through to Live's tracks.
 
 **Colour values** (CC 22): red 1, yellow 2, green 3, cyan 4, blue 5, magenta 6, off 7, white 8, orange 9, lime 10, pink 11. Value 0 ("as set in Note Lights") also shows dark, but means device default and is used only to hand column 1's lights back on unload. On the device, lime looks yellow and green looks lime.
 
@@ -275,7 +282,7 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 
 **Device behaviour BleakLoop depends on:**
 
-- **NRPN changes are RAM only.** Flash is written only when the player commits a change on the panel (releasing Per-Split, Octave, Volume, Preset and the like), and each commit saves the whole config as it is in RAM. Checked on the device: an unload that doesn't restore leaves BleakLoop's split until a power cycle (E1). Panel buttons do nothing in User Firmware Mode (E2), but a commit in Note Mode saves BleakLoop's split to flash (E2′). BleakLoop never makes the device save.
+- **NRPN changes are RAM only.** Flash is written only when the player commits a change on the panel (releasing Per-Split, Octave, Volume, Preset and the like), and each commit saves the whole config as it is in RAM. Checked on the device: an unload that doesn't restore leaves BleakLoop's split until a power cycle (E1). Panel buttons do nothing in User Firmware Mode (E2), but a commit in Linnstrument Mode saves BleakLoop's split to flash (E2′). BleakLoop never makes the device save.
 - **NRPN 299 = N reads setting N.** The reply is a normal NRPN (CC 99 / 98 / 6 / 38, then 101 / 100 = 127) on the query's channel minus one, clamped to channel 1. BleakLoop queries on channel 1, so replies arrive there. NRPN 35 doesn't reply when its combination of special modes is unusual; that setting is then not restored.
 - **The device applies light changes one at a time.** A full-grid flip leaves Live in under 1 ms but ripples visibly; BleakLoop never adds to it by spreading changes across refreshes.
 
@@ -308,10 +315,10 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
   - Y-axis values: CC 64 + column on channels 1–8, claimed only in Mixer Mode. Columns 2–14 (CC 66–78) become fader input; the other columns are claimed and dropped, because Y reporting is per row and their reports would otherwise reach Live's tracks.
 
 > [!IMPORTANT]
-> **Elements in Note Mode:** notes 0–127 on every channel, 16 × 128 = 2048 note buttons. The control channel is chosen from the right split after load, and elements must be declared before it is known. Only the chosen channel's 128 are listened. All 128, not only the eight that column 1 sends, so column 1 never plays Live's tracks, even between a Row Offset change and the next poll. The build time is logged at load (`BleakLoop elements built in`).
+> **Elements in Linnstrument Mode:** notes 0–127 on every channel, 16 × 128 = 2048 note buttons. The control channel is chosen from the right split after load, and elements must be declared before it is known. Only the chosen channel's 128 are listened. All 128, not only the eight that column 1 sends, so column 1 never plays Live's tracks, even between a Row Offset change and the next poll. The build time is logged at load (`BleakLoop elements built in`).
 
-- **NRPN replies:** CC 99, 98, 6, 38, 101 and 100 on channel 1, listened during the setup and in Note Mode, so the setup's queries and the Note Mode poll can be read. Their listeners are removed when Session Mode is entered. The cost: in Note Mode, any channel-1 RPN or NRPN the LinnStrument sends (for example, MPE configuration on a settings change) doesn't reach Live.
-- **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Note Mode, only the control channel's 128 notes and the NRPN replies are listened; everything else reaches Live's tracks.
+- **NRPN replies:** CC 99, 98, 6, 38, 101 and 100 on channel 1, listened during the setup and in Linnstrument Mode, so the setup's queries and the Linnstrument Mode poll can be read. Their listeners are removed when Session Mode is entered. The cost: in Linnstrument Mode, any channel-1 RPN or NRPN the LinnStrument sends (for example, MPE configuration on a settings change) doesn't reach Live.
+- **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Linnstrument Mode, only the control channel's 128 notes and the NRPN replies are listened; everything else reaches Live's tracks.
 - **LED output.** One "light pad" call sends CC 20, 21 and 22. The LED driver (section 3) is the only caller. v3's per-element send cache isn't relied on.
 
 > [!IMPORTANT]
@@ -319,7 +326,7 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
 
 ### Device lifecycle
 
-- **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Note Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
+- **Device setup and mode.** On load, BleakLoop leaves User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Linnstrument Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
 
 ```mermaid
 sequenceDiagram
@@ -414,7 +421,7 @@ stateDiagram-v2
 ```
 ### Session ring
 
-- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 7, False)` draws it from the core's window state whenever the window changes and on every Session entry; `(-1, -1, -1, -1, False)` removes it on Note entry and on unload. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
+- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 7, False)` draws it from the core's window state whenever the window changes and on every Session entry; `(-1, -1, -1, -1, False)` removes it on Linnstrument Mode entry and on unload. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
 
 ## 7. Adapters: Live mechanisms
 
@@ -423,7 +430,7 @@ stateDiagram-v2
 | Clip and scene launch | `ClipSlot.fire()` and `Scene.fire()`. Legato passes `force_legato=True`, which the LOM doesn't document but Live accepts, also together with `record_length`. |
 | Fixed Length | `ClipSlot.fire(record_length=beats)`, with beats = N × numerator × 4 / denominator. Passed only for an empty slot on an armed track, the only case where Live starts a new recording (`fire` raises if the slot owns a clip). Live records the exact length natively, from a stopped transport and with quantization None, so no relaunch timer is needed. |
 | Detail view focus | Poll the pending slot on the display tick; set `song.view.detail_clip` and show `Detail/Clip` (section 6). |
-| Auto Note Mode | The core decides from the snapshot (track type, arm, slot state and Session Record) and emits a mode-switch action. |
+| Auto Linnstrument Mode | The core decides from the snapshot (track type, arm, slot state and Session Record) and emits a mode-switch action. |
 | Launch quantization | `song.clip_trigger_quantization = Live.Song.Quantization.values[n]`, read back with `int(...)`. Names in `session.QUANTIZATION_NAMES` match Live's dropdown. The remembered choice is core state, not Live. |
 | Track and global stop | `Track.stop_all_clips()`, `Song.stop_all_clips()`. Both stop at the next launch quantization mark, like Live's own stop buttons, on purpose. |
 | Arm | Exclusive arm disarms the others in `song.tracks`, then sets `track.arm`. Tracks are compared with `!=`, not `is`, because `song.tracks` and `song.visible_tracks` may return different wrappers for one track. `live_state` reads `arm` and `implicit_arm` only when `can_be_armed` is true, because Live is expected to raise on unarmable tracks such as groups. Both guards are deliberate. |
@@ -437,7 +444,7 @@ stateDiagram-v2
 | Record pad | Session View: toggle `song.session_record`. Arrangement View: clear `song.back_to_arranger` if set, then toggle `song.record_mode`. Session View's record light counts MIDI Arrangement Overdub, on purpose. |
 | Track volume | Read and set `track.mixer_device.volume.value`, clamped to the parameter's `min`/`max`. A glide for a track index that no longer exists is skipped. |
 | Fader gesture undo | `song.begin_undo_step()` on the first coarse press and `song.end_undo_step()` once no touch, continuation window or glide is left, so one gesture is one undo step. The core tracks the open step (`State.undo_open`); leaving Mixer Mode and unload close it. |
-| Record Clip | `live_state` reads the selected track (`song.view.selected_track`, only if it's in `song.visible_tracks`) and every scene of its slots, plus `song.view.selected_scene`, only in Note Mode. The core searches from the highlighted scene down, wrapping. When no slot is empty, `song.create_scene(-1)` runs before `FireSlot`: actions resolve their slot when applied, so the new scene exists by then. |
+| Record Clip | `live_state` reads the selected track (`song.view.selected_track`, only if it's in `song.visible_tracks`) and every scene of its slots, plus `song.view.selected_scene`, only in Linnstrument Mode. The core searches from the highlighted scene down, wrapping. When no slot is empty, `song.create_scene(-1)` runs before `FireSlot`: actions resolve their slot when applied, so the new scene exists by then. |
 | Capture MIDI | `song.capture_midi()` with no argument, only when `song.can_capture_midi` is true; otherwise the core posts "Nothing to capture". |
 
 ## 8. Values
@@ -452,7 +459,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Octave fit: the NRPN 36 value in 0–10 closest to 5, ties lower, that keeps column 1's eight notes in 0–127 | `device.fit_octave` | Device protocol; every Row Offset spans at most 112, so one always fits | Verify on device |
 | NRPN 299 = N: query setting N, answered as NRPN N | `device.query` | Device protocol | Confirmed on device |
 | `RESTORE_GAP_MS = 20`: sleep before each unload restore NRPN | `surface.disconnect` | Tuned: 0 lost the last 18 messages, 20 restored all 13 | Confirmed on device |
-| `POLL_MS = 1000`: Note Mode re-check of Row Offset and the left split's Octave/Transpose | `surface` | Chosen: shorter than a trip through Global Settings and back | Verify on device |
+| `POLL_MS = 1000`: Linnstrument Mode re-check of Row Offset and the left split's Octave/Transpose | `surface` | Chosen: shorter than a trip through Global Settings and back | Verify on device |
 | Off colour value: 7 | `leds` | Device protocol | Confirmed; 0 also dark |
 | `FAST_BLINK_MS = 200`: fast blink, 200 ms on, 200 ms off | `leds` | Tuned | Verify on device (#25) |
 | Light refresh: Live's display callback, about 100 ms | `surface` | Mechanism | Measured |
