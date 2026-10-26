@@ -279,6 +279,12 @@ def poll_numbers(reads, channel, rescan):
     return numbers
 
 
+def poll_missed(reads, polled, channel, rescan):
+    # Whether the new reads need numbers the poll didn't query: a Row Offset change to
+    # custom or Guitar, whose values would otherwise come from an older read.
+    return not set(poll_numbers(reads, channel, rescan)) <= set(polled)
+
+
 def poll_steps(numbers):
     return _query_steps(numbers)
 

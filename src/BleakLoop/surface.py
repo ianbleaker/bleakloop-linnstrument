@@ -79,6 +79,8 @@ class BleakLoop(ControlSurface):
         self._right_split_unread = False
         self._sent = {}  # BleakLoop's last left split Octave/Transpose
         self._poll = []  # Linnstrument Mode query steps still to send
+        self._polled = []  # the numbers the current poll queries
+        self._repolling = False  # the map is stale until the repeat poll: drop presses
         self._pending_sets = []  # (number, value) sets from the last re-check
         self._poll_due = 0
         self._poll_wait = False
@@ -191,14 +193,19 @@ class BleakLoop(ControlSurface):
         elif self._poll_wait:
             # One tick after the last query: its replies are in.
             self._poll_wait = False
+            if device.poll_missed(self._reads, self._polled, self._control_channel, self._rescan):
+                # Don't build a map from stale reads: drop presses and poll again at once.
+                self._poll_due, self._repolling = 0, True
+                return
             # Before the re-check: a clash brings the next poll forward.
             self._poll_due = now_ms + values.POLL_MS
             self._realign()
         elif now_ms >= self._poll_due:
-            numbers = device.poll_numbers(self._reads, self._control_channel, self._rescan)
-            self._poll = device.poll_steps(numbers)
+            self._polled = device.poll_numbers(self._reads, self._control_channel, self._rescan)
+            self._poll = device.poll_steps(self._polled)
 
     def _realign(self):
+        self._repolling = False
         was_refused = self._note_map is None
         note_map, refusal, settings, player_changed = device.realign(self._reads, self._sent)
         self._pending_sets = settings
@@ -339,6 +346,10 @@ class BleakLoop(ControlSurface):
         if self._note_map is None:
             if value > 0:
                 self.show_message(self._refusal)
+            return
+        if self._repolling and value > 0:
+            # Row Offset changed type: drop the press until the repeat poll. A release goes
+            # through, on the note its press was mapped from.
             return
         pad = self._note_map.get(note)
         if pad is None:

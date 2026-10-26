@@ -260,6 +260,22 @@ def test_poll_numbers_rescan():
     assert device.poll_numbers({227: 5}, 7, True) == [227, 36, 37, 38, 100, 101, 118, *range(102, 118)]
 
 
+OFFSETS = [3, 5, 7, 0, 127, 12, 13]
+
+
+@pytest.mark.parametrize("before", OFFSETS)
+@pytest.mark.parametrize("after", OFFSETS)
+def test_poll_missed_after_offset_change(before, after):
+    # Only a change into custom or Guitar needs reads the last poll didn't make.
+    polled = device.poll_numbers({227: before}, 7, False)
+    assert device.poll_missed({227: after}, polled, 7, False) is (after in (12, 13) and after != before)
+
+
+def test_poll_missed_not_when_already_polled():
+    polled = device.poll_numbers({227: 12}, 7, False)
+    assert device.poll_missed({227: 12}, polled, 7, False) is False
+
+
 def test_poll_steps():
     assert device.poll_steps([227, 36, 37]) == [queries(227, 36), queries(37)]
 
