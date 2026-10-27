@@ -570,7 +570,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | `CONTINUE_MS = 600`: a press next to a pad released within this time continues the slide (device gaps 160–460 ms, section 5) | `mixer` | Tuned | Fine on device; retuning stays in #15 |
 | Slide pace: during a continued slide the glide moves one step per press-to-press period of the last pad crossed, never faster than `GLIDE_STEP` | `mixer` | Derived | Fine on device; retuning stays in #15 |
 | `FX_DATA_KEY = "BleakLoop.fx"`: the `song.set_data` key holding the FX snapshots | `live_state`, `live_actions` | Chosen | Confirmed on device: survives save and reload, per Set |
-| `FX_SCENES_DATA_KEY = "BleakLoop.fx.scenes"`: the `song.set_data` key holding the scene snapshots | `live_state`, `live_actions` | Chosen | Unchecked until #57's device check |
+| `FX_SCENES_DATA_KEY = "BleakLoop.fx.scenes"`: the `song.set_data` key holding the scene snapshots | `live_state`, `live_actions` | Chosen | Confirmed on device: survives save and reload, per Set |
 | `FX_TOUCH_TOLERANCE = 0.005`: during a morph, a macro further than 0.5 % of its range from BleakLoop's last write was turned by hand and drops out | `fx` | Chosen | Fine on device: a hand-turned macro drops out, and BleakLoop's own writes never trip it |
 | `X_COLUMN_WIDTH = 170.625`: X units per column; column c's centre is `X_COLUMN_WIDTH × (c − 0.5)` | `faders` | From firmware (`FXD_CALX_FULL_UNIT` = 4095 / 24) | Confirmed on device: column starts within 6 units, centres within 26 (section 5) |
 | `FADERS_DATA_KEY = "BleakLoop.faders"`: the `song.set_data` key holding the Mapped FX bindings | `live_state`, `live_actions` | Chosen | Unchecked until stage 3's device check |
