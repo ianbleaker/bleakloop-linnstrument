@@ -110,6 +110,7 @@ class BleakLoop(ControlSurface):
         self._phase = None
         self._longest_tick_ms = 0.0  # of the running morph
         self._fx_text = None  # the stored FX snapshots as last read
+        self._fx_scenes_text = None  # the stored scene snapshots as last read
         self._faders_text = None  # the stored Mapped FX bindings as last read
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
@@ -142,6 +143,7 @@ class BleakLoop(ControlSurface):
         if self._started:
             self._check_pending_clip()
             self._load_fx()
+            self._load_fx_scenes()
             self._load_faders()
             self._follow_selected_device()
             if self._state.mode is Mode.LINNSTRUMENT:
@@ -170,6 +172,7 @@ class BleakLoop(ControlSurface):
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
             self._load_fx()
+            self._load_fx_scenes()
             self._load_faders()
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
@@ -207,6 +210,17 @@ class BleakLoop(ControlSurface):
         if text and fx.dump(slots) != text:
             logger.warning("FX: stored snapshots unreadable, starting empty")
         self._state = replace(self._state, fx_slots=slots)
+
+    def _load_fx_scenes(self):
+        # As _load_fx, for the scene snapshots.
+        text = live_state.read_fx_scenes_store(self.song)
+        if text == self._fx_scenes_text:
+            return
+        self._fx_scenes_text = text
+        scenes = fx.parse_scenes(text)
+        if text and fx.dump_scenes(scenes) != text:
+            logger.warning("FX: stored scene snapshots unreadable, starting empty")
+        self._state = replace(self._state, fx_scenes=scenes)
 
     def _load_faders(self):
         # As _load_fx: Undo and Redo of a bind or unbind change the stored text.

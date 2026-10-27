@@ -121,11 +121,12 @@ class MorphMacro:
 
 @dataclass(frozen=True)
 class Morph:
-    slot: int
+    slot: int | None  # None once a morphing scene snapshot's scene is deleted
     start_beats: float
     end_beats: float
     last_beats: float  # song time at the last tick
     macros: tuple = ()  # MorphMacro per macro still morphing
+    scene: bool = False  # slot is a scene index, not a global slot
 
 
 @dataclass(frozen=True)
@@ -171,6 +172,8 @@ class State:
     morph: Morph | None = None  # runs in every mode
     fx_undo_open: bool = False  # a recall's undo step is open in Live
     fx_landed: int | None = None  # the slot of the last recall that landed
+    fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty
+    fx_landed_scene: int | None = None  # the scene of the last recall that landed
     fader_touches: tuple = ()  # FaderTouch per touched fader row
     fader_undo_open: bool = False  # a fader gesture's undo step is open in Live
     fader_source: str = "device"  # "device" or "mapped"

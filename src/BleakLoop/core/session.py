@@ -440,7 +440,7 @@ def render(state, snapshot):
             frame[(column, pad)] = _slot_light(track, pad - 1)
         _render_rows(frame, column, track, shift_layer)
     if state.fx:
-        frame.update(fx.render(state))
+        frame.update(fx.render(state, snapshot))
     if faders.visible(state):
         frame.update(faders.render(state, snapshot))
     for pad in range(1, layout.WINDOW_SCENES + 1):

@@ -238,10 +238,12 @@ class SceneSelected:
 @dataclass(frozen=True)
 class RacksRead:
     # Fed back by the adapter after StoreFxSnapshot or RecallFxSnapshot.
-    slot: int  # 0-15
+    slot: int  # 0-15, or the scene index of a scene snapshot
     racks: tuple  # RackView per rack, in Set order
     recall: bool
     bars: int | None = None  # the morph length; None for a jump
+    scene: bool = False
+    end_beats: float | None = None  # a scene launch's landing time, decided at the press
 
 
 # Actions
@@ -451,13 +453,16 @@ class EndUndoStep:
 
 @dataclass(frozen=True)
 class StoreFxSnapshot:
-    slot: int
+    slot: int  # 0-15, or the scene index of a scene snapshot
+    scene: bool = False
 
 
 @dataclass(frozen=True)
 class RecallFxSnapshot:
-    slot: int
+    slot: int  # 0-15, or the scene index of a scene snapshot
     bars: int | None  # None for a jump
+    scene: bool = False
+    end_beats: float | None = None  # a scene launch's landing time, decided at the press
 
 
 @dataclass(frozen=True)
@@ -467,6 +472,11 @@ class SetMacros:
 
 @dataclass(frozen=True)
 class SaveFxSnapshots:
+    text: str
+
+
+@dataclass(frozen=True)
+class SaveFxScenes:
     text: str
 
 

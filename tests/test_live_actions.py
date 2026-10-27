@@ -17,10 +17,13 @@ from BleakLoop.core.model import (  # noqa: E402
     EditNotes,
     FaderBound,
     HighlightSlot,
+    RacksRead,
+    RecallFxSnapshot,
     ModifyNotes,
     RemovePitch,
     SelectDrumPad,
     SaveFaderBindings,
+    SaveFxScenes,
     SelectSetTrack,
     SetArm,
     SetArms,
@@ -29,6 +32,7 @@ from BleakLoop.core.model import (  # noqa: E402
     SetLoop,
     StepDevice,
     StepTrack,
+    StoreFxSnapshot,
     ToggleSolo,
     UnmuteAll,
     UnsoloAll,
@@ -374,6 +378,37 @@ def test_save_fader_bindings():
     song = SimpleNamespace(set_data=lambda key, text: stored.update({key: text}))
     apply(SaveFaderBindings("{}"), song)
     assert stored == {"BleakLoop.faders": "{}"}
+
+
+# FX snapshots
+
+
+def test_save_fx_scenes():
+    stored = {}
+    song = SimpleNamespace(set_data=lambda key, text: stored.update({key: text}))
+    apply(SaveFxScenes("{}"), song)
+    assert stored == {"BleakLoop.fx.scenes": "{}"}
+
+
+@pytest.fixture
+def no_racks(monkeypatch):
+    monkeypatch.setattr(live_actions.live_state, "read_racks", lambda song: ())
+
+
+@pytest.mark.parametrize(
+    "action, event",
+    [
+        (StoreFxSnapshot(3), RacksRead(3, (), False)),
+        (StoreFxSnapshot(3, scene=True), RacksRead(3, (), False, scene=True)),
+        (RecallFxSnapshot(3, 2), RacksRead(3, (), True, 2)),
+        (
+            RecallFxSnapshot(3, None, scene=True, end_beats=8.0),
+            RacksRead(3, (), True, None, scene=True, end_beats=8.0),
+        ),
+    ],
+)
+def test_fx_snapshot_reads_pass_scene_and_end_through(no_racks, action, event):
+    assert apply(action, SimpleNamespace()) == event
 
 
 # Sequencer Mode actions
