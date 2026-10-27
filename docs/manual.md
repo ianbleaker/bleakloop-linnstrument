@@ -208,7 +208,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Metronome**: Metronome on/off. Blinks while on. *(Shift: Launch quantization on/off; red while off)*
 - **Fixed Length**: Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, then off.
 - **Undo**: Undo. *(Shift: Redo)*
-- **Back**: Back to the mode you came from: Session, Mixer or FX. *(Shift: Show the scene page)*
+- **Back**: Back to the mode you came from: Session, Mixer, FX or Sequencer. *(Shift: Show the scene page)*
 - **Shift**: Hold for the Shift layer.
 <!-- /callouts:linnstrument -->
 

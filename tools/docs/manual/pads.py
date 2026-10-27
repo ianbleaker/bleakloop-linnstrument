@@ -321,7 +321,7 @@ _LINNSTRUMENT = (
     METRONOME,
     FIXED_LENGTH,
     UNDO,
-    _one("Back", layout.MODE_PAD, "Back to the mode you came from: Session, Mixer or FX."),
+    _one("Back", layout.MODE_PAD, "Back to the mode you came from: Session, Mixer, FX or Sequencer."),
     SHIFT,
 )
 
