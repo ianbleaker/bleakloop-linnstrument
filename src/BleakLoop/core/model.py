@@ -284,6 +284,13 @@ class DeleteClip:
 
 
 @dataclass(frozen=True)
+class DeleteGroupClips:
+    # Each leaf member of the group track deletes its own clip in scene.
+    track: int
+    scene: int
+
+
+@dataclass(frozen=True)
 class DeleteScene:
     scene: int
 

@@ -9,6 +9,8 @@ sys.modules.setdefault("Live", ModuleType("Live"))
 from BleakLoop import live_actions  # noqa: E402
 from BleakLoop.core.model import (  # noqa: E402
     CopyGroupClips,
+    CopyScene,
+    DeleteGroupClips,
     SetArm,
     ToggleSolo,
     UnmuteAll,
@@ -23,6 +25,9 @@ class FakeSlot:
 
     def duplicate_clip_to(self, target):
         self.copied_to = target
+
+    def delete_clip(self):
+        self.has_clip = False
 
 
 def fake_track(arm=False, mute=False, solo=False, clips=(), is_foldable=False, group=None):
@@ -40,11 +45,16 @@ def fake_track(arm=False, mute=False, solo=False, clips=(), is_foldable=False, g
 
 
 def fake_song(tracks, returns=(), exclusive_solo=False, visible=None):
+    # undo: the undo-step calls, in order.
+    undo = []
     return SimpleNamespace(
         tracks=list(tracks),
         visible_tracks=list(tracks if visible is None else visible),
         return_tracks=list(returns),
         exclusive_solo=exclusive_solo,
+        undo=undo,
+        begin_undo_step=lambda: undo.append("begin"),
+        end_undo_step=lambda: undo.append("end"),
     )
 
 
@@ -101,7 +111,45 @@ def test_copy_group_clips_copies_each_member_to_its_own_slot():
     empty = fake_track(clips=(2,), group=group)  # no source clip
     outside = fake_track(clips=(0,))
     tracks = [outside, group, inner, folded, direct, empty]
-    apply(CopyGroupClips(1, 0, 2), fake_song(tracks, visible=[outside, group, inner, direct, empty]))
+    song = fake_song(tracks, visible=[outside, group, inner, direct, empty])
+    apply(CopyGroupClips(1, 0, 2), song)
     assert folded.clip_slots[0].copied_to is folded.clip_slots[2]
     assert direct.clip_slots[0].copied_to is None
     assert all(slot.copied_to is None for slot in empty.clip_slots + outside.clip_slots)
+    assert song.undo == ["begin", "end"]
+
+
+def test_copy_scene_is_one_undo_step():
+    group = fake_track(is_foldable=True)
+    full = fake_track(clips=(0,), group=group)
+    empty = fake_track()
+    song = fake_song([group, full, empty])
+    apply(CopyScene(0, 1), song)
+    assert full.clip_slots[0].copied_to is full.clip_slots[1]
+    assert empty.clip_slots[0].copied_to is None
+    assert song.undo == ["begin", "end"]
+
+
+def test_delete_group_clips_deletes_each_member_clip_in_the_row():
+    group = fake_track(is_foldable=True)
+    inner = fake_track(is_foldable=True, group=group)
+    folded = fake_track(clips=(0, 1), group=inner)  # in a folded nested group
+    direct = fake_track(clips=(0,), group=group)
+    outside = fake_track(clips=(0,))
+    tracks = [outside, group, inner, folded, direct]
+    song = fake_song(tracks, visible=[outside, group, inner, direct])
+    apply(DeleteGroupClips(1, 0), song)
+    assert not folded.clip_slots[0].has_clip and folded.clip_slots[1].has_clip
+    assert not direct.clip_slots[0].has_clip
+    assert outside.clip_slots[0].has_clip
+    assert song.undo == ["begin", "end"]
+
+
+def test_delete_group_clips_closes_its_undo_step_on_failure():
+    group = fake_track(is_foldable=True)
+    member = fake_track(clips=(0,), group=group)
+    member.clip_slots[0].delete_clip = lambda: 1 / 0
+    song = fake_song([group, member], visible=[group])
+    with pytest.raises(ZeroDivisionError):
+        apply(DeleteGroupClips(0, 0), song)
+    assert song.undo == ["begin", "end"]

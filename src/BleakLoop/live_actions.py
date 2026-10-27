@@ -2,6 +2,7 @@
 
 import logging
 import time
+from contextlib import contextmanager
 
 import Live
 
@@ -18,6 +19,7 @@ from .core.model import (
     CopyGroupClips,
     CopyScene,
     DeleteClip,
+    DeleteGroupClips,
     DeleteScene,
     EndUndoStep,
     EnterMode,
@@ -57,6 +59,16 @@ logger = logging.getLogger(__name__)
 
 def _slot(song, track, scene):
     return song.visible_tracks[track].clip_slots[scene]
+
+
+@contextmanager
+def _undo_step(song):
+    # Several changes from one press undo together; a failure mustn't leave the step open.
+    song.begin_undo_step()
+    try:
+        yield
+    finally:
+        song.end_undo_step()
 
 
 def _mixable(song):
@@ -133,19 +145,28 @@ def apply(action, song, surface):
     elif isinstance(action, CopyGroupClips):
         # Folded members aren't in visible_tracks: resolve them through song.tracks.
         group = song.visible_tracks[action.track]
-        for member in live_state.group_members(song, group):
-            source = member.clip_slots[action.source_scene]
-            target = member.clip_slots[action.scene]
-            if source.has_clip and not target.has_clip:
-                source.duplicate_clip_to(target)
+        with _undo_step(song):
+            for member in live_state.group_members(song, group):
+                source = member.clip_slots[action.source_scene]
+                target = member.clip_slots[action.scene]
+                if source.has_clip and not target.has_clip:
+                    source.duplicate_clip_to(target)
     elif isinstance(action, CopyScene):
-        for track in song.tracks:
-            if not track.is_foldable and track.clip_slots[action.source].has_clip:
-                track.clip_slots[action.source].duplicate_clip_to(
-                    track.clip_slots[action.target]
-                )
+        with _undo_step(song):
+            for track in song.tracks:
+                if not track.is_foldable and track.clip_slots[action.source].has_clip:
+                    track.clip_slots[action.source].duplicate_clip_to(
+                        track.clip_slots[action.target]
+                    )
     elif isinstance(action, DeleteClip):
         _slot(song, action.track, action.scene).delete_clip()
+    elif isinstance(action, DeleteGroupClips):
+        group = song.visible_tracks[action.track]
+        with _undo_step(song):
+            for member in live_state.group_members(song, group):
+                slot = member.clip_slots[action.scene]
+                if slot.has_clip:
+                    slot.delete_clip()
     elif isinstance(action, DeleteScene):
         song.delete_scene(action.scene)
     elif isinstance(action, CaptureAndInsertScene):

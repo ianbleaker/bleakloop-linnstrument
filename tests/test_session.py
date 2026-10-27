@@ -29,6 +29,7 @@ from BleakLoop.core.model import (
     CopyGroupClips,
     CopyScene,
     DeleteClip,
+    DeleteGroupClips,
     DeleteScene,
     EndUndoStep,
     EnterMode,
@@ -1078,6 +1079,16 @@ def test_delete_empty_slot_does_nothing():
 def test_delete_slot_outside_session_does_nothing():
     assert handle(DELETE, (8, 1), COPY_SNAP) == (DELETE, [])
     assert handle(DELETE, (2, 1), replace(COPY_SNAP, scene_count=0)) == (DELETE, [])
+
+
+def test_delete_group_slot_deletes_its_members_clips():
+    snapshot = slot_snapshot(GROUP, is_foldable=True, can_be_armed=False)
+    assert handle(DELETE, (2, 1), snapshot) == (DELETE, [DeleteGroupClips(0, 0)])
+
+
+def test_delete_empty_group_slot_does_nothing():
+    snapshot = slot_snapshot(SlotView(), is_foldable=True, can_be_armed=False)
+    assert handle(DELETE, (2, 1), snapshot) == (DELETE, [])
 
 
 def test_shift_delete_clip_deletes():

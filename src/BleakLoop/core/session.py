@@ -25,6 +25,7 @@ from .model import (
     CopyGroupClips,
     CopyScene,
     DeleteClip,
+    DeleteGroupClips,
     DeleteScene,
     EnterMode,
     FireScene,
@@ -238,9 +239,14 @@ def _copy_scene(state, event, snapshot):
 def _delete(state, event, snapshot):
     if _is_slot(event):
         target = _slot_at(state, event, snapshot)
-        if target is not None and target[0].slots[event.pad - 1].has_clip:
-            track, scene = target
+        if target is None:
+            return state, []
+        track, scene = target
+        slot = track.slots[event.pad - 1]
+        if slot.has_clip:
             return state, [DeleteClip(track.index, scene)]
+        if track.is_foldable and slot.controls_other_clips:
+            return state, [DeleteGroupClips(track.index, scene)]
         return state, []
     if _is_scene(event):
         scene = state.window.scene + event.pad - 1
