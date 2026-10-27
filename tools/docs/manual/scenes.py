@@ -24,7 +24,6 @@ class Layer(enum.Enum):
     MIXER_SHIFT = "mixer-shift"
     FX = "fx"
     FX_SHIFT = "fx-shift"
-    MAPPED_FX = "fx-mapped"
     SEQUENCER = "sequencer"
     SEQUENCER_SETTINGS = "sequencer-settings"
     SEQUENCER_SHIFT = "sequencer-shift"
@@ -116,16 +115,6 @@ FX_SNAPSHOT = replace(
     ),
 )
 
-# Mapped FX with rows 3 and 7 unbound.
-MAPPED_VALUES = (0.85, 0.5, None, 0.3, 0.7, 1.0, None, 0.15)
-MAPPED_SNAPSHOT = replace(
-    SNAPSHOT,
-    faders=tuple(
-        None if value is None else FaderView("Bound", value, 0.0, 1.0)
-        for value in MAPPED_VALUES
-    ),
-)
-
 # Sequencer Mode on Lead's clip at 1/16, as in the mockup: E2 selected, G2 on the other
 # steps, the loop on pages 1-2, and the playhead on step 9, whose G2 is playing.
 SEQ_PITCH = 52  # E2
@@ -195,10 +184,6 @@ SCENES = {
     Layer.MIXER_SHIFT: (State(mixer=True, shift=True), MIXER_SNAPSHOT),
     Layer.FX: (FX_STATE, FX_SNAPSHOT),
     Layer.FX_SHIFT: (replace(FX_STATE, shift=True), FX_SNAPSHOT),
-    Layer.MAPPED_FX: (
-        State(fx=True, fx_slots=FX_SLOTS, fader_source="mapped"),
-        MAPPED_SNAPSHOT,
-    ),
     Layer.SEQUENCER: (SEQUENCER, SEQ_SNAPSHOT),
     Layer.SEQUENCER_SETTINGS: (replace(SEQUENCER, seq_settings=True), SEQ_SNAPSHOT),
     Layer.SEQUENCER_SHIFT: (replace(SEQUENCER, shift=True), SEQ_SNAPSHOT),

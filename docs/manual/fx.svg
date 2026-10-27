@@ -179,6 +179,16 @@
 <text x="588" y="247" font-size="9" fill="#ffffff" text-anchor="middle">Scene 5</text>
 <rect x="570" y="283" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="588" y="293" font-size="9" fill="#ffffff" text-anchor="middle">Scene 6</text>
+<rect x="616" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="634" y="63" font-size="9" fill="#ffffff" text-anchor="middle">1 bar</text>
+<rect x="616" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="634" y="109" font-size="9" fill="#ffffff" text-anchor="middle">2 bars</text>
+<rect x="616" y="145" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="634" y="155" font-size="9" fill="#ffffff" text-anchor="middle">4 bars</text>
+<rect x="616" y="191" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="634" y="201" font-size="9" fill="#ffffff" text-anchor="middle">8 bars</text>
+<rect x="616" y="237" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="634" y="247" font-size="9" fill="#ffffff" text-anchor="middle">16 bars</text>
 <rect x="662" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="680" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
 <rect x="662" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
@@ -215,9 +225,6 @@
 <rect x="473" y="37" width="92" height="368" rx="6" fill="none" stroke="#e8e8ec" stroke-width="1" stroke-opacity="0.6"/>
 <rect x="473" y="212" width="92" height="19" rx="9" fill="#000000" fill-opacity="0.72"/>
 <text x="519" y="226" font-size="13" fill="#ffffff" text-anchor="middle">Snapshots</text>
-<rect x="611" y="37" width="46" height="230" rx="6" fill="none" stroke="#e8e8ec" stroke-width="1" stroke-opacity="0.6"/>
-<rect x="608" y="143" width="52" height="19" rx="9" fill="#000000" fill-opacity="0.72"/>
-<text x="634" y="157" font-size="13" fill="#ffffff" text-anchor="middle">Bars</text>
 <rect x="16" y="422" width="16" height="16" rx="2" fill="#2a2a2e"/>
 <rect x="14" y="420" width="20" height="20" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
 <text x="42" y="434" font-size="12" fill="#e8e8ec">Tempo blink</text>

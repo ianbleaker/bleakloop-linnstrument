@@ -148,8 +148,6 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 
 ![FX Mode with Shift held](manual/fx-shift.svg)
 
-![FX Mode, Mapped FX](manual/fx-mapped.svg)
-
 <!-- callouts:fx -->
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
 - **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall.
@@ -157,7 +155,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.
 <!-- /callouts:fx -->
 
-- The faders show **Device FX**, the selected device's macros or parameters, or **Mapped FX**, eight parameters you bind yourself. Device/Clip + Fader source switches between them.
+- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Device/Clip and press Fader source (column 16, pad 5) to switch between them; the status bar names the one you switched to.
 - Snapshots are saved in the Set. A held Bars pad turns a recall into a morph.
 - With Shift held the grid, faders included, goes dark and ignores presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
@@ -166,29 +164,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 
 ![Sequencer Mode](manual/sequencer.svg)
 
-![Sequencer Mode with Shift held](manual/sequencer-shift.svg)
-
-![Sequencer Mode, settings](manual/sequencer-settings.svg)
-
-<!-- callouts:sequencer-side -->
-- **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop the selected track's clips)*
-- **Record Clip**: Record a new clip on the selected track. *(Shift: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording)*
-- **Capture MIDI**: Capture MIDI. *(Shift: Quantize the current MIDI clip to 1/16 notes)*
-- **Metronome**: Metronome on/off. Blinks while on. *(Shift: Launch quantization on/off; red while off)*
-- **Fixed Length**: Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, then off.
-- **Undo**: Undo. *(Shift: Redo)*
-- **Linnstrument Mode**: Switch to Linnstrument Mode, keeping the arm. Back returns here. *(Shift: Show the scene page)*
-- **Shift**: Hold for the Shift layer.
-- **Copy**: Hold, press a step, then press steps to paste it onto. *(Shift: Move the window up)*
-- **Delete**: Hold, then press a step to clear it, or a note pad to remove that note from the clip. *(Shift: Move the window down)*
-- **Session**: Back to Session Mode. *(Shift: Move the window left)*
-- **Mixer**: Mixer Mode. *(Shift: Move the window right)*
-- **FX**: FX Mode.
-- **Seq**: Back to Session Mode. *(Shift: Tempo +1 or -1 BPM)*
-- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
-<!-- /callouts:sequencer-side -->
-
-<!-- callouts:sequencer -->
+<!-- callouts:sequencer-functions -->
 - **Steps**: 64 steps, top row first. Tap to add or remove the selected note. Hold a step and press a later one for one long note, or slide along the row to change its velocity.
 - **Notes**: Press to pick the note the steps edit, and hear it. Hold steps and press a note to add or remove it on them.
 - **Double**: Double the loop, notes and all.
@@ -196,7 +172,26 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Follow**: Follow on/off: the steps show the page that's playing. Blue while on.
 - **Up/Down**: Move the note pads an octave up or down.
 - **Notes/Settings**: Switch columns 11–14 between the note pads and the settings.
-<!-- /callouts:sequencer -->
+- **Copy**: Hold, press a step, then press steps to paste it onto.
+- **Delete**: Hold, then press a step to clear it, or a note pad to remove that note from the clip.
+- **Session**: Back to Session Mode.
+- **Mixer**: Mixer Mode.
+- **FX**: FX Mode.
+- **Seq**: Back to Session Mode.
+- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source.
+<!-- /callouts:sequencer-functions -->
+
+![Sequencer Mode with Shift held](manual/sequencer-shift.svg)
+
+<!-- callouts:sequencer-nav-shift -->
+- **Window up**: Move the window up.
+- **Window down**: Move the window down.
+- **Window left**: Move the window left.
+- **Window right**: Move the window right.
+- **Tempo**: Tempo +1 or -1 BPM.
+<!-- /callouts:sequencer-nav-shift -->
+
+![Sequencer Mode, settings](manual/sequencer-settings.svg)
 
 <!-- callouts:sequencer-settings -->
 - **Rates**: The step length: 1/4, 1/8, 1/16 or 1/32. The current one is blue.
@@ -205,8 +200,8 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 <!-- /callouts:sequencer-settings -->
 
 - Tap Seq to sequence Live's highlighted clip slot, or, in Session Mode, hold Seq and press a slot.
-- The track is armed alone while you sequence it. Leaving puts every arm back.
-- Column 1 has Linnstrument Mode's Shift layer. Shift + column 16 pads 1–4 move the ring, as in every mode, and pads 7 and 8 step the tempo. Step through tracks with Device/Clip + Tracks.
+- The track is armed alone while you sequence it; Device/Clip + Tracks steps to another. Leaving puts every arm back.
+- The Global column works as in Linnstrument Mode: Record Clip, Capture MIDI, and with Shift held, Stop track, Session Record and the scene page on pad 7. Pad 7 switches to Linnstrument Mode keeping the arm, and its Back returns here.
 - Column 15, pad 8 switches columns 11–14 between the note pads and the settings.
 
 ### Linnstrument Mode

@@ -279,10 +279,9 @@ _FX = (
         "A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a "
         "stored one to recall. Launching the scene morphs to it.",
     ),
-    Block(
+    Item(
         "Bars",
-        range(min(layout.FX_LENGTHS)[0], min(layout.FX_LENGTHS)[0] + 1),
-        range(1, len(layout.FX_LENGTHS) + 1),
+        {key: f"{bars} bar" if bars == 1 else f"{bars} bars" for key, bars in layout.FX_LENGTHS.items()},
         "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.",
     ),
 )
@@ -352,7 +351,7 @@ _LINNSTRUMENT_SCENES = (
 )
 
 # Sequencer Mode: column 1 as in Linnstrument Mode, and its own columns 15 and 16.
-_SEQUENCER_SIDE = (
+_SEQUENCER_GLOBAL = (
     PLAY,
     RECORD_CLIP,
     CAPTURE_MIDI,
@@ -366,6 +365,9 @@ _SEQUENCER_SIDE = (
         label="Linn",
     ),
     SHIFT,
+)
+
+_SEQUENCER_NAV = (
     _one("Copy", layout.COPY, "Hold, press a step, then press steps to paste it onto."),
     _one(
         "Delete",
@@ -379,16 +381,19 @@ _SEQUENCER_SIDE = (
     DEVICE_CLIP,
 )
 
-_SEQUENCER_SHIFT = (
+_SEQUENCER_GLOBAL_SHIFT = (
     STOP_TRACK,
     SESSION_RECORD,
     QUANTIZE,
     LAUNCH_QUANTIZATION,
     REDO,
     SCENE_PAGE,
+    SHIFT_HELD,
+)
+
+_SEQUENCER_NAV_SHIFT = (
     *WINDOW_MOVES,
     TEMPO,
-    SHIFT_HELD,
 )
 
 # Steps and column 15, the same in both views.
@@ -468,11 +473,15 @@ SECTIONS = {
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
     "linnstrument-scenes": _LINNSTRUMENT_SCENES,
-    "sequencer-side": _SEQUENCER_SIDE,
-    "sequencer-shift": _SEQUENCER_SHIFT,
+    "sequencer-global": _SEQUENCER_GLOBAL,
+    "sequencer-nav": _SEQUENCER_NAV,
+    "sequencer-global-shift": _SEQUENCER_GLOBAL_SHIFT,
+    "sequencer-nav-shift": _SEQUENCER_NAV_SHIFT,
     "sequencer-grid": _SEQUENCER_GRID,
     "sequencer": _SEQUENCER,
     "sequencer-settings": _SEQUENCER_SETTINGS,
+    # Listed, not drawn: Sequencer Mode's own pads, after its first map.
+    "sequencer-functions": (*_SEQUENCER, *_SEQUENCER_NAV),
 }
 
 # The sections the manual lists, each with the section holding its Shift layer.
@@ -487,8 +496,8 @@ LISTS = {
     "device-clip": None,
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,
-    "sequencer-side": "sequencer-shift",
-    "sequencer": None,
+    "sequencer-functions": None,
+    "sequencer-nav-shift": None,
     "sequencer-settings": None,
 }
 
@@ -501,11 +510,15 @@ LAYERS = {
     Layer.MIXER_SHIFT: ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
     Layer.FX: ("global", "view", "navigation", "fx"),
     Layer.FX_SHIFT: ("global-shift", "view-shift", "navigation-shift", "fx-shift"),
-    Layer.MAPPED_FX: ("global", "view", "navigation", "fx"),
-    Layer.SEQUENCER: ("sequencer-side", "sequencer"),
-    Layer.SEQUENCER_SETTINGS: ("sequencer-side", "sequencer-grid", "sequencer-settings"),
-    Layer.SEQUENCER_SHIFT: ("sequencer-shift", "sequencer"),
-    Layer.SEQUENCER_DRUMS: ("sequencer-side", "sequencer"),
+    Layer.SEQUENCER: ("sequencer-global", "sequencer-nav", "sequencer"),
+    Layer.SEQUENCER_SETTINGS: (
+        "sequencer-global",
+        "sequencer-nav",
+        "sequencer-grid",
+        "sequencer-settings",
+    ),
+    Layer.SEQUENCER_SHIFT: ("sequencer-global-shift", "sequencer-nav-shift", "sequencer"),
+    Layer.SEQUENCER_DRUMS: ("sequencer-global", "sequencer-nav", "sequencer"),
 }
 
 # Columns a map shows dimmed and unlabelled, per layer: none at present.

@@ -37,7 +37,6 @@ TITLES = {
     Layer.MIXER_SHIFT: "Mixer Mode with Shift held",
     Layer.FX: "FX Mode",
     Layer.FX_SHIFT: "FX Mode with Shift held",
-    Layer.MAPPED_FX: "FX Mode, Mapped FX",
     Layer.SEQUENCER: "Sequencer Mode",
     Layer.SEQUENCER_SETTINGS: "Sequencer Mode, settings",
     Layer.SEQUENCER_SHIFT: "Sequencer Mode with Shift held",
@@ -48,10 +47,12 @@ CAPTION = 20
 CAPTION_MARGIN = 16  # extra side margin so a held panel's caption fits
 LEGEND_STEP = 140
 
-# Per hold: the words, a background tint a shade off BACKGROUND, and the words' colour.
+# Per held or toggled pad: the words, a background tint a shade off BACKGROUND, and the
+# words' colour.
 HOLDS = {
     "shift": ("SHIFT HELD", "#1b1d30", "#a3abff"),
     "device-clip": ("DEV HELD", "#281e14", "#ffb46b"),
+    "view": ("VIEW TOGGLED", "#12252a", "#6fdde6"),
 }
 
 
@@ -74,10 +75,12 @@ def panel(frame, columns, labels, blocks, caption=None, dimmed=(), held=None):
 
 
 def held_of(state):
-    # The held pad a frame shows: Device/Clip's layer sits over Shift's.
+    # The held or toggled pad a frame shows: Device/Clip's layer sits over Shift's.
     if state.device_clip:
         return "device-clip"
-    return "shift" if state.shift else None
+    if state.shift:
+        return "shift"
+    return "view" if state.seq_settings else None
 
 
 def map_svg(layer):
