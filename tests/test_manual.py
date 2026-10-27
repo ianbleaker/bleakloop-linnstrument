@@ -3,7 +3,8 @@ import pytest
 from BleakLoop.core import engine
 from BleakLoop.core.leds import OFF
 from tools.docs import __main__ as generator
-from tools.docs.manual.pads import DIMMED, blocks, items, labels
+from tools.docs.manual.columns import FIGURES
+from tools.docs.manual.pads import DIMMED, blocks, items, labels, section_labels
 from tools.docs.manual.scenes import SCENES, Layer
 
 
@@ -42,6 +43,29 @@ def test_labels_fit_on_a_pad(layer):
 def test_no_pad_is_in_two_items(layer):
     keys = [key for item in items(layer) for key in item.keys]
     assert len(keys) == len(set(keys))
+
+
+COLUMN_PANELS = [
+    (column, scene, section)
+    for _, column, panels in FIGURES.values()
+    for _, scene, section in panels
+]
+
+
+@pytest.mark.parametrize("column, scene, section", COLUMN_PANELS)
+def test_every_lit_pad_of_a_column_panel_is_labelled(column, scene, section):
+    lit = {
+        key
+        for key, light in engine.render(*scene).items()
+        if key[0] == column and light.colour != OFF
+    }
+    assert lit - set(section_labels(section)) == set()
+    assert set(section_labels(section)) <= {key for key in engine.render(*scene) if key[0] == column}
+
+
+@pytest.mark.parametrize("column, scene, section", COLUMN_PANELS)
+def test_column_panel_labels_fit_on_a_pad(column, scene, section):
+    assert [label for label in section_labels(section).values() if len(label) > 7] == []
 
 
 def test_generated_docs_are_current():

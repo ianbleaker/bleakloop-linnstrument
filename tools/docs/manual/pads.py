@@ -524,9 +524,13 @@ def ordered(section):
 
 
 def labels(layer):
+    return {key: label for section in LAYERS[layer] for key, label in section_labels(section).items()}
+
+
+def section_labels(section):
     return {
         key: label
-        for item in items(layer)
+        for item in SECTIONS[section]
         if isinstance(item, Item)
         for key, label in item.labels.items()
     }

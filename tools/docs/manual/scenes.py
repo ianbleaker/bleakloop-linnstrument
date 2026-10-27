@@ -178,6 +178,9 @@ SEQ_DRUM_SNAPSHOT = replace(
     ),
 )
 
+# Device/Clip held over Session Mode, for the Navigation column figure.
+DEVICE_CLIP_HELD = (State(device_clip=True, fixed_length=2), SNAPSHOT)
+
 FX_STATE = State(
     fx=True, fx_slots=FX_SLOTS, fx_scenes=FX_SCENES, fx_landed_scene=2, fx_length=4
 )

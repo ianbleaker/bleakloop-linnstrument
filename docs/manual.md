@@ -90,6 +90,8 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 
 **Stop** (column 15, pad 8) is held like Copy and Delete. Hold it and press any pad in a track's column to stop that track's clips; a tap on its own does nothing. Shift + Stop stops all clips. In FX Mode, holding Stop leaves the grid alone.
 
+![Global column](manual/columns-global.svg)
+
 <!-- callouts:global -->
 - **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop all clips. In Linnstrument Mode, stops the selected track's clips)*
 - **Record**: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording. In Linnstrument Mode, records a new clip on the selected track.
@@ -101,11 +103,15 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 - **Shift**: Hold for the Shift layer.
 <!-- /callouts:global -->
 
+![View column](manual/columns-view.svg)
+
 <!-- callouts:view -->
 - **Scenes**: Launch a scene. Its FX snapshot, if it has one, lands as it starts. *(Shift: Launch with legato, leaving the FX snapshot alone)*
 - **Unmute all**: Unmute every track and return track in the Set. Orange while any is muted. *(Shift: Unsolo every track and return track in the Set. Blue while any is soloed)*
 - **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Disarm every track in the Set. Red while any is armed)*
 <!-- /callouts:view -->
+
+![Navigation column](manual/columns-navigation.svg)
 
 <!-- callouts:navigation -->
 - **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
@@ -156,6 +162,8 @@ Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a 
 
 ![Mixer Mode](manual/mixer.svg)
 
+![Mixer Mode with Shift held](manual/mixer-shift.svg)
+
 <!-- callouts:mixer -->
 - **Faders**: One volume fader per track.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted. *(Shift: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed)*
@@ -175,6 +183,8 @@ Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a 
 FX Mode has eight horizontal faders for the selected device, and stores snapshots of every rack's macros and brings them back, at once or as a morph over a number of bars. The snapshots are saved in the Set. Press FX (column 16, pad 5) to turn it on, and press it again, or Session, to turn it off. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
+
+![FX Mode with Shift held](manual/fx-shift.svg)
 
 <!-- callouts:fx -->
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.

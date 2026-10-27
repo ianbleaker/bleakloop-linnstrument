@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="502" viewBox="0 0 164 502" font-family="Helvetica, Arial, sans-serif">
+<title>View column</title>
+<rect x="0" y="0" width="164" height="502" rx="8" fill="#141418"/>
+<text x="36" y="28" font-size="12" fill="#9a9aa4" text-anchor="middle">normal</text>
+<text x="36" y="48" font-size="11" fill="#9a9aa4" text-anchor="middle">15</text>
+<rect x="16" y="60" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="14" y="58" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="16" y="106" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="14" y="104" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="16" y="152" width="40" height="40" rx="4" fill="#f2f2f2"/>
+<rect x="16" y="198" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="14" y="196" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="16" y="244" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<rect x="16" y="290" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<rect x="16" y="336" width="40" height="40" rx="4" fill="#ff8a1a"/>
+<rect x="16" y="382" width="40" height="40" rx="4" fill="#ff2a2a"/>
+<rect x="18" y="73" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="83" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
+<rect x="18" y="119" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="129" font-size="9" fill="#ffffff" text-anchor="middle">Scene 2</text>
+<rect x="18" y="165" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="175" font-size="9" fill="#ffffff" text-anchor="middle">Scene 3</text>
+<rect x="18" y="211" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="221" font-size="9" fill="#ffffff" text-anchor="middle">Scene 4</text>
+<rect x="18" y="257" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="267" font-size="9" fill="#ffffff" text-anchor="middle">Scene 5</text>
+<rect x="18" y="303" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="313" font-size="9" fill="#ffffff" text-anchor="middle">Scene 6</text>
+<rect x="18" y="349" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="359" font-size="9" fill="#ffffff" text-anchor="middle">Unmute</text>
+<rect x="18" y="395" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="405" font-size="9" fill="#ffffff" text-anchor="middle">Stop</text>
+<text x="128" y="28" font-size="12" fill="#9a9aa4" text-anchor="middle">shift</text>
+<text x="128" y="48" font-size="11" fill="#9a9aa4" text-anchor="middle">15</text>
+<rect x="108" y="60" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="106" y="58" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="108" y="106" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="106" y="104" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="108" y="152" width="40" height="40" rx="4" fill="#f2f2f2"/>
+<rect x="108" y="198" width="40" height="40" rx="4" fill="#a6ff1a"/>
+<rect x="106" y="196" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="108" y="244" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<rect x="108" y="290" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<rect x="108" y="336" width="40" height="40" rx="4" fill="#2a5bff"/>
+<rect x="108" y="382" width="40" height="40" rx="4" fill="#ff2a2a"/>
+<rect x="110" y="73" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="83" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
+<rect x="110" y="119" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="129" font-size="9" fill="#ffffff" text-anchor="middle">Scene 2</text>
+<rect x="110" y="165" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="175" font-size="9" fill="#ffffff" text-anchor="middle">Scene 3</text>
+<rect x="110" y="211" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="221" font-size="9" fill="#ffffff" text-anchor="middle">Scene 4</text>
+<rect x="110" y="257" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="267" font-size="9" fill="#ffffff" text-anchor="middle">Scene 5</text>
+<rect x="110" y="303" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="313" font-size="9" fill="#ffffff" text-anchor="middle">Scene 6</text>
+<rect x="110" y="349" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="359" font-size="9" fill="#ffffff" text-anchor="middle">Unsolo</text>
+<rect x="110" y="395" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="128" y="405" font-size="9" fill="#ffffff" text-anchor="middle">Unarm</text>
+<rect x="16" y="442" width="16" height="16" rx="2" fill="#2a2a2e"/>
+<rect x="14" y="440" width="20" height="20" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="42" y="454" font-size="12" fill="#e8e8ec">Tempo blink</text>
+<rect x="16" y="466" width="16" height="16" rx="2" fill="#2a2a2e"/>
+<rect x="14" y="464" width="20" height="20" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="2 3"/>
+<text x="42" y="478" font-size="12" fill="#e8e8ec">Fast blink</text>
+</svg>
