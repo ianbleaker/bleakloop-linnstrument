@@ -1,7 +1,16 @@
+from dataclasses import replace
+
 import pytest
 
 from BleakLoop.core import engine, layout
-from BleakLoop.core.model import EnterMode, PadPress, SlideMoved, Snapshot
+from BleakLoop.core.model import (
+    EnterMode,
+    PadPress,
+    SequencerView,
+    SetArms,
+    SlideMoved,
+    Snapshot,
+)
 from BleakLoop.core.modes import Mode, State
 
 STOPPED = Snapshot(
@@ -89,3 +98,57 @@ def test_blink_beats_follows_song_while_playing():
 def test_blink_beats_uses_tempo_while_stopped():
     # 120 BPM: two beats per second.
     assert engine.blink_beats(STOPPED, now_ms=1500) == 3.0
+
+
+# Sequencer Mode
+
+SEQUENCER = State(Mode.SEQUENCER, seq_track=0)
+
+
+def test_sequencer_input_goes_to_the_sequencer_module():
+    state, actions = engine.handle(SEQUENCER, press(layout.SEQ), STOPPED)
+    assert state.mode is Mode.SESSION
+    assert actions == [EnterMode(Mode.SESSION)]
+
+
+def test_sequencer_renders_its_own_frame():
+    frame = engine.render(SEQUENCER, STOPPED)
+    assert frame[layout.SEQ] == engine.sequencer.render(SEQUENCER, STOPPED)[layout.SEQ]
+    assert (layout.SEQ_VIEW) in frame
+
+
+def test_seq_sync_runs_only_in_sequencer_mode():
+    view = SequencerView(track=1, is_midi=True)
+    snapshot = Snapshot(
+        is_playing=False,
+        song_beats=0.0,
+        tempo=120.0,
+        metronome=False,
+        session_view=True,
+        arms=(True, False),
+        sequencer=view,
+    )
+    assert engine.seq_sync(SESSION, snapshot) == (SESSION, [])
+    state, actions = engine.seq_sync(SEQUENCER, snapshot)
+    assert state.seq_track == 1
+    assert actions == [SetArms(((0, False), (1, True)))]
+
+
+def test_seq_phase_is_the_playhead():
+    view = SequencerView(is_playing=True, position=1.0)
+    assert engine.seq_phase(SEQUENCER, view) == 4
+    assert engine.seq_phase(SEQUENCER, SequencerView()) is None
+
+
+def test_sequencer_x_rows_are_its_held_rows():
+    view = SequencerView(track=0, is_midi=True, has_clip=True, loop_end=16.0)
+    held, _ = engine.handle(SEQUENCER, press((4, 2)), replace(STOPPED, sequencer=view))
+    assert engine.x_rows(held) == (6,)
+
+
+def test_an_unowned_slide_in_sequencer_mode_releases_the_pad_it_left():
+    slide = SlideMoved(pad=1, from_column=4, to_column=5)
+    held, _ = engine.handle(SEQUENCER, press((12, 1)), STOPPED)
+    assert engine.slide(held, slide, STOPPED) == engine.handle(
+        held, press((4, 1), False), STOPPED
+    )

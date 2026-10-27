@@ -369,7 +369,7 @@ class SlideDecoder:
             del self._armed[row]
             self._swallow.add((row, source))
             return SlideMoved(layout.pad_of(row), source, column)
-        return PadPress(column, layout.pad_of(row), value > 0)
+        return PadPress(column, layout.pad_of(row), value > 0, value)
 
 
 class LedDriver:

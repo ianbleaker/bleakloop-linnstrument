@@ -42,14 +42,15 @@ flowchart LR
 | Carrying out an `Action` as Live calls | `live_actions.py` |
 | Geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping | `core/layout.py` |
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
-| Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers | `core/modes.py` |
-| Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights | `core/controls.py` |
+| Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers | `core/modes.py` |
+| Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights | `core/controls.py` |
 | Clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table | `core/session.py` |
 | Column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/column_1.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
 | FX Mode: snapshot storage format, rack identity, store, recall, morph timing and tick, FX lights | `core/fx.py` |
 | Horizontal faders: X maths, touches and slides, undo, fader lights | `core/faders.py` |
 | Linnstrument Mode: column 1 only, handed to `column_1` | `core/linnstrument_mode.py` |
+| Sequencer Mode: entry, the arm, step maths, editing, pages and loop, note pads, its lights | `core/sequencer.py` |
 | Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
 | Tuned numbers: every value in section 8, by name | `core/values.py` |
 | `handle()` and `render()`, composing the core modules | `core/engine.py` |
@@ -142,14 +143,15 @@ src/BleakLoop/
   core/
     layout.py          geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping
     model.py           Snapshot, Action and Frame types (plain dataclasses)
-    modes.py           Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers
-    controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights
+    modes.py           Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers
+    controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights
     session.py         clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table
     column_1.py        column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page
     mixer.py           Mixer toggle, coarse steps, bands, smoothing
     fx.py              FX Mode: snapshot storage, rack identity, store, recall, morph timing and tick, FX lights
     faders.py          horizontal faders: X maths, touches and slides, undo, fader lights
     linnstrument_mode.py  Linnstrument Mode: column 1 only, handed to column_1
+    sequencer.py       Sequencer Mode: entry, the arm, step maths, editing, pages and loop, note pads, its lights
     leds.py            device colours, track colour matching, tempo and fast blink
     values.py          every value in section 8, by name
     engine.py          handle() and render(), composing the modules above
@@ -202,6 +204,7 @@ flowchart TD
     core_mixer["mixer"]
     core_model["model"]
     core_modes["modes"]
+    core_sequencer["sequencer"]
     core_session["session"]
     core_values["values"]
   end
@@ -218,14 +221,17 @@ flowchart TD
   core_column_1 --> core_mixer
   core_column_1 --> core_model
   core_column_1 --> core_modes
+  core_controls --> core_layout
   core_controls --> core_leds
   core_controls --> core_model
+  core_controls --> core_values
   core_engine --> core_faders
   core_engine --> core_fx
   core_engine --> core_linnstrument_mode
   core_engine --> core_mixer
   core_engine --> core_model
   core_engine --> core_modes
+  core_engine --> core_sequencer
   core_engine --> core_session
   core_faders --> core_layout
   core_faders --> core_leds
@@ -249,6 +255,17 @@ flowchart TD
   core_mixer --> core_values
   core_model --> core_leds
   core_modes --> core_layout
+  core_modes --> core_values
+  core_sequencer --> core_column_1
+  core_sequencer --> core_controls
+  core_sequencer --> core_faders
+  core_sequencer --> core_fx
+  core_sequencer --> core_layout
+  core_sequencer --> core_leds
+  core_sequencer --> core_mixer
+  core_sequencer --> core_model
+  core_sequencer --> core_modes
+  core_sequencer --> core_values
   core_session --> core_column_1
   core_session --> core_controls
   core_session --> core_faders
@@ -258,7 +275,7 @@ flowchart TD
   core_session --> core_mixer
   core_session --> core_model
   core_session --> core_modes
-  core_session --> core_values
+  core_session --> core_sequencer
   device --> core_layout
   device --> core_leds
   device --> core_model
@@ -280,6 +297,7 @@ flowchart TD
   surface --> core_leds
   surface --> core_model
   surface --> core_modes
+  surface --> core_sequencer
   surface --> core_session
   surface --> core_values
   surface --> device
@@ -352,12 +370,15 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
   - Pad presses: notes 0–16 on channels 1–8.
   - Y-axis values: CC 64 + column on channels 1–8, claimed only in Mixer Mode. Columns 2–14 (CC 66–78) become fader input; the other columns are claimed and dropped, because Y reporting is per row and their reports would otherwise reach Live's tracks.
   - X values (CC column and CC 32 + column, columns 1–16) and slide transfers (CC 119) on channels 1–8, claimed only while the core wants X (`engine.x_rows`); X for row 0, column 6 comes through the `nrpn_6` / `nrpn_38` elements.
+  - **Sequencer Mode's note pads** (columns 11–14) are translated, except in the rows holding a step: each element gets `ScriptForwarding.non_consuming`, channel `AUDITION_CHANNEL` (16, outside the row channels 1–8) and its pad's note (`set_channel`, `set_identifier`). Live installs the translation and the script forwarding independently, so the press still reaches the script, for selection and editing, and the translated note, with its strike velocity, plays the armed track (confirmed on the device). `surface._retranslate` sets them after each event and display tick, only when a note changed (then `request_rebuild_midi_map`), and never for a note pad that's held: it keeps its translation until its release retranslates it, so its Note Off leaves as the note its Note On did, while the other pads update at once. A pad with no note, and every pad outside Sequencer Mode, gets back its own forwarding and `use_default_message()`. Linnstrument Mode doesn't listen to the pads, so entering it resets them at once: a translation left there would move the player's notes.
+  - Entering Sequencer Mode sends Y, X and slide mode off: from Mixer Mode Y is on, from FX Mode or the split view X is.
+  - **Sequencer Mode's slides** use #46's X layer (section 5). `engine.x_rows` is the device rows holding a step (`sequencer.x_rows`), so X (CC 10) and slide mode (CC 9) are on only there, sent on each change. Sequencer Mode listens to every X element (MSB and LSB, columns 1–16, including `nrpn_6` / `nrpn_38` for row 0, column 6) and CC 119 on channels 1–8 for as long as it lasts, and drops the reports no hold uses, so none reach the armed track. Y stays off. A transfer (CC 119) moves the hold to its new cell (`sequencer.slide`), and the hold ends on that cell's release, whatever the column, as a fader touch does; one no hold owns releases the pad it left, as in Session Mode. The decoder isn't reset when the held rows change, since another row's slide may be mid-transfer.
 
 > [!IMPORTANT]
 > **Elements in Linnstrument Mode:** notes 0–127 on every channel, 16 × 128 = 2048 note buttons. The control channel is chosen from the right split after load, and elements must be declared before it is known. Only the chosen channel's 128 are listened. All 128, not only the eight that column 1 sends, so column 1 never plays Live's tracks, even between a Row Offset change and the next poll. The build time is logged at load (`BleakLoop elements built in`).
 
 - **NRPN replies:** CC 99, 98, 6, 38, 101 and 100 on channel 1, listened during the setup and in Linnstrument Mode, so the setup's queries and the Linnstrument Mode poll can be read. Their listeners are removed when Session Mode is entered. The cost: in Linnstrument Mode, any channel-1 RPN or NRPN the LinnStrument sends (for example, MPE configuration on a settings change) doesn't reach Live.
-- **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. In Linnstrument Mode, only the control channel's 128 notes and the NRPN replies are listened; everything else reaches Live's tracks.
+- **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. Sequencer Mode listens to the pads as Session Mode does. In Linnstrument Mode, only the control channel's 128 notes and the NRPN replies are listened; everything else reaches Live's tracks.
 - **LED output.** One "light pad" call sends CC 20, 21 and 22. The LED driver (section 3) is the only caller. v3's per-element send cache isn't relied on.
 
 > [!IMPORTANT]
@@ -414,11 +435,13 @@ flowchart LR
     transport --> morphing{"morph running?"}
     morphing -->|"yes"| fxtick["read_macro_values, engine.fx_tick"]
     morphing -->|"no"| flipped
-    fxtick --> flipped{"blink phase flipped?"}
+    fxtick --> flipped{"blink phase or Sequencer playhead step changed?"}
     flipped -->|"yes"| extra["extra render"]
   end
 ```
 
+- **Sequencer playhead.** In Sequencer Mode the timer also reads the target clip's play position (`live_state.read_position`: `is_playing` and `playing_position` of `song.view.highlighted_clip_slot`'s clip) and adds `engine.seq_phase`, the playhead step, to the blink phase key, so a step change triggers a render. The 100 ms display tick alone can't follow the playhead: at 1/32 and 120 BPM a step lasts 62.5 ms. Notes are read only when a frame is drawn, never on a timer tick. The surface logs the longest Sequencer Mode timer tick, render included, when the mode is left (`SEQ: longest tick`), and each note read's count and time once per entry and whenever the count changes (`SEQ: read N notes`). Measured on the device (Live 12.4.7): the longest Sequencer tick 3.8–6.9 ms, inside the 10 ms timer, and note reads at most 0.5 ms, for 250 notes.
+- **Sequencer arm sync.** A click on another track in Live sends no event, so on every display tick in Sequencer Mode the surface calls `engine.seq_sync` with a fresh snapshot and applies its actions before rendering.
 - **FX morph.** While `State.morph` is set, in any mode, the timer reads the morphing macros' values (`live_state.read_macro_values`, resolving each rack by its path and name) and passes them with the transport to `engine.fx_tick`. It interpolates linearly in song beats to the bar line set at the recall, drops a macro whose value no longer matches BleakLoop's last write (a hand turn, `FX_TOUCH_TOLERANCE`) or can't be read, and lands every remaining target when the end beat is reached, the transport stops or song time goes backwards. Quantized macros switch only on landing. The surface redraws on landing and logs the longest tick of the morph. Measured with 6 racks: reading every rack for a store or recall takes 0.4–2.3 ms, and the longest morph tick 1.6–4.2 ms, well inside the 10 ms timer.
 ### Mixer
 
@@ -455,7 +478,7 @@ stateDiagram-v2
   - If reading the slot raises (its track or scene was deleted), the error is logged and the pending slot is cleared.
 
 > [!IMPORTANT]
-> `highlighted_clip_slot` is never set, because that would change the selected track and, with auto-arm, which track is armed.
+> `highlighted_clip_slot` is set only by Sequencer Mode's entry (`HighlightSlot`: Seq + a slot, and a Seq tap's move to the Detail-view or playing clip). Setting it changes the selected track, which is the point there: Sequencer Mode's arm follows the selection. Nothing else sets it.
 
 ```mermaid
 stateDiagram-v2
@@ -507,6 +530,13 @@ stateDiagram-v2
 | Binding identity | `BindFader` reads `song.view.selected_parameter` and walks `canonical_parent`: a device whose parent is a track, return or master, or a track's `MixerDevice` (volume, panning and sends only, as `param` 0, 1, 2…). The track is (name, n) with n counting earlier same-named tracks in `song.tracks`, `song.return_tracks`, then master; a device is (name, n) among the track's same-named devices; `param` indexes `device.parameters`. A parameter under a rack chain is refused ("Map it to a macro instead"), anything else not on a track too. The adapter returns `FaderBound`, which `engine.handle` passes to `faders.bound` in any mode. A binding resolves only if the parameter at `param` still has the bound name. |
 | Blue hand | Other control surfaces, even in a slot with no ports, can hold `song.appointed_device` away from the device clicked in Live (seen with APC40_MkII and Launchkey_Mini_MK3 loaded). The surface polls `song.view.selected_track.view.selected_device` on the display tick and, when it changes, sets `song.appointed_device` to it, so a click moves the hand. Only on a change: a device another controller picked stays until the next click. |
 | Dev steps | Tracks: `song.visible_tracks`, then `song.return_tracks`, then `song.master_track`, set as `song.view.selected_track`. Devices: the selected track's `devices`, from the selected device's top-level ancestor (walking `canonical_parent` up through chains and racks), selected with `song.view.select_device` and appointed (`song.appointed_device`) at once, so the next fader write lands on it. The name, or "No more …", goes to the status bar. |
+| Sequencer target clip | Live's highlighted slot, `song.view.selected_track` × `song.view.selected_scene`, read live; Sequencer Mode follows a click in Live. `live_state.read_seq_entry`, read only while Seq is held, gives a tap its fallbacks: the Detail-view clip when its `canonical_parent` is a clip slot on a MIDI track in `song.tracks` (an Arrangement clip's parent is its track), then the selected track's `playing_slot_index`. Sequencer actions index `song.tracks`, folded group members included, not `song.visible_tracks`; `TrackView.set_index` maps a window track to it, read only for Sequencer Mode and while Seq is held. A MIDI track is `has_midi_input` and not `is_foldable`. |
+| Sequencer arm | Entry saves `arm` for every track in `song.tracks` (None where `can_be_armed` is false) and arms the target alone (`SetArms`, only the changes). A selection change moves the arm (old off, new on). Leaving for Session, Mixer or FX, or unloading while the arms are saved (in Sequencer Mode, or in Linnstrument Mode entered from it; `sequencer.restore_arms`, in a try so the device hand-back still runs), sets each track back to its saved arm only if it still equals what BleakLoop set; with the track count changed, nothing is restored, since the indexes no longer line up. Linnstrument Mode keeps the arm. |
+| Note reads | `clip.get_notes_extended(0, 128, 0.0, max(loop_end, end_marker))`, as plain `NoteView`s (`note_id`, `pitch`, `start_time`, `duration`, `velocity`, a float), only in Sequencer Mode, when a frame is drawn. The notes don't come back sorted. Measured: 45 notes in 0.02–0.06 ms, 250 in 0.5 ms. |
+| Note edits and undo | `EditNotes` is one undo step (`begin_undo_step` / `end_undo_step` in a `finally`): `slot.create_clip(length)` for an empty slot, `clip.remove_notes_by_id`, then `clip.add_new_notes` with `Live.Clip.MidiNoteSpecification`s. `RemovePitch` is `clip.remove_notes_extended(pitch, 1, 0.0, max(loop_end, end_marker))` in an undo step. Before any write the core closes a running morph's undo step, so undoing the morph doesn't undo the edit. A slide's `ModifyNotes` reads its notes with `clip.get_notes_by_id`, sets `start_time` and `velocity`, and writes them back with `clip.apply_note_modifications`, only when the values change; the whole slide is one undo step (`State.seq_undo_open`), opened when the slide starts and closed when the last sliding finger lifts, on leaving the mode, on a track change and on unload. An action whose track, slot or clip is gone skips with a log line. |
+| Loop writes | `SetLoop` writes `loop_end` first when the new start is at or past the current end, else `loop_start` first, since Live refuses a start past the end; both in one undo step. Double is `clip.duplicate_loop()`. |
+| Drum Rack sync | The track's first device with `can_have_drum_pads`, depth first: its devices in order, and inside a rack (`can_have_chains`) its chains' devices in order, so a Drum Rack inside an Instrument Rack counts; a Drum Rack's own pads aren't searched (`live_state.drum_rack`, used by the reads and the actions). Read live: `view.drum_pads_scroll_position` (the rack row at the bottom of Live's 16 pads, 0–28), `view.selected_drum_pad.note`, and the pads with chains (`len(pad.chains) > 0`). Up/Down set the scroll (`SetDrumScroll`) and a note pad press sets `view.selected_drum_pad = drum_pads[note]` (`SelectDrumPad`); both skip with a log line when the rack is gone. The note pads' base is 4 × the scroll, so pads 5–8 are Live's visible 16, and `_retranslate` follows a scroll in Live on the next display tick. |
+| Audition | Note translation with non-consuming forwarding (section 6, Elements). Velocity follows the strike; no pressure (#56) and no pitch. A press that also edits (Delete + note pad, hold step + note pad) sounds the note too, except in a row holding a step: `_retranslate` leaves those rows' note pads untranslated (`engine.x_rows`), so a slide onto them reaches only the script. |
 | Macro writes | `parameter.value`, clamped to `min`/`max`, as a knob turn: it overrides automation and lights Live's Re-Enable Automation button (#47). A jump is one undo step, and so is a whole morph (`State.fx_undo_open`): a new recall, a Mixer fader press and unload close an open morph step. |
 
 ## 8. Values
@@ -540,3 +570,9 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | `FX_TOUCH_TOLERANCE = 0.005`: during a morph, a macro further than 0.5 % of its range from BleakLoop's last write was turned by hand and drops out | `fx` | Chosen | Fine on device: a hand-turned macro drops out, and BleakLoop's own writes never trip it |
 | `X_COLUMN_WIDTH = 170.625`: X units per column; column c's centre is `X_COLUMN_WIDTH × (c − 0.5)` | `faders` | From firmware (`FXD_CALX_FULL_UNIT` = 4095 / 24) | Confirmed on device: column starts within 6 units, centres within 26 (section 5) |
 | `FADERS_DATA_KEY = "BleakLoop.faders"`: the `song.set_data` key holding the Mapped FX bindings | `live_state`, `live_actions` | Chosen | Unchecked until stage 3's device check |
+| `SEQ_BASE_NOTE = 48`: Sequencer Mode's melodic note pads start here, at the bottom left (C2 in Live's naming, C3 = 60) | `sequencer` | Chosen (#53 issue) | Confirmed on device (stage 1 check) |
+| `SEQ_DEFAULT_RATE = 0.25`: Sequencer Mode's step length in beats (1/16) until a rate pad is pressed | `modes.State` | Chosen (#53) | Confirmed on device (stage 1 check) |
+| `AUDITION_CHANNEL = 15` (0-based): the channel note pads are translated to for audition, outside User Firmware Mode's row channels 1–8 | `surface` | Chosen (#53) | Confirmed on device (stage 1 check) |
+| `SLIDE_START = 0.25`: of a column, the X travel from a held step's first report that starts a velocity or nudge slide | `sequencer` | Chosen (#53) | Fine on device (stage 2 check) |
+| `VELOCITY_PER_COLUMN = 16`: velocity change per column of a velocity slide | `sequencer` | Chosen (#53 issue: about 16 per column) | Fine on device (stage 2 check) |
+| `NUDGE_PER_COLUMN = 0.125`: of a step, the start-time move per column of a nudge slide | `sequencer` | Chosen (#53 issue: one column per 1/8 step) | Fine on device (stage 2 check) |

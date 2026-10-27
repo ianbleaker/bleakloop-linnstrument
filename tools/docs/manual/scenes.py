@@ -3,7 +3,16 @@
 import enum
 from dataclasses import replace
 
-from BleakLoop.core.model import FaderView, SelectedTrack, SlotView, Snapshot, TrackView
+from BleakLoop.core.model import (
+    DrumView,
+    FaderView,
+    NoteView,
+    SelectedTrack,
+    SequencerView,
+    SlotView,
+    Snapshot,
+    TrackView,
+)
 from BleakLoop.core.modes import FxRack, Mode, State
 
 
@@ -19,6 +28,10 @@ class Layer(enum.Enum):
     LINNSTRUMENT = "linnstrument"
     LINNSTRUMENT_SHIFT = "linnstrument-shift"
     LINNSTRUMENT_SCENES = "linnstrument-scenes"
+    SEQUENCER = "sequencer"
+    SEQUENCER_SETTINGS = "sequencer-settings"
+    SEQUENCER_SHIFT = "sequencer-shift"
+    SEQUENCER_DRUMS = "sequencer-drums"
 
     @property
     def slug(self):
@@ -113,6 +126,56 @@ MAPPED_SNAPSHOT = replace(
     ),
 )
 
+# Sequencer Mode on Lead's clip at 1/16, as in the mockup: E2 selected, G2 on the other
+# steps, the loop on pages 1-2, and the playhead on step 9, whose G2 is playing.
+SEQ_PITCH = 52  # E2
+SEQ_OTHER = 55  # G2
+_SELECTED_STEPS = (0, 3, 6, 10, 16, 19, 22, 28, 32, 35, 38, 42, 48, 51, 54, 60)
+_OTHER_STEPS = (2, 8, 12, 14, 24, 26, 30, 34, 40, 44, 46, 56, 58, 62)
+SEQ_SNAPSHOT = replace(
+    SNAPSHOT,
+    sequencer=SequencerView(
+        track=3,
+        name="Lead",
+        scene=1,
+        is_midi=True,
+        has_clip=True,
+        is_playing=True,
+        loop_end=32.0,
+        position=2.1,
+        notes=tuple(
+            NoteView(i, pitch, step * 0.25, 0.25, 100)
+            for i, (pitch, step) in enumerate(
+                [(SEQ_PITCH, step) for step in _SELECTED_STEPS]
+                + [(SEQ_OTHER, step) for step in _OTHER_STEPS]
+            )
+        ),
+        midi_tracks=(3,),
+    ),
+)
+SEQUENCER = State(mode=Mode.SEQUENCER, seq_pitch=SEQ_PITCH, fixed_length=2)
+
+# A Drum Rack in Live's default view: kick, snare and hats filled, the snare selected, the
+# kick playing on the playhead's step.
+_KICK, _SNARE, _HAT, _OPEN_HAT = 36, 38, 42, 46
+_DRUM_HITS = (
+    [(_KICK, step) for step in range(0, 64, 8)]
+    + [(_SNARE, step) for step in range(4, 64, 8)]
+    + [(_HAT, step) for step in range(2, 64, 4)]
+)
+SEQ_DRUM_SNAPSHOT = replace(
+    SEQ_SNAPSHOT,
+    sequencer=replace(
+        SEQ_SNAPSHOT.sequencer,
+        name="Drums",
+        position=2.1,
+        notes=tuple(
+            NoteView(i, pitch, step * 0.25, 0.25, 100) for i, (pitch, step) in enumerate(_DRUM_HITS)
+        ),
+        drum=DrumView(9, _SNARE, frozenset({_KICK, _SNARE, 39, _HAT, 44, _OPEN_HAT, 49, 51})),
+    ),
+)
+
 SCENES = {
     Layer.SESSION: (State(fixed_length=2), SNAPSHOT),
     Layer.SIDE: (State(fixed_length=2), SNAPSHOT),
@@ -128,4 +191,8 @@ SCENES = {
     Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
     Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
     Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),
+    Layer.SEQUENCER: (SEQUENCER, SEQ_SNAPSHOT),
+    Layer.SEQUENCER_SETTINGS: (replace(SEQUENCER, seq_settings=True), SEQ_SNAPSHOT),
+    Layer.SEQUENCER_SHIFT: (replace(SEQUENCER, shift=True), SEQ_SNAPSHOT),
+    Layer.SEQUENCER_DRUMS: (SEQUENCER, SEQ_DRUM_SNAPSHOT),
 }

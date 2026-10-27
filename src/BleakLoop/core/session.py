@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import column_1, controls, faders, fx, layout, mixer, modes
+from . import column_1, controls, faders, fx, layout, mixer, modes, sequencer
 from .leds import (
     BLUE,
     CYAN,
@@ -34,11 +34,8 @@ from .model import (
     SceneSelected,
     SelectTrack,
     SetArm,
-    SetTempo,
     ShowClip,
     ShowMessage,
-    StepDevice,
-    StepTrack,
     StopAllClips,
     StopTrackClips,
     ToggleMute,
@@ -47,7 +44,6 @@ from .model import (
     UnsoloAll,
 )
 from .modes import ClipSource, GroupSource, Mode, SceneSource
-from .values import TEMPO_MAX, TEMPO_MIN
 
 def window_tracks(state):
     # The split view shows 8 tracks; Mixer and FX Mode always 13.
@@ -73,6 +69,8 @@ def handle(state, event, snapshot):
         # A fader touch ends on its cell's release, wherever the finger slid to.
         return faders.press(state, event, snapshot)
     key = (event.column, event.pad)
+    if state.seq_held and event.pressed and key != layout.SEQ:
+        return _seq_press(state, event, snapshot)
     if key == layout.SHIFT:
         return column_1.handle(state, event, snapshot)
     # Under Shift, Copy and Delete's pads are window moves.
@@ -82,7 +80,10 @@ def handle(state, event, snapshot):
         return replace(state, dev=event.pressed), []
     if state.dev and event.column == layout.NAV_COLUMN and event.pressed:
         # Dev's layer replaces column 16's normal and Shift layers.
-        return _dev_layer(state, key)
+        return controls.dev_layer(state, key)
+    if key == layout.SEQ and not (shift_layer and event.pressed):
+        # On Shift's layer the pad is a tempo step.
+        return _seq(state, event, snapshot)
     if key == layout.COPY and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, copy=False, copy_source=None), []
@@ -294,6 +295,32 @@ def _delete(state, event, snapshot):
     return state, []
 
 
+def _seq(state, event, snapshot):
+    # A hold pad, like Stop: hold it and press a clip slot to sequence that slot, or tap it.
+    if event.pressed:
+        if state.copy or state.delete:
+            return state, []
+        return replace(state, seq_held=True, seq_used=False), []
+    if not state.seq_held:
+        return state, []
+    used = state.seq_used
+    state = replace(state, seq_held=False, seq_used=False)
+    if used:
+        return state, []
+    return sequencer.enter_by_tap(state, snapshot)
+
+
+def _seq_press(state, event, snapshot):
+    # Any press while Seq is held uses the hold; only a slot on the plain Session layer enters.
+    state = replace(state, seq_used=True)
+    plain = not (state.mixer or state.fx or state.shift or state.copy or state.delete)
+    if plain and _is_slot(event) and event.column in _track_columns(state):
+        target = _slot_at(state, event, snapshot)
+        if target is not None:
+            return sequencer.enter_on_slot(state, *target, snapshot)
+    return state, []
+
+
 def _stop(state, event):
     # A hold pad: hold it and press a track's pad to stop that track. Shift + Stop stops all.
     if not event.pressed:
@@ -338,10 +365,9 @@ def _nav_column(state, key, snapshot):
         if key in layout.WINDOW_MOVES:
             return _move_window(state, layout.WINDOW_MOVES[key], snapshot)
         if key in layout.TEMPO_STEPS:
-            bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + layout.TEMPO_STEPS[key]))
-            return state, [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
+            return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
         return state, []
-    # The reserved pads have no match here. The current mode's pad goes back to Session.
+    # The reserved pad and Seq have no match here. The current mode's pad goes back to Session.
     if key == layout.SESSION:
         if state.mixer:
             return mixer.toggle(state)
@@ -365,18 +391,6 @@ def _widen(state, toggle, snapshot):
         )
         state = replace(state, window=window)
     return state, actions
-
-
-def _dev_layer(state, key):
-    if key in layout.DEV_TRACK_STEPS:
-        return state, [StepTrack(layout.DEV_TRACK_STEPS[key])]
-    if key in layout.DEV_DEVICE_STEPS:
-        return state, [StepDevice(layout.DEV_DEVICE_STEPS[key])]
-    if key == layout.DEV_SOURCE:
-        mapped = state.fader_source == "device"
-        state = replace(state, fader_source="mapped" if mapped else "device")
-        return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
-    return state, []
 
 
 def _toggle_split(state, snapshot):
@@ -440,7 +454,7 @@ def render(state, snapshot):
         _render_normal_layer(frame, state)
         frame[layout.UNMUTE_ALL] = Light(ORANGE if snapshot.any_muted else OFF)
     if state.dev:
-        _render_dev_layer(frame)
+        controls.render_dev_layer(frame)
     frame[layout.STOP] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
     frame.update(column_1.render(state, snapshot))
     _render_copy_source(frame, state)
@@ -523,23 +537,13 @@ def _render_normal_layer(frame, state):
     frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
     # Modes are cyan, the current one blue.
     current = layout.MIXER if state.mixer else layout.FX if state.fx else layout.SESSION
-    for key in (layout.SESSION, layout.MIXER, layout.FX):
+    for key in (layout.SESSION, layout.MIXER, layout.FX, layout.SEQ):
         frame[key] = Light(BLUE if key == current else CYAN)
     if state.split and current == layout.SESSION:
         frame[layout.SESSION] = Light(PINK)
+    if state.seq_held:
+        frame[layout.SEQ] = Light(CYAN, Blink.FAST)
     frame[layout.DEV] = Light(ORANGE)
-
-
-def _render_dev_layer(frame):
-    # Over either layer: the whole of column 16.
-    for pad in range(1, layout.ROWS + 1):
-        frame[(layout.NAV_COLUMN, pad)] = Light(OFF)
-    for key in layout.DEV_TRACK_STEPS:
-        frame[key] = Light(LIME)
-    for key in layout.DEV_DEVICE_STEPS:
-        frame[key] = Light(MAGENTA)
-    frame[layout.DEV_SOURCE] = Light(ORANGE)
-    frame[layout.DEV] = Light(ORANGE, Blink.FAST)
 
 
 def _render_shift_layer(frame):

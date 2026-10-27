@@ -76,13 +76,13 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 
 ## 4. Side columns
 
-Columns 1, 15 and 16 work the same in Session, Mixer and FX Mode. Column 1 is also the same in Linnstrument Mode (section 8), where Record, Capture and Shift + Play act on the selected track. Column 16, on the outer edge, holds Copy, Delete and the mode pads in every mode, and column 15, next to the grid, holds the scenes.
+Columns 1, 15 and 16 work the same in Session, Mixer and FX Mode. Column 1 is also the same in Linnstrument Mode (section 9) and Sequencer Mode (section 8), where Record, Capture and Shift + Play act on the selected track. Column 16, on the outer edge, holds Copy, Delete and the mode pads in every mode, and column 15, next to the grid, holds the scenes.
 
 **Fixed Length** is one pad: its colour shows the length, dark while off, then cyan, blue, magenta and pink. The length stays when you change mode.
 
 **Session, Mixer and FX** (column 16, pads 3–5) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode. In Session Mode, Session toggles the split view (section 3), and is pink while it's on.
 
-Pads 6 and 7 of column 16 are dark and do nothing: they're kept for Chord and Sequencer modes still to come. Pad 8 is **Dev** (below).
+Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to come. Pad 7 is **Seq**, which opens Sequencer Mode (section 8), and pad 8 is **Dev** (below).
 
 **Unmute all** (column 15, pad 7) acts on every track and return track in the Set, not just the window. With Shift held it's **Unsolo all**.
 
@@ -107,6 +107,7 @@ Pads 6 and 7 of column 16 are dark and do nothing: they're kept for Chord and Se
 - **Session**: Session Mode. In Session Mode, toggles the split view. *(Shift: Move the window left)*
 - **Mixer**: Mixer Mode. Press again for Session Mode. *(Shift: Move the window right)*
 - **FX**: FX Mode. Press again for Session Mode.
+- **Seq**: Hold and press a clip, or tap, for Sequencer Mode. *(Shift: Tempo +1 or -1 BPM)*
 - **Dev**: Hold for the Dev layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
 <!-- /callouts:side -->
 
@@ -123,7 +124,7 @@ Pads 6 and 7 of column 16 are dark and do nothing: they're kept for Chord and Se
 
 ### Dev
 
-Dev (column 16, pad 8, orange) is held, like Shift. While you hold it, its pad blinks fast and column 16 shows the Dev layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual. Dev works in Session, Mixer and FX Mode.
+Dev (column 16, pad 8, orange) is held, like Shift. While you hold it, its pad blinks fast and column 16 shows the Dev layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual. Dev works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
 
 ![Dev](manual/dev.svg)
 
@@ -218,7 +219,113 @@ FX Mode has eight horizontal faders for the selected device, and stores snapshot
 
 A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot yet (#63).
 
-## 8. Linnstrument Mode
+## 8. Sequencer Mode
+
+Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and hear notes. It works on Live's highlighted clip slot, and follows it when you click another slot in Live.
+
+**Opening it** with Seq (column 16, pad 7), which is cyan in Session, Mixer and FX Mode:
+
+- Tap Seq to open Sequencer Mode on the highlighted slot. If that slot is empty, it moves first to the clip in Live's Detail view, if that's a Session clip on a MIDI track, or else to the selected track's playing clip.
+- In Session Mode, hold Seq (it blinks fast) and press a clip slot to open Sequencer Mode on that slot. The clip doesn't launch, and an empty slot works too. In Mixer and FX Mode the grid ignores presses while Seq is held.
+- On an audio or group track, Seq says "Sequencer needs a MIDI track".
+- In Sequencer Mode, Seq or Session goes back to Session Mode, and Mixer or FX to that mode.
+
+**The arm.** Opening Sequencer Mode arms the track alone, so the note pads play it. Selecting another MIDI track, with Shift + Session or Mixer or by clicking it in Live, moves the arm with it. Leaving for Session, Mixer or FX puts every track's arm back as it was, except a track you armed or disarmed yourself in the meantime, and so does closing the Set or Live while in Sequencer Mode. Linnstrument Mode (column 1, pad 7) keeps the arm, so you play the track you were sequencing, and its Back returns to Sequencer Mode. Selecting an audio track in Live leaves the arm where it is, and the steps and note pads go dark.
+
+**An empty slot** gets a new MIDI clip when you add its first note, Fixed Length long, or 1 bar while Fixed Length is off.
+
+![Sequencer Mode](manual/sequencer.svg)
+
+<!-- callouts:sequencer-side -->
+- **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop the selected track's clips)*
+- **Record Clip**: Record a new clip on the selected track. *(Shift: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording)*
+- **Capture MIDI**: Capture MIDI. *(Shift: Quantize the current MIDI clip to 1/16 notes)*
+- **Metronome**: Metronome on/off. Blinks while on. *(Shift: Launch quantization on/off; red while off)*
+- **Fixed Length**: Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, then off.
+- **Undo**: Undo. *(Shift: Redo)*
+- **Linnstrument Mode**: Switch to Linnstrument Mode, keeping the arm. Back returns here. *(Shift: Show the scene page)*
+- **Shift**: Hold for the Shift layer.
+- **Copy**: Hold, press a step, then press steps to paste it onto.
+- **Delete**: Hold, then press a step to clear it, or a note pad to remove that note from the clip.
+- **Session**: Back to Session Mode. *(Shift: Select the previous or next MIDI track; the arm moves with it)*
+- **Mixer**: Mixer Mode. *(Shift: Select the previous or next MIDI track; the arm moves with it)*
+- **FX**: FX Mode.
+- **Seq**: Back to Session Mode. *(Shift: Tempo +1 or -1 BPM)*
+- **Dev**: Hold for the Dev layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
+<!-- /callouts:sequencer-side -->
+
+<!-- callouts:sequencer -->
+- **Steps**: 64 steps, top row first. Tap to add or remove the selected note. Hold a step and press a later one for one long note, or slide along the row to change its velocity.
+- **Notes**: Press to pick the note the steps edit, and hear it. Hold steps and press a note to add or remove it on them.
+- **Double**: Double the loop, notes and all.
+- **Halve**: Halve the loop. Notes past the new end stay in the clip.
+- **Follow**: Follow on/off: the steps show the page that's playing. Blue while on.
+- **Up/Down**: Move the note pads an octave up or down.
+- **Notes/Settings**: Switch columns 11–14 between the note pads and the settings.
+<!-- /callouts:sequencer -->
+
+**Steps** (columns 3–10): 64 steps, row by row from the top, of the page in view.
+
+- A step is orange if the selected note starts in it, blue if it only holds other notes, and dark if it's empty. The playhead is white. Steps past the loop end are dark and do nothing.
+- Tap a step to add a one-step note of the selected note, at the strength you struck the pad. Tap it again to remove it. The tap acts when you lift your finger.
+- Hold a step and press a later one for one note spanning both. It replaces the selected note's notes between them.
+- Hold steps and press a note pad to add or remove that note on each of them, at the strength you struck the note pad.
+- A note belongs to the step it starts nearest: a note that starts past a step's midpoint belongs to the next step.
+- Each edit is one undo.
+
+**Slides.** Hold a step and slide your finger along its row:
+
+- **Velocity:** slide right to raise the velocity of every note on the step, left to lower it, by about 16 per column, between 1 and 127. While you slide, the row is a meter of the velocity, orange for the selected note, or blue for the step's loudest note when the selected note isn't there.
+- **Nudge:** hold Shift as you press the step, then slide: each column moves its notes by an eighth of a step, later to the right, earlier to the left, never before the clip's start. A note nudged past the step's midpoint belongs to the next step, and its light moves there.
+- A slide starts once your finger has moved a quarter of a column. Until then, the hold works as a tap or as the start of a span. An empty step doesn't slide.
+- Your finger can slide over other pads without pressing them, until you lift it. Sliding onto the note pads doesn't sound them.
+- A slide is one undo, however far it goes. Other edits wait until you lift your finger.
+
+**Note pads** (columns 11–14): 32 notes, chromatic, with each row 4 semitones above the one below. C2 is at the bottom left.
+
+- Naturals are white, sharps and flats magenta. With Live's Scale Mode on, the root is cyan, the scale's other notes white, and the rest magenta. Every pad still plays.
+- Press a note pad to select it and hear it on the armed track, at the strength you struck it. The selected note blinks green, and a note playing in the clip lights yellow.
+- While you hold a step, the note pads in its row are silent, so a slide can cross them. Holding a step and pressing a note pad in another row still lets you hear the note.
+
+**On a Drum Rack** track, the note pads are the rack's pads, kept in step with Live's rack view:
+
+![Sequencer Mode on a Drum Rack](manual/sequencer-drums.svg)
+
+- Pads 5–8 (the near half) are the 16 pads Live's rack view shows, laid out as Live lays them out, and pads 1–4 the 16 above them. Pads with a sound are white in the near half and cyan in the far half; empty pads are dark but still play and select.
+- Up and Down scroll the rack a row of 4 at a time, and Live's rack view scrolls with them. Scrolling in Live moves the pads too.
+- Pressing a pad selects that drum pad in Live, and the steps edit it. Selecting a pad in Live does the same.
+- The rack is the track's first Drum Rack, also inside an Instrument Rack or another rack: BleakLoop looks through the track's devices in order, and through each rack's chains in order.
+
+**Copy and Delete:**
+
+- Hold Copy and press a step: it blinks red. Then press other steps to paste it. A paste replaces what the step holds with the copied notes, each with its pitch, velocity, length and position in the step. Keep holding Copy to paste again, on any page. An empty step can't be copied.
+- Hold Delete and press a step to clear it, or a note pad to remove that note from the whole clip.
+
+### Settings
+
+Column 15, pad 8 switches columns 11–14 between the note pads and the settings. It's blue while the settings show. Up and Down, just above it, move the note pads an octave in either view.
+
+![Sequencer Mode, settings](manual/sequencer-settings.svg)
+
+<!-- callouts:sequencer-settings -->
+- **Rates**: The step length: 1/4, 1/8, 1/16 or 1/32. The current one is blue.
+- **Triplet**: Triplet steps on/off: orange while on.
+- **Pages**: Pages 1–16 of 64 steps: 1–8 in column 12, 9–16 in column 13. Press one to show it, or hold one and press another to loop both.
+<!-- /callouts:sequencer-settings -->
+
+- A new rate changes how long a step is, not the notes: they stay where they are, and the steps redraw. The rate and Triplet stay while Live runs.
+- Each page is 64 steps. The page in view is blue, pages starting before the loop end are cyan, and pages past it are dark. The page that's playing blinks with the beat.
+- **Follow** (column 15, pad 4) is on whenever Sequencer Mode opens or moves to another track: the steps show the page that's playing, or page 1 while the clip is stopped. Pressing a page shows it and turns Follow off; pressing the playing page turns it back on.
+- Press a dark page past the loop end to extend the loop to the end of that page. Hold one page and press another to loop from the start of the first to the end of the last.
+- **Double** doubles the loop, copying its notes into the new half. **Halve** halves it, as long as it stays at least a step long.
+
+### With Shift held
+
+![Sequencer Mode with Shift held](manual/sequencer-shift.svg)
+
+Column 1 has Linnstrument Mode's Shift layer. Shift + Session and Shift + Mixer select the previous and next MIDI track, skipping audio and group tracks, and Shift + column 16 pads 7 and 8 step the tempo.
+
+## 9. Linnstrument Mode
 
 The LinnStrument is your instrument again. Column 1 keeps the controls it has in Session Mode, so the pads are where you know them. You're playing the selected track, so Record records a new clip on it, Capture captures MIDI to it, and Shift + Play stops its clips. Column 1 always opens on the controls page. Pad 7 is **Back**: it returns to the mode you came from, Session, Mixer or FX.
 
@@ -258,9 +365,10 @@ Shift + Back opens it. It shows the window's 6 scenes on pads 1–6. Press a sce
 - **Back**: Back to the controls without launching.
 <!-- /callouts:linnstrument-scenes -->
 
-## 9. Lights
+## 10. Lights
 
 - **Tempo blink** (dashed ring): on the beat while playing, and at the Set's tempo while stopped.
 - **Fast blink** (dotted ring): something held or chosen.
 - **Track colours** use the closest LinnStrument colour.
+- **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, and the playhead is white. A note pad lights yellow while its note plays, and the selected note blinks green.
 - On the LinnStrument, lime looks yellow and green looks lime.

@@ -44,6 +44,10 @@ TITLES = {
     Layer.LINNSTRUMENT: "Linnstrument Mode controls page",
     Layer.LINNSTRUMENT_SHIFT: "Linnstrument Mode with Shift held",
     Layer.LINNSTRUMENT_SCENES: "Linnstrument Mode scene page",
+    Layer.SEQUENCER: "Sequencer Mode",
+    Layer.SEQUENCER_SETTINGS: "Sequencer Mode, settings",
+    Layer.SEQUENCER_SHIFT: "Sequencer Mode with Shift held",
+    Layer.SEQUENCER_DRUMS: "Sequencer Mode on a Drum Rack",
 }
 
 INSTRUMENT_COLUMNS = range(2, 17)

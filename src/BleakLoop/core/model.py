@@ -36,6 +36,7 @@ class TrackView:
     selected: bool = False  # Live's selected track
     volume: float = 0.0  # Live's volume control position
     slots: tuple = ()  # one SlotView per window row that exists, top first
+    set_index: int | None = None  # index in song.tracks
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,59 @@ class SelectedTrack:
     armed: bool = False  # can_be_armed and (arm or implicit_arm)
     is_foldable: bool = False
     clips: tuple = ()  # one bool per scene in the Set, true if that slot has a clip
+
+
+@dataclass(frozen=True)
+class NoteView:
+    note_id: int
+    pitch: int
+    start: float  # beats from clip time 0
+    duration: float
+    velocity: float
+
+
+@dataclass(frozen=True)
+class ScaleView:
+    # Live 12's Scale Mode: the root and the intervals from it, both in semitones.
+    on: bool = False
+    root: int = 0
+    intervals: tuple = ()
+
+
+@dataclass(frozen=True)
+class DrumView:
+    scroll: int  # Live's drum_pads_scroll_position: the rack row at the bottom of its view
+    selected: int | None  # the selected drum pad's note
+    filled: frozenset  # the notes of the pads with chains
+
+
+@dataclass(frozen=True)
+class SequencerView:
+    # Sequencer Mode's target: Live's highlighted slot. Track indexes are song.tracks indexes.
+    track: int | None = None
+    name: str = ""
+    scene: int = 0
+    is_midi: bool = False  # a MIDI track: has MIDI input and isn't a group
+    has_clip: bool = False
+    is_playing: bool = False
+    loop_start: float = 0.0
+    loop_end: float = 0.0
+    position: float = 0.0  # the clip's playing position
+    notes: tuple = ()  # NoteView per note in the clip
+    drum: DrumView | None = None
+    scale: ScaleView = ScaleView()
+    midi_tracks: tuple = ()  # the song.tracks indexes of every MIDI track
+
+
+@dataclass(frozen=True)
+class SeqEntry:
+    # Read only while Seq is held: where a Seq tap enters. Track indexes are song.tracks indexes.
+    selected: int | None = None
+    selected_midi: bool = False
+    scene: int = 0  # Live's highlighted scene
+    has_clip: bool = False  # the highlighted slot has a clip
+    detail: tuple | None = None  # (track, scene) of the Detail-view clip, a Session MIDI clip
+    playing_scene: int | None = None  # the selected track's playing slot
 
 
 class ClipTarget(enum.Enum):
@@ -96,6 +150,11 @@ class Snapshot:
     any_soloed: bool = False
     # FaderView or None per fader row, pad 1 first; read only while the faders show.
     faders: tuple = ()
+    # Per song.tracks: True, False, or None when it can't be armed. Read only for Sequencer
+    # Mode.
+    arms: tuple = ()
+    sequencer: SequencerView | None = None  # read only in Sequencer Mode
+    seq_entry: SeqEntry | None = None  # read only while Seq is held
 
 
 @dataclass(frozen=True)
@@ -135,6 +194,7 @@ class PadPress:
     column: int
     pad: int
     pressed: bool
+    velocity: int = 127  # the strike velocity of a press
 
 
 @dataclass(frozen=True)
@@ -435,6 +495,76 @@ class StepTrack:
 @dataclass(frozen=True)
 class StepDevice:
     step: int  # -1 previous, 1 next
+
+
+# Sequencer Mode actions. Track indexes are song.tracks indexes.
+
+
+@dataclass(frozen=True)
+class HighlightSlot:
+    track: int
+    scene: int
+
+
+@dataclass(frozen=True)
+class SetArms:
+    arms: tuple  # (track, bool) per track to change
+
+
+@dataclass(frozen=True)
+class SelectSetTrack:
+    track: int
+
+
+@dataclass(frozen=True)
+class EditNotes:
+    # One undo step: create the clip if the slot is empty, remove, then add.
+    track: int
+    scene: int
+    remove: tuple = ()  # note ids
+    add: tuple = ()  # (pitch, start, duration, velocity) per note
+    create_length: float | None = None  # beats, for a new clip
+
+
+@dataclass(frozen=True)
+class RemovePitch:
+    track: int
+    scene: int
+    pitch: int
+
+
+@dataclass(frozen=True)
+class ModifyNotes:
+    track: int
+    scene: int
+    changes: tuple  # (note_id, start, velocity) per note
+
+
+@dataclass(frozen=True)
+class SetLoop:
+    track: int
+    scene: int
+    start: float
+    end: float
+
+
+@dataclass(frozen=True)
+class DuplicateLoop:
+    track: int
+    scene: int
+
+
+@dataclass(frozen=True)
+class SetDrumScroll:
+    # The track's Drum Rack view: the rack row at the bottom of Live's 16 pads.
+    track: int
+    position: int
+
+
+@dataclass(frozen=True)
+class SelectDrumPad:
+    track: int
+    note: int
 
 
 @dataclass(frozen=True)

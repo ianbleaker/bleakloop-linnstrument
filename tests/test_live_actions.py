@@ -13,10 +13,20 @@ from BleakLoop.core.model import (  # noqa: E402
     CopyGroupClips,
     CopyScene,
     DeleteGroupClips,
+    DuplicateLoop,
+    EditNotes,
     FaderBound,
+    HighlightSlot,
+    ModifyNotes,
+    RemovePitch,
+    SelectDrumPad,
     SaveFaderBindings,
+    SelectSetTrack,
     SetArm,
+    SetArms,
+    SetDrumScroll,
     SetFaderParameter,
+    SetLoop,
     StepDevice,
     StepTrack,
     ToggleSolo,
@@ -364,3 +374,193 @@ def test_save_fader_bindings():
     song = SimpleNamespace(set_data=lambda key, text: stored.update({key: text}))
     apply(SaveFaderBindings("{}"), song)
     assert stored == {"BleakLoop.faders": "{}"}
+
+
+# Sequencer Mode actions
+
+
+class FakeClip:
+    def __init__(self, loop_start=0.0, loop_end=4.0, end_marker=4.0, notes=()):
+        self.loop_start, self.loop_end, self.end_marker = loop_start, loop_end, end_marker
+        self.notes = list(notes)
+        self.calls = []
+
+    def __setattr__(self, name, value):
+        if name in ("loop_start", "loop_end") and hasattr(self, "calls"):
+            self.calls.append((name, value))
+        super().__setattr__(name, value)
+
+    def remove_notes_by_id(self, ids):
+        self.calls.append(("remove", ids))
+
+    def add_new_notes(self, specs):
+        self.calls.append(("add", specs))
+
+    def remove_notes_extended(self, *args):
+        self.calls.append(("remove_pitch", args))
+
+    def duplicate_loop(self):
+        self.calls.append(("duplicate",))
+
+    def get_notes_by_id(self, ids):
+        return [note for note in self.notes if note.note_id in ids]
+
+    def apply_note_modifications(self, notes):
+        self.calls.append(("modify", [(n.note_id, n.start_time, n.velocity) for n in notes]))
+
+
+class SeqSlot(FakeSlot):
+    def __init__(self, clip=None):
+        super().__init__(clip is not None)
+        self.clip = clip
+
+    def create_clip(self, length):
+        self.clip = FakeClip(loop_end=length, end_marker=length)
+        self.has_clip = True
+
+
+def seq_song(clip=None, armable=(True, True, False)):
+    tracks = [fake_track() for _ in armable]
+    for track, can in zip(tracks, armable):
+        track.can_be_armed = can
+    tracks[1].clip_slots = [SeqSlot(), SeqSlot(clip)]
+    song = fake_song(tracks, visible=tracks[:1])
+    song.view = SimpleNamespace(highlighted_clip_slot=None, selected_track=None)
+    return song
+
+
+@pytest.fixture
+def note_specs(monkeypatch):
+    clip_module = SimpleNamespace(MidiNoteSpecification=lambda **k: k)
+    monkeypatch.setattr(sys.modules["Live"], "Clip", clip_module, raising=False)
+
+
+def test_highlight_slot_uses_song_tracks():
+    song = seq_song()
+    apply(HighlightSlot(1, 1), song)
+    assert song.view.highlighted_clip_slot is song.tracks[1].clip_slots[1]
+
+
+def test_highlight_slot_skips_a_missing_track():
+    song = seq_song()
+    apply(HighlightSlot(5, 0), song)
+    assert song.view.highlighted_clip_slot is None
+
+
+def test_set_arms_skips_tracks_that_cant_be_armed():
+    song = seq_song()
+    apply(SetArms(((0, True), (2, True), (9, True))), song)
+    assert song.tracks[0].arm and not song.tracks[2].arm
+
+
+def test_select_set_track():
+    song = seq_song()
+    apply(SelectSetTrack(1), song)
+    assert song.view.selected_track is song.tracks[1]
+
+
+def test_edit_notes_is_one_undo_step(note_specs):
+    clip = FakeClip()
+    song = seq_song(clip)
+    apply(EditNotes(1, 1, remove=(3, 4), add=((48, 0.5, 0.25, 90),)), song)
+    assert song.undo == ["begin", "end"]
+    assert clip.calls == [
+        ("remove", [3, 4]),
+        ("add", ({"pitch": 48, "start_time": 0.5, "duration": 0.25, "velocity": 90},)),
+    ]
+
+
+def test_edit_notes_creates_the_clip(note_specs):
+    song = seq_song()
+    apply(EditNotes(1, 0, add=((48, 0.0, 0.25, 90),), create_length=6.0), song)
+    slot = song.tracks[1].clip_slots[0]
+    assert slot.has_clip and slot.clip.loop_end == 6.0
+    assert slot.clip.calls[-1][0] == "add"
+    assert song.undo == ["begin", "end"]
+
+
+def test_edit_notes_skips_an_empty_slot_without_a_length():
+    song = seq_song()
+    apply(EditNotes(1, 0, add=((48, 0.0, 0.25, 90),)), song)
+    assert song.undo == []
+
+
+def test_remove_pitch_covers_the_clip():
+    clip = FakeClip(loop_end=8.0, end_marker=12.0)
+    song = seq_song(clip)
+    apply(RemovePitch(1, 1, 50), song)
+    assert clip.calls == [("remove_pitch", (50, 1, 0.0, 12.0))]
+    assert song.undo == ["begin", "end"]
+
+
+def test_set_loop_moves_the_start_first_when_shrinking():
+    clip = FakeClip(loop_start=0.0, loop_end=16.0)
+    apply(SetLoop(1, 1, 4.0, 8.0), seq_song(clip))
+    assert clip.calls == [("loop_start", 4.0), ("loop_end", 8.0)]
+
+
+def test_set_loop_moves_the_end_first_past_it():
+    clip = FakeClip(loop_start=0.0, loop_end=4.0)
+    apply(SetLoop(1, 1, 16.0, 32.0), seq_song(clip))
+    assert clip.calls == [("loop_end", 32.0), ("loop_start", 16.0)]
+
+
+def test_duplicate_loop():
+    clip = FakeClip()
+    apply(DuplicateLoop(1, 1), seq_song(clip))
+    assert clip.calls == [("duplicate",)]
+
+
+def test_modify_notes():
+    notes = [SimpleNamespace(note_id=i, start_time=0.0, velocity=100) for i in (1, 2)]
+    clip = FakeClip(notes=notes)
+    apply(ModifyNotes(1, 1, ((2, 0.125, 64),)), seq_song(clip))
+    assert clip.calls == [("modify", [(2, 0.125, 64)])]
+
+
+@pytest.mark.parametrize(
+    "action",
+    [RemovePitch(1, 0, 48), SetLoop(1, 0, 0.0, 4.0), DuplicateLoop(1, 0), ModifyNotes(1, 0, ())],
+)
+def test_clip_actions_skip_an_empty_slot(action):
+    song = seq_song()
+    apply(action, song)
+    assert song.undo == []
+
+
+def drum_song():
+    song = seq_song()
+    pads = [SimpleNamespace(note=n) for n in range(128)]
+    rack = SimpleNamespace(
+        can_have_drum_pads=True,
+        drum_pads=pads,
+        view=SimpleNamespace(drum_pads_scroll_position=9, selected_drum_pad=pads[36]),
+    )
+    instrument_rack = SimpleNamespace(
+        can_have_drum_pads=False,
+        can_have_chains=True,
+        chains=[SimpleNamespace(devices=[rack])],
+    )
+    song.tracks[1].devices = [instrument_rack]
+    song.tracks[0].devices = []
+    return song, rack
+
+
+def test_set_drum_scroll():
+    song, rack = drum_song()
+    apply(SetDrumScroll(1, 12), song)
+    assert rack.view.drum_pads_scroll_position == 12
+
+
+def test_select_drum_pad():
+    song, rack = drum_song()
+    apply(SelectDrumPad(1, 40), song)
+    assert rack.view.selected_drum_pad is rack.drum_pads[40]
+
+
+@pytest.mark.parametrize("action", [SetDrumScroll(0, 3), SelectDrumPad(0, 40), SetDrumScroll(9, 3)])
+def test_drum_actions_skip_without_a_rack(action):
+    song, rack = drum_song()
+    apply(action, song)
+    assert rack.view.drum_pads_scroll_position == 9
+    assert rack.view.selected_drum_pad is rack.drum_pads[36]

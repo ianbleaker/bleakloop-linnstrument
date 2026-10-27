@@ -22,17 +22,17 @@ def test_source_release_with_target_column_velocity_is_swallowed():
     assert decoder.pad(3, 5, 70) == SlideMoved(5, 4, 5)
     assert decoder.pad(3, 4, 5) is None
     # Only once: the next message on the source goes through.
-    assert decoder.pad(3, 4, 100) == PadPress(4, 5, True)
+    assert decoder.pad(3, 4, 100) == PadPress(4, 5, True, 100)
 
 
 def test_plain_press_and_release_pass_through():
     decoder = SlideDecoder()
-    assert decoder.pad(7, 2, 100) == PadPress(2, 1, True)
-    assert decoder.pad(7, 2, 0) == PadPress(2, 1, False)
+    assert decoder.pad(7, 2, 100) == PadPress(2, 1, True, 100)
+    assert decoder.pad(7, 2, 0) == PadPress(2, 1, False, 0)
 
 
 def test_release_on_another_column_after_a_transfer_is_not_swallowed():
     decoder = SlideDecoder()
     decoder.transfer(1, 6)
-    assert decoder.pad(1, 9, 0) == PadPress(9, 7, False)
+    assert decoder.pad(1, 9, 0) == PadPress(9, 7, False, 0)
     assert decoder.pad(1, 7, 80) == SlideMoved(7, 6, 7)

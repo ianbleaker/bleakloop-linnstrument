@@ -1,16 +1,23 @@
 """Behaviour shared by Session and Linnstrument Mode: undo, metronome, Play/Stop, record, Fixed Length
-and scene lights."""
+and scene lights; shared by Session and Sequencer Mode: the tempo steps and the Dev layer."""
 
-from .leds import BLUE, GREEN, LIME, OFF, ORANGE, RED, WHITE, Blink, Light
+from dataclasses import replace
+
+from . import layout
+from .leds import BLUE, GREEN, LIME, MAGENTA, OFF, ORANGE, RED, WHITE, Blink, Light
 from .model import (
     ClearBackToArrangement,
     Redo,
     SetArrangementRecord,
     SetSessionRecord,
+    SetTempo,
     ShowMessage,
+    StepDevice,
+    StepTrack,
     ToggleMetronome,
     Undo,
 )
+from .values import TEMPO_MAX, TEMPO_MIN
 
 
 def metronome_light(snapshot):
@@ -38,6 +45,37 @@ def redo(snapshot):
     if snapshot.can_redo:
         return [Redo(), ShowMessage("Redo")]
     return [ShowMessage("Nothing to redo")]
+
+
+def tempo_step(snapshot, step):
+    # Shift + column 16 pads 7 and 8.
+    bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + step))
+    return [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
+
+
+def dev_layer(state, key):
+    # Dev held + a column 16 pad.
+    if key in layout.DEV_TRACK_STEPS:
+        return state, [StepTrack(layout.DEV_TRACK_STEPS[key])]
+    if key in layout.DEV_DEVICE_STEPS:
+        return state, [StepDevice(layout.DEV_DEVICE_STEPS[key])]
+    if key == layout.DEV_SOURCE:
+        mapped = state.fader_source == "device"
+        state = replace(state, fader_source="mapped" if mapped else "device")
+        return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
+    return state, []
+
+
+def render_dev_layer(frame):
+    # Over either layer: the whole of column 16.
+    for pad in range(1, layout.ROWS + 1):
+        frame[(layout.NAV_COLUMN, pad)] = Light(OFF)
+    for key in layout.DEV_TRACK_STEPS:
+        frame[key] = Light(LIME)
+    for key in layout.DEV_DEVICE_STEPS:
+        frame[key] = Light(MAGENTA)
+    frame[layout.DEV_SOURCE] = Light(ORANGE)
+    frame[layout.DEV] = Light(ORANGE, Blink.FAST)
 
 
 def record_length(bars, snapshot):

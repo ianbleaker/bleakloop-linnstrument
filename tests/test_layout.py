@@ -90,6 +90,7 @@ def test_reserved_pads_have_no_normal_role():
         layout.SESSION,
         layout.MIXER,
         layout.FX,
+        layout.SEQ,
         layout.DEV,
         layout.UNMUTE_ALL,
         layout.STOP,
@@ -98,7 +99,15 @@ def test_reserved_pads_have_no_normal_role():
 
 
 def test_column_16_has_one_pad_per_role():
-    roles = [layout.COPY, layout.DELETE, layout.SESSION, layout.MIXER, layout.FX, layout.DEV]
+    roles = [
+        layout.COPY,
+        layout.DELETE,
+        layout.SESSION,
+        layout.MIXER,
+        layout.FX,
+        layout.SEQ,
+        layout.DEV,
+    ]
     assert sorted(roles + list(layout.RESERVED)) == [(16, pad) for pad in range(1, 9)]
 
 

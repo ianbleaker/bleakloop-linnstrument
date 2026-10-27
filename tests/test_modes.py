@@ -12,6 +12,7 @@ from BleakLoop.core.modes import (
     Origin,
     SceneSource,
     State,
+    StepHold,
     Touch,
 )
 
@@ -113,3 +114,54 @@ def test_entry_turns_fx_off_but_keeps_the_morph(target):
     assert entered.fx_undo_open
     assert entered.fx_slots == slots
     assert entered.fx_landed == 1
+
+
+def test_entering_linnstrument_from_sequencer_records_the_origin():
+    state = State(mode=Mode.SEQUENCER)
+    assert modes.enter(state, Mode.LINNSTRUMENT).came_from is Origin.SEQUENCER
+
+
+def test_entering_sequencer_keeps_shift():
+    assert modes.enter(State(shift=True), Mode.SEQUENCER).shift
+
+
+def test_entering_sequencer_resets_holds_follow_and_the_view():
+    state = State(
+        seq_held=True,
+        seq_used=True,
+        seq_holds=(StepHold(0, 3, 1, 100),),
+        seq_copy_source=(0, ()),
+        seq_page_held=2,
+        seq_follow=False,
+        seq_page=3,
+        seq_settings=True,
+    )
+    entered = modes.enter(state, Mode.SEQUENCER)
+    assert entered.mode is Mode.SEQUENCER
+    assert not entered.seq_held and not entered.seq_used
+    assert entered.seq_holds == ()
+    assert entered.seq_copy_source is None
+    assert entered.seq_page_held is None
+    assert entered.seq_follow and entered.seq_page == 0
+    assert not entered.seq_settings
+
+
+@pytest.mark.parametrize("target", [Mode.SESSION, Mode.LINNSTRUMENT, Mode.SEQUENCER])
+def test_entry_keeps_the_sequencer_arm_and_settings(target):
+    state = State(
+        mode=Mode.SEQUENCER,
+        seq_saved_arms=(True, False),
+        seq_set_arms=(False, True),
+        seq_track=1,
+        seq_rate=0.5,
+        seq_triplet=True,
+        seq_base=60,
+        seq_pitch=62,
+    )
+    entered = modes.enter(state, target)
+    assert entered.seq_saved_arms == (True, False)
+    assert entered.seq_set_arms == (False, True)
+    assert entered.seq_track == 1
+    assert (entered.seq_rate, entered.seq_triplet) == (0.5, True)
+    assert (entered.seq_base, entered.seq_pitch) == (60, 62)
+

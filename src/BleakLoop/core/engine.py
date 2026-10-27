@@ -1,6 +1,6 @@
 """handle() and render(): all behaviour, no side effects."""
 
-from . import faders, fx, mixer, linnstrument_mode, session
+from . import faders, fx, mixer, linnstrument_mode, sequencer, session
 from .model import FaderBound, PadPress, RacksRead
 from .modes import Mode
 
@@ -13,6 +13,8 @@ def handle(state, event, snapshot):
         return faders.bound(state, event)
     if state.mode is Mode.SESSION:
         return session.handle(state, event, snapshot)
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.handle(state, event, snapshot)
     return linnstrument_mode.handle(state, event, snapshot)
 
 
@@ -24,20 +26,28 @@ def y_axis(state, event):
 
 
 def x_rows(state):
-    # The device rows that want X and slide mode: every row while the faders show.
+    # The device rows that want X and slide mode: every row while the faders show, and in
+    # Sequencer Mode the rows holding a step.
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.x_rows(state)
     return tuple(range(8)) if faders.visible(state) else ()
 
 
 def x_axis(state, event):
     # An X report: no snapshot, and a redraw flag.
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.x_axis(state, event)
     if state.mode is not Mode.SESSION:
         return state, [], False
     return faders.x_axis(state, event)
 
 
 def slide(state, event, snapshot):
-    # A slide no fader owns releases the pad it left.
-    state, owned = faders.slide(state, event)
+    # A slide no fader or held step owns releases the pad it left.
+    if state.mode is Mode.SEQUENCER:
+        state, owned = sequencer.slide(state, event)
+    else:
+        state, owned = faders.slide(state, event)
     if owned:
         return state, []
     return handle(state, PadPress(event.from_column, event.pad, False), snapshot)
@@ -57,9 +67,28 @@ def fx_tick(state, transport, values):
     return fx.tick(state, transport, values)
 
 
+def seq_sync(state, snapshot):
+    # On every display tick in Sequencer Mode: the arm follows Live's selected track.
+    if state.mode is not Mode.SEQUENCER:
+        return state, []
+    return sequencer.sync(state, snapshot)
+
+
+def seq_unload_arms(state, arms):
+    # On unload: the arm actions that put Sequencer Mode's saved arms back, if any are saved.
+    return sequencer.restore_arms(state, arms)
+
+
+def seq_phase(state, view):
+    # The playhead step, for the 10 ms timer's redraw key: no notes are read.
+    return sequencer.playhead(state, view)
+
+
 def render(state, snapshot):
     if state.mode is Mode.SESSION:
         return session.render(state, snapshot)
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.render(state, snapshot)
     return linnstrument_mode.render(state, snapshot)
 
 

@@ -6,10 +6,15 @@ from .core import layout, values
 from .core.model import (
     ClipTarget,
     ClipView,
+    DrumView,
     FaderView,
     MacroView,
+    NoteView,
     RackView,
+    ScaleView,
     SelectedTrack,
+    SeqEntry,
+    SequencerView,
     SlotView,
     Snapshot,
     TrackView,
@@ -35,21 +40,26 @@ def read(
     selected=False,
     faders=None,
     width=layout.WINDOW_TRACKS,
+    sequencer=None,
+    seq_entry=False,
 ):
     # faders: the core state whose faders show, or None while they're hidden.
+    # sequencer: Sequencer Mode's SequencerView, read by read_sequencer, or None outside it.
     tracks = list(song.visible_tracks)
     scenes = list(song.scenes)
     rows = range(window.scene, min(window.scene + layout.WINDOW_SCENES, len(scenes)))
     columns = range(window.track, min(window.track + width, len(tracks)))
     selected_track = song.view.selected_track
     mixable = list(song.tracks) + list(song.return_tracks)
+    set_tracks = list(song.tracks) if sequencer is not None or seq_entry else None
     return replace(
         read_transport(song, application),
         track_count=len(tracks),
         scene_count=len(scenes),
         # Group members' clips are costly too: only while Copy is held.
         tracks=tuple(
-            _track(song, i, tracks[i], rows, selected_track, scene_clips) for i in columns
+            _track(song, i, tracks[i], rows, selected_track, scene_clips, set_tracks)
+            for i in columns
         ),
         can_undo=song.can_undo,
         can_redo=song.can_redo,
@@ -73,7 +83,137 @@ def read(
         any_muted=any(track.mute for track in mixable),
         any_soloed=any(track.solo for track in mixable),
         faders=read_faders(song, faders) if faders is not None else (),
+        arms=_arms(set_tracks) if set_tracks is not None else (),
+        sequencer=sequencer,
+        seq_entry=read_seq_entry(song) if seq_entry else None,
     )
+
+
+def read_arms(song):
+    return _arms(list(song.tracks))
+
+
+def _arms(tracks):
+    # Live raises on reading arm state from a track that can't be armed.
+    return tuple(track.arm if track.can_be_armed else None for track in tracks)
+
+
+def _index(items, item):
+    # By equality: Live hands out a new wrapper per read.
+    return next((i for i, other in enumerate(items) if other == item), None)
+
+
+def _is_midi(track):
+    return track.has_midi_input and not track.is_foldable
+
+
+def read_sequencer(song):
+    # Sequencer Mode's target: Live's highlighted slot, every note of its clip, and the scale.
+    tracks = list(song.tracks)
+    scene = _index(list(song.scenes), song.view.selected_scene) or 0
+    track = song.view.selected_track
+    index = _index(tracks, track)
+    view = SequencerView(
+        scene=scene,
+        scale=ScaleView(song.scale_mode, song.root_note, tuple(song.scale_intervals)),
+        midi_tracks=tuple(i for i, other in enumerate(tracks) if _is_midi(other)),
+    )
+    if index is None:
+        return view
+    view = replace(view, track=index, name=track.name, is_midi=_is_midi(track))
+    if not view.is_midi:
+        return view
+    view = replace(view, drum=_drum(track))
+    slot = track.clip_slots[scene]
+    if not slot.has_clip:
+        return view
+    clip = slot.clip
+    notes = clip.get_notes_extended(0, 128, 0.0, max(clip.loop_end, clip.end_marker))
+    return replace(
+        view,
+        has_clip=True,
+        is_playing=clip.is_playing,
+        loop_start=clip.loop_start,
+        loop_end=clip.loop_end,
+        position=clip.playing_position,
+        notes=tuple(
+            NoteView(note.note_id, note.pitch, note.start_time, note.duration, note.velocity)
+            for note in notes
+        ),
+    )
+
+
+RACK_DEPTH = 8  # racks nest a few levels at most; this only guards against a parent loop
+
+
+def drum_rack(track, depth=RACK_DEPTH):
+    # The track's first Drum Rack, depth first: its devices in order, and inside a rack its
+    # chains in order, such as a Drum Rack inside an Instrument Rack. A Drum Rack's own pads
+    # aren't searched. None without one. live_actions resolves the drum actions with this too.
+    for device in track.devices:
+        if device.can_have_drum_pads:
+            return device
+        if device.can_have_chains and depth > 0:
+            for chain in device.chains:
+                found = drum_rack(chain, depth - 1)
+                if found is not None:
+                    return found
+    return None
+
+
+def _drum(track):
+    rack = drum_rack(track)
+    if rack is None:
+        return None
+    selected = rack.view.selected_drum_pad
+    return DrumView(
+        scroll=rack.view.drum_pads_scroll_position,
+        selected=selected.note if selected is not None else None,
+        filled=frozenset(pad.note for pad in rack.drum_pads if len(pad.chains) > 0),
+    )
+
+
+def read_seq_entry(song):
+    # Where a Seq tap enters: the highlighted slot, the Detail-view clip and the playing slot.
+    tracks = list(song.tracks)
+    scene = _index(list(song.scenes), song.view.selected_scene) or 0
+    track = song.view.selected_track
+    index = _index(tracks, track)
+    if index is None:
+        return SeqEntry(scene=scene, detail=_detail_slot(song, tracks))
+    playing = track.playing_slot_index
+    return SeqEntry(
+        selected=index,
+        selected_midi=_is_midi(track),
+        scene=scene,
+        has_clip=track.clip_slots[scene].has_clip,
+        detail=_detail_slot(song, tracks),
+        playing_scene=playing if playing >= 0 else None,
+    )
+
+
+def _detail_slot(song, tracks):
+    # (track, scene) of the Detail-view clip when it's a Session clip on a MIDI track. An
+    # Arrangement clip's parent is its track, not a slot.
+    clip = song.view.detail_clip
+    if clip is None:
+        return None
+    slot = clip.canonical_parent
+    owner = getattr(slot, "canonical_parent", None)
+    index = _index(tracks, owner)
+    if index is None or not _is_midi(owner):
+        return None
+    scene = _index(list(owner.clip_slots), slot)
+    return None if scene is None else (index, scene)
+
+
+def read_position(song):
+    # The 10 ms timer's read: whether the highlighted slot's clip plays, and where.
+    slot = song.view.highlighted_clip_slot
+    if slot is None or not slot.has_clip:
+        return False, 0.0
+    clip = slot.clip
+    return clip.is_playing, clip.playing_position
 
 
 FADER_ROWS = 8
@@ -244,7 +384,7 @@ def _selected_track(song, tracks, scenes):
     )
 
 
-def _track(song, index, track, rows, selected_track, read_members=False):
+def _track(song, index, track, rows, selected_track, read_members=False, set_tracks=None):
     slots = track.clip_slots
     members = group_members(song, track) if read_members and track.is_foldable else []
     # Live raises on reading arm state from a track that can't be armed.
@@ -263,6 +403,7 @@ def _track(song, index, track, rows, selected_track, read_members=False):
         selected=track == selected_track,
         volume=track.mixer_device.volume.value,
         slots=tuple(_slot(slots[scene], members, scene) for scene in rows),
+        set_index=_index(set_tracks, track) if set_tracks is not None else None,
     )
 
 

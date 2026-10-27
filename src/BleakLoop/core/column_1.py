@@ -1,7 +1,7 @@
 """Column 1: the control column, the same in every mode, and Linnstrument Mode's scene page.
 
-In Linnstrument Mode the player is playing the selected track, so Record, Capture and
-Shift + Play/Stop act on it.
+In Linnstrument and Sequencer Mode the player is on the selected track, so Record, Capture
+and Shift + Play/Stop act on it.
 """
 
 from dataclasses import replace
@@ -22,6 +22,7 @@ from .leds import (
 )
 from .model import (
     AddScene,
+    EndUndoStep,
     CaptureAndInsertScene,
     CaptureMidi,
     ClipTarget,
@@ -76,7 +77,7 @@ def handle(state, event, snapshot):
 
 
 def _normal(state, key, snapshot):
-    linnstrument = state.mode is Mode.LINNSTRUMENT
+    linnstrument = state.mode is not Mode.SESSION
     if key == layout.PLAY_STOP:
         return state, [TogglePlay()]
     if key == layout.RECORD:
@@ -92,8 +93,18 @@ def _normal(state, key, snapshot):
     if key == layout.UNDO:
         return state, controls.undo(snapshot)
     if key == layout.MODE_PAD:
-        if linnstrument:
+        if state.mode is Mode.LINNSTRUMENT:
             return _back(state)
+        if state.mode is Mode.SEQUENCER:
+            # The arm stays: the player plays the track they were sequencing.
+            actions = []
+            if state.seq_undo_open:
+                state = replace(state, seq_undo_open=False)
+                actions.append(EndUndoStep())
+            return (
+                modes.enter(state, Mode.LINNSTRUMENT),
+                actions + [EnterMode(Mode.LINNSTRUMENT)],
+            )
         state, actions = mixer.reset(state)
         state, more = faders.reset(state)
         return (
@@ -105,7 +116,7 @@ def _normal(state, key, snapshot):
 
 def _shift(state, key, snapshot):
     # Session Shift + Record, Session Shift + Mode and Shift + Fixed Length do nothing.
-    linnstrument = state.mode is Mode.LINNSTRUMENT
+    linnstrument = state.mode is not Mode.SESSION
     if key == layout.PLAY_STOP:
         if linnstrument:
             return state, _stop_track(snapshot)
@@ -125,6 +136,8 @@ def _shift(state, key, snapshot):
 
 def _back(state):
     # Back to the layer Linnstrument Mode was entered from, through its own entry path.
+    if state.came_from is Origin.SEQUENCER:
+        return modes.enter(state, Mode.SEQUENCER), [EnterMode(Mode.SEQUENCER)]
     state = modes.enter(state, Mode.SESSION)
     actions = [EnterMode(Mode.SESSION)]
     if state.came_from is Origin.MIXER:
@@ -241,7 +254,7 @@ def render(state, snapshot):
         frame[layout.MODE_PAD] = Light(OFF)
         frame[layout.SHIFT] = shift_held
         return frame
-    linnstrument = state.mode is Mode.LINNSTRUMENT
+    linnstrument = state.mode is not Mode.SESSION
     if state.shift and not state.copy and not state.delete:
         frame = {
             layout.PLAY_STOP: Light(RED),

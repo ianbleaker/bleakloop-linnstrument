@@ -341,3 +341,217 @@ def test_the_split_view_reads_8_tracks():
     song = fake_song([fake_track(str(i)) for i in range(20)])
     snapshot = live_state.read(song, APPLICATION, Window(), width=8)
     assert [track.name for track in snapshot.tracks] == [str(i) for i in range(8)]
+
+
+# Sequencer Mode reads
+
+
+class FakeNote:
+    def __init__(self, note_id, pitch, start_time, duration=0.25, velocity=100.0):
+        self.note_id, self.pitch, self.start_time = note_id, pitch, start_time
+        self.duration, self.velocity = duration, velocity
+
+
+def fake_clip(notes=(), loop_start=0.0, loop_end=4.0, end_marker=4.0, playing=False):
+    clip = SimpleNamespace(
+        loop_start=loop_start,
+        loop_end=loop_end,
+        end_marker=end_marker,
+        is_playing=playing,
+        playing_position=1.5 if playing else 0.0,
+        reads=[],
+    )
+    clip.get_notes_extended = lambda *args: clip.reads.append(args) or list(notes)
+    return clip
+
+
+def seq_track(name, midi=True, foldable=False, armable=True, arm=False, clips=None, playing=-1):
+    track = fake_track(name)
+    track.has_midi_input = midi
+    track.is_foldable = foldable
+    track.can_be_armed = armable
+    track.arm = arm
+    track.playing_slot_index = playing
+    track.devices = []
+    clips = clips or {}
+    track.clip_slots = [
+        SimpleNamespace(
+            has_clip=scene in clips,
+            clip=clips.get(scene),
+            is_playing=False, is_triggered=False, is_recording=False,
+            is_group_slot=False, controls_other_clips=False,
+            canonical_parent=track,
+        )
+        for scene in range(4)
+    ]
+    for clip in clips.values():
+        if clip is not None:
+            clip.canonical_parent = next(s for s in track.clip_slots if s.clip is clip)
+    return track
+
+
+def seq_song(tracks, selected, scene=0, detail=None):
+    scenes = [SimpleNamespace(is_triggered=False, number=n) for n in range(4)]
+    song = fake_song(tracks, selected=selected, scenes=scenes)
+    song.view.selected_scene = scenes[scene]
+    song.view.detail_clip = detail
+    song.scale_mode = True
+    song.root_note = 2
+    song.scale_intervals = [0, 2, 3, 5, 7, 8, 10]
+    return song
+
+
+def test_set_index_arms_and_entry_only_for_the_sequencer():
+    keys = seq_track("Keys", arm=True)
+    group = seq_track("Group", foldable=True, armable=False)
+    # A folded member is in song.tracks but not visible.
+    member = seq_track("Member")
+    song = seq_song([keys, group, member], selected=keys)
+    song.visible_tracks = [keys, group]
+    plain = live_state.read(song, APPLICATION, Window())
+    assert plain.arms == () and plain.seq_entry is None
+    assert plain.tracks[1].set_index is None
+    snapshot = live_state.read(song, APPLICATION, Window(), seq_entry=True)
+    assert snapshot.arms == (True, None, False)
+    assert [track.set_index for track in snapshot.tracks] == [0, 1]
+    assert snapshot.seq_entry.selected == 0
+
+
+def test_read_sequencer_reads_the_highlighted_clip():
+    clip = fake_clip(
+        [FakeNote(5, 48, 0.25), FakeNote(6, 50, 1.0, 0.5, 90.0)],
+        loop_start=1.0,
+        loop_end=8.0,
+        end_marker=6.0,
+        playing=True,
+    )
+    audio = seq_track("Audio", midi=False)
+    keys = seq_track("Keys", clips={2: clip})
+    song = seq_song([audio, keys], selected=keys, scene=2)
+    view = live_state.read_sequencer(song)
+    assert (view.track, view.name, view.scene, view.is_midi) == (1, "Keys", 2, True)
+    assert (view.has_clip, view.is_playing, view.position) == (True, True, 1.5)
+    assert (view.loop_start, view.loop_end) == (1.0, 8.0)
+    assert [(n.note_id, n.pitch, n.start, n.duration, n.velocity) for n in view.notes] == [
+        (5, 48, 0.25, 0.25, 100.0),
+        (6, 50, 1.0, 0.5, 90.0),
+    ]
+    assert clip.reads == [(0, 128, 0.0, 8.0)]
+    assert view.midi_tracks == (1,)
+    assert (view.scale.on, view.scale.root, view.scale.intervals) == (
+        True,
+        2,
+        (0, 2, 3, 5, 7, 8, 10),
+    )
+
+
+def test_read_sequencer_on_an_empty_slot():
+    keys = seq_track("Keys")
+    view = live_state.read_sequencer(seq_song([keys], selected=keys, scene=1))
+    assert view.track == 0 and view.is_midi and not view.has_clip
+
+
+def test_read_sequencer_on_an_audio_track_reads_no_notes():
+    audio = seq_track("Audio", midi=False, clips={0: fake_clip()})
+    view = live_state.read_sequencer(seq_song([audio], selected=audio))
+    assert view.track == 0 and not view.is_midi and not view.has_clip
+
+
+def test_read_sequencer_on_master():
+    keys = seq_track("Keys")
+    view = live_state.read_sequencer(seq_song([keys], selected=fake_track("Master")))
+    assert view.track is None and view.midi_tracks == (0,)
+
+
+def test_seq_entry_finds_the_detail_clip_and_the_playing_slot():
+    clip = fake_clip()
+    keys = seq_track("Keys", playing=3)
+    other = seq_track("Other", clips={1: clip})
+    song = seq_song([keys, other], selected=keys, scene=2, detail=clip)
+    entry = live_state.read_seq_entry(song)
+    assert (entry.selected, entry.selected_midi, entry.scene, entry.has_clip) == (0, True, 2, False)
+    assert entry.detail == (1, 1)
+    assert entry.playing_scene == 3
+
+
+def test_seq_entry_ignores_an_arrangement_clip():
+    clip = fake_clip()
+    keys = seq_track("Keys")
+    clip.canonical_parent = keys  # an Arrangement clip's parent is its track
+    entry = live_state.read_seq_entry(seq_song([keys], selected=keys, detail=clip))
+    assert entry.detail is None and entry.playing_scene is None
+
+
+def test_seq_entry_ignores_a_detail_clip_on_an_audio_track():
+    clip = fake_clip()
+    keys = seq_track("Keys")
+    audio = seq_track("Audio", midi=False, clips={0: clip})
+    entry = live_state.read_seq_entry(seq_song([keys, audio], selected=keys, detail=clip))
+    assert entry.detail is None
+
+
+def test_read_position():
+    clip = fake_clip(playing=True)
+    song = seq_song([], selected=None)
+    assert live_state.read_position(song) == (False, 0.0)
+    song.view.highlighted_clip_slot = SimpleNamespace(has_clip=True, clip=clip)
+    assert live_state.read_position(song) == (True, 1.5)
+
+
+def fake_rack(scroll=9, selected=36, filled=(36, 38)):
+    pads = [SimpleNamespace(note=n, chains=[object()] if n in filled else []) for n in range(128)]
+    view = SimpleNamespace(
+        drum_pads_scroll_position=scroll,
+        selected_drum_pad=pads[selected] if selected is not None else None,
+    )
+    return SimpleNamespace(
+        can_have_drum_pads=True, can_have_chains=True, view=view, drum_pads=pads, chains=[]
+    )
+
+
+def fake_instrument(chains=()):
+    return SimpleNamespace(
+        can_have_drum_pads=False, can_have_chains=bool(chains), chains=list(chains)
+    )
+
+
+def fake_chain(*devices):
+    return SimpleNamespace(devices=list(devices))
+
+
+def test_read_sequencer_reads_the_first_drum_rack():
+    drums = seq_track("Drums")
+    drums.devices = [fake_instrument(), fake_rack(), fake_rack(scroll=3)]
+    view = live_state.read_sequencer(seq_song([drums], selected=drums))
+    assert view.drum.scroll == 9
+    assert view.drum.selected == 36
+    assert view.drum.filled == frozenset({36, 38})
+
+
+def test_a_drum_rack_with_no_selected_pad():
+    drums = seq_track("Drums")
+    drums.devices = [fake_rack(selected=None)]
+    view = live_state.read_sequencer(seq_song([drums], selected=drums))
+    assert view.drum.selected is None
+
+
+def test_a_melodic_track_has_no_drum_view():
+    keys = seq_track("Keys")
+    keys.devices = [fake_instrument(), fake_instrument([fake_chain(fake_instrument())])]
+    assert live_state.read_sequencer(seq_song([keys], selected=keys)).drum is None
+
+
+def test_a_drum_rack_inside_an_instrument_rack():
+    drums = seq_track("Drums")
+    inner = fake_rack(scroll=4)
+    instrument_rack = fake_instrument([fake_chain(fake_instrument()), fake_chain(inner)])
+    drums.devices = [instrument_rack, fake_rack(scroll=9)]
+    assert live_state.drum_rack(drums) is inner
+    assert live_state.read_sequencer(seq_song([drums], selected=drums)).drum.scroll == 4
+
+
+def test_a_drum_rack_s_own_pads_arent_searched():
+    outer = fake_rack(scroll=2)
+    outer.chains = [fake_chain(fake_rack(scroll=5))]
+    track = SimpleNamespace(devices=[outer])
+    assert live_state.drum_rack(track) is outer

@@ -33,6 +33,7 @@ from BleakLoop.core.model import (
     DeleteScene,
     EndUndoStep,
     EnterMode,
+    HighlightSlot,
     FireScene,
     FireSlot,
     PadPress,
@@ -40,6 +41,8 @@ from BleakLoop.core.model import (
     Redo,
     SceneSelected,
     SelectTrack,
+    SeqEntry,
+    SetArms,
     SetArm,
     SetArrangementRecord,
     SetLaunchQuantization,
@@ -477,7 +480,7 @@ def test_normal_layer_column_16():
     frame = session.render(SESSION, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
         Light(MAGENTA), Light(RED), Light(BLUE), Light(CYAN),
-        Light(CYAN), Light(OFF), Light(OFF), Light(ORANGE),
+        Light(CYAN), Light(OFF), Light(CYAN), Light(ORANGE),
     ]
 
 
@@ -1574,3 +1577,141 @@ def test_shift_midi_recording_enters_linnstrument_without_shift():
     assert state.mode is Mode.LINNSTRUMENT
     assert not state.shift
     assert actions == [FireSlot(0, 0, legato=True), ShowClip(0, 0), EnterMode(Mode.LINNSTRUMENT)]
+
+
+# Seq: entering Sequencer Mode
+
+
+def seq_snapshot(entry=None, arms=(False, True, None, False), **k):
+    # Window tracks T1-T4 are song.tracks 0-3: T1 and T4 MIDI, T2 audio (armed), T3 a group.
+    snapshot = replace(SNAP, arms=arms, seq_entry=entry, **k)
+    snapshot = with_track(snapshot, 2, set_index=0, has_midi_input=True)
+    snapshot = with_track(snapshot, 3, set_index=1)
+    snapshot = with_track(snapshot, 4, set_index=2, has_midi_input=True, is_foldable=True)
+    return with_track(snapshot, 5, set_index=3, has_midi_input=True)
+
+
+SEQ_HELD = State(seq_held=True)
+ENTERED = [SetArms(((0, True), (1, False))), EnterMode(Mode.SEQUENCER), ShowMessage("Sequencer")]
+
+
+def tap(state, snapshot):
+    held, actions = handle(state, layout.SEQ, snapshot)
+    assert held.seq_held and not held.seq_used and actions == []
+    return handle(held, layout.SEQ, snapshot, pressed=False)
+
+
+def test_seq_tap_on_a_highlighted_clip():
+    snapshot = seq_snapshot(SeqEntry(selected=0, selected_midi=True, has_clip=True))
+    state, actions = tap(SESSION, snapshot)
+    assert state.mode is Mode.SEQUENCER
+    assert actions == ENTERED
+    assert state.seq_track == 0
+    assert state.seq_saved_arms == (False, True, None, False)
+    assert state.seq_set_arms == (True, False, None, False)
+
+
+def test_seq_tap_on_an_empty_slot_moves_to_the_detail_clip():
+    entry = SeqEntry(selected=0, selected_midi=True, scene=2, detail=(3, 5), playing_scene=1)
+    state, actions = tap(SESSION, seq_snapshot(entry))
+    assert actions[0] == HighlightSlot(3, 5)
+    assert state.seq_track == 3
+    assert actions[1] == SetArms(((1, False), (3, True)))
+
+
+def test_seq_tap_on_an_empty_slot_moves_to_the_playing_clip():
+    entry = SeqEntry(selected=0, selected_midi=True, scene=2, playing_scene=1)
+    state, actions = tap(SESSION, seq_snapshot(entry))
+    assert actions == [HighlightSlot(0, 1)] + ENTERED
+
+
+def test_seq_tap_on_an_empty_slot_with_no_other_clip_stays():
+    entry = SeqEntry(selected=0, selected_midi=True, scene=2)
+    state, actions = tap(SESSION, seq_snapshot(entry))
+    assert state.mode is Mode.SEQUENCER
+    assert actions == ENTERED
+
+
+@pytest.mark.parametrize("entry", [None, SeqEntry(), SeqEntry(selected=1, has_clip=True)])
+def test_seq_tap_needs_a_midi_track(entry):
+    state, actions = tap(SESSION, seq_snapshot(entry))
+    assert state == SESSION
+    assert actions == [ShowMessage("Sequencer needs a MIDI track")]
+
+
+@pytest.mark.parametrize("pad", [1, 4])
+def test_seq_and_a_slot_enters_on_it(pad):
+    # A clip or an empty slot alike; the clip doesn't launch.
+    snapshot = seq_snapshot()
+    snapshot = with_track(snapshot, 2, slots=tuple(SlotView(has_clip=p == 0) for p in range(6)))
+    state, actions = handle(SEQ_HELD, (2, pad), snapshot)
+    assert state.mode is Mode.SEQUENCER
+    assert actions == [HighlightSlot(0, pad - 1)] + ENTERED
+
+
+def test_seq_and_a_slot_uses_the_window():
+    state = replace(SEQ_HELD, window=Window(0, 3))
+    _, actions = handle(state, (5, 2), seq_snapshot())
+    assert actions[0] == HighlightSlot(3, 4)
+
+
+@pytest.mark.parametrize("column", [3, 4])
+def test_seq_and_an_audio_or_group_slot_refuses(column):
+    state, actions = handle(SEQ_HELD, (column, 1), seq_snapshot())
+    assert state == replace(SEQ_HELD, seq_used=True)
+    assert actions == [ShowMessage("Sequencer needs a MIDI track")]
+
+
+def test_the_release_after_seq_and_a_slot_does_nothing():
+    snapshot = seq_snapshot(SeqEntry(selected=0, selected_midi=True, has_clip=True))
+    state, _ = handle(SEQ_HELD, (3, 1), snapshot)
+    assert handle(state, layout.SEQ, snapshot, pressed=False) == (SESSION, [])
+
+
+@pytest.mark.parametrize("key", [(2, 7), (2, 8), layout.UNMUTE_ALL, layout.MIXER, layout.PLAY_STOP])
+def test_seq_and_any_other_pad_does_nothing(key):
+    assert handle(SEQ_HELD, key, seq_snapshot()) == (replace(SEQ_HELD, seq_used=True), [])
+
+
+def test_shift_and_seq_is_the_tempo_step():
+    snapshot = seq_snapshot(SeqEntry(selected=0, selected_midi=True, has_clip=True))
+    state, actions = handle(SHIFT, layout.SEQ, snapshot)
+    assert state == SHIFT
+    assert actions[0] == SetTempo(121.0)
+    assert handle(state, layout.SEQ, snapshot, pressed=False) == (SHIFT, [])
+
+
+@pytest.mark.parametrize("state", [MIXING, FX_ON])
+def test_seq_tap_from_mixer_and_fx(state):
+    snapshot = seq_snapshot(SeqEntry(selected=0, selected_midi=True, has_clip=True))
+    entered, actions = tap(state, snapshot)
+    assert entered.mode is Mode.SEQUENCER
+    assert not entered.mixer and not entered.fx
+    assert actions == ENTERED
+
+
+@pytest.mark.parametrize("state", [MIXING, FX_ON])
+def test_mixer_and_fx_grid_ignore_presses_while_seq_is_held(state):
+    held = replace(state, seq_held=True)
+    assert handle(held, (2, 1), seq_snapshot()) == (replace(held, seq_used=True), [])
+
+
+def test_seq_entry_closes_a_mixer_gesture():
+    state = replace(MIXING, seq_held=True, undo_open=True)
+    snapshot = seq_snapshot(SeqEntry(selected=0, selected_midi=True, has_clip=True))
+    entered, actions = handle(state, layout.SEQ, snapshot, pressed=False)
+    assert not entered.undo_open
+    assert actions[0] == EndUndoStep()
+
+
+def test_seq_entry_sets_only_changed_arms():
+    snapshot = seq_snapshot(
+        SeqEntry(selected=0, selected_midi=True, has_clip=True), arms=(True, False, None)
+    )
+    _, actions = tap(SESSION, snapshot)
+    assert actions == [EnterMode(Mode.SEQUENCER), ShowMessage("Sequencer")]
+
+
+def test_seq_blinks_while_held():
+    assert session.render(SESSION, SNAP)[layout.SEQ] == Light(CYAN)
+    assert session.render(SEQ_HELD, SNAP)[layout.SEQ] == Light(CYAN, Blink.FAST)

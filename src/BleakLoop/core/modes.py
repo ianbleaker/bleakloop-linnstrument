@@ -3,19 +3,23 @@
 import enum
 from dataclasses import dataclass, replace
 
+from . import values
 from .layout import Window
 
 
 class Mode(enum.Enum):
     SESSION = enum.auto()
     LINNSTRUMENT = enum.auto()
+    SEQUENCER = enum.auto()
 
 
 class Origin(enum.Enum):
-    # The Session Mode layer Linnstrument Mode was entered from, which Back returns to.
+    # The Session Mode layer, or Sequencer Mode, Linnstrument Mode was entered from, which
+    # Back returns to.
     SESSION = enum.auto()
     MIXER = enum.auto()
     FX = enum.auto()
+    SEQUENCER = enum.auto()
 
 
 @dataclass(frozen=True)
@@ -125,6 +129,23 @@ class Morph:
 
 
 @dataclass(frozen=True)
+class StepHold:
+    # One finger on a Sequencer Mode step.
+    step: int  # the global step, from clip time 0
+    column: int  # the cell the finger is on, which a slide moves
+    pad: int
+    velocity: int  # the strike velocity
+    used: bool = False  # by a span, a note pad, a slide or a paste: no toggle on release
+    shift: bool = False  # Shift was held at the press: a slide nudges
+    x0: int | None = None  # the first X report
+    notes: tuple = ()  # the step's NoteViews at the press, which a slide moves
+    sliding: bool = False
+    target: tuple | None = None  # (track, scene) at the press: an X report has no snapshot
+    length: float = 0.0  # the step length at the press, in beats
+    moved: int = 0  # the slide's last written velocity change, or nudge in columns
+
+
+@dataclass(frozen=True)
 class State:
     mode: Mode = Mode.SESSION
     window: Window = Window()
@@ -156,6 +177,25 @@ class State:
     dev: bool = False  # Dev is held
     split: bool = False  # Session Mode's split view
     fader_bindings: tuple = (None,) * 8  # Mapped FX: FaderBinding or None per row
+    seq_held: bool = False  # Seq is held in Session Mode
+    seq_used: bool = False  # the Seq hold entered on a slot: its release does nothing
+    # Sequencer Mode's arm: per song.tracks, the arm before entry and what BleakLoop set.
+    seq_saved_arms: tuple | None = None
+    seq_set_arms: tuple | None = None
+    seq_track: int | None = None  # the song.tracks index BleakLoop last armed
+    seq_refused: int | None = None  # the non-MIDI track the selection last moved to
+    seq_rate: float = values.SEQ_DEFAULT_RATE  # beats per step, before Triplet
+    seq_triplet: bool = False
+    seq_follow: bool = True
+    seq_page: int = 0  # the page in view while Follow is off
+    seq_page_held: int | None = None
+    seq_settings: bool = False  # columns 11-14 show the settings, not the note pads
+    seq_base: int = values.SEQ_BASE_NOTE  # the melodic note pads' bottom-left note
+    seq_pitch: int = values.SEQ_BASE_NOTE  # the selected note on a melodic track
+    seq_holds: tuple = ()  # StepHold per held step
+    # (step, notes) of the copied step, each note (pitch, offset in the step, duration, velocity)
+    seq_copy_source: tuple | None = None
+    seq_undo_open: bool = False  # a slide's undo step is open in Live
 
 
 def enter(state, mode):
@@ -168,9 +208,13 @@ def enter(state, mode):
     # leaving the faders closes theirs (faders.reset). The split view, the fader source and
     # the bindings survive.
     # FX Mode turns off, but a running morph, its undo step and the snapshots carry on.
+    # Sequencer Mode's holds reset; its arm, rate, Triplet, note range and pitch survive. A
+    # caller leaving it closes a slide's undo step first.
     if mode is Mode.LINNSTRUMENT and state.mode is Mode.SESSION:
         origin = Origin.MIXER if state.mixer else Origin.FX if state.fx else Origin.SESSION
         state = replace(state, came_from=origin)
+    elif mode is Mode.LINNSTRUMENT and state.mode is Mode.SEQUENCER:
+        state = replace(state, came_from=Origin.SEQUENCER)
     state = replace(
         state,
         mode=mode,
@@ -190,7 +234,15 @@ def enter(state, mode):
         fx_length=None,
         dev=False,
         fader_touches=(),
+        seq_held=False,
+        seq_used=False,
+        seq_holds=(),
+        seq_copy_source=None,
+        seq_page_held=None,
     )
-    if mode is not Mode.SESSION:
+    if mode is Mode.SEQUENCER:
+        # Page 1: a page pinned on another clip can lie past this one's end.
+        state = replace(state, seq_follow=True, seq_page=0, seq_settings=False)
+    if mode is Mode.LINNSTRUMENT:
         state = replace(state, shift=False)
     return state

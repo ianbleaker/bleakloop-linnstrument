@@ -78,6 +78,12 @@ LAUNCH_QUANTIZATION = _one(
 )
 REDO = _one("Redo", layout.UNDO, "Redo.")
 SHIFT_HELD = Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False)
+DEV = _one("Dev", layout.DEV, "Hold for the Dev layer: tracks, devices and the fader source.")
+TEMPO = Item(
+    "Tempo",
+    {key: "Tempo+" if step > 0 else "Tempo-" for key, step in layout.TEMPO_STEPS.items()},
+    "Tempo +1 or -1 BPM.",
+)
 
 # Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
 _SIDE = (
@@ -119,7 +125,12 @@ _SIDE = (
     _one("Session", layout.SESSION, "Session Mode. In Session Mode, toggles the split view."),
     _one("Mixer", layout.MIXER, "Mixer Mode. Press again for Session Mode."),
     _one("FX", layout.FX, "FX Mode. Press again for Session Mode."),
-    _one("Dev", layout.DEV, "Hold for the Dev layer: tracks, devices and the fader source."),
+    _one(
+        "Seq",
+        layout.SEQ,
+        "Hold and press a clip, or tap, for Sequencer Mode.",
+    ),
+    DEV,
 )
 
 _SIDE_SHIFT = (
@@ -144,11 +155,7 @@ _SIDE_SHIFT = (
         _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
         for key, name in zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))
     ),
-    Item(
-        "Tempo",
-        {key: "Tempo+" if step > 0 else "Tempo-" for key, step in layout.TEMPO_STEPS.items()},
-        "Tempo +1 or -1 BPM.",
-    ),
+    TEMPO,
     SHIFT_HELD,
 )
 
@@ -268,15 +275,18 @@ _DEV = (
     Item("Dev", {layout.DEV: "Dev"}, "Held.", variant=False),
 )
 
+RECORD_CLIP = _one(
+    "Record Clip",
+    layout.RECORD,
+    "Record a new clip on the selected track.",
+    label="RecClip",
+)
+CAPTURE_MIDI = _one("Capture MIDI", layout.CAPTURE, "Capture MIDI.", label="CapMIDI")
+
 _LINNSTRUMENT = (
     PLAY,
-    _one(
-        "Record Clip",
-        layout.RECORD,
-        "Record a new clip on the selected track.",
-        label="RecClip",
-    ),
-    _one("Capture MIDI", layout.CAPTURE, "Capture MIDI.", label="CapMIDI"),
+    RECORD_CLIP,
+    CAPTURE_MIDI,
     METRONOME,
     FIXED_LENGTH,
     UNDO,
@@ -284,26 +294,130 @@ _LINNSTRUMENT = (
     SHIFT,
 )
 
+STOP_TRACK = _one(
+    "Stop track", layout.PLAY_STOP, "Stop the selected track's clips.", label="StopTrk"
+)
+SESSION_RECORD = _one(
+    "Record",
+    layout.RECORD,
+    "Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording.",
+)
+SCENE_PAGE = _one("Scene page", layout.SCENE_PAGE, "Show the scene page.", label="Scenes")
+
 _LINNSTRUMENT_SHIFT = (
-    _one(
-        "Stop track", layout.PLAY_STOP, "Stop the selected track's clips.", label="StopTrk"
-    ),
-    _one(
-        "Record",
-        layout.RECORD,
-        "Session Record on/off (Arrangement Record in Arrangement View). Blinks while "
-        "recording.",
-    ),
+    STOP_TRACK,
+    SESSION_RECORD,
     QUANTIZE,
     LAUNCH_QUANTIZATION,
     REDO,
-    _one("Scene page", layout.SCENE_PAGE, "Show the scene page.", label="Scenes"),
+    SCENE_PAGE,
     SHIFT_HELD,
 )
 
 _LINNSTRUMENT_SCENES = (
     _scenes(1, "Launch a scene and go back to the controls."),
     _one("Back", layout.SHIFT, "Back to the controls without launching."),
+)
+
+# Sequencer Mode: column 1 as in Linnstrument Mode, and its own columns 15 and 16.
+_SEQUENCER_SIDE = (
+    PLAY,
+    RECORD_CLIP,
+    CAPTURE_MIDI,
+    METRONOME,
+    FIXED_LENGTH,
+    UNDO,
+    _one(
+        "Linnstrument Mode",
+        layout.MODE_PAD,
+        "Switch to Linnstrument Mode, keeping the arm. Back returns here.",
+        label="Linn",
+    ),
+    SHIFT,
+    _one("Copy", layout.COPY, "Hold, press a step, then press steps to paste it onto."),
+    _one(
+        "Delete",
+        layout.DELETE,
+        "Hold, then press a step to clear it, or a note pad to remove that note from the clip.",
+    ),
+    _one("Session", layout.SESSION, "Back to Session Mode."),
+    _one("Mixer", layout.MIXER, "Mixer Mode."),
+    _one("FX", layout.FX, "FX Mode."),
+    _one("Seq", layout.SEQ, "Back to Session Mode."),
+    DEV,
+)
+
+_SEQUENCER_SHIFT = (
+    STOP_TRACK,
+    SESSION_RECORD,
+    QUANTIZE,
+    LAUNCH_QUANTIZATION,
+    REDO,
+    SCENE_PAGE,
+    Item(
+        "Tracks",
+        {key: "Track-" if step < 0 else "Track+" for key, step in layout.TRACK_STEPS.items()},
+        "Select the previous or next MIDI track; the arm moves with it.",
+    ),
+    TEMPO,
+    SHIFT_HELD,
+)
+
+# Steps and column 15, the same in both views.
+_SEQUENCER_GRID = (
+    Block(
+        "Steps",
+        layout.SEQ_STEP_COLUMNS,
+        ALL_PADS,
+        "64 steps, top row first. Tap to add or remove the selected note. Hold a step and "
+        "press a later one for one long note, or slide along the row to change its "
+        "velocity.",
+    ),
+    _one("Double", layout.SEQ_DOUBLE, "Double the loop, notes and all."),
+    _one("Halve", layout.SEQ_HALVE, "Halve the loop. Notes past the new end stay in the clip."),
+    _one(
+        "Follow",
+        layout.SEQ_FOLLOW,
+        "Follow on/off: the steps show the page that's playing. Blue while on.",
+    ),
+    Item(
+        "Up/Down",
+        {layout.SEQ_UP: "Up", layout.SEQ_DOWN: "Down"},
+        "Move the note pads an octave up or down.",
+    ),
+    _one(
+        "Notes/Settings",
+        layout.SEQ_VIEW,
+        "Switch columns 11–14 between the note pads and the settings.",
+        label="View",
+    ),
+)
+
+_SEQUENCER = (
+    *_SEQUENCER_GRID,
+    Block(
+        "Notes",
+        layout.SEQ_NOTE_COLUMNS,
+        ALL_PADS,
+        "Press to pick the note the steps edit, and hear it. Hold steps and press a note "
+        "to add or remove it on them.",
+    ),
+)
+
+_SEQUENCER_SETTINGS = (
+    Item(
+        "Rates",
+        dict(zip(layout.SEQ_RATES, ("1/4", "1/8", "1/16", "1/32"))),
+        "The step length: 1/4, 1/8, 1/16 or 1/32. The current one is blue.",
+    ),
+    _one("Triplet", layout.SEQ_TRIPLET, "Triplet steps on/off: orange while on."),
+    Block(
+        "Pages",
+        range(layout.SEQ_PAGES[0][0], layout.SEQ_PAGES[-1][0] + 1),
+        ALL_PADS,
+        "Pages 1–16 of 64 steps: 1–8 in column 12, 9–16 in column 13. Press one to show it, "
+        "or hold one and press another to loop both.",
+    ),
 )
 
 # The manual's sections, by marker slug.
@@ -321,6 +435,11 @@ SECTIONS = {
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
     "linnstrument-scenes": _LINNSTRUMENT_SCENES,
+    "sequencer-side": _SEQUENCER_SIDE,
+    "sequencer-shift": _SEQUENCER_SHIFT,
+    "sequencer-grid": _SEQUENCER_GRID,
+    "sequencer": _SEQUENCER,
+    "sequencer-settings": _SEQUENCER_SETTINGS,
 }
 
 # The sections the manual lists, each with the section holding its Shift layer.
@@ -333,6 +452,9 @@ LISTS = {
     "dev": None,
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,
+    "sequencer-side": "sequencer-shift",
+    "sequencer": None,
+    "sequencer-settings": None,
 }
 
 # The sections each map is drawn from.
@@ -348,6 +470,10 @@ LAYERS = {
     Layer.LINNSTRUMENT: ("linnstrument",),
     Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
     Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),
+    Layer.SEQUENCER: ("sequencer-side", "sequencer"),
+    Layer.SEQUENCER_SETTINGS: ("sequencer-side", "sequencer-grid", "sequencer-settings"),
+    Layer.SEQUENCER_SHIFT: ("sequencer-shift", "sequencer"),
+    Layer.SEQUENCER_DRUMS: ("sequencer-side", "sequencer"),
 }
 
 # Columns a map shows dimmed and unlabelled: the side columns map dims the grid, and the Dev

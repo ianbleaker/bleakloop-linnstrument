@@ -11,12 +11,13 @@ from ableton.v3.control_surface import (
     ControlSurface,
     ControlSurfaceSpecification,
     ElementsBase,
+    ScriptForwarding,
 )
 
 from . import device, live_actions, live_state
-from .core import engine, faders, fx, layout, session, values
+from .core import engine, faders, fx, layout, sequencer, session, values
 from .core.leds import Clock, phase_key
-from .core.model import PadPress, SlideMoved, YAxis
+from .core.model import PadPress, SequencerView, SlideMoved, YAxis
 from .core.modes import Mode, State
 
 logger = logging.getLogger(__name__)
@@ -114,6 +115,12 @@ class BleakLoop(ControlSurface):
         self._pending_clip = None  # the clip slot to show in the Detail view
         self._pending_fresh = False
         self._selected_device = None  # the selected track's selected device, last tick
+        self._seq_view = SequencerView()  # Sequencer Mode's last read target
+        self._seq_notes = None  # the note count last logged
+        self._longest_seq_tick_ms = 0.0
+        self._translated = {}  # (row, column) -> the audition note a note pad is translated to
+        self._forwarding = None  # the pad elements' own script forwarding
+        self._held_note_pads = set()  # (row, column) of note pads held now
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
         logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
@@ -139,6 +146,8 @@ class BleakLoop(ControlSurface):
             self._follow_selected_device()
             if self._state.mode is Mode.LINNSTRUMENT:
                 self._poll_tick()
+            if self._state.mode is Mode.SEQUENCER:
+                self._seq_sync()
             self._refresh()
         elif self._setup is None:
             logger.info("BleakLoop loaded")
@@ -220,6 +229,9 @@ class BleakLoop(ControlSurface):
             self.song.end_undo_step()
         if self._state.fader_undo_open:
             self.song.end_undo_step()
+        if self._state.seq_undo_open:
+            self.song.end_undo_step()
+        self._restore_seq_arms()
         # Hand the device back for playing, with the player's own split.
         self._send(
             device.y_axis(False)
@@ -235,6 +247,18 @@ class BleakLoop(ControlSurface):
         # After the hand-back: if this raises, the device is already playable.
         self._c_instance.set_session_highlight(-1, -1, -1, -1, False)
         super().disconnect()
+
+    def _restore_seq_arms(self):
+        # Unloaded in Sequencer Mode, or in Linnstrument Mode entered from it: the arms go
+        # back as leaving the mode would put them. After this fails, the hand-back still runs.
+        if self._state.seq_saved_arms is None:
+            return
+        try:
+            arms = live_state.read_arms(self.song)
+            for action in engine.seq_unload_arms(self._state, arms):
+                live_actions.apply(action, self.song, self)
+        except Exception:
+            logger.exception("SEQ: restoring the arms on unload failed")
 
     def _compute_settings(self):
         settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
@@ -325,6 +349,7 @@ class BleakLoop(ControlSurface):
             self._listen_for(Mode.LINNSTRUMENT)
 
     def _on_blink_timer(self):
+        start = time.monotonic()
         try:
             if self._state.glides or self._state.lifts:
                 state, actions, redraw = engine.tick(self._state, time.monotonic() * 1000)
@@ -337,11 +362,29 @@ class BleakLoop(ControlSurface):
             if self._state.morph is not None:
                 self._morph_tick(transport)
             key = phase_key(self._clock(transport))
+            if self._state.mode is Mode.SEQUENCER:
+                key += (self._playhead(),)
             if key != self._phase:
                 self._phase = key
                 self._refresh()
         except Exception:
             logger.exception("blink timer failed")
+        if self._state.mode is Mode.SEQUENCER:
+            tick_ms = (time.monotonic() - start) * 1000
+            self._longest_seq_tick_ms = max(self._longest_seq_tick_ms, tick_ms)
+
+    def _playhead(self):
+        # Only the play position: notes are read when a frame is drawn.
+        playing, position = live_state.read_position(self.song)
+        return engine.seq_phase(self._state, SequencerView(is_playing=playing, position=position))
+
+    def _seq_sync(self):
+        # The arm follows Live's selected track: a click in Live sends no event.
+        state, actions = engine.seq_sync(self._state, self._snapshot())
+        self._state = state
+        for action in actions:
+            live_actions.apply(action, self.song, self)
+        self._retranslate()
 
     def _morph_tick(self, transport):
         start = time.monotonic()
@@ -363,10 +406,23 @@ class BleakLoop(ControlSurface):
         self._poll, self._pending_sets, self._poll_wait = [], [], False
         if mode is Mode.LINNSTRUMENT:
             self._poll_due = 0  # re-check at once
+        if mode is not Mode.SEQUENCER and self._longest_seq_tick_ms:
+            logger.info("SEQ: longest tick %.1f ms", self._longest_seq_tick_ms)
+            self._longest_seq_tick_ms = 0.0
+        if mode is Mode.SEQUENCER:
+            self._seq_notes = None
         if mode is Mode.SESSION:
             self._send(device.user_firmware_mode(True))
             # The device turns X and slide mode off on entering User Firmware Mode.
             self._x_rows = None
+        elif mode is Mode.SEQUENCER:
+            # Y and X off too: Mixer Mode's Y and the faders' X may be on, and nothing claims
+            # them here. CC 64 is sustain on the armed track, CC 1-16 mod wheel, volume, pan.
+            self._send(
+                device.user_firmware_mode(True) + device.y_axis(False) + device.x_rows(())
+            )
+            self._x_rows = ()
+            self._slides.reset()
         else:
             self._send(device.y_axis(False) + device.x_rows(()) + device.user_firmware_mode(False))
             self._x_rows = ()
@@ -375,6 +431,44 @@ class BleakLoop(ControlSurface):
         self._update_ring(force=True)
         self._driver.reset()
         self._refresh()
+        self._retranslate()
+
+    def _retranslate(self):
+        # Sequencer Mode's note pads play the armed track through note translation, and still
+        # reach the script. A held pad keeps its translation until its release, which retranslates
+        # it: its Note Off must leave as the note its Note On did. Linnstrument Mode doesn't listen
+        # to the pads, so their releases never arrive, and a translation left there would move
+        # the player's notes.
+        if self._state.mode is Mode.LINNSTRUMENT:
+            self._held_note_pads.clear()
+        sequencing = self._state.mode is Mode.SEQUENCER
+        # A row holding a step isn't translated: a slide onto its note pads mustn't sound.
+        held_rows = set(engine.x_rows(self._state)) if sequencing else set()
+        changed = False
+        for row in range(layout.ROWS):
+            for column in layout.SEQ_NOTE_COLUMNS:
+                note = None
+                if sequencing and row not in held_rows:
+                    pad = layout.pad_of(row)
+                    note = sequencer.pad_note(self._state, self._seq_view, column, pad)
+                if (row, column) in self._held_note_pads:
+                    continue
+                if self._translated.get((row, column)) == note:
+                    continue
+                element = getattr(self.elements, f"pad_{row}_{column}")
+                if self._forwarding is None:
+                    self._forwarding = element.script_forwarding
+                if note is None:
+                    element.script_forwarding = self._forwarding
+                    element.use_default_message()
+                else:
+                    element.script_forwarding = ScriptForwarding.non_consuming
+                    element.set_channel(values.AUDITION_CHANNEL)
+                    element.set_identifier(note)
+                self._translated[(row, column)] = note
+                changed = True
+        if changed:
+            self.request_rebuild_midi_map()
 
     def set_mixer(self, on):
         # One burst, no driver reset; _handle's refresh sends only the changed pads.
@@ -384,21 +478,28 @@ class BleakLoop(ControlSurface):
 
     def _sync_x_rows(self):
         # X and slide mode only on the rows that want them, sent only on a change.
-        if self._state.mode is not Mode.SESSION:
+        mode = self._state.mode
+        if mode is Mode.LINNSTRUMENT:
             return
         rows = engine.x_rows(self._state)
         if rows == self._x_rows:
             return
         self._send(device.x_rows(rows))
         self._x_rows = rows
-        self._slides.reset()
-        if bool(rows) != self._x_listened:
-            self._listen_for(Mode.SESSION)
+        if mode is Mode.SESSION:
+            # A Sequencer hold keeps its transfer state: its slide continues on the new row set.
+            self._slides.reset()
+        if self._wants_x(mode) != self._x_listened:
+            self._listen_for(mode)
+
+    def _wants_x(self, mode):
+        # Sequencer Mode claims X and transfers on every row, so none reach the armed track.
+        return mode is Mode.SEQUENCER or bool(engine.x_rows(self._state))
 
     def _listen_for(self, mode):
         self._remove_listeners()
         self._x_listened = False
-        if mode is Mode.SESSION:
+        if mode in (Mode.SESSION, Mode.SEQUENCER):
             for row in range(layout.ROWS):
                 for column in range(layout.COLUMNS):
                     element = getattr(self.elements, f"pad_{row}_{column}")
@@ -412,7 +513,7 @@ class BleakLoop(ControlSurface):
                         self._add_listener(
                             element, lambda v, c=column, r=row: self._on_y_axis(c, r, v)
                         )
-            if engine.x_rows(self._state):
+            if self._wants_x(mode):
                 self._listen_for_x()
         else:
             # All 128 notes, so column 1 never plays Live's tracks whatever Row Offset sends.
@@ -465,6 +566,11 @@ class BleakLoop(ControlSurface):
             self._saved_split.setdefault(parameter, setting)
 
     def _on_pad(self, column, row, value):
+        if column in layout.SEQ_NOTE_COLUMNS:
+            if value:
+                self._held_note_pads.add((row, column))
+            else:
+                self._held_note_pads.discard((row, column))
         event = self._slides.pad(row, column, value)
         if isinstance(event, SlideMoved):
             self._handle(event, engine.slide)
@@ -535,6 +641,7 @@ class BleakLoop(ControlSurface):
         self._log_fader_gesture()
         self._update_ring()
         self._refresh()
+        self._retranslate()
 
     # Detail view
 
@@ -564,15 +671,29 @@ class BleakLoop(ControlSurface):
     # Output
 
     def _snapshot(self):
+        mode = self._state.mode
         return live_state.read(
             self.song,
             Live.Application.get_application(),
             self._state.window,
             scene_clips=self._state.copy,
-            selected=self._state.mode is Mode.LINNSTRUMENT,
+            selected=mode is not Mode.SESSION,
             faders=self._state if faders.visible(self._state) else None,
             width=session.window_tracks(self._state),
+            sequencer=self._read_sequencer() if mode is Mode.SEQUENCER else None,
+            seq_entry=self._state.seq_held,
         )
+
+    def _read_sequencer(self):
+        # Timed, and logged once per entry and whenever the note count changes.
+        start = time.monotonic()
+        self._seq_view = live_state.read_sequencer(self.song)
+        count = len(self._seq_view.notes)
+        if count != self._seq_notes:
+            self._seq_notes = count
+            ms = (time.monotonic() - start) * 1000
+            logger.info("SEQ: read %d notes in %.1f ms", count, ms)
+        return self._seq_view
 
     def _update_ring(self, force=False):
         if self._state.mode is Mode.SESSION:

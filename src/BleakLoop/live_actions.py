@@ -23,23 +23,33 @@ from .core.model import (
     DeleteClip,
     DeleteGroupClips,
     DeleteScene,
+    DuplicateLoop,
+    EditNotes,
     EndUndoStep,
     EnterMode,
     FaderBound,
     FireScene,
     FireSlot,
+    HighlightSlot,
+    ModifyNotes,
     QuantizeClip,
     RacksRead,
     RecallFxSnapshot,
     Redo,
+    RemovePitch,
     SaveFaderBindings,
     SaveFxSnapshots,
     SceneSelected,
+    SelectDrumPad,
+    SelectSetTrack,
     SelectTrack,
     SetArm,
+    SetArms,
     SetArrangementRecord,
+    SetDrumScroll,
     SetFaderParameter,
     SetLaunchQuantization,
+    SetLoop,
     SetMacros,
     SetMixer,
     SetSessionRecord,
@@ -66,6 +76,71 @@ logger = logging.getLogger(__name__)
 
 def _slot(song, track, scene):
     return song.visible_tracks[track].clip_slots[scene]
+
+
+def _set_track(song, index):
+    # Sequencer actions index song.tracks, folded group members included.
+    tracks = list(song.tracks)
+    return tracks[index] if index < len(tracks) else None
+
+
+def _set_slot(song, track, scene):
+    # The clip slot, or None when its track or scene is gone.
+    owner = _set_track(song, track)
+    if owner is None:
+        return None
+    slots = list(owner.clip_slots)
+    return slots[scene] if scene < len(slots) else None
+
+
+def _set_clip(song, action):
+    # The action's clip, or None with a log line when it's gone.
+    slot = _set_slot(song, action.track, action.scene)
+    if slot is None or not slot.has_clip:
+        name = type(action).__name__
+        logger.info("SEQ: skipped %s, no clip at %d/%d", name, action.track, action.scene)
+        return None
+    return slot.clip
+
+
+def _edit_notes(song, action):
+    slot = _set_slot(song, action.track, action.scene)
+    if slot is None or (not slot.has_clip and action.create_length is None):
+        logger.info("SEQ: skipped EditNotes, no clip at %d/%d", action.track, action.scene)
+        return
+    with _undo_step(song):
+        if not slot.has_clip:
+            slot.create_clip(action.create_length)
+        clip = slot.clip
+        if action.remove:
+            clip.remove_notes_by_id(list(action.remove))
+        if action.add:
+            clip.add_new_notes(
+                tuple(
+                    Live.Clip.MidiNoteSpecification(
+                        pitch=pitch, start_time=start, duration=duration, velocity=velocity
+                    )
+                    for pitch, start, duration, velocity in action.add
+                )
+            )
+
+
+def _set_loop(clip, start, end):
+    # Live refuses a loop start at or past the loop end: move the end first when it would be.
+    if start >= clip.loop_end:
+        clip.loop_end = end
+        clip.loop_start = start
+    else:
+        clip.loop_start = start
+        clip.loop_end = end
+
+
+def _modify_notes(clip, changes):
+    notes = clip.get_notes_by_id([note_id for note_id, _, _ in changes])
+    wanted = {note_id: (start, velocity) for note_id, start, velocity in changes}
+    for note in notes:
+        note.start_time, note.velocity = wanted[note.note_id]
+    clip.apply_note_modifications(notes)
 
 
 @contextmanager
@@ -322,6 +397,51 @@ def apply(action, song, surface):
         surface.show_message(_step_device(song, action.step))
     elif isinstance(action, SaveFxSnapshots):
         song.set_data(values.FX_DATA_KEY, action.text)
+    elif isinstance(action, HighlightSlot):
+        slot = _set_slot(song, action.track, action.scene)
+        if slot is None:
+            logger.info("SEQ: skipped HighlightSlot, no slot at %d/%d", action.track, action.scene)
+        else:
+            song.view.highlighted_clip_slot = slot
+    elif isinstance(action, SetArms):
+        for index, arm in action.arms:
+            track = _set_track(song, index)
+            if track is not None and track.can_be_armed:
+                track.arm = arm
+    elif isinstance(action, SelectSetTrack):
+        track = _set_track(song, action.track)
+        if track is not None:
+            song.view.selected_track = track
+    elif isinstance(action, EditNotes):
+        _edit_notes(song, action)
+    elif isinstance(action, RemovePitch):
+        clip = _set_clip(song, action)
+        if clip is not None:
+            with _undo_step(song):
+                span = max(clip.loop_end, clip.end_marker)
+                clip.remove_notes_extended(action.pitch, 1, 0.0, span)
+    elif isinstance(action, ModifyNotes):
+        clip = _set_clip(song, action)
+        if clip is not None:
+            _modify_notes(clip, action.changes)
+    elif isinstance(action, SetLoop):
+        clip = _set_clip(song, action)
+        if clip is not None:
+            with _undo_step(song):
+                _set_loop(clip, action.start, action.end)
+    elif isinstance(action, DuplicateLoop):
+        clip = _set_clip(song, action)
+        if clip is not None:
+            clip.duplicate_loop()
+    elif isinstance(action, (SetDrumScroll, SelectDrumPad)):
+        track = _set_track(song, action.track)
+        rack = live_state.drum_rack(track) if track is not None else None
+        if rack is None:
+            logger.info("SEQ: skipped %s, no Drum Rack on %d", type(action).__name__, action.track)
+        elif isinstance(action, SetDrumScroll):
+            rack.view.drum_pads_scroll_position = action.position
+        else:
+            rack.view.selected_drum_pad = rack.drum_pads[action.note]
     elif isinstance(action, BeginUndoStep):
         song.begin_undo_step()
     elif isinstance(action, EndUndoStep):

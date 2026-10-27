@@ -33,8 +33,9 @@ DELETE = (NAV_COLUMN, 2)
 SESSION = (NAV_COLUMN, 3)
 MIXER = (NAV_COLUMN, 4)
 FX = (NAV_COLUMN, 5)
-# Unlit and unused until Chord (16/6) and Sequencer (16/7) are built.
-RESERVED = ((NAV_COLUMN, 6), (NAV_COLUMN, 7))
+# Unlit and unused until Chord (16/6) is built.
+RESERVED = ((NAV_COLUMN, 6),)
+SEQ = (NAV_COLUMN, 7)
 DEV = (NAV_COLUMN, 8)
 UNMUTE_ALL = (SCENE_COLUMN, 7)
 STOP = (SCENE_COLUMN, 8)
@@ -63,6 +64,25 @@ WINDOW_MOVES = {
 
 # Shift + column 16 pads 7 and 8: BPM step.
 TEMPO_STEPS = {(NAV_COLUMN, 7): 1, (NAV_COLUMN, 8): -1}
+
+# Sequencer Mode: steps in columns 3-10, note pads or settings in 11-14.
+SEQ_STEP_COLUMNS = range(3, 11)
+SEQ_NOTE_COLUMNS = range(11, 15)
+# Settings view: step length in beats per rate pad.
+SEQ_RATES = {(11, 1): 1.0, (11, 2): 0.5, (11, 3): 0.25, (11, 4): 0.125}
+SEQ_TRIPLET = (11, 5)
+# Settings view: page N is SEQ_PAGES[N], column 12 then column 13.
+SEQ_PAGES = tuple((12, pad) for pad in range(1, 9)) + tuple((13, pad) for pad in range(1, 9))
+SEQ_DOUBLE = (SCENE_COLUMN, 1)
+SEQ_HALVE = (SCENE_COLUMN, 2)
+SEQ_FOLLOW = (SCENE_COLUMN, 4)
+# Up and Down sit above the view switch, in reach in both views.
+SEQ_UP = (SCENE_COLUMN, 6)
+SEQ_DOWN = (SCENE_COLUMN, 7)
+SEQ_VIEW = (SCENE_COLUMN, 8)
+
+# Sequencer Mode, Shift + column 16 pads 3 and 4: MIDI track step.
+TRACK_STEPS = {(NAV_COLUMN, 3): -1, (NAV_COLUMN, 4): 1}
 
 # Dev + column 16 pads 1-5: track step, device step, fader source.
 DEV_TRACK_STEPS = {(NAV_COLUMN, 1): -1, (NAV_COLUMN, 2): 1}
