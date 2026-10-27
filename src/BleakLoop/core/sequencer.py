@@ -33,7 +33,6 @@ from .model import (
     PadPress,
     RemovePitch,
     SelectDrumPad,
-    SelectSetTrack,
     SequencerView,
     SetArms,
     SetDrumScroll,
@@ -323,8 +322,8 @@ def _nav(state, event, snapshot):
         # Every Seq release too: a Seq + slot hold's release arrives after entry.
         return state, []
     if shift_layer:
-        if key in layout.TRACK_STEPS:
-            return state, _step_track(snapshot, layout.TRACK_STEPS[key])
+        if key in layout.WINDOW_MOVES:
+            return controls.move_window(state, layout.WINDOW_MOVES[key], snapshot)
         if key in layout.TEMPO_STEPS:
             return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
         return state, []
@@ -337,21 +336,6 @@ def _nav(state, event, snapshot):
         window = layout.move_window(state.window, 0, 0, snapshot.track_count, snapshot.scene_count)
         return replace(state, window=window), actions + more
     return state, []
-
-
-def _step_track(snapshot, step):
-    # The previous or next MIDI track; the arm follows through sync.
-    view = snapshot.sequencer or SequencerView()
-    current = view.track if view.track is not None else -1
-    if step > 0:
-        found = [track for track in view.midi_tracks if track > current]
-        target = min(found) if found else None
-    else:
-        found = [track for track in view.midi_tracks if track < current]
-        target = max(found) if found else None
-    if target is None:
-        return [ShowMessage("No more MIDI tracks")]
-    return [SelectSetTrack(target)]
 
 
 def _side(state, key, view):
@@ -781,7 +765,7 @@ def _render_side(frame, state):
 
 def _render_nav(frame, state):
     if state.shift and not state.copy and not state.delete:
-        for key in layout.TRACK_STEPS:
+        for key in layout.WINDOW_MOVES:
             frame[key] = Light(YELLOW)
         for key in layout.TEMPO_STEPS:
             frame[key] = Light(GREEN)

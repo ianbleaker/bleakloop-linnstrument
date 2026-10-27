@@ -153,7 +153,6 @@ SEQ_SNAPSHOT = replace(
                 + [(SEQ_OTHER, step) for step in _OTHER_STEPS]
             )
         ),
-        midi_tracks=(3,),
     ),
 )
 SEQUENCER = State(mode=Mode.SEQUENCER, seq_pitch=SEQ_PITCH, fixed_length=2)

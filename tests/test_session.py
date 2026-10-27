@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, engine, fx, layout, modes, session
+from BleakLoop.core import column_1, controls, engine, fx, layout, modes, session
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -428,10 +428,10 @@ def test_mixer_or_fx_from_the_split_view_reclamps_the_window(key):
 
 
 def test_window_tracks():
-    assert session.window_tracks(SPLIT) == 8
-    assert session.window_tracks(SESSION) == 13
-    assert session.window_tracks(replace(SPLIT, mixer=True)) == 13
-    assert session.window_tracks(replace(SPLIT, fx=True)) == 13
+    assert controls.window_tracks(SPLIT) == 8
+    assert controls.window_tracks(SESSION) == 13
+    assert controls.window_tracks(replace(SPLIT, mixer=True)) == 13
+    assert controls.window_tracks(replace(SPLIT, fx=True)) == 13
 
 
 def test_split_routes_column_9_to_the_clips_and_10_to_the_faders():

@@ -42,7 +42,6 @@ from .core.model import (
     SaveFxSnapshots,
     SceneSelected,
     SelectDrumPad,
-    SelectSetTrack,
     SelectTrack,
     SetArm,
     SetArms,
@@ -427,10 +426,6 @@ def apply(action, song, surface):
             track = _set_track(song, index)
             if track is not None and track.can_be_armed:
                 track.arm = arm
-    elif isinstance(action, SelectSetTrack):
-        track = _set_track(song, action.track)
-        if track is not None:
-            song.view.selected_track = track
     elif isinstance(action, EditNotes):
         _edit_notes(song, action)
     elif isinstance(action, RemovePitch):

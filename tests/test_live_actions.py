@@ -24,7 +24,6 @@ from BleakLoop.core.model import (  # noqa: E402
     SelectDrumPad,
     SaveFaderBindings,
     SaveFxScenes,
-    SelectSetTrack,
     SetArm,
     SetArms,
     SetDrumScroll,
@@ -530,12 +529,6 @@ def test_toggle_detail_view_follows_lives_view(monkeypatch, visible, shown):
     )
     apply(ToggleDetailView(), fake_song([]))
     assert view.shown == [shown]
-
-
-def test_select_set_track():
-    song = seq_song()
-    apply(SelectSetTrack(1), song)
-    assert song.view.selected_track is song.tracks[1]
 
 
 def test_edit_notes_is_one_undo_step(note_specs):

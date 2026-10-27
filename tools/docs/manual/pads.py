@@ -85,6 +85,11 @@ TEMPO = Item(
     "Tempo +1 or -1 BPM.",
 )
 
+WINDOW_MOVES = tuple(
+    _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
+    for key, name in zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))
+)
+
 # Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
 _SIDE = (
     PLAY,
@@ -151,10 +156,7 @@ _SIDE_SHIFT = (
         label="Unsolo",
     ),
     _one("Stop all", layout.STOP, "Stop all clips.", label="StopAll"),
-    *(
-        _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
-        for key, name in zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))
-    ),
+    *WINDOW_MOVES,
     TEMPO,
     SHIFT_HELD,
 )
@@ -360,11 +362,7 @@ _SEQUENCER_SHIFT = (
     LAUNCH_QUANTIZATION,
     REDO,
     SCENE_PAGE,
-    Item(
-        "Tracks",
-        {key: "Track-" if step < 0 else "Track+" for key, step in layout.TRACK_STEPS.items()},
-        "Select the previous or next MIDI track; the arm moves with it.",
-    ),
+    *WINDOW_MOVES,
     TEMPO,
     SHIFT_HELD,
 )

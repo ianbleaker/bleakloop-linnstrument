@@ -57,7 +57,7 @@ SPLIT_FADER_COLUMNS = range(10, 15)
 # bars, in Fixed Length's cycle order
 FIXED_LENGTHS = (1, 2, 4, 8)
 
-# Shift + column 16 pads 1-4: (track step, scene step).
+# Shift + column 16 pads 1-4, in every mode but Linnstrument Mode: (track step, scene step).
 WINDOW_MOVES = {
     (NAV_COLUMN, 1): (0, -1),
     (NAV_COLUMN, 2): (0, 1),
@@ -83,9 +83,6 @@ SEQ_FOLLOW = (SCENE_COLUMN, 4)
 SEQ_UP = (SCENE_COLUMN, 6)
 SEQ_DOWN = (SCENE_COLUMN, 7)
 SEQ_VIEW = (SCENE_COLUMN, 8)
-
-# Sequencer Mode, Shift + column 16 pads 3 and 4: MIDI track step.
-TRACK_STEPS = {(NAV_COLUMN, 3): -1, (NAV_COLUMN, 4): 1}
 
 # Device/Clip + column 16 pads 1-5: track step, device step, fader source.
 DEVICE_CLIP_TRACK_STEPS = {(NAV_COLUMN, 1): -1, (NAV_COLUMN, 2): 1}

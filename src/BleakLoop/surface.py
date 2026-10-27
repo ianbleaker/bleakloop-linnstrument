@@ -15,7 +15,7 @@ from ableton.v3.control_surface import (
 )
 
 from . import device, live_actions, live_state
-from .core import engine, faders, fx, layout, sequencer, session, values
+from .core import controls, engine, faders, fx, layout, sequencer, values
 from .core.leds import Clock, phase_key
 from .core.model import PadPress, ScenesChanged, SequencerView, SlideMoved, YAxis
 from .core.modes import Mode, State
@@ -726,7 +726,7 @@ class BleakLoop(ControlSurface):
             scene_clips=self._state.copy,
             selected=mode is not Mode.SESSION,
             faders=self._state if faders.visible(self._state) else None,
-            width=session.window_tracks(self._state),
+            width=controls.window_tracks(self._state),
             sequencer=self._read_sequencer() if mode is Mode.SEQUENCER else None,
             seq_entry=self._state.seq_held,
         )
@@ -745,7 +745,7 @@ class BleakLoop(ControlSurface):
     def _update_ring(self, force=False):
         # In every mode: Live's ring shows which scenes the pads, and FX Mode's column 13, show.
         window = self._state.window
-        width = session.window_tracks(self._state)
+        width = controls.window_tracks(self._state)
         want = (window.track, window.scene, width, layout.WINDOW_SCENES)
         if force or want != self._ring:
             self._c_instance.set_session_highlight(*want, False)

@@ -118,7 +118,6 @@ def read_sequencer(song):
     view = SequencerView(
         scene=scene,
         scale=ScaleView(song.scale_mode, song.root_note, tuple(song.scale_intervals)),
-        midi_tracks=tuple(i for i, other in enumerate(tracks) if _is_midi(other)),
     )
     if index is None:
         return view

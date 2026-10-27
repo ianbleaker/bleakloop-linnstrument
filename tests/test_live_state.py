@@ -448,7 +448,6 @@ def test_read_sequencer_reads_the_highlighted_clip():
         (6, 50, 1.0, 0.5, 90.0),
     ]
     assert clip.reads == [(0, 128, 0.0, 8.0)]
-    assert view.midi_tracks == (1,)
     assert (view.scale.on, view.scale.root, view.scale.intervals) == (
         True,
         2,
@@ -471,7 +470,7 @@ def test_read_sequencer_on_an_audio_track_reads_no_notes():
 def test_read_sequencer_on_master():
     keys = seq_track("Keys")
     view = live_state.read_sequencer(seq_song([keys], selected=fake_track("Master")))
-    assert view.track is None and view.midi_tracks == (0,)
+    assert view.track is None
 
 
 def test_seq_entry_finds_the_detail_clip_and_the_playing_slot():

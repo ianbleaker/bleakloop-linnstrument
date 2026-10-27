@@ -1,5 +1,6 @@
 """Behaviour shared by Session and Linnstrument Mode: undo, metronome, Play/Stop, record, Fixed Length
-and scene lights; shared by Session and Sequencer Mode: the tempo steps and the Device/Clip layer."""
+and scene lights; shared by Session and Sequencer Mode: the window moves, the tempo steps and the
+Device/Clip layer."""
 
 from dataclasses import replace
 
@@ -46,6 +47,31 @@ def redo(snapshot):
     if snapshot.can_redo:
         return [Redo(), ShowMessage("Redo")]
     return [ShowMessage("Nothing to redo")]
+
+
+def window_tracks(state):
+    # The split view shows 8 tracks; Mixer and FX Mode always 13. Sequencer Mode keeps the
+    # split view's width, as the ring does.
+    if state.split and not state.mixer and not state.fx:
+        return layout.SPLIT_TRACKS
+    return layout.WINDOW_TRACKS
+
+
+def move_window(state, steps, snapshot):
+    # Shift + column 16 pads 1-4, in Session, Mixer, FX and Sequencer Mode.
+    width = window_tracks(state)
+    window = layout.move_window(
+        state.window, *steps, snapshot.track_count, snapshot.scene_count, width
+    )
+    if window == state.window:
+        return state, []
+    last_track = min(window.track + width, snapshot.track_count)
+    last_scene = min(window.scene + layout.WINDOW_SCENES, snapshot.scene_count)
+    message = (
+        f"Tracks {window.track + 1}–{last_track}, "
+        f"Scenes {window.scene + 1}–{last_scene}"
+    )
+    return replace(state, window=window), [ShowMessage(message)]
 
 
 def tempo_step(snapshot, step):

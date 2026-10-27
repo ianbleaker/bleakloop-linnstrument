@@ -45,13 +45,6 @@ from .model import (
 )
 from .modes import ClipSource, GroupSource, Mode, SceneSource
 
-def window_tracks(state):
-    # The split view shows 8 tracks; Mixer and FX Mode always 13.
-    if state.split and not state.mixer and not state.fx:
-        return layout.SPLIT_TRACKS
-    return layout.WINDOW_TRACKS
-
-
 def handle(state, event, snapshot):
     if isinstance(event, SceneSelected):
         # Keep the scene Capture selected in view.
@@ -60,7 +53,7 @@ def handle(state, event, snapshot):
             event.scene,
             snapshot.track_count,
             snapshot.scene_count,
-            window_tracks(state),
+            controls.window_tracks(state),
         )
         return replace(state, window=window), []
     if not isinstance(event, PadPress):
@@ -293,7 +286,7 @@ def _delete(state, event, snapshot):
             0,
             snapshot.track_count,
             snapshot.scene_count - 1,
-            window_tracks(state),
+            controls.window_tracks(state),
         )
         return replace(state, window=window), [DeleteScene(scene)]
     return state, []
@@ -368,7 +361,7 @@ def _select_row(state, track):
 def _nav_column(state, key, snapshot):
     if state.shift:
         if key in layout.WINDOW_MOVES:
-            return _move_window(state, layout.WINDOW_MOVES[key], snapshot)
+            return controls.move_window(state, layout.WINDOW_MOVES[key], snapshot)
         if key in layout.TEMPO_STEPS:
             return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
         return state, []
@@ -388,9 +381,9 @@ def _nav_column(state, key, snapshot):
 
 def _widen(state, toggle, snapshot):
     # Leaving the split view for 13 tracks keeps the last tracks filling the window.
-    width = window_tracks(state)
+    width = controls.window_tracks(state)
     state, actions = toggle(state)
-    if window_tracks(state) > width:
+    if controls.window_tracks(state) > width:
         window = layout.move_window(
             state.window, 0, 0, snapshot.track_count, snapshot.scene_count
         )
@@ -406,22 +399,6 @@ def _toggle_split(state, snapshot):
     state = replace(state, split=False)
     window = layout.move_window(state.window, 0, 0, snapshot.track_count, snapshot.scene_count)
     return replace(state, window=window), actions + [ShowMessage("Split view OFF")]
-
-
-def _move_window(state, steps, snapshot):
-    width = window_tracks(state)
-    window = layout.move_window(
-        state.window, *steps, snapshot.track_count, snapshot.scene_count, width
-    )
-    if window == state.window:
-        return state, []
-    last_track = min(window.track + width, snapshot.track_count)
-    last_scene = min(window.scene + layout.WINDOW_SCENES, snapshot.scene_count)
-    message = (
-        f"Tracks {window.track + 1}–{last_track}, "
-        f"Scenes {window.scene + 1}–{last_scene}"
-    )
-    return replace(state, window=window), [ShowMessage(message)]
 
 
 def render(state, snapshot):
@@ -471,7 +448,7 @@ def render(state, snapshot):
 
 
 def _track_columns(state):
-    return range(layout.GRID_COLUMNS[0], layout.GRID_COLUMNS[0] + window_tracks(state))
+    return range(layout.GRID_COLUMNS[0], layout.GRID_COLUMNS[0] + controls.window_tracks(state))
 
 
 def _render_copy_source(frame, state):

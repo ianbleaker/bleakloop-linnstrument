@@ -260,10 +260,10 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 - **Undo**: Undo. *(Shift: Redo)*
 - **Linnstrument Mode**: Switch to Linnstrument Mode, keeping the arm. Back returns here. *(Shift: Show the scene page)*
 - **Shift**: Hold for the Shift layer.
-- **Copy**: Hold, press a step, then press steps to paste it onto.
-- **Delete**: Hold, then press a step to clear it, or a note pad to remove that note from the clip.
-- **Session**: Back to Session Mode. *(Shift: Select the previous or next MIDI track; the arm moves with it)*
-- **Mixer**: Mixer Mode. *(Shift: Select the previous or next MIDI track; the arm moves with it)*
+- **Copy**: Hold, press a step, then press steps to paste it onto. *(Shift: Move the window up)*
+- **Delete**: Hold, then press a step to clear it, or a note pad to remove that note from the clip. *(Shift: Move the window down)*
+- **Session**: Back to Session Mode. *(Shift: Move the window left)*
+- **Mixer**: Mixer Mode. *(Shift: Move the window right)*
 - **FX**: FX Mode.
 - **Seq**: Back to Session Mode. *(Shift: Tempo +1 or -1 BPM)*
 - **Dev**: Hold for the Dev layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*

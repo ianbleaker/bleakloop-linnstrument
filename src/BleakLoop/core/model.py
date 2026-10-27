@@ -93,7 +93,6 @@ class SequencerView:
     notes: tuple = ()  # NoteView per note in the clip
     drum: DrumView | None = None
     scale: ScaleView = ScaleView()
-    midi_tracks: tuple = ()  # the song.tracks indexes of every MIDI track
 
 
 @dataclass(frozen=True)
@@ -539,11 +538,6 @@ class SetArms:
 class ToggleDetailView:
     # Clip view if the Detail view shows anything else or is hidden, else Device view.
     pass
-
-
-@dataclass(frozen=True)
-class SelectSetTrack:
-    track: int
 
 
 @dataclass(frozen=True)

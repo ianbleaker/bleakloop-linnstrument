@@ -291,6 +291,7 @@ flowchart TD
   live_state --> core_values
   surface --> Live
   surface --> ableton_v3
+  surface --> core_controls
   surface --> core_engine
   surface --> core_faders
   surface --> core_fx
@@ -299,7 +300,6 @@ flowchart TD
   surface --> core_model
   surface --> core_modes
   surface --> core_sequencer
-  surface --> core_session
   surface --> core_values
   surface --> device
   surface --> live_actions
@@ -500,7 +500,7 @@ stateDiagram-v2
 ```
 ### Session ring
 
-- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 6, False)` draws it from the core's window state in every mode, whenever the window or its width changes and on every mode entry, so the player can see which scenes the scene pads (and FX Mode's scene snapshots) show; the width is `session.window_tracks(state)`, 8 in the split view; `(-1, -1, -1, -1, False)` removes it on unload only. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
+- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 6, False)` draws it from the core's window state in every mode, whenever the window or its width changes and on every mode entry, so the player can see which scenes the scene pads (and FX Mode's scene snapshots) show; the width is `controls.window_tracks(state)`, 8 in the split view; `(-1, -1, -1, -1, False)` removes it on unload only. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
 
 ## 7. Adapters: Live mechanisms
 
