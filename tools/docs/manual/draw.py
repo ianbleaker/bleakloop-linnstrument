@@ -32,13 +32,13 @@ RINGS = {Blink.TEMPO: "6 4", Blink.FAST: "2 3"}
 
 TITLES = {
     Layer.SESSION: "Session Mode",
-    Layer.SIDE: "Side columns",
     Layer.SESSION_SHIFT: "Session Mode with Shift held",
     Layer.SPLIT: "Session Mode, split view",
     Layer.MIXER: "Mixer Mode",
+    Layer.MIXER_SHIFT: "Mixer Mode with Shift held",
     Layer.FX: "FX Mode",
+    Layer.FX_SHIFT: "FX Mode with Shift held",
     Layer.MAPPED_FX: "FX Mode, Mapped FX",
-    Layer.DEVICE_CLIP: "Dev held",
     Layer.LINNSTRUMENT: "Linnstrument Mode controls page",
     Layer.LINNSTRUMENT_SHIFT: "Linnstrument Mode with Shift held",
     Layer.LINNSTRUMENT_SCENES: "Linnstrument Mode scene page",

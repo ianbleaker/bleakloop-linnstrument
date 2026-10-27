@@ -254,7 +254,7 @@ _MIXER = (
 # Not drawn: the Shift notes of the split view's list.
 _SPLIT_SHIFT = tuple(replace(block, columns=SPLIT_TRACK_COLUMNS) for block in _SESSION_SHIFT)
 
-# Not drawn: the Shift notes of Mixer Mode's list.
+# The faders are dark under Shift.
 _MIXER_SHIFT = (SOLO, ARM)
 
 _FX = (
@@ -462,6 +462,7 @@ SECTIONS = {
     "mixer": _MIXER,
     "mixer-shift": _MIXER_SHIFT,
     "fx": _FX,
+    "fx-shift": (),  # the grid is dark under Shift
     "device-clip": _DEVICE_CLIP,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
@@ -493,13 +494,13 @@ LISTS = {
 # The sections each map is drawn from.
 LAYERS = {
     Layer.SESSION: ("global", "view", "navigation", "session"),
-    Layer.SIDE: ("global", "view", "navigation"),
     Layer.SESSION_SHIFT: ("global-shift", "view-shift", "navigation-shift", "session-shift"),
     Layer.SPLIT: ("global", "view", "navigation", "split"),
     Layer.MIXER: ("global", "view", "navigation", "mixer"),
+    Layer.MIXER_SHIFT: ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
     Layer.FX: ("global", "view", "navigation", "fx"),
+    Layer.FX_SHIFT: ("global-shift", "view-shift", "navigation-shift", "fx-shift"),
     Layer.MAPPED_FX: ("global", "view", "navigation", "fx"),
-    Layer.DEVICE_CLIP: ("device-clip",),
     Layer.LINNSTRUMENT: ("linnstrument",),
     Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
     Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),
@@ -509,9 +510,8 @@ LAYERS = {
     Layer.SEQUENCER_DRUMS: ("sequencer-side", "sequencer"),
 }
 
-# Columns a map shows dimmed and unlabelled: the side columns map dims the grid, and the
-# Device/Clip layer's map everything but column 16.
-DIMMED = {Layer.SIDE: layout.GRID_COLUMNS, Layer.DEVICE_CLIP: range(1, layout.NAV_COLUMN)}
+# Columns a map shows dimmed and unlabelled, per layer: none at present.
+DIMMED = {}
 
 
 def items(layer):

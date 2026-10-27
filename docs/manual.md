@@ -90,8 +90,6 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 
 **Stop** (column 15, pad 8) is held like Copy and Delete. Hold it and press any pad in a track's column to stop that track's clips; a tap on its own does nothing. Shift + Stop stops all clips. In FX Mode, holding Stop leaves the grid alone.
 
-![Side columns](manual/side.svg)
-
 <!-- callouts:global -->
 - **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop all clips. In Linnstrument Mode, stops the selected track's clips)*
 - **Record**: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording. In Linnstrument Mode, records a new clip on the selected track.
@@ -133,8 +131,6 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 ### Dev
 
 Dev (column 16, pad 8, orange) is held, like Shift. While you hold it, its pad blinks fast and column 16 shows the Dev layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual. Dev works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
-
-![Dev](manual/dev.svg)
 
 <!-- callouts:device-clip -->
 - **Tracks**: Select the previous or next track, through the returns and master.

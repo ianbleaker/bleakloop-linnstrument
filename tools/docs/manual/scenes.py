@@ -18,13 +18,13 @@ from BleakLoop.core.modes import FxRack, Mode, State
 
 class Layer(enum.Enum):
     SESSION = "session"
-    SIDE = "side"
     SESSION_SHIFT = "session-shift"
     SPLIT = "session-split"
     MIXER = "mixer"
+    MIXER_SHIFT = "mixer-shift"
     FX = "fx"
+    FX_SHIFT = "fx-shift"
     MAPPED_FX = "fx-mapped"
-    DEVICE_CLIP = "dev"
     LINNSTRUMENT = "linnstrument"
     LINNSTRUMENT_SHIFT = "linnstrument-shift"
     LINNSTRUMENT_SCENES = "linnstrument-scenes"
@@ -178,21 +178,22 @@ SEQ_DRUM_SNAPSHOT = replace(
     ),
 )
 
+FX_STATE = State(
+    fx=True, fx_slots=FX_SLOTS, fx_scenes=FX_SCENES, fx_landed_scene=2, fx_length=4
+)
+
 SCENES = {
     Layer.SESSION: (State(fixed_length=2), SNAPSHOT),
-    Layer.SIDE: (State(fixed_length=2), SNAPSHOT),
     Layer.SESSION_SHIFT: (State(fixed_length=2, shift=True), SNAPSHOT),
     Layer.SPLIT: (State(split=True, fixed_length=2), FX_SNAPSHOT),
     Layer.MIXER: (State(mixer=True), MIXER_SNAPSHOT),
-    Layer.FX: (
-        State(fx=True, fx_slots=FX_SLOTS, fx_scenes=FX_SCENES, fx_landed_scene=2, fx_length=4),
-        FX_SNAPSHOT,
-    ),
+    Layer.MIXER_SHIFT: (State(mixer=True, shift=True), MIXER_SNAPSHOT),
+    Layer.FX: (FX_STATE, FX_SNAPSHOT),
+    Layer.FX_SHIFT: (replace(FX_STATE, shift=True), FX_SNAPSHOT),
     Layer.MAPPED_FX: (
         State(fx=True, fx_slots=FX_SLOTS, fader_source="mapped"),
         MAPPED_SNAPSHOT,
     ),
-    Layer.DEVICE_CLIP: (State(device_clip=True, fixed_length=2), SNAPSHOT),
     Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
     Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
     Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),
