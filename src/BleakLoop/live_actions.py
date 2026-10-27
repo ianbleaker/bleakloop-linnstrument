@@ -42,7 +42,6 @@ from .core.model import (
     SaveFxSnapshots,
     SceneSelected,
     SelectDrumPad,
-    SelectSetTrack,
     SelectTrack,
     SetArm,
     SetArms,
@@ -63,12 +62,14 @@ from .core.model import (
     StopAllClips,
     StopTrackClips,
     StoreFxSnapshot,
+    ToggleDetailView,
     ToggleMetronome,
     ToggleMute,
     TogglePlay,
     ToggleSolo,
     Undo,
     UnmuteAll,
+    UnarmAll,
     UnsoloAll,
 )
 
@@ -252,6 +253,15 @@ def _top_level(device, track, devices):
     return device
 
 
+def _toggle_detail_view(view):
+    # Read Live's view, not a flag of our own, so a mouse click in between counts. Showing
+    # Detail/Clip also opens a hidden Detail view.
+    if view.is_view_visible("Detail/Clip"):
+        view.show_view("Detail/DeviceChain")
+    else:
+        view.show_view("Detail/Clip")
+
+
 def apply(action, song, surface):
     # Returns None, or a follow-up event for the core (Capture, FX store and recall).
     if isinstance(action, ToggleMetronome):
@@ -301,6 +311,10 @@ def apply(action, song, surface):
         for track in _mixable(song):
             if track.solo:
                 track.solo = False
+    elif isinstance(action, UnarmAll):
+        for track in song.tracks:
+            if track.can_be_armed and track.arm:
+                track.arm = False
     elif isinstance(action, StopTrackClips):
         song.visible_tracks[action.track].stop_all_clips()
     elif isinstance(action, StopAllClips):
@@ -412,10 +426,6 @@ def apply(action, song, surface):
             track = _set_track(song, index)
             if track is not None and track.can_be_armed:
                 track.arm = arm
-    elif isinstance(action, SelectSetTrack):
-        track = _set_track(song, action.track)
-        if track is not None:
-            song.view.selected_track = track
     elif isinstance(action, EditNotes):
         _edit_notes(song, action)
     elif isinstance(action, RemovePitch):
@@ -450,6 +460,8 @@ def apply(action, song, surface):
         song.begin_undo_step()
     elif isinstance(action, EndUndoStep):
         song.end_undo_step()
+    elif isinstance(action, ToggleDetailView):
+        _toggle_detail_view(Live.Application.get_application().view)
     elif isinstance(action, SetMixer):
         surface.set_mixer(action.on)
     elif isinstance(action, ShowMessage):

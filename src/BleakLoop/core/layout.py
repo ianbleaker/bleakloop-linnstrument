@@ -36,7 +36,7 @@ FX = (NAV_COLUMN, 5)
 # Unlit and unused until Chord (16/6) is built.
 RESERVED = ((NAV_COLUMN, 6),)
 SEQ = (NAV_COLUMN, 7)
-DEV = (NAV_COLUMN, 8)
+DEVICE_CLIP = (NAV_COLUMN, 8)
 UNMUTE_ALL = (SCENE_COLUMN, 7)
 STOP = (SCENE_COLUMN, 8)
 
@@ -57,7 +57,7 @@ SPLIT_FADER_COLUMNS = range(10, 15)
 # bars, in Fixed Length's cycle order
 FIXED_LENGTHS = (1, 2, 4, 8)
 
-# Shift + column 16 pads 1-4: (track step, scene step).
+# Shift + column 16 pads 1-4, in every mode but Linnstrument Mode: (track step, scene step).
 WINDOW_MOVES = {
     (NAV_COLUMN, 1): (0, -1),
     (NAV_COLUMN, 2): (0, 1),
@@ -84,13 +84,10 @@ SEQ_UP = (SCENE_COLUMN, 6)
 SEQ_DOWN = (SCENE_COLUMN, 7)
 SEQ_VIEW = (SCENE_COLUMN, 8)
 
-# Sequencer Mode, Shift + column 16 pads 3 and 4: MIDI track step.
-TRACK_STEPS = {(NAV_COLUMN, 3): -1, (NAV_COLUMN, 4): 1}
-
-# Dev + column 16 pads 1-5: track step, device step, fader source.
-DEV_TRACK_STEPS = {(NAV_COLUMN, 1): -1, (NAV_COLUMN, 2): 1}
-DEV_DEVICE_STEPS = {(NAV_COLUMN, 3): -1, (NAV_COLUMN, 4): 1}
-DEV_SOURCE = (NAV_COLUMN, 5)
+# Device/Clip + column 16 pads 1-5: track step, device step, fader source.
+DEVICE_CLIP_TRACK_STEPS = {(NAV_COLUMN, 1): -1, (NAV_COLUMN, 2): 1}
+DEVICE_CLIP_DEVICE_STEPS = {(NAV_COLUMN, 3): -1, (NAV_COLUMN, 4): 1}
+DEVICE_CLIP_SOURCE = (NAV_COLUMN, 5)
 
 
 def device_row(pad):

@@ -17,6 +17,7 @@ from BleakLoop.core.model import (
     ShowMessage,
     Snapshot,
     StopAllClips,
+    UnarmAll,
     ToggleMute,
     ToggleSolo,
     TrackView,
@@ -127,6 +128,12 @@ def test_toggle_off_resets_fader_state_and_closes_undo():
     assert (state.touches, state.lifts, state.glides) == ((), (), ())
     assert (state.glide_ms, state.undo_open) == (None, False)
     assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("Mixer Mode OFF")]
+
+
+def test_shift_stop_in_mixer_unarms_all():
+    state, actions = handle(replace(MIXER, shift=True), press(*layout.STOP))
+    assert state.mixer and not state.stop
+    assert actions == [UnarmAll(), ShowMessage("Unarm all")]
 
 
 def test_shift_play_stop_in_mixer_stops_all():

@@ -403,14 +403,14 @@ def test_bad_binding_text_gives_empty_rows(text):
     assert faders.parse(text) == (None,) * 8
 
 
-def test_dev_and_a_row_binds_in_mapped_fx():
-    state = replace(MAPPED, dev=True)
+def test_device_clip_and_a_row_binds_in_mapped_fx():
+    state = replace(MAPPED, device_clip=True)
     assert press(5, 3, state=state) == (state, [BindFader(2)])
 
 
-def test_dev_and_a_row_in_device_fx_points_to_mapped_fx():
-    state = replace(FX_ON, dev=True)
-    assert press(5, 3, state=state) == (state, [ShowMessage("Dev + FX for Mapped FX")])
+def test_device_clip_and_a_row_in_device_fx_points_to_mapped_fx():
+    state = replace(FX_ON, device_clip=True)
+    assert press(5, 3, state=state) == (state, [ShowMessage("Device/Clip + FX for Mapped FX")])
 
 
 def test_a_bound_row_stores_and_saves():

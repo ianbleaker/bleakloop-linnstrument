@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, layout, modes, sequencer
+from BleakLoop.core import column_1, engine, layout, modes, sequencer
 from BleakLoop.core.leds import (
     BLUE,
     CYAN,
@@ -19,6 +19,7 @@ from BleakLoop.core.leds import (
     Light,
 )
 from BleakLoop.core.model import (
+    ToggleDetailView,
     DrumView,
     DuplicateLoop,
     EditNotes,
@@ -33,7 +34,6 @@ from BleakLoop.core.model import (
     SelectDrumPad,
     ScaleView,
     SelectedTrack,
-    SelectSetTrack,
     SequencerView,
     SetArms,
     SetDrumScroll,
@@ -190,8 +190,8 @@ def test_drum_pads_start_at_the_rack_scroll():
 
 # Side columns, leaving and the arm
 
-# Tracks 0, 2 and 5 are MIDI; the target is track 2, scene 1.
-TARGET = replace(MIDI, track=2, scene=1, midi_tracks=(0, 2, 5))
+# The target is track 2, scene 1.
+TARGET = replace(MIDI, track=2, scene=1)
 ARMS = (False, True, True, None, False, False)
 
 
@@ -297,18 +297,48 @@ def test_chord_does_nothing():
     assert handle(ENTERED, (16, 6)) == (ENTERED, [])
 
 
-def test_dev_layer_steps_tracks_and_devices():
-    held, actions = handle(ENTERED, layout.DEV)
-    assert held.dev and actions == []
+def test_device_clip_layer_steps_tracks_and_devices():
+    held, actions = handle(ENTERED, layout.DEVICE_CLIP)
+    assert held.device_clip and actions == []
     assert handle(held, (16, 1)) == (held, [StepTrack(-1)])
     assert handle(held, (16, 4)) == (held, [StepDevice(1)])
-    # Not Seq: Dev's layer has nothing on pad 7.
+    # Not Seq: Device/Clip's layer has nothing on pad 7.
     assert handle(held, layout.SEQ) == (held, [])
-    assert handle(held, layout.DEV, pressed=False)[0] == ENTERED
+    assert handle(held, layout.DEVICE_CLIP, pressed=False)[0] == ENTERED
 
 
-def test_dev_layer_lights():
-    held, _ = handle(ENTERED, layout.DEV)
+def engine_presses(state, *presses):
+    actions = []
+    for key, pressed in presses:
+        state, more = engine.handle(state, press(key, pressed), SNAP_IN)
+        actions += more
+    return state, actions
+
+
+def test_device_clip_tap_flips_the_detail_view():
+    state, actions = engine_presses(
+        ENTERED, (layout.DEVICE_CLIP, True), (layout.DEVICE_CLIP, False)
+    )
+    assert actions == [ToggleDetailView()] and state == ENTERED
+
+
+@pytest.mark.parametrize("key", [(16, 2), layout.SHIFT])
+def test_device_clip_with_another_press_does_not_flip(key):
+    _, actions = engine_presses(
+        ENTERED, (layout.DEVICE_CLIP, True), (key, True), (key, False), (layout.DEVICE_CLIP, False)
+    )
+    assert ToggleDetailView() not in actions
+
+
+def test_device_clip_on_shifts_layer_never_flips():
+    _, actions = engine_presses(
+        replace(ENTERED, shift=True), (layout.DEVICE_CLIP, True), (layout.DEVICE_CLIP, False)
+    )
+    assert ToggleDetailView() not in actions
+
+
+def test_device_clip_layer_lights():
+    held, _ = handle(ENTERED, layout.DEVICE_CLIP)
     frame = sequencer.render(held, SNAP_IN)
     assert [frame[(16, pad)] for pad in range(1, 9)] == [
         Light(LIME), Light(LIME), Light(MAGENTA), Light(MAGENTA),
@@ -319,7 +349,7 @@ def test_dev_layer_lights():
 SHIFTED = replace(ENTERED, shift=True)
 
 
-@pytest.mark.parametrize("key", [(16, 1), (16, 2), (16, 5), (16, 6)])
+@pytest.mark.parametrize("key", [(16, 5), (16, 6)])
 def test_shift_layer_dark_pads_do_nothing(key):
     assert handle(SHIFTED, key) == (SHIFTED, [])
 
@@ -329,16 +359,27 @@ def test_shift_tempo_steps():
     assert handle(SHIFTED, (16, 8))[1][0] == SetTempo(119.0)
 
 
-def test_shift_track_steps_skip_other_tracks():
-    assert handle(SHIFTED, (16, 3)) == (SHIFTED, [SelectSetTrack(0)])
-    assert handle(SHIFTED, (16, 4)) == (SHIFTED, [SelectSetTrack(5)])
+def test_shift_moves_the_window():
+    snapshot = replace(SNAP_IN, track_count=20, scene_count=10)
+    state, actions = handle(SHIFTED, (16, 4), snapshot)
+    assert state == replace(SHIFTED, window=layout.Window(1, 0))
+    assert actions == [ShowMessage("Tracks 2–14, Scenes 1–6")]
+    state, actions = handle(state, (16, 2), snapshot)
+    assert state.window == layout.Window(1, 1)
+    assert actions == [ShowMessage("Tracks 2–14, Scenes 2–7")]
+    assert handle(state, (16, 3), snapshot)[0].window == layout.Window(0, 1)
+    assert handle(state, (16, 1), snapshot)[0].window == layout.Window(1, 0)
 
 
-def test_shift_track_step_at_each_end():
-    first = snap(replace(TARGET, track=0))
-    last = snap(replace(TARGET, track=5))
-    assert handle(SHIFTED, (16, 3), first) == (SHIFTED, [ShowMessage("No more MIDI tracks")])
-    assert handle(SHIFTED, (16, 4), last) == (SHIFTED, [ShowMessage("No more MIDI tracks")])
+def test_shift_window_move_keeps_the_split_views_width():
+    snapshot = replace(SNAP_IN, track_count=20, scene_count=10)
+    state, actions = handle(replace(SHIFTED, split=True), (16, 4), snapshot)
+    assert actions == [ShowMessage("Tracks 2–9, Scenes 1–6")]
+
+
+@pytest.mark.parametrize("key", [(16, 1), (16, 3)])
+def test_shift_window_move_at_the_edge_does_nothing(key):
+    assert handle(SHIFTED, key) == (SHIFTED, [])
 
 
 def test_sync_without_a_change_does_nothing():
@@ -864,7 +905,7 @@ def test_column_16():
 def test_column_16_shift_layer():
     frame = render(SHIFTED)
     assert [frame[(16, pad)] for pad in range(1, 9)] == [
-        Light(OFF), Light(OFF), Light(YELLOW), Light(YELLOW),
+        Light(YELLOW), Light(YELLOW), Light(YELLOW), Light(YELLOW),
         Light(OFF), Light(OFF), Light(GREEN), Light(GREEN),
     ]
 

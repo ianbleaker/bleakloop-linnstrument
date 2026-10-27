@@ -13,11 +13,20 @@ class Item:
     name: str
     labels: dict  # (column, pad) -> label of at most 7 characters
     callout: str
-    variant: bool = True  # on a Shift layer: noted on the normal layer's item
+    variant: bool = True  # on a Shift layer: listed under the normal list, with Shift held
 
     @property
     def keys(self):
         return sorted(self.labels)
+
+
+@dataclass(frozen=True)
+class Gesture:
+    # A list-only line for a way of playing pads, not a pad: listed after the pads.
+    name: str
+    callout: str
+    variant: bool = False
+    keys = ()
 
 
 @dataclass(frozen=True)
@@ -77,16 +86,29 @@ LAUNCH_QUANTIZATION = _one(
     label="LaunchQ",
 )
 REDO = _one("Redo", layout.UNDO, "Redo.")
-SHIFT_HELD = Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False)
-DEV = _one("Dev", layout.DEV, "Hold for the Dev layer: tracks, devices and the fader source.")
+# A held pad's label names it and says so, one word per line.
+SHIFT_HELD = Item("Shift", {layout.SHIFT: "SHIFT\nHELD"}, "Held.", variant=False)
+DEVICE_CLIP = _one(
+    "Device/Clip",
+    layout.DEVICE_CLIP,
+    "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, "
+    "devices and the fader source.",
+    label="DevClip",
+)
 TEMPO = Item(
     "Tempo",
     {key: "Tempo+" if step > 0 else "Tempo-" for key, step in layout.TEMPO_STEPS.items()},
     "Tempo +1 or -1 BPM.",
 )
 
+WINDOW_MOVES = Item(
+    "Window directions",
+    dict(zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))),
+    "Move the Ableton session ring in the selected direction.",
+)
+
 # Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
-_SIDE = (
+_GLOBAL = (
     PLAY,
     _one(
         "Record",
@@ -104,6 +126,22 @@ _SIDE = (
     UNDO,
     _one("Linnstrument Mode", layout.MODE_PAD, "Switch to Linnstrument Mode.", label="Linn"),
     SHIFT,
+)
+
+_GLOBAL_SHIFT = (
+    _one(
+        "Stop all",
+        layout.PLAY_STOP,
+        "Stop all clips. In Linnstrument Mode, stops the selected track's clips.",
+        label="StopAll",
+    ),
+    QUANTIZE,
+    LAUNCH_QUANTIZATION,
+    REDO,
+    SHIFT_HELD,
+)
+
+_VIEW = (
     _scenes(layout.SCENE_COLUMN, "Launch a scene. Its FX snapshot, if it has one, lands as it starts."),
     _one(
         "Unmute all",
@@ -116,6 +154,25 @@ _SIDE = (
         layout.STOP,
         "Hold, then press a track's pad to stop that track's clips.",
     ),
+)
+
+_VIEW_SHIFT = (
+    _scenes(layout.SCENE_COLUMN, "Launch with legato, leaving the FX snapshot alone."),
+    _one(
+        "Unsolo all",
+        layout.UNMUTE_ALL,
+        "Unsolo every track and return track in the Set. Blue while any is soloed.",
+        label="Unsolo",
+    ),
+    _one(
+        "Unarm all",
+        layout.STOP,
+        "Disarm every track in the Set. Red while any is armed.",
+        label="Unarm",
+    ),
+)
+
+_NAVIGATION = (
     _one(
         "Copy",
         layout.COPY,
@@ -130,33 +187,12 @@ _SIDE = (
         layout.SEQ,
         "Hold and press a clip, or tap, for Sequencer Mode.",
     ),
-    DEV,
+    DEVICE_CLIP,
 )
 
-_SIDE_SHIFT = (
-    _one(
-        "Stop all",
-        layout.PLAY_STOP,
-        "Stop all clips. In Linnstrument Mode, stops the selected track's clips.",
-        label="StopAll",
-    ),
-    QUANTIZE,
-    LAUNCH_QUANTIZATION,
-    REDO,
-    _scenes(layout.SCENE_COLUMN, "Launch with legato, leaving the FX snapshot alone."),
-    _one(
-        "Unsolo all",
-        layout.UNMUTE_ALL,
-        "Unsolo every track and return track in the Set. Blue while any is soloed.",
-        label="Unsolo",
-    ),
-    _one("Stop all", layout.STOP, "Stop all clips.", label="StopAll"),
-    *(
-        _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
-        for key, name in zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))
-    ),
+_NAVIGATION_SHIFT = (
+    WINDOW_MOVES,
     TEMPO,
-    SHIFT_HELD,
 )
 
 MUTE = Block(
@@ -205,7 +241,7 @@ _SPLIT = (
         "Faders",
         layout.SPLIT_FADER_COLUMNS,
         ALL_PADS,
-        "One fader per row, as in FX Mode, from the source Dev + Fader source picks.",
+        "One fader per row, as in FX Mode, from the source Device/Clip + Fader source picks.",
     ),
 )
 
@@ -229,7 +265,7 @@ _MIXER = (
 # Not drawn: the Shift notes of the split view's list.
 _SPLIT_SHIFT = tuple(replace(block, columns=SPLIT_TRACK_COLUMNS) for block in _SESSION_SHIFT)
 
-# Not drawn: the Shift notes of Mixer Mode's list.
+# The faders are dark under Shift.
 _MIXER_SHIFT = (SOLO, ARM)
 
 _FX = (
@@ -253,32 +289,37 @@ _FX = (
         "A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a "
         "stored one to recall. Launching the scene morphs to it.",
     ),
-    Block(
+    Item(
         "Bars",
-        range(min(layout.FX_LENGTHS)[0], min(layout.FX_LENGTHS)[0] + 1),
-        range(1, len(layout.FX_LENGTHS) + 1),
+        {key: f"{bars} bar" if bars == 1 else f"{bars} bars" for key, bars in layout.FX_LENGTHS.items()},
         "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.",
     ),
 )
 
-_DEV = (
+_DEVICE_CLIP = (
     Item(
         "Tracks",
-        {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEV_TRACK_STEPS.items()},
+        {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEVICE_CLIP_TRACK_STEPS.items()},
         "Select the previous or next track, through the returns and master.",
     ),
     Item(
         "Devices",
-        {key: "Device-" if step < 0 else "Device+" for key, step in layout.DEV_DEVICE_STEPS.items()},
+        {key: "Device-" if step < 0 else "Device+" for key, step in layout.DEVICE_CLIP_DEVICE_STEPS.items()},
         "Select the previous or next device on the selected track.",
     ),
     _one(
         "Fader source",
-        layout.DEV_SOURCE,
+        layout.DEVICE_CLIP_SOURCE,
         "Switch the faders between Device FX and Mapped FX.",
         label="Source",
     ),
-    Item("Dev", {layout.DEV: "Dev"}, "Held.", variant=False),
+    Item(
+        "Device/Clip",
+        {layout.DEVICE_CLIP: "DEV\nHELD"},
+        "Hold it for this layer. A tap, pressing nothing else, flips Live between Device and "
+        "Clip view instead.",
+        variant=False,
+    ),
 )
 
 RECORD_CLIP = _one(
@@ -296,7 +337,7 @@ _LINNSTRUMENT = (
     METRONOME,
     FIXED_LENGTH,
     UNDO,
-    _one("Back", layout.MODE_PAD, "Back to the mode you came from: Session, Mixer or FX."),
+    _one("Back", layout.MODE_PAD, "Back to the mode you came from: Session, Mixer, FX or Sequencer."),
     SHIFT,
 )
 
@@ -326,7 +367,7 @@ _LINNSTRUMENT_SCENES = (
 )
 
 # Sequencer Mode: column 1 as in Linnstrument Mode, and its own columns 15 and 16.
-_SEQUENCER_SIDE = (
+_SEQUENCER_GLOBAL = (
     PLAY,
     RECORD_CLIP,
     CAPTURE_MIDI,
@@ -340,33 +381,38 @@ _SEQUENCER_SIDE = (
         label="Linn",
     ),
     SHIFT,
-    _one("Copy", layout.COPY, "Hold, press a step, then press steps to paste it onto."),
-    _one(
-        "Delete",
-        layout.DELETE,
-        "Hold, then press a step to clear it, or a note pad to remove that note from the clip.",
-    ),
+)
+
+SEQ_COPY = _one("Copy", layout.COPY, "Hold, press a step, then press steps to paste it onto.")
+SEQ_DELETE = _one(
+    "Delete",
+    layout.DELETE,
+    "Hold, then press a step to clear it, or a note pad to remove that note from the clip.",
+)
+
+_SEQUENCER_NAV = (
+    SEQ_COPY,
+    SEQ_DELETE,
     _one("Session", layout.SESSION, "Back to Session Mode."),
     _one("Mixer", layout.MIXER, "Mixer Mode."),
     _one("FX", layout.FX, "FX Mode."),
     _one("Seq", layout.SEQ, "Back to Session Mode."),
-    DEV,
+    DEVICE_CLIP,
 )
 
-_SEQUENCER_SHIFT = (
+_SEQUENCER_GLOBAL_SHIFT = (
     STOP_TRACK,
     SESSION_RECORD,
     QUANTIZE,
     LAUNCH_QUANTIZATION,
     REDO,
     SCENE_PAGE,
-    Item(
-        "Tracks",
-        {key: "Track-" if step < 0 else "Track+" for key, step in layout.TRACK_STEPS.items()},
-        "Select the previous or next MIDI track; the arm moves with it.",
-    ),
-    TEMPO,
     SHIFT_HELD,
+)
+
+_SEQUENCER_NAV_SHIFT = (
+    WINDOW_MOVES,
+    TEMPO,
 )
 
 # Steps and column 15, the same in both views.
@@ -392,7 +438,7 @@ _SEQUENCER_GRID = (
         "Move the note pads an octave up or down.",
     ),
     _one(
-        "Notes/Settings",
+        "View",
         layout.SEQ_VIEW,
         "Switch columns 11–14 between the note pads and the settings.",
         label="View",
@@ -405,8 +451,8 @@ _SEQUENCER = (
         "Notes",
         layout.SEQ_NOTE_COLUMNS,
         ALL_PADS,
-        "Press to pick the note the steps edit, and hear it. Hold steps and press a note "
-        "to add or remove it on them.",
+        "Choose the note the steps write: press a pad to select its note and hear it on the "
+        "armed track. Hold steps and press a pad to add or remove that note on them.",
     ),
 )
 
@@ -428,8 +474,12 @@ _SEQUENCER_SETTINGS = (
 
 # The manual's sections, by marker slug.
 SECTIONS = {
-    "side": _SIDE,
-    "side-shift": _SIDE_SHIFT,
+    "global": _GLOBAL,
+    "global-shift": _GLOBAL_SHIFT,
+    "view": _VIEW,
+    "view-shift": _VIEW_SHIFT,
+    "navigation": _NAVIGATION,
+    "navigation-shift": _NAVIGATION_SHIFT,
     "session": _SESSION,
     "session-shift": _SESSION_SHIFT,
     "split": _SPLIT,
@@ -437,54 +487,73 @@ SECTIONS = {
     "mixer": _MIXER,
     "mixer-shift": _MIXER_SHIFT,
     "fx": _FX,
-    "dev": _DEV,
+    "fx-shift": (),  # the grid is dark under Shift
+    "device-clip": _DEVICE_CLIP,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
     "linnstrument-scenes": _LINNSTRUMENT_SCENES,
-    "sequencer-side": _SEQUENCER_SIDE,
-    "sequencer-shift": _SEQUENCER_SHIFT,
+    "sequencer-global": _SEQUENCER_GLOBAL,
+    "sequencer-nav": _SEQUENCER_NAV,
+    "sequencer-global-shift": _SEQUENCER_GLOBAL_SHIFT,
+    "sequencer-nav-shift": _SEQUENCER_NAV_SHIFT,
     "sequencer-grid": _SEQUENCER_GRID,
     "sequencer": _SEQUENCER,
     "sequencer-settings": _SEQUENCER_SETTINGS,
+    # Listed, not drawn: Sequencer Mode's own pads, after its first map. Column 16's mode
+    # pads are in the Navigation column's list.
+    "sequencer-functions": (
+        *_SEQUENCER,
+        SEQ_COPY,
+        SEQ_DELETE,
+        Gesture(
+            "Press and hold a step",
+            "Change the velocity by sliding left (lower) or right (higher).",
+        ),
+        Gesture(
+            "Shift + press and hold a step",
+            "Nudge the note forward or backward by sliding left and right.",
+        ),
+    ),
 }
 
 # The sections the manual lists, each with the section holding its Shift layer.
 LISTS = {
-    "side": "side-shift",
+    "global": "global-shift",
+    "view": "view-shift",
+    "navigation": "navigation-shift",
     "session": "session-shift",
     "split": "split-shift",
     "mixer": "mixer-shift",
     "fx": None,
-    "dev": None,
+    "device-clip": None,
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,
-    "sequencer-side": "sequencer-shift",
-    "sequencer": None,
+    "sequencer-functions": None,
     "sequencer-settings": None,
 }
 
 # The sections each map is drawn from.
 LAYERS = {
-    Layer.SESSION: ("side", "session"),
-    Layer.SIDE: ("side",),
-    Layer.SESSION_SHIFT: ("side-shift", "session-shift"),
-    Layer.SPLIT: ("side", "split"),
-    Layer.MIXER: ("side", "mixer"),
-    Layer.FX: ("side", "fx"),
-    Layer.MAPPED_FX: ("side", "fx"),
-    Layer.DEV: ("dev",),
-    Layer.LINNSTRUMENT: ("linnstrument",),
-    Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
-    Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),
-    Layer.SEQUENCER: ("sequencer-side", "sequencer"),
-    Layer.SEQUENCER_SETTINGS: ("sequencer-side", "sequencer-grid", "sequencer-settings"),
-    Layer.SEQUENCER_SHIFT: ("sequencer-shift", "sequencer"),
-    Layer.SEQUENCER_DRUMS: ("sequencer-side", "sequencer"),
+    Layer.SESSION: ("global", "view", "navigation", "session"),
+    Layer.SESSION_SHIFT: ("global-shift", "view-shift", "navigation-shift", "session-shift"),
+    Layer.SPLIT: ("global", "view", "navigation", "split"),
+    Layer.MIXER: ("global", "view", "navigation", "mixer"),
+    Layer.MIXER_SHIFT: ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
+    Layer.FX: ("global", "view", "navigation", "fx"),
+    Layer.FX_SHIFT: ("global-shift", "view-shift", "navigation-shift", "fx-shift"),
+    Layer.SEQUENCER: ("sequencer-global", "sequencer-nav", "sequencer"),
+    Layer.SEQUENCER_SETTINGS: (
+        "sequencer-global",
+        "sequencer-nav",
+        "sequencer-grid",
+        "sequencer-settings",
+    ),
+    Layer.SEQUENCER_SHIFT: ("sequencer-global-shift", "sequencer-nav-shift", "sequencer"),
+    Layer.SEQUENCER_DRUMS: ("sequencer-global", "sequencer-nav", "sequencer"),
 }
 
-# Columns a map shows dimmed and unlabelled: the side columns map dims the grid, and the Dev
-# layer's map everything but column 16.
-DIMMED = {Layer.SIDE: layout.GRID_COLUMNS, Layer.DEV: range(1, layout.NAV_COLUMN)}
+# Columns a map shows dimmed and unlabelled, per layer: none at present.
+DIMMED = {}
 
 
 def items(layer):
@@ -492,14 +561,20 @@ def items(layer):
 
 
 def ordered(section):
-    # Left to right, then far to near, by each item's first pad.
-    return sorted(SECTIONS[section], key=lambda item: item.keys[0])
+    # Left to right, then far to near, by each item's first pad; gestures last, as written.
+    pads = [item for item in SECTIONS[section] if item.keys]
+    gestures = [item for item in SECTIONS[section] if not item.keys]
+    return sorted(pads, key=lambda item: item.keys[0]) + gestures
 
 
 def labels(layer):
+    return {key: label for section in LAYERS[layer] for key, label in section_labels(section).items()}
+
+
+def section_labels(section):
     return {
         key: label
-        for item in items(layer)
+        for item in SECTIONS[section]
         if isinstance(item, Item)
         for key, label in item.labels.items()
     }
@@ -508,15 +583,3 @@ def labels(layer):
 def blocks(layer):
     return [item for item in items(layer) if isinstance(item, Block)]
 
-
-def shift_note(section, item):
-    # What the item's pads do under Shift, from the Shift layer's items.
-    shifted = LISTS[section]
-    if shifted is None:
-        return None
-    notes = [
-        other.callout.rstrip(".")
-        for other in ordered(shifted)
-        if other.variant and set(other.keys) & set(item.keys)
-    ]
-    return "; ".join(notes) or None

@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, fx, layout, session
+from BleakLoop.core import column_1, controls, engine, fx, layout, modes, session
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -20,6 +20,8 @@ from BleakLoop.core.leds import (
     Light,
 )
 from BleakLoop.core.model import (
+    BindFader,
+    ToggleDetailView,
     ArmExclusive,
     CaptureAndInsertScene,
     ClearBackToArrangement,
@@ -65,6 +67,7 @@ from BleakLoop.core.model import (
     ToggleSolo,
     TrackView,
     Undo,
+    UnarmAll,
     UnmuteAll,
     UnsoloAll,
 )
@@ -425,10 +428,10 @@ def test_mixer_or_fx_from_the_split_view_reclamps_the_window(key):
 
 
 def test_window_tracks():
-    assert session.window_tracks(SPLIT) == 8
-    assert session.window_tracks(SESSION) == 13
-    assert session.window_tracks(replace(SPLIT, mixer=True)) == 13
-    assert session.window_tracks(replace(SPLIT, fx=True)) == 13
+    assert controls.window_tracks(SPLIT) == 8
+    assert controls.window_tracks(SESSION) == 13
+    assert controls.window_tracks(replace(SPLIT, mixer=True)) == 13
+    assert controls.window_tracks(replace(SPLIT, fx=True)) == 13
 
 
 def test_split_routes_column_9_to_the_clips_and_10_to_the_faders():
@@ -527,17 +530,64 @@ def test_tempo_clamps_at_20():
     )
 
 
-# Dev
+# Device/Clip
 
 
-DEV = State(dev=True)
+DEVICE_CLIP = State(device_clip=True)
 
 
 @pytest.mark.parametrize("state", [SESSION, MIXING, FX_ON])
-def test_dev_is_held(state):
-    held, actions = handle(state, layout.DEV)
-    assert held.dev and actions == []
-    assert handle(held, layout.DEV, pressed=False) == (state, [])
+def test_device_clip_is_held(state):
+    held, actions = handle(state, layout.DEVICE_CLIP)
+    assert held.device_clip and actions == []
+    assert handle(held, layout.DEVICE_CLIP, pressed=False) == (state, [ToggleDetailView()])
+
+
+def engine_presses(state, *presses, snapshot=SNAP):
+    # Through engine.handle, which marks a Device/Clip hold used; returns every action.
+    actions = []
+    for key, pressed in presses:
+        state, more = engine.handle(state, press(key, pressed), snapshot)
+        actions += more
+    return state, actions
+
+
+DOWN, UP = True, False
+
+
+def test_device_clip_tap_flips_the_detail_view():
+    state, actions = engine_presses(SESSION, (layout.DEVICE_CLIP, DOWN), (layout.DEVICE_CLIP, UP))
+    assert actions == [ToggleDetailView()]
+    assert not state.device_clip and not state.device_clip_used
+
+
+@pytest.mark.parametrize("key", [(16, 2), layout.SHIFT, (3, 1), (1, 4)])
+def test_device_clip_with_another_press_does_not_flip(key):
+    state, actions = engine_presses(
+        SESSION, (layout.DEVICE_CLIP, DOWN), (key, DOWN), (key, UP), (layout.DEVICE_CLIP, UP)
+    )
+    assert ToggleDetailView() not in actions
+    assert not state.device_clip and not state.device_clip_used
+
+
+def test_device_clip_and_a_mapped_fx_row_binds_without_flipping():
+    mapped = replace(FX_ON, fader_source="mapped")
+    _, actions = engine_presses(
+        mapped, (layout.DEVICE_CLIP, DOWN), ((5, 3), DOWN), ((5, 3), UP), (layout.DEVICE_CLIP, UP)
+    )
+    assert actions == [BindFader(2)]
+
+
+def test_device_clip_on_shifts_layer_never_flips():
+    state, actions = engine_presses(SHIFT, (layout.DEVICE_CLIP, DOWN), (layout.DEVICE_CLIP, UP))
+    assert actions == [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")]
+    assert not state.device_clip
+
+
+@pytest.mark.parametrize("mode", [Mode.SESSION, Mode.LINNSTRUMENT, Mode.SEQUENCER])
+def test_mode_entry_clears_the_device_clip_hold(mode):
+    state = modes.enter(State(device_clip=True, device_clip_used=True), mode)
+    assert not state.device_clip and not state.device_clip_used
 
 
 @pytest.mark.parametrize(
@@ -551,34 +601,34 @@ def test_dev_is_held(state):
         ((16, 7), []),
     ],
 )
-@pytest.mark.parametrize("state", [DEV, replace(DEV, shift=True), replace(DEV, fx=True)])
-def test_dev_layer(state, key, actions):
+@pytest.mark.parametrize("state", [DEVICE_CLIP, replace(DEVICE_CLIP, shift=True), replace(DEVICE_CLIP, fx=True)])
+def test_device_clip_layer(state, key, actions):
     assert handle(state, key) == (state, actions)
 
 
-def test_dev_toggles_the_fader_source():
-    state, actions = handle(DEV, layout.DEV_SOURCE)
+def test_device_clip_toggles_the_fader_source():
+    state, actions = handle(DEVICE_CLIP, layout.DEVICE_CLIP_SOURCE)
     assert state.fader_source == "mapped"
     assert actions == [ShowMessage("Mapped FX")]
-    state, actions = handle(state, layout.DEV_SOURCE)
+    state, actions = handle(state, layout.DEVICE_CLIP_SOURCE)
     assert state.fader_source == "device"
     assert actions == [ShowMessage("Device FX")]
 
 
-def test_dev_on_shifts_layer_steps_the_tempo():
-    assert handle(SHIFT, layout.DEV) == (
+def test_device_clip_on_shifts_layer_steps_the_tempo():
+    assert handle(SHIFT, layout.DEVICE_CLIP) == (
         SHIFT,
         [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")],
     )
 
 
-def test_dev_pad_lights():
-    assert session.render(SESSION, SNAP)[layout.DEV] == Light(ORANGE)
-    assert session.render(SHIFT, SNAP)[layout.DEV] == Light(GREEN)
+def test_device_clip_pad_lights():
+    assert session.render(SESSION, SNAP)[layout.DEVICE_CLIP] == Light(ORANGE)
+    assert session.render(SHIFT, SNAP)[layout.DEVICE_CLIP] == Light(GREEN)
 
 
-@pytest.mark.parametrize("state", [DEV, replace(DEV, shift=True)])
-def test_dev_layer_lights(state):
+@pytest.mark.parametrize("state", [DEVICE_CLIP, replace(DEVICE_CLIP, shift=True)])
+def test_device_clip_layer_lights(state):
     frame = session.render(state, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
         Light(LIME), Light(LIME), Light(MAGENTA), Light(MAGENTA),
@@ -586,9 +636,9 @@ def test_dev_layer_lights(state):
     ]
 
 
-def test_entering_a_mode_drops_dev():
-    state = session.handle(DEV, press(layout.MODE_PAD), SNAP)[0]
-    assert state.mode is Mode.LINNSTRUMENT and not state.dev
+def test_entering_a_mode_drops_device_clip():
+    state = session.handle(DEVICE_CLIP, press(layout.MODE_PAD), SNAP)[0]
+    assert state.mode is Mode.LINNSTRUMENT and not state.device_clip
 
 
 # Column 15
@@ -663,7 +713,7 @@ def test_unmute_all_in_mixer_and_fx(state):
 
 
 STOPPING = State(stop=True)
-STOP_ALL = [StopAllClips(), ShowMessage("Stop all clips")]
+UNARM_ALL = [UnarmAll(), ShowMessage("Unarm all")]
 
 
 def test_stop_press_holds():
@@ -678,8 +728,8 @@ def test_stop_tap_does_nothing(state):
 
 
 @pytest.mark.parametrize("state", [SHIFT, State(mixer=True, shift=True), State(fx=True, shift=True)])
-def test_shift_stop_stops_all_clips(state):
-    assert handle(state, layout.STOP) == (state, STOP_ALL)
+def test_shift_stop_unarms_all(state):
+    assert handle(state, layout.STOP) == (state, UNARM_ALL)
     assert handle(state, layout.STOP, pressed=False) == (state, [])
 
 
@@ -1465,10 +1515,24 @@ def test_shift_unmute_all_light_shows_solo(soloed, light):
     assert session.render(SHIFT, snapshot)[layout.UNMUTE_ALL] == light
 
 
-@pytest.mark.parametrize("state", [SESSION, SHIFT, State(mixer=True), State(fx=True)])
-def test_stop_light(state):
-    assert session.render(state, SNAP)[layout.STOP] == Light(RED)
-    assert session.render(replace(state, stop=True), SNAP)[layout.STOP] == Light(RED, Blink.FAST)
+@pytest.mark.parametrize("state", [SESSION, State(mixer=True), State(fx=True)])
+@pytest.mark.parametrize("armed", [False, True])
+def test_stop_light(state, armed):
+    snapshot = replace(SNAP, any_armed=armed)
+    assert session.render(state, snapshot)[layout.STOP] == Light(RED)
+    held = replace(state, stop=True)
+    assert session.render(held, snapshot)[layout.STOP] == Light(RED, Blink.FAST)
+
+
+@pytest.mark.parametrize("state", [SHIFT, State(mixer=True, shift=True), State(fx=True, shift=True)])
+@pytest.mark.parametrize("armed, light", [(False, Light(OFF)), (True, Light(RED))])
+def test_shift_stop_light_shows_an_arm(state, armed, light):
+    assert session.render(state, replace(SNAP, any_armed=armed))[layout.STOP] == light
+
+
+def test_stop_held_keeps_its_light_under_shift():
+    state = State(stop=True, shift=True)
+    assert session.render(state, SNAP)[layout.STOP] == Light(RED, Blink.FAST)
 
 
 def test_normal_layer_column_1():

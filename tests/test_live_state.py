@@ -86,6 +86,17 @@ def test_nothing_muted_or_soloed():
     assert not snapshot.any_soloed
 
 
+def test_any_armed_reads_armable_tracks_only():
+    armed = fake_track("b")
+    armed.arm = True
+    # Live raises on reading arm from a track that can't be armed.
+    unarmable = fake_track("c")
+    unarmable.can_be_armed = False
+    del unarmable.arm
+    assert not read(fake_song([fake_track("a"), unarmable])).any_armed
+    assert read(fake_song([fake_track("a"), unarmable, armed])).any_armed
+
+
 def test_muted_track():
     snapshot = read(fake_song([fake_track("a"), fake_track("b", mute=True)]))
     assert snapshot.any_muted
@@ -437,7 +448,6 @@ def test_read_sequencer_reads_the_highlighted_clip():
         (6, 50, 1.0, 0.5, 90.0),
     ]
     assert clip.reads == [(0, 128, 0.0, 8.0)]
-    assert view.midi_tracks == (1,)
     assert (view.scale.on, view.scale.root, view.scale.intervals) == (
         True,
         2,
@@ -460,7 +470,7 @@ def test_read_sequencer_on_an_audio_track_reads_no_notes():
 def test_read_sequencer_on_master():
     keys = seq_track("Keys")
     view = live_state.read_sequencer(seq_song([keys], selected=fake_track("Master")))
-    assert view.track is None and view.midi_tracks == (0,)
+    assert view.track is None
 
 
 def test_seq_entry_finds_the_detail_clip_and_the_playing_slot():

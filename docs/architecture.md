@@ -227,6 +227,7 @@ flowchart TD
   core_controls --> core_values
   core_engine --> core_faders
   core_engine --> core_fx
+  core_engine --> core_layout
   core_engine --> core_linnstrument_mode
   core_engine --> core_mixer
   core_engine --> core_model
@@ -290,6 +291,7 @@ flowchart TD
   live_state --> core_values
   surface --> Live
   surface --> ableton_v3
+  surface --> core_controls
   surface --> core_engine
   surface --> core_faders
   surface --> core_fx
@@ -298,7 +300,6 @@ flowchart TD
   surface --> core_model
   surface --> core_modes
   surface --> core_sequencer
-  surface --> core_session
   surface --> core_values
   surface --> device
   surface --> live_actions
@@ -499,7 +500,7 @@ stateDiagram-v2
 ```
 ### Session ring
 
-- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 6, False)` draws it from the core's window state in every mode, whenever the window or its width changes and on every mode entry, so the player can see which scenes the scene pads (and FX Mode's scene snapshots) show; the width is `session.window_tracks(state)`, 8 in the split view; `(-1, -1, -1, -1, False)` removes it on unload only. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
+- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 6, False)` draws it from the core's window state in every mode, whenever the window or its width changes and on every mode entry, so the player can see which scenes the scene pads (and FX Mode's scene snapshots) show; the width is `controls.window_tracks(state)`, 8 in the split view; `(-1, -1, -1, -1, False)` removes it on unload only. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
 
 ## 7. Adapters: Live mechanisms
 
@@ -508,10 +509,11 @@ stateDiagram-v2
 | Clip and scene launch | `ClipSlot.fire()` and `Scene.fire()`. Legato passes `force_legato=True`, which the LOM doesn't document but Live accepts, also together with `record_length`. |
 | Fixed Length | `ClipSlot.fire(record_length=beats)`, with beats = N × numerator × 4 / denominator. Passed only for an empty slot on an armed track, the only case where Live starts a new recording (`fire` raises if the slot owns a clip). Live records the exact length natively, from a stopped transport and with quantization None, so no relaunch timer is needed. |
 | Detail view focus | Poll the pending slot on the display tick; set `song.view.detail_clip` and show `Detail/Clip` (section 6). |
+| Detail view flip | `ToggleDetailView` (a Device/Clip tap) asks `application.view.is_view_visible("Detail/Clip")`: if so it shows `Detail/DeviceChain`, otherwise `Detail/Clip`, which also opens a hidden Detail view. It reads Live's view rather than keeping a flag, so a mouse click in between counts. |
 | Auto Linnstrument Mode | The core decides from the snapshot (track type, arm, slot state and Session Record) and emits a mode-switch action. |
 | Launch quantization | `song.clip_trigger_quantization = Live.Song.Quantization.values[n]`, read back with `int(...)`. Names in `session.QUANTIZATION_NAMES` match Live's dropdown. The remembered choice is core state, not Live. |
 | Track and global stop | `Track.stop_all_clips()`, `Song.stop_all_clips()`. Both stop at the next launch quantization mark, like Live's own stop buttons, on purpose. |
-| Arm | Exclusive arm disarms the others in `song.tracks`, then sets `track.arm`. Tracks are compared with `!=`, not `is`, because `song.tracks` and `song.visible_tracks` may return different wrappers for one track. `live_state` reads `arm` and `implicit_arm` only when `can_be_armed` is true, because Live is expected to raise on unarmable tracks such as groups. Both guards are deliberate. |
+| Arm | Exclusive arm disarms the others in `song.tracks`, then sets `track.arm`. Tracks are compared with `!=`, not `is`, because `song.tracks` and `song.visible_tracks` may return different wrappers for one track. `live_state` reads `arm` and `implicit_arm` only when `can_be_armed` is true, because Live is expected to raise on unarmable tracks such as groups. Both guards are deliberate. `UnarmAll` (Shift + Stop) disarms every track in `song.tracks` with `can_be_armed` and `arm`, and `Snapshot.any_armed` reads the same tracks for its light. |
 | Track list | `song.visible_tracks`: folded group members are skipped, and unfolding shifts the columns. |
 | Status bar messages | `ShowMessage` action, through v3's `ControlSurface.show_message`. |
 | Clip copy | `ClipSlot.duplicate_clip_to`. It raises on a MIDI/audio mismatch and on group slots, so the core refuses both first, using the track's `has_midi_input` and `is_foldable`. |
@@ -532,7 +534,7 @@ stateDiagram-v2
 | Mapped FX bindings | `song.set_data(FADERS_DATA_KEY, text)` on each bind and unbind, read with `song.get_data` at load and on every display tick, reloading the rows when the text changed, as the FX snapshots are; Undo doesn't revert the text either (#63). The text is JSON, `{"v": 1, "rows": [null or {"track", "tn", "device", "dn", "param", "name"} × 8]}`; anything unreadable loads as 8 unbound rows, with a log warning. A separate key from the snapshots, so neither format's version can wipe the other. |
 | Binding identity | `BindFader` reads `song.view.selected_parameter` and walks `canonical_parent`: a device whose parent is a track, return or master, or a track's `MixerDevice` (volume, panning and sends only, as `param` 0, 1, 2…). The track is (name, n) with n counting earlier same-named tracks in `song.tracks`, `song.return_tracks`, then master; a device is (name, n) among the track's same-named devices; `param` indexes `device.parameters`. A parameter under a rack chain is refused ("Map it to a macro instead"), anything else not on a track too. The adapter returns `FaderBound`, which `engine.handle` passes to `faders.bound` in any mode. A binding resolves only if the parameter at `param` still has the bound name. |
 | Blue hand | Other control surfaces, even in a slot with no ports, can hold `song.appointed_device` away from the device clicked in Live (seen with APC40_MkII and Launchkey_Mini_MK3 loaded). The surface polls `song.view.selected_track.view.selected_device` on the display tick and, when it changes, sets `song.appointed_device` to it, so a click moves the hand. Only on a change: a device another controller picked stays until the next click. |
-| Dev steps | Tracks: `song.visible_tracks`, then `song.return_tracks`, then `song.master_track`, set as `song.view.selected_track`. Devices: the selected track's `devices`, from the selected device's top-level ancestor (walking `canonical_parent` up through chains and racks), selected with `song.view.select_device` and appointed (`song.appointed_device`) at once, so the next fader write lands on it. The name, or "No more …", goes to the status bar. |
+| Device/Clip steps | Tracks: `song.visible_tracks`, then `song.return_tracks`, then `song.master_track`, set as `song.view.selected_track`. Devices: the selected track's `devices`, from the selected device's top-level ancestor (walking `canonical_parent` up through chains and racks), selected with `song.view.select_device` and appointed (`song.appointed_device`) at once, so the next fader write lands on it. The name, or "No more …", goes to the status bar. |
 | Sequencer target clip | Live's highlighted slot, `song.view.selected_track` × `song.view.selected_scene`, read live; Sequencer Mode follows a click in Live. `live_state.read_seq_entry`, read only while Seq is held, gives a tap its fallbacks: the Detail-view clip when its `canonical_parent` is a clip slot on a MIDI track in `song.tracks` (an Arrangement clip's parent is its track), then the selected track's `playing_slot_index`. Sequencer actions index `song.tracks`, folded group members included, not `song.visible_tracks`; `TrackView.set_index` maps a window track to it, read only for Sequencer Mode and while Seq is held. A MIDI track is `has_midi_input` and not `is_foldable`. |
 | Sequencer arm | Entry saves `arm` for every track in `song.tracks` (None where `can_be_armed` is false) and arms the target alone (`SetArms`, only the changes). A selection change moves the arm (old off, new on). Leaving for Session, Mixer or FX, or unloading while the arms are saved (in Sequencer Mode, or in Linnstrument Mode entered from it; `sequencer.restore_arms`, in a try so the device hand-back still runs), sets each track back to its saved arm only if it still equals what BleakLoop set; with the track count changed, nothing is restored, since the indexes no longer line up. Linnstrument Mode keeps the arm. |
 | Note reads | `clip.get_notes_extended(0, 128, 0.0, max(loop_end, end_marker))`, as plain `NoteView`s (`note_id`, `pitch`, `start_time`, `duration`, `velocity`, a float), only in Sequencer Mode, when a frame is drawn. The notes don't come back sorted. Measured: 45 notes in 0.02–0.06 ms, 250 in 0.5 ms. |

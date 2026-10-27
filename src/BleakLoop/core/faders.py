@@ -70,9 +70,9 @@ def press(state, event, snapshot):
         return state, []
     mapped = state.fader_source == "mapped"
     row = event.pad - 1
-    if state.dev:
+    if state.device_clip:
         if not mapped:
-            return state, [ShowMessage("Dev + FX for Mapped FX")]
+            return state, [ShowMessage("Device/Clip + FX for Mapped FX")]
         return state, [BindFader(row)]
     if state.delete:
         return _unbind(state, row) if mapped else (state, [])

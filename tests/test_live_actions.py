@@ -24,7 +24,6 @@ from BleakLoop.core.model import (  # noqa: E402
     SelectDrumPad,
     SaveFaderBindings,
     SaveFxScenes,
-    SelectSetTrack,
     SetArm,
     SetArms,
     SetDrumScroll,
@@ -33,7 +32,9 @@ from BleakLoop.core.model import (  # noqa: E402
     StepDevice,
     StepTrack,
     StoreFxSnapshot,
+    ToggleDetailView,
     ToggleSolo,
+    UnarmAll,
     UnmuteAll,
     UnsoloAll,
 )
@@ -96,6 +97,15 @@ def test_unmute_all_covers_tracks_and_returns():
     returns = [fake_track(mute=True)]
     apply(UnmuteAll(), fake_song(tracks, returns))
     assert not any(track.mute for track in tracks + returns)
+
+
+def test_unarm_all_disarms_only_armed_armable_tracks():
+    armed, idle = fake_track(arm=True), fake_track()
+    # Live raises on reading arm from a track that can't be armed.
+    unarmable = SimpleNamespace(can_be_armed=False)
+    apply(UnarmAll(), fake_song([armed, unarmable, idle]))
+    assert not armed.arm and not idle.arm
+    assert not hasattr(unarmable, "arm")
 
 
 def test_unsolo_all_covers_tracks_and_returns():
@@ -176,7 +186,7 @@ def test_delete_group_clips_closes_its_undo_step_on_failure():
     assert song.undo == ["begin", "end"]
 
 
-# Faders and Dev
+# Faders and Device/Clip
 
 
 class FakeParameter:
@@ -488,10 +498,37 @@ def test_set_arms_skips_tracks_that_cant_be_armed():
     assert song.tracks[0].arm and not song.tracks[2].arm
 
 
-def test_select_set_track():
-    song = seq_song()
-    apply(SelectSetTrack(1), song)
-    assert song.view.selected_track is song.tracks[1]
+class FakeAppView:
+    def __init__(self, visible):
+        self.visible = visible
+        self.shown = []
+
+    def is_view_visible(self, name):
+        return name in self.visible
+
+    def show_view(self, name):
+        self.shown.append(name)
+
+
+@pytest.mark.parametrize(
+    "visible, shown",
+    [
+        ({"Detail", "Detail/Clip"}, "Detail/DeviceChain"),
+        ({"Detail", "Detail/DeviceChain"}, "Detail/Clip"),
+        (set(), "Detail/Clip"),
+    ],
+)
+def test_toggle_detail_view_follows_lives_view(monkeypatch, visible, shown):
+    view = FakeAppView(visible)
+    app = SimpleNamespace(view=view)
+    monkeypatch.setattr(
+        live_actions.Live,
+        "Application",
+        SimpleNamespace(get_application=lambda: app),
+        raising=False,
+    )
+    apply(ToggleDetailView(), fake_song([]))
+    assert view.shown == [shown]
 
 
 def test_edit_notes_is_one_undo_step(note_specs):

@@ -18,16 +18,12 @@ from BleakLoop.core.modes import FxRack, Mode, State
 
 class Layer(enum.Enum):
     SESSION = "session"
-    SIDE = "side"
     SESSION_SHIFT = "session-shift"
     SPLIT = "session-split"
     MIXER = "mixer"
+    MIXER_SHIFT = "mixer-shift"
     FX = "fx"
-    MAPPED_FX = "fx-mapped"
-    DEV = "dev"
-    LINNSTRUMENT = "linnstrument"
-    LINNSTRUMENT_SHIFT = "linnstrument-shift"
-    LINNSTRUMENT_SCENES = "linnstrument-scenes"
+    FX_SHIFT = "fx-shift"
     SEQUENCER = "sequencer"
     SEQUENCER_SETTINGS = "sequencer-settings"
     SEQUENCER_SHIFT = "sequencer-shift"
@@ -90,6 +86,7 @@ SNAPSHOT = Snapshot(
     tracks=TRACKS,
     any_muted=True,
     any_soloed=True,
+    any_armed=True,
     selected_track=SelectedTrack(
         index=3, name="Lead", armed=True, clips=(True, True, False, False)
     ),
@@ -118,16 +115,6 @@ FX_SNAPSHOT = replace(
     ),
 )
 
-# Mapped FX with rows 3 and 7 unbound.
-MAPPED_VALUES = (0.85, 0.5, None, 0.3, 0.7, 1.0, None, 0.15)
-MAPPED_SNAPSHOT = replace(
-    SNAPSHOT,
-    faders=tuple(
-        None if value is None else FaderView("Bound", value, 0.0, 1.0)
-        for value in MAPPED_VALUES
-    ),
-)
-
 # Sequencer Mode on Lead's clip at 1/16, as in the mockup: E2 selected, G2 on the other
 # steps, the loop on pages 1-2, and the playhead on step 9, whose G2 is playing.
 SEQ_PITCH = 52  # E2
@@ -152,7 +139,6 @@ SEQ_SNAPSHOT = replace(
                 + [(SEQ_OTHER, step) for step in _OTHER_STEPS]
             )
         ),
-        midi_tracks=(3,),
     ),
 )
 SEQUENCER = State(mode=Mode.SEQUENCER, seq_pitch=SEQ_PITCH, fixed_length=2)
@@ -178,24 +164,26 @@ SEQ_DRUM_SNAPSHOT = replace(
     ),
 )
 
+# Linnstrument Mode's column 1, for its own column figure: the rest is the instrument.
+LINNSTRUMENT = (State(mode=Mode.LINNSTRUMENT), SNAPSHOT)
+LINNSTRUMENT_SHIFT = (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT)
+LINNSTRUMENT_SCENES = (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT)
+
+# Device/Clip held over Session Mode, for the Navigation column figure.
+DEVICE_CLIP_HELD = (State(device_clip=True, fixed_length=2), SNAPSHOT)
+
+FX_STATE = State(
+    fx=True, fx_slots=FX_SLOTS, fx_scenes=FX_SCENES, fx_landed_scene=2, fx_length=4
+)
+
 SCENES = {
     Layer.SESSION: (State(fixed_length=2), SNAPSHOT),
-    Layer.SIDE: (State(fixed_length=2), SNAPSHOT),
     Layer.SESSION_SHIFT: (State(fixed_length=2, shift=True), SNAPSHOT),
     Layer.SPLIT: (State(split=True, fixed_length=2), FX_SNAPSHOT),
     Layer.MIXER: (State(mixer=True), MIXER_SNAPSHOT),
-    Layer.FX: (
-        State(fx=True, fx_slots=FX_SLOTS, fx_scenes=FX_SCENES, fx_landed_scene=2, fx_length=4),
-        FX_SNAPSHOT,
-    ),
-    Layer.MAPPED_FX: (
-        State(fx=True, fx_slots=FX_SLOTS, fader_source="mapped"),
-        MAPPED_SNAPSHOT,
-    ),
-    Layer.DEV: (State(dev=True, fixed_length=2), SNAPSHOT),
-    Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
-    Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
-    Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),
+    Layer.MIXER_SHIFT: (State(mixer=True, shift=True), MIXER_SNAPSHOT),
+    Layer.FX: (FX_STATE, FX_SNAPSHOT),
+    Layer.FX_SHIFT: (replace(FX_STATE, shift=True), FX_SNAPSHOT),
     Layer.SEQUENCER: (SEQUENCER, SEQ_SNAPSHOT),
     Layer.SEQUENCER_SETTINGS: (replace(SEQUENCER, seq_settings=True), SEQ_SNAPSHOT),
     Layer.SEQUENCER_SHIFT: (replace(SEQUENCER, shift=True), SEQ_SNAPSHOT),

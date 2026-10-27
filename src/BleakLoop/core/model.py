@@ -93,7 +93,6 @@ class SequencerView:
     notes: tuple = ()  # NoteView per note in the clip
     drum: DrumView | None = None
     scale: ScaleView = ScaleView()
-    midi_tracks: tuple = ()  # the song.tracks indexes of every MIDI track
 
 
 @dataclass(frozen=True)
@@ -148,6 +147,7 @@ class Snapshot:
     # Over every track and return track in the Set, not just the window.
     any_muted: bool = False
     any_soloed: bool = False
+    any_armed: bool = False
     # FaderView or None per fader row, pad 1 first; read only while the faders show.
     faders: tuple = ()
     # Per song.tracks: True, False, or None when it can't be armed. Read only for Sequencer
@@ -322,6 +322,12 @@ class UnmuteAll:
 @dataclass(frozen=True)
 class UnsoloAll:
     # Every track and return track in the Set.
+    pass
+
+
+@dataclass(frozen=True)
+class UnarmAll:
+    # Every armable track in the Set; returns and master can't be armed.
     pass
 
 
@@ -529,8 +535,9 @@ class SetArms:
 
 
 @dataclass(frozen=True)
-class SelectSetTrack:
-    track: int
+class ToggleDetailView:
+    # Clip view if the Detail view shows anything else or is hidden, else Device view.
+    pass
 
 
 @dataclass(frozen=True)
