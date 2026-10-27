@@ -243,8 +243,17 @@ class BleakLoop(ControlSurface):
         if origins is None:
             # A different Set: it keeps its own store.
             return
-        logger.info("FX: scenes changed, %d -> %d", len(old), len(scenes))
+        before = self._state.fx_scenes
         self._handle(ScenesChanged(*origins))
+        logger.info(
+            "FX: scenes changed, %d -> %d, origin %s, copies %s, stored %s -> %s",
+            len(old),
+            len(scenes),
+            origins[0],
+            origins[1],
+            [i for i, snapshot in enumerate(before) if snapshot is not None],
+            [i for i, snapshot in enumerate(self._state.fx_scenes) if snapshot is not None],
+        )
 
     def _load_faders(self):
         # As _load_fx: Undo and Redo of a bind or unbind change the stored text.

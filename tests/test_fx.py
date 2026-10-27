@@ -907,6 +907,19 @@ def test_scene_origins_move():
     assert fx.scene_origins(["a", "b", "c"], ["b", "c", "a"], never) == ((1, 2, 0), (None,) * 3)
 
 
+def test_scene_origins_live_drag_recreates_the_scene():
+    # Live's drag of scene 3 to slot 6: the moved scene comes back as a new object.
+    old = list("abcdefghijk")
+    new = list("abdefXghijk")
+    assert fx.scene_origins(old, new, always) == ((0, 1, 3, 4, 5, 2, 6, 7, 8, 9, 10), (None,) * 11)
+
+
+def test_scene_origins_drag_of_two_scenes_pairs_them_in_order():
+    old = list("abcde")
+    new = list("adXYe")
+    assert fx.scene_origins(old, new, never) == ((0, 3, 1, 2, 4), (None,) * 5)
+
+
 def test_scene_origins_duplicate():
     asked = []
 

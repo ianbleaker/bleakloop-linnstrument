@@ -90,6 +90,11 @@ def scene_origins(old, new, duplicate):
     origin = tuple(next((i for i, scene in enumerate(old) if scene == item), None) for item in new)
     if all(i is None for i in origin):
         return None
+    # Live re-creates a dragged scene as a new object. With the count unchanged, the scenes
+    # that vanished are the ones that moved: pair them, in order, with the new ones.
+    if len(old) == len(new):
+        vanished = iter(i for i in range(len(old)) if i not in origin)
+        origin = tuple(next(vanished) if i is None else i for i in origin)
     copies = tuple(
         origin[i - 1]
         if origin[i] is None and i > 0 and origin[i - 1] is not None and duplicate(i)
