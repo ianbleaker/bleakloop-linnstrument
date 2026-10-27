@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, layout, session
+from BleakLoop.core import column_1, fx, layout, session
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -40,6 +40,7 @@ from BleakLoop.core.model import (
     QuantizeClip,
     RecallFxSnapshot,
     Redo,
+    SaveFxScenes,
     SceneSelected,
     SelectTrack,
     SeqEntry,
@@ -1221,6 +1222,25 @@ def test_copy_scene():
         COPY,
         [CopyScene(0, 1), ShowMessage("Scene copied")],
     )
+
+
+def test_copy_scene_copies_its_snapshot():
+    state = replace(COPY, copy_source=SceneSource(0), fx_scenes=(SCENE_SNAPSHOT,))
+    state, actions = handle(state, (layout.SCENE_COLUMN, 2), SCENES)
+    scenes = (SCENE_SNAPSHOT, SCENE_SNAPSHOT) + (None,) * (SCENES.scene_count - 2)
+    assert state.fx_scenes == scenes
+    assert actions == [
+        CopyScene(0, 1),
+        SaveFxScenes(fx.dump_scenes(scenes)),
+        ShowMessage("Scene copied"),
+    ]
+
+
+def test_copy_scene_without_a_snapshot_keeps_the_targets():
+    state = replace(COPY, copy_source=SceneSource(0), fx_scenes=(None, SCENE_SNAPSHOT))
+    state, actions = handle(state, (layout.SCENE_COLUMN, 2), SCENES)
+    assert state.fx_scenes == (None, SCENE_SNAPSHOT)
+    assert actions == [CopyScene(0, 1), ShowMessage("Scene copied")]
 
 
 def test_copy_scene_with_short_scene_clips_counts_as_empty():

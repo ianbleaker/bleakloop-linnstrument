@@ -14,6 +14,7 @@ from BleakLoop.core.model import (
     RackView,
     RecallFxSnapshot,
     SaveFxScenes,
+    ScenesChanged,
     SaveFxSnapshots,
     SetMacros,
     SetMixer,
@@ -23,7 +24,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     TrackView,
 )
-from BleakLoop.core.modes import FxRack, Glide, Morph, MorphMacro, State
+from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, State
 from BleakLoop.core.values import FX_TOUCH_TOLERANCE
 
 
@@ -877,3 +878,119 @@ def test_a_launch_recall_replaces_a_running_morph():
     state, actions = launch_read(state, 2, 8.0, launching(5.5))
     assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
     assert (state.morph.slot, state.morph.scene) == (2, True)
+
+
+# Scene changes in the Set
+
+
+def never(i):
+    return False
+
+
+def always(i):
+    return True
+
+
+def test_scene_origins_unchanged():
+    assert fx.scene_origins(["a", "b"], ["a", "b"], never) == ((0, 1), (None, None))
+
+
+def test_scene_origins_insert():
+    assert fx.scene_origins(["a", "b"], ["a", "x", "b"], never) == ((0, None, 1), (None,) * 3)
+
+
+def test_scene_origins_delete():
+    assert fx.scene_origins(["a", "b", "c"], ["a", "c"], never) == ((0, 2), (None, None))
+
+
+def test_scene_origins_move():
+    assert fx.scene_origins(["a", "b", "c"], ["b", "c", "a"], never) == ((1, 2, 0), (None,) * 3)
+
+
+def test_scene_origins_duplicate():
+    asked = []
+
+    def duplicate(i):
+        asked.append(i)
+        return True
+
+    result = fx.scene_origins(["a", "b"], ["a", "a2", "b"], duplicate)
+    assert result == ((0, None, 1), (None, 0, None))
+    assert asked == [1]  # only new scenes are checked
+
+
+def test_scene_origins_insert_at_the_top_is_never_a_duplicate():
+    assert fx.scene_origins(["a"], ["x", "a"], always) == ((None, 0), (None, None))
+
+
+def test_scene_origins_insert_after_an_insert_is_not_a_duplicate():
+    assert fx.scene_origins(["a"], ["a", "x", "y"], always) == ((0, None, None), (None, 0, None))
+
+
+def test_scene_origins_of_a_different_set_is_none():
+    assert fx.scene_origins(["a", "b"], ["x", "y"], always) is None
+
+
+A_SNAP = (FxRack("A", "R", 0, (1.0,)),)
+B_SNAP = (FxRack("B", "R", 0, (2.0,)),)
+
+
+def changed(state, origin, copies=None):
+    copies = copies or (None,) * len(origin)
+    return engine.handle(state, ScenesChanged(origin, copies), SNAP)
+
+
+@pytest.mark.parametrize("state", [FX, State(), State(mode=Mode.SEQUENCER)])
+def test_a_move_keeps_each_snapshot_in_every_mode(state):
+    state = replace(state, fx_scenes=(A_SNAP, None, B_SNAP))
+    state, actions = changed(state, (2, 0, 1))
+    assert state.fx_scenes == (B_SNAP, A_SNAP, None)
+    assert actions == [SaveFxScenes(fx.dump_scenes((B_SNAP, A_SNAP, None)))]
+
+
+def test_a_delete_drops_its_snapshot():
+    state, actions = changed(replace(FX, fx_scenes=(A_SNAP, B_SNAP)), (1,))
+    assert state.fx_scenes == (B_SNAP,)
+    assert actions == [SaveFxScenes(fx.dump_scenes((B_SNAP,)))]
+
+
+def test_an_insert_starts_empty():
+    state, _ = changed(replace(FX, fx_scenes=(A_SNAP, B_SNAP)), (0, None, 1))
+    assert state.fx_scenes == (A_SNAP, None, B_SNAP)
+
+
+def test_a_duplicate_copies_its_source():
+    state, _ = changed(replace(FX, fx_scenes=(A_SNAP,)), (0, None), (None, 0))
+    assert state.fx_scenes == (A_SNAP, A_SNAP)
+
+
+def test_an_empty_scene_added_at_the_end_saves_nothing():
+    state, actions = changed(replace(FX, fx_scenes=(A_SNAP,)), (0, None))
+    assert state.fx_scenes == (A_SNAP, None)
+    assert actions == []
+
+
+def test_a_change_remaps_the_morph_and_the_landed_scene():
+    morph = Morph(1, 0.0, 16.0, 0.0, scene=True)
+    state = replace(FX, fx_scenes=(A_SNAP, B_SNAP), morph=morph, fx_landed_scene=0)
+    state, _ = changed(state, (None, 0, 1))
+    assert (state.morph.slot, state.fx_landed_scene) == (2, 1)
+
+
+def test_a_change_leaves_a_global_morph_and_landed_alone():
+    state = replace(FX, fx_scenes=(A_SNAP,), morph=Morph(0, 0.0, 16.0, 0.0), fx_landed=0)
+    state, _ = changed(state, (None, 0))
+    assert (state.morph.slot, state.fx_landed) == (0, 0)
+
+
+def test_a_deleted_morphing_scene_still_lands_and_blinks_nothing():
+    morph = replace(MORPH, slot=1, scene=True)
+    state = replace(MORPHING, fx_scenes=(A_SNAP, B_SNAP), morph=morph, fx_landed_scene=1)
+    state, _ = changed(state, (0,))
+    assert (state.morph.slot, state.fx_landed_scene) == (None, None)
+    frame = fx.render(state, replace(SNAP, scene_count=1))
+    blinking = [light for light in frame.values() if light.blink is Blink.FAST]
+    assert blinking == []
+    state, actions, _ = tick(state, 16.0, (0.0, 0.0, 50.0))
+    assert state.morph is None and actions[-1] == EndUndoStep()
+    assert (state.fx_landed, state.fx_landed_scene) == (None, None)

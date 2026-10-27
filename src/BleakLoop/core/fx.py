@@ -83,6 +83,52 @@ def scene_snapshot(state, scene):
     return state.fx_scenes[scene] if scene < len(state.fx_scenes) else None
 
 
+def scene_origins(old, new, duplicate):
+    # (origin, copies) per new scene, or None when no scene is kept: a different Set.
+    # duplicate(i) says whether new scene i has scene i - 1's clips, as Live's Duplicate
+    # inserts it.
+    origin = tuple(next((i for i, scene in enumerate(old) if scene == item), None) for item in new)
+    if all(i is None for i in origin):
+        return None
+    copies = tuple(
+        origin[i - 1]
+        if origin[i] is None and i > 0 and origin[i - 1] is not None and duplicate(i)
+        else None
+        for i in range(len(new))
+    )
+    return origin, copies
+
+
+def scenes_changed(state, event):
+    # A moved scene keeps its snapshot, a deleted one's goes, a duplicate copies its source's.
+    def kept(old):
+        return scene_snapshot(state, old) if old is not None else None
+
+    scenes = tuple(
+        kept(old) if old is not None else kept(copy)
+        for old, copy in zip(event.origin, event.copies)
+    )
+    moved = {old: new for new, old in enumerate(event.origin) if old is not None}
+    morph = state.morph
+    if morph is not None and morph.scene and morph.slot is not None:
+        morph = replace(morph, slot=moved.get(morph.slot))
+    landed = state.fx_landed_scene
+    if landed is not None:
+        landed = moved.get(landed)
+    changed = scenes != _fit(state.fx_scenes, len(scenes))
+    state = replace(state, fx_scenes=scenes, morph=morph, fx_landed_scene=landed)
+    return state, [SaveFxScenes(dump_scenes(scenes))] if changed else []
+
+
+def copy_scene(state, source, target, scene_count):
+    # Session Mode's scene copy: the target takes the source's snapshot, if it has one.
+    snapshot = scene_snapshot(state, source)
+    if snapshot is None:
+        return state, []
+    state, save = _set(state, target, True, snapshot, scene_count)
+    return state, [save]
+
+
 def _encode(snapshot):
     if snapshot is None:
         return None

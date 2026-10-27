@@ -265,7 +265,8 @@ def _copy_scene(state, event, snapshot):
     dropped = replace(state, copy_source=None)
     if has:
         return dropped, [ShowMessage("Target scene not empty")]
-    return dropped, [CopyScene(source.scene, scene), ShowMessage("Scene copied")]
+    dropped, save = fx.copy_scene(dropped, source.scene, scene, snapshot.scene_count)
+    return dropped, [CopyScene(source.scene, scene), *save, ShowMessage("Scene copied")]
 
 
 def _delete(state, event, snapshot):

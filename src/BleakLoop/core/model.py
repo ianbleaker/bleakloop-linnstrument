@@ -236,6 +236,13 @@ class SceneSelected:
 
 
 @dataclass(frozen=True)
+class ScenesChanged:
+    # From the display tick, when the Set's scene list changed (fx.scene_origins).
+    origin: tuple  # per new scene: its old index, or None for a new scene
+    copies: tuple  # per new scene: the old index a duplicate copies its snapshot from, or None
+
+
+@dataclass(frozen=True)
 class RacksRead:
     # Fed back by the adapter after StoreFxSnapshot or RecallFxSnapshot.
     slot: int  # 0-15, or the scene index of a scene snapshot

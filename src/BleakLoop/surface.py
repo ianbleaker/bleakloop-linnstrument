@@ -17,7 +17,7 @@ from ableton.v3.control_surface import (
 from . import device, live_actions, live_state
 from .core import engine, faders, fx, layout, sequencer, session, values
 from .core.leds import Clock, phase_key
-from .core.model import PadPress, SequencerView, SlideMoved, YAxis
+from .core.model import PadPress, ScenesChanged, SequencerView, SlideMoved, YAxis
 from .core.modes import Mode, State
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,7 @@ class BleakLoop(ControlSurface):
         self._longest_tick_ms = 0.0  # of the running morph
         self._fx_text = None  # the stored FX snapshots as last read
         self._fx_scenes_text = None  # the stored scene snapshots as last read
+        self._scenes = []  # song.scenes at the last display tick
         self._faders_text = None  # the stored Mapped FX bindings as last read
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
@@ -144,6 +145,7 @@ class BleakLoop(ControlSurface):
             self._check_pending_clip()
             self._load_fx()
             self._load_fx_scenes()
+            self._follow_scenes()
             self._load_faders()
             self._follow_selected_device()
             if self._state.mode is Mode.LINNSTRUMENT:
@@ -173,6 +175,7 @@ class BleakLoop(ControlSurface):
             self._started = True
             self._load_fx()
             self._load_fx_scenes()
+            self._scenes = list(self.song.scenes)
             self._load_faders()
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
@@ -221,6 +224,27 @@ class BleakLoop(ControlSurface):
         if text and fx.dump_scenes(scenes) != text:
             logger.warning("FX: stored scene snapshots unreadable, starting empty")
         self._state = replace(self._state, fx_scenes=scenes)
+
+    def _follow_scenes(self):
+        # After _load_fx_scenes, so a remap works on the loaded store. Scenes compare equal
+        # across reads, so a moved, deleted or inserted scene shows against the last tick's.
+        scenes = list(self.song.scenes)
+        if scenes == self._scenes:
+            return
+        old, self._scenes = self._scenes, scenes
+        tracks = list(self.song.tracks)
+
+        def duplicate(i):
+            # Live's Duplicate: the scene above's clips, and at least one.
+            clips = [track.clip_slots[i].has_clip for track in tracks]
+            return any(clips) and clips == [track.clip_slots[i - 1].has_clip for track in tracks]
+
+        origins = fx.scene_origins(old, scenes, duplicate)
+        if origins is None:
+            # A different Set: it keeps its own store.
+            return
+        logger.info("FX: scenes changed, %d -> %d", len(old), len(scenes))
+        self._handle(ScenesChanged(*origins))
 
     def _load_faders(self):
         # As _load_fx: Undo and Redo of a bind or unbind change the stored text.
