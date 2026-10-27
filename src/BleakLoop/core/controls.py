@@ -1,5 +1,5 @@
 """Behaviour shared by Session and Linnstrument Mode: undo, metronome, Play/Stop, record, Fixed Length
-and scene lights; shared by Session and Sequencer Mode: the tempo steps and the Dev layer."""
+and scene lights; shared by Session and Sequencer Mode: the tempo steps and the Device/Clip layer."""
 
 from dataclasses import replace
 
@@ -53,29 +53,29 @@ def tempo_step(snapshot, step):
     return [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
 
 
-def dev_layer(state, key):
-    # Dev held + a column 16 pad.
-    if key in layout.DEV_TRACK_STEPS:
-        return state, [StepTrack(layout.DEV_TRACK_STEPS[key])]
-    if key in layout.DEV_DEVICE_STEPS:
-        return state, [StepDevice(layout.DEV_DEVICE_STEPS[key])]
-    if key == layout.DEV_SOURCE:
+def device_clip_layer(state, key):
+    # Device/Clip held + a column 16 pad.
+    if key in layout.DEVICE_CLIP_TRACK_STEPS:
+        return state, [StepTrack(layout.DEVICE_CLIP_TRACK_STEPS[key])]
+    if key in layout.DEVICE_CLIP_DEVICE_STEPS:
+        return state, [StepDevice(layout.DEVICE_CLIP_DEVICE_STEPS[key])]
+    if key == layout.DEVICE_CLIP_SOURCE:
         mapped = state.fader_source == "device"
         state = replace(state, fader_source="mapped" if mapped else "device")
         return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
     return state, []
 
 
-def render_dev_layer(frame):
+def render_device_clip_layer(frame):
     # Over either layer: the whole of column 16.
     for pad in range(1, layout.ROWS + 1):
         frame[(layout.NAV_COLUMN, pad)] = Light(OFF)
-    for key in layout.DEV_TRACK_STEPS:
+    for key in layout.DEVICE_CLIP_TRACK_STEPS:
         frame[key] = Light(LIME)
-    for key in layout.DEV_DEVICE_STEPS:
+    for key in layout.DEVICE_CLIP_DEVICE_STEPS:
         frame[key] = Light(MAGENTA)
-    frame[layout.DEV_SOURCE] = Light(ORANGE)
-    frame[layout.DEV] = Light(ORANGE, Blink.FAST)
+    frame[layout.DEVICE_CLIP_SOURCE] = Light(ORANGE)
+    frame[layout.DEVICE_CLIP] = Light(ORANGE, Blink.FAST)
 
 
 def record_length(bars, snapshot):

@@ -78,7 +78,7 @@ LAUNCH_QUANTIZATION = _one(
 )
 REDO = _one("Redo", layout.UNDO, "Redo.")
 SHIFT_HELD = Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False)
-DEV = _one("Dev", layout.DEV, "Hold for the Dev layer: tracks, devices and the fader source.")
+DEVICE_CLIP = _one("Dev", layout.DEVICE_CLIP, "Hold for the Dev layer: tracks, devices and the fader source.")
 TEMPO = Item(
     "Tempo",
     {key: "Tempo+" if step > 0 else "Tempo-" for key, step in layout.TEMPO_STEPS.items()},
@@ -130,7 +130,7 @@ _SIDE = (
         layout.SEQ,
         "Hold and press a clip, or tap, for Sequencer Mode.",
     ),
-    DEV,
+    DEVICE_CLIP,
 )
 
 _SIDE_SHIFT = (
@@ -264,21 +264,21 @@ _FX = (
 _DEV = (
     Item(
         "Tracks",
-        {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEV_TRACK_STEPS.items()},
+        {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEVICE_CLIP_TRACK_STEPS.items()},
         "Select the previous or next track, through the returns and master.",
     ),
     Item(
         "Devices",
-        {key: "Device-" if step < 0 else "Device+" for key, step in layout.DEV_DEVICE_STEPS.items()},
+        {key: "Device-" if step < 0 else "Device+" for key, step in layout.DEVICE_CLIP_DEVICE_STEPS.items()},
         "Select the previous or next device on the selected track.",
     ),
     _one(
         "Fader source",
-        layout.DEV_SOURCE,
+        layout.DEVICE_CLIP_SOURCE,
         "Switch the faders between Device FX and Mapped FX.",
         label="Source",
     ),
-    Item("Dev", {layout.DEV: "Dev"}, "Held.", variant=False),
+    Item("Dev", {layout.DEVICE_CLIP: "Dev"}, "Held.", variant=False),
 )
 
 RECORD_CLIP = _one(
@@ -350,7 +350,7 @@ _SEQUENCER_SIDE = (
     _one("Mixer", layout.MIXER, "Mixer Mode."),
     _one("FX", layout.FX, "FX Mode."),
     _one("Seq", layout.SEQ, "Back to Session Mode."),
-    DEV,
+    DEVICE_CLIP,
 )
 
 _SEQUENCER_SHIFT = (
@@ -472,7 +472,7 @@ LAYERS = {
     Layer.MIXER: ("side", "mixer"),
     Layer.FX: ("side", "fx"),
     Layer.MAPPED_FX: ("side", "fx"),
-    Layer.DEV: ("dev",),
+    Layer.DEVICE_CLIP: ("dev",),
     Layer.LINNSTRUMENT: ("linnstrument",),
     Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
     Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),
@@ -484,7 +484,7 @@ LAYERS = {
 
 # Columns a map shows dimmed and unlabelled: the side columns map dims the grid, and the Dev
 # layer's map everything but column 16.
-DIMMED = {Layer.SIDE: layout.GRID_COLUMNS, Layer.DEV: range(1, layout.NAV_COLUMN)}
+DIMMED = {Layer.SIDE: layout.GRID_COLUMNS, Layer.DEVICE_CLIP: range(1, layout.NAV_COLUMN)}
 
 
 def items(layer):

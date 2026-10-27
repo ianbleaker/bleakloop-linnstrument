@@ -24,7 +24,7 @@ class Layer(enum.Enum):
     MIXER = "mixer"
     FX = "fx"
     MAPPED_FX = "fx-mapped"
-    DEV = "dev"
+    DEVICE_CLIP = "dev"
     LINNSTRUMENT = "linnstrument"
     LINNSTRUMENT_SHIFT = "linnstrument-shift"
     LINNSTRUMENT_SCENES = "linnstrument-scenes"
@@ -192,7 +192,7 @@ SCENES = {
         State(fx=True, fx_slots=FX_SLOTS, fader_source="mapped"),
         MAPPED_SNAPSHOT,
     ),
-    Layer.DEV: (State(dev=True, fixed_length=2), SNAPSHOT),
+    Layer.DEVICE_CLIP: (State(device_clip=True, fixed_length=2), SNAPSHOT),
     Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
     Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
     Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),

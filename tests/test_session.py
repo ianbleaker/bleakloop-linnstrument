@@ -527,17 +527,17 @@ def test_tempo_clamps_at_20():
     )
 
 
-# Dev
+# Device/Clip
 
 
-DEV = State(dev=True)
+DEVICE_CLIP = State(device_clip=True)
 
 
 @pytest.mark.parametrize("state", [SESSION, MIXING, FX_ON])
-def test_dev_is_held(state):
-    held, actions = handle(state, layout.DEV)
-    assert held.dev and actions == []
-    assert handle(held, layout.DEV, pressed=False) == (state, [])
+def test_device_clip_is_held(state):
+    held, actions = handle(state, layout.DEVICE_CLIP)
+    assert held.device_clip and actions == []
+    assert handle(held, layout.DEVICE_CLIP, pressed=False) == (state, [])
 
 
 @pytest.mark.parametrize(
@@ -551,34 +551,34 @@ def test_dev_is_held(state):
         ((16, 7), []),
     ],
 )
-@pytest.mark.parametrize("state", [DEV, replace(DEV, shift=True), replace(DEV, fx=True)])
-def test_dev_layer(state, key, actions):
+@pytest.mark.parametrize("state", [DEVICE_CLIP, replace(DEVICE_CLIP, shift=True), replace(DEVICE_CLIP, fx=True)])
+def test_device_clip_layer(state, key, actions):
     assert handle(state, key) == (state, actions)
 
 
-def test_dev_toggles_the_fader_source():
-    state, actions = handle(DEV, layout.DEV_SOURCE)
+def test_device_clip_toggles_the_fader_source():
+    state, actions = handle(DEVICE_CLIP, layout.DEVICE_CLIP_SOURCE)
     assert state.fader_source == "mapped"
     assert actions == [ShowMessage("Mapped FX")]
-    state, actions = handle(state, layout.DEV_SOURCE)
+    state, actions = handle(state, layout.DEVICE_CLIP_SOURCE)
     assert state.fader_source == "device"
     assert actions == [ShowMessage("Device FX")]
 
 
-def test_dev_on_shifts_layer_steps_the_tempo():
-    assert handle(SHIFT, layout.DEV) == (
+def test_device_clip_on_shifts_layer_steps_the_tempo():
+    assert handle(SHIFT, layout.DEVICE_CLIP) == (
         SHIFT,
         [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")],
     )
 
 
-def test_dev_pad_lights():
-    assert session.render(SESSION, SNAP)[layout.DEV] == Light(ORANGE)
-    assert session.render(SHIFT, SNAP)[layout.DEV] == Light(GREEN)
+def test_device_clip_pad_lights():
+    assert session.render(SESSION, SNAP)[layout.DEVICE_CLIP] == Light(ORANGE)
+    assert session.render(SHIFT, SNAP)[layout.DEVICE_CLIP] == Light(GREEN)
 
 
-@pytest.mark.parametrize("state", [DEV, replace(DEV, shift=True)])
-def test_dev_layer_lights(state):
+@pytest.mark.parametrize("state", [DEVICE_CLIP, replace(DEVICE_CLIP, shift=True)])
+def test_device_clip_layer_lights(state):
     frame = session.render(state, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
         Light(LIME), Light(LIME), Light(MAGENTA), Light(MAGENTA),
@@ -587,8 +587,8 @@ def test_dev_layer_lights(state):
 
 
 def test_entering_a_mode_drops_dev():
-    state = session.handle(DEV, press(layout.MODE_PAD), SNAP)[0]
-    assert state.mode is Mode.LINNSTRUMENT and not state.dev
+    state = session.handle(DEVICE_CLIP, press(layout.MODE_PAD), SNAP)[0]
+    assert state.mode is Mode.LINNSTRUMENT and not state.device_clip
 
 
 # Column 15

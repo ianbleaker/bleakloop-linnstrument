@@ -297,18 +297,18 @@ def test_chord_does_nothing():
     assert handle(ENTERED, (16, 6)) == (ENTERED, [])
 
 
-def test_dev_layer_steps_tracks_and_devices():
-    held, actions = handle(ENTERED, layout.DEV)
-    assert held.dev and actions == []
+def test_device_clip_layer_steps_tracks_and_devices():
+    held, actions = handle(ENTERED, layout.DEVICE_CLIP)
+    assert held.device_clip and actions == []
     assert handle(held, (16, 1)) == (held, [StepTrack(-1)])
     assert handle(held, (16, 4)) == (held, [StepDevice(1)])
-    # Not Seq: Dev's layer has nothing on pad 7.
+    # Not Seq: Device/Clip's layer has nothing on pad 7.
     assert handle(held, layout.SEQ) == (held, [])
-    assert handle(held, layout.DEV, pressed=False)[0] == ENTERED
+    assert handle(held, layout.DEVICE_CLIP, pressed=False)[0] == ENTERED
 
 
-def test_dev_layer_lights():
-    held, _ = handle(ENTERED, layout.DEV)
+def test_device_clip_layer_lights():
+    held, _ = handle(ENTERED, layout.DEVICE_CLIP)
     frame = sequencer.render(held, SNAP_IN)
     assert [frame[(16, pad)] for pad in range(1, 9)] == [
         Light(LIME), Light(LIME), Light(MAGENTA), Light(MAGENTA),

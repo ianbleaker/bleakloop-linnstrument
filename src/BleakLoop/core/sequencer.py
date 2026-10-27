@@ -305,12 +305,12 @@ def handle(state, event, snapshot):
 def _nav(state, event, snapshot):
     key = (event.column, event.pad)
     shift_layer = state.shift and not state.copy and not state.delete
-    if key == layout.DEV and not (shift_layer and event.pressed):
+    if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
         # On Shift's layer the pad is a tempo step.
-        return replace(state, dev=event.pressed), []
-    if state.dev and event.pressed:
-        # Dev's layer replaces column 16's normal and Shift layers, as in Session Mode.
-        return controls.dev_layer(state, key)
+        return replace(state, device_clip=event.pressed), []
+    if state.device_clip and event.pressed:
+        # Device/Clip's layer replaces column 16's normal and Shift layers, as in Session Mode.
+        return controls.device_clip_layer(state, key)
     if key == layout.COPY and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, copy=False, seq_copy_source=None), []
@@ -791,6 +791,6 @@ def _render_nav(frame, state):
         for key in (layout.SESSION, layout.MIXER, layout.FX):
             frame[key] = Light(CYAN)
         frame[layout.SEQ] = Light(BLUE)
-        frame[layout.DEV] = Light(ORANGE)
-    if state.dev:
-        controls.render_dev_layer(frame)
+        frame[layout.DEVICE_CLIP] = Light(ORANGE)
+    if state.device_clip:
+        controls.render_device_clip_layer(frame)

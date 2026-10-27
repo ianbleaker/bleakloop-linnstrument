@@ -38,7 +38,7 @@ TITLES = {
     Layer.MIXER: "Mixer Mode",
     Layer.FX: "FX Mode",
     Layer.MAPPED_FX: "FX Mode, Mapped FX",
-    Layer.DEV: "Dev held",
+    Layer.DEVICE_CLIP: "Dev held",
     Layer.LINNSTRUMENT: "Linnstrument Mode controls page",
     Layer.LINNSTRUMENT_SHIFT: "Linnstrument Mode with Shift held",
     Layer.LINNSTRUMENT_SCENES: "Linnstrument Mode scene page",

@@ -176,7 +176,7 @@ def test_delete_group_clips_closes_its_undo_step_on_failure():
     assert song.undo == ["begin", "end"]
 
 
-# Faders and Dev
+# Faders and Device/Clip
 
 
 class FakeParameter:

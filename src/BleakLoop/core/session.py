@@ -75,12 +75,12 @@ def handle(state, event, snapshot):
         return column_1.handle(state, event, snapshot)
     # Under Shift, Copy and Delete's pads are window moves.
     shift_layer = state.shift and not state.copy and not state.delete
-    if key == layout.DEV and not (shift_layer and event.pressed):
+    if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
         # On Shift's layer the pad is a tempo step.
-        return replace(state, dev=event.pressed), []
-    if state.dev and event.column == layout.NAV_COLUMN and event.pressed:
-        # Dev's layer replaces column 16's normal and Shift layers.
-        return controls.dev_layer(state, key)
+        return replace(state, device_clip=event.pressed), []
+    if state.device_clip and event.column == layout.NAV_COLUMN and event.pressed:
+        # Device/Clip's layer replaces column 16's normal and Shift layers.
+        return controls.device_clip_layer(state, key)
     if key == layout.SEQ and not (shift_layer and event.pressed):
         # On Shift's layer the pad is a tempo step.
         return _seq(state, event, snapshot)
@@ -457,8 +457,8 @@ def render(state, snapshot):
     else:
         _render_normal_layer(frame, state)
         frame[layout.UNMUTE_ALL] = Light(ORANGE if snapshot.any_muted else OFF)
-    if state.dev:
-        controls.render_dev_layer(frame)
+    if state.device_clip:
+        controls.render_device_clip_layer(frame)
     frame[layout.STOP] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
     frame.update(column_1.render(state, snapshot))
     _render_copy_source(frame, state)
@@ -547,7 +547,7 @@ def _render_normal_layer(frame, state):
         frame[layout.SESSION] = Light(PINK)
     if state.seq_held:
         frame[layout.SEQ] = Light(CYAN, Blink.FAST)
-    frame[layout.DEV] = Light(ORANGE)
+    frame[layout.DEVICE_CLIP] = Light(ORANGE)
 
 
 def _render_shift_layer(frame):
