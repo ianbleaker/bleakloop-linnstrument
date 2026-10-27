@@ -13,11 +13,20 @@ class Item:
     name: str
     labels: dict  # (column, pad) -> label of at most 7 characters
     callout: str
-    variant: bool = True  # on a Shift layer: noted on the normal layer's item
+    variant: bool = True  # on a Shift layer: listed under the normal list, with Shift held
 
     @property
     def keys(self):
         return sorted(self.labels)
+
+
+@dataclass(frozen=True)
+class Gesture:
+    # A list-only line for a way of playing pads, not a pad: listed after the pads.
+    name: str
+    callout: str
+    variant: bool = False
+    keys = ()
 
 
 @dataclass(frozen=True)
@@ -92,9 +101,10 @@ TEMPO = Item(
     "Tempo +1 or -1 BPM.",
 )
 
-WINDOW_MOVES = tuple(
-    _one(f"Window {name.lower()}", key, f"Move the window {name.lower()}.", label=name)
-    for key, name in zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))
+WINDOW_MOVES = Item(
+    "Window directions",
+    dict(zip(layout.WINDOW_MOVES, ("Up", "Down", "Left", "Right"))),
+    "Move the Ableton session ring in the selected direction.",
 )
 
 # Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
@@ -181,7 +191,7 @@ _NAVIGATION = (
 )
 
 _NAVIGATION_SHIFT = (
-    *WINDOW_MOVES,
+    WINDOW_MOVES,
     TEMPO,
 )
 
@@ -303,7 +313,13 @@ _DEVICE_CLIP = (
         "Switch the faders between Device FX and Mapped FX.",
         label="Source",
     ),
-    Item("Device/Clip", {layout.DEVICE_CLIP: "DEV\nHELD"}, "Held.", variant=False),
+    Item(
+        "Device/Clip",
+        {layout.DEVICE_CLIP: "DEV\nHELD"},
+        "Hold it for this layer. A tap, pressing nothing else, flips Live between Device and "
+        "Clip view instead.",
+        variant=False,
+    ),
 )
 
 RECORD_CLIP = _one(
@@ -367,13 +383,16 @@ _SEQUENCER_GLOBAL = (
     SHIFT,
 )
 
+SEQ_COPY = _one("Copy", layout.COPY, "Hold, press a step, then press steps to paste it onto.")
+SEQ_DELETE = _one(
+    "Delete",
+    layout.DELETE,
+    "Hold, then press a step to clear it, or a note pad to remove that note from the clip.",
+)
+
 _SEQUENCER_NAV = (
-    _one("Copy", layout.COPY, "Hold, press a step, then press steps to paste it onto."),
-    _one(
-        "Delete",
-        layout.DELETE,
-        "Hold, then press a step to clear it, or a note pad to remove that note from the clip.",
-    ),
+    SEQ_COPY,
+    SEQ_DELETE,
     _one("Session", layout.SESSION, "Back to Session Mode."),
     _one("Mixer", layout.MIXER, "Mixer Mode."),
     _one("FX", layout.FX, "FX Mode."),
@@ -392,7 +411,7 @@ _SEQUENCER_GLOBAL_SHIFT = (
 )
 
 _SEQUENCER_NAV_SHIFT = (
-    *WINDOW_MOVES,
+    WINDOW_MOVES,
     TEMPO,
 )
 
@@ -419,7 +438,7 @@ _SEQUENCER_GRID = (
         "Move the note pads an octave up or down.",
     ),
     _one(
-        "Notes/Settings",
+        "View",
         layout.SEQ_VIEW,
         "Switch columns 11–14 between the note pads and the settings.",
         label="View",
@@ -432,8 +451,8 @@ _SEQUENCER = (
         "Notes",
         layout.SEQ_NOTE_COLUMNS,
         ALL_PADS,
-        "Press to pick the note the steps edit, and hear it. Hold steps and press a note "
-        "to add or remove it on them.",
+        "Choose the note the steps write: press a pad to select its note and hear it on the "
+        "armed track. Hold steps and press a pad to add or remove that note on them.",
     ),
 )
 
@@ -480,8 +499,21 @@ SECTIONS = {
     "sequencer-grid": _SEQUENCER_GRID,
     "sequencer": _SEQUENCER,
     "sequencer-settings": _SEQUENCER_SETTINGS,
-    # Listed, not drawn: Sequencer Mode's own pads, after its first map.
-    "sequencer-functions": (*_SEQUENCER, *_SEQUENCER_NAV),
+    # Listed, not drawn: Sequencer Mode's own pads, after its first map. Column 16's mode
+    # pads are in the Navigation column's list.
+    "sequencer-functions": (
+        *_SEQUENCER,
+        SEQ_COPY,
+        SEQ_DELETE,
+        Gesture(
+            "Press and hold a step",
+            "Change the velocity by sliding left (lower) or right (higher).",
+        ),
+        Gesture(
+            "Shift + press and hold a step",
+            "Nudge the note forward or backward by sliding left and right.",
+        ),
+    ),
 }
 
 # The sections the manual lists, each with the section holding its Shift layer.
@@ -497,7 +529,6 @@ LISTS = {
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,
     "sequencer-functions": None,
-    "sequencer-nav-shift": None,
     "sequencer-settings": None,
 }
 
@@ -530,8 +561,10 @@ def items(layer):
 
 
 def ordered(section):
-    # Left to right, then far to near, by each item's first pad.
-    return sorted(SECTIONS[section], key=lambda item: item.keys[0])
+    # Left to right, then far to near, by each item's first pad; gestures last, as written.
+    pads = [item for item in SECTIONS[section] if item.keys]
+    gestures = [item for item in SECTIONS[section] if not item.keys]
+    return sorted(pads, key=lambda item: item.keys[0]) + gestures
 
 
 def labels(layer):
@@ -550,15 +583,3 @@ def section_labels(section):
 def blocks(layer):
     return [item for item in items(layer) if isinstance(item, Block)]
 
-
-def shift_note(section, item):
-    # What the item's pads do under Shift, from the Shift layer's items.
-    shifted = LISTS[section]
-    if shifted is None:
-        return None
-    notes = [
-        other.callout.rstrip(".")
-        for other in ordered(shifted)
-        if other.variant and set(other.keys) & set(item.keys)
-    ]
-    return "; ".join(notes) or None

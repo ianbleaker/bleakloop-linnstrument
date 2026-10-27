@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ..markers import read, replace_between
 from . import columns, draw, surface
-from .pads import LISTS, ordered, shift_note
+from .pads import LISTS, ordered
 from .scenes import Layer
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -13,12 +13,18 @@ MAPS = ROOT / "docs" / "manual"
 
 
 def callouts(section):
-    lines = []
-    for item in ordered(section):
-        note = shift_note(section, item)
-        shift = f" *(Shift: {note})*" if note else ""
-        lines.append(f"- **{item.name}**: {item.callout}{shift}\n")
+    # The section's items, then what its pads do under Shift as a list of its own.
+    lines = [_line(item) for item in ordered(section)]
+    shifted = LISTS[section]
+    if shifted is not None:
+        variants = [item for item in ordered(shifted) if item.variant]
+        if variants:
+            lines += ["\nWith **Shift** held:\n\n", *(_line(item) for item in variants)]
     return "".join(lines)
+
+
+def _line(item):
+    return f"- **{item.name}**: {item.callout}\n"
 
 
 def manual_text(text):

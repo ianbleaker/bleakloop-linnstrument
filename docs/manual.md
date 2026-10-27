@@ -30,7 +30,7 @@ How to read the surface:
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
 - Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it in every mode, so you can always see which scenes the scene pads launch. Pads 7 and 8 of each column mute and arm that track. The split view narrows the window to 8 tracks.
 - Shift + column 16 pads 1–4 move the window in every mode but Linnstrument Mode.
-- Shift, Copy, Delete, Stop and Device/Clip work while held. Shift (column 1, pad 8, nearest you) works in every mode: each list gives a pad's Shift function in italics, and each mode has a map with Shift held. Unlit pads do nothing.
+- Shift, Copy, Delete, Stop and Device/Clip work while held. Shift (column 1, pad 8, nearest you) works in every mode: each list is followed by what its pads do with Shift held, and each mode has a map with Shift held. Unlit pads do nothing.
 - Each map shows the pads' names over their colours in an example Set. A dashed ring blinks with the beat; a dotted ring blinks fast.
 
 ### Columns
@@ -42,14 +42,21 @@ How to read the surface:
 Column 1 holds the transport, recording, Undo and Shift, the same in every mode. In Linnstrument and Sequencer Mode, Record, Capture and Shift + Play act on the selected track.
 
 <!-- callouts:global -->
-- **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop all clips. In Linnstrument Mode, stops the selected track's clips)*
+- **Play**: Start/stop. Blinks on the beat while playing.
 - **Record**: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording. In Linnstrument Mode, records a new clip on the selected track.
-- **Capture**: Capture and Insert Scene. In Linnstrument Mode, captures MIDI. *(Shift: Quantize the current MIDI clip to 1/16 notes)*
-- **Metronome**: Metronome on/off. Blinks while on. *(Shift: Launch quantization on/off; red while off)*
+- **Capture**: Capture and Insert Scene. In Linnstrument Mode, captures MIDI.
+- **Metronome**: Metronome on/off. Blinks while on.
 - **Fixed Length**: Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, then off.
-- **Undo**: Undo. *(Shift: Redo)*
+- **Undo**: Undo.
 - **Linnstrument Mode**: Switch to Linnstrument Mode.
 - **Shift**: Hold for the Shift layer.
+
+With **Shift** held:
+
+- **Stop all**: Stop all clips. In Linnstrument Mode, stops the selected track's clips.
+- **Quantize**: Quantize the current MIDI clip to 1/16 notes.
+- **Launch quantization**: Launch quantization on/off; red while off.
+- **Redo**: Redo.
 <!-- /callouts:global -->
 
 <br clear="right">
@@ -61,9 +68,15 @@ Column 1 holds the transport, recording, Undo and Shift, the same in every mode.
 Column 15, next to the grid, holds the window's scenes, Unmute all and Stop, in Session, Mixer and FX Mode. Sequencer Mode has its own.
 
 <!-- callouts:view -->
-- **Scenes**: Launch a scene. Its FX snapshot, if it has one, lands as it starts. *(Shift: Launch with legato, leaving the FX snapshot alone)*
-- **Unmute all**: Unmute every track and return track in the Set. Orange while any is muted. *(Shift: Unsolo every track and return track in the Set. Blue while any is soloed)*
-- **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Disarm every track in the Set. Red while any is armed)*
+- **Scenes**: Launch a scene. Its FX snapshot, if it has one, lands as it starts.
+- **Unmute all**: Unmute every track and return track in the Set. Orange while any is muted.
+- **Stop**: Hold, then press a track's pad to stop that track's clips.
+
+With **Shift** held:
+
+- **Scenes**: Launch with legato, leaving the FX snapshot alone.
+- **Unsolo all**: Unsolo every track and return track in the Set. Blue while any is soloed.
+- **Unarm all**: Disarm every track in the Set. Red while any is armed.
 <!-- /callouts:view -->
 
 <br clear="right">
@@ -75,42 +88,53 @@ Column 15, next to the grid, holds the window's scenes, Unmute all and Stop, in 
 Column 16, the outer edge, holds Copy, Delete and the mode pads. Its last pad is **Device/Clip**: tap it to flip Live between Device and Clip view, or hold it for the Device/Clip layer of tracks, devices and the fader source.
 
 <!-- callouts:navigation -->
-- **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
-- **Delete**: Hold, then press a clip or scene to delete it. *(Shift: Move the window down)*
-- **Session**: Session Mode. In Session Mode, toggles the split view. *(Shift: Move the window left)*
-- **Mixer**: Mixer Mode. Press again for Session Mode. *(Shift: Move the window right)*
+- **Copy**: Hold, press a clip, then an empty slot.
+- **Delete**: Hold, then press a clip or scene to delete it.
+- **Session**: Session Mode. In Session Mode, toggles the split view.
+- **Mixer**: Mixer Mode. Press again for Session Mode.
 - **FX**: FX Mode. Press again for Session Mode.
-- **Seq**: Hold and press a clip, or tap, for Sequencer Mode. *(Shift: Tempo +1 or -1 BPM)*
-- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
+- **Seq**: Hold and press a clip, or tap, for Sequencer Mode.
+- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source.
+
+With **Shift** held:
+
+- **Window directions**: Move the Ableton session ring in the selected direction.
+- **Tempo**: Tempo +1 or -1 BPM.
 <!-- /callouts:navigation -->
 
-With Device/Clip held:
+With **Device/Clip** held:
 
 <!-- callouts:device-clip -->
 - **Tracks**: Select the previous or next track, through the returns and master.
 - **Devices**: Select the previous or next device on the selected track.
 - **Fader source**: Switch the faders between Device FX and Mapped FX.
-- **Device/Clip**: Held.
+- **Device/Clip**: Hold it for this layer. A tap, pressing nothing else, flips Live between Device and Clip view instead.
 <!-- /callouts:device-clip -->
 
 <br clear="right">
 
 ### Session Mode
 
+- A slot shows its clip in the track's colour, blinking while it plays. Yellow is about to launch, red is recording, and white is an empty slot ready to record.
+- Recording on a MIDI track switches to Linnstrument Mode, so you can play straight away.
+- Pad 7 mutes the track, or solos it with Shift held. Pad 8 selects and arms it, or arms it alone with Shift held. Shift + Stop disarms every track.
+- Session (column 16, pad 3) turns the split view on and off.
+
 ![Session Mode](manual/session.svg)
 
 ![Session Mode with Shift held](manual/session-shift.svg)
 
 <!-- callouts:session -->
-- **Clip slots**: Launch a clip. On an armed track, an empty slot records. *(Shift: Launch with legato)*
-- **Mute**: Mute or unmute the track: pink while audible, orange while muted. *(Shift: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed)*
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it. *(Shift: Arm or disarm the track alone, keeping the selection)*
-<!-- /callouts:session -->
+- **Clip slots**: Launch a clip. On an armed track, an empty slot records.
+- **Mute**: Mute or unmute the track: pink while audible, orange while muted.
+- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
 
-- A slot shows its clip in the track's colour, blinking while it plays. Yellow is about to launch, red is recording, and white is an empty slot ready to record. Reading the lights has the full list.
-- Recording on a MIDI track switches to Linnstrument Mode, so you can play straight away.
-- Pad 7 mutes the track, or solos it with Shift held. Pad 8 selects and arms it, or arms it alone with Shift held. Shift + Stop disarms every track.
-- Session (column 16, pad 3) turns the split view on and off.
+With **Shift** held:
+
+- **Clip slots: legato**: Launch with legato.
+- **Solo**: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed.
+- **Arm**: Arm or disarm the track alone, keeping the selection.
+<!-- /callouts:session -->
 
 #### Split view
 
@@ -119,13 +143,24 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 ![Session Mode, split view](manual/session-split.svg)
 
 <!-- callouts:split -->
-- **Clip slots**: Launch a clip. On an armed track, an empty slot records. *(Shift: Launch with legato)*
-- **Mute**: Mute or unmute the track: pink while audible, orange while muted. *(Shift: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed)*
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it. *(Shift: Arm or disarm the track alone, keeping the selection)*
+- **Clip slots**: Launch a clip. On an armed track, an empty slot records.
+- **Mute**: Mute or unmute the track: pink while audible, orange while muted.
+- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
 - **Faders**: One fader per row, as in FX Mode, from the source Device/Clip + Fader source picks.
+
+With **Shift** held:
+
+- **Clip slots: legato**: Launch with legato.
+- **Solo**: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed.
+- **Arm**: Arm or disarm the track alone, keeping the selection.
 <!-- /callouts:split -->
 
 ### Mixer Mode
+
+- Pads 1–6 of each track are its volume fader: pad 1 is 0 dB. Slide to fine-tune.
+- With Shift held the faders go dark, and pads 7 and 8 show their Shift layer: solo, and arm alone.
+- Copy and Delete do nothing here.
+- Press Mixer again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
 ![Mixer Mode](manual/mixer.svg)
 
@@ -133,16 +168,21 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 
 <!-- callouts:mixer -->
 - **Faders**: One volume fader per track.
-- **Mute**: Mute or unmute the track: pink while audible, orange while muted. *(Shift: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed)*
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it. *(Shift: Arm or disarm the track alone, keeping the selection)*
+- **Mute**: Mute or unmute the track: pink while audible, orange while muted.
+- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+
+With **Shift** held:
+
+- **Solo**: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed.
+- **Arm**: Arm or disarm the track alone, keeping the selection.
 <!-- /callouts:mixer -->
 
-- Pads 1–6 of each track are its volume fader: pad 1 is 0 dB. Slide to fine-tune.
-- With Shift held the faders go dark, and pads 7 and 8 show their Shift layer: solo, and arm alone.
-- Copy and Delete do nothing here.
-- Press Mixer again, or Session, for Session Mode. FX and Mixer Mode replace each other.
-
 ### FX Mode
+
+- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Device/Clip and press Fader source (column 16, pad 5) to switch between them; the status bar names the one you switched to.
+- Snapshots are saved in the Set. A held Bars pad turns a recall into a morph.
+- With Shift held the grid, faders included, goes dark and ignores presses.
+- Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
 
@@ -155,41 +195,31 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.
 <!-- /callouts:fx -->
 
-- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Device/Clip and press Fader source (column 16, pad 5) to switch between them; the status bar names the one you switched to.
-- Snapshots are saved in the Set. A held Bars pad turns a recall into a morph.
-- With Shift held the grid, faders included, goes dark and ignores presses.
-- Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
-
 ### Sequencer Mode
+
+- Tap Seq to sequence Live's highlighted clip slot.
+- In Session Mode, hold Seq and press a slot to highlight the clip and open the sequencer.
+- The track is armed alone while you sequence it; Device/Clip + Track (+/-) steps to another. Leaving puts every arm back.
+- The Global column works as in Linnstrument Mode: Record Clip, Capture MIDI, and with Shift held, Stop track, Session Record and the scene page on pad 7. Pad 7 switches to Linnstrument Mode keeping the arm, and its Back returns here.
+- **View** toggle (col. 15, pad 8) switches columns 11–14 between the note pads tab and the sequence pages/settings tab.
 
 ![Sequencer Mode](manual/sequencer.svg)
 
+![Sequencer Mode with Shift held](manual/sequencer-shift.svg)
+
 <!-- callouts:sequencer-functions -->
 - **Steps**: 64 steps, top row first. Tap to add or remove the selected note. Hold a step and press a later one for one long note, or slide along the row to change its velocity.
-- **Notes**: Press to pick the note the steps edit, and hear it. Hold steps and press a note to add or remove it on them.
+- **Notes**: Choose the note the steps write: press a pad to select its note and hear it on the armed track. Hold steps and press a pad to add or remove that note on them.
 - **Double**: Double the loop, notes and all.
 - **Halve**: Halve the loop. Notes past the new end stay in the clip.
 - **Follow**: Follow on/off: the steps show the page that's playing. Blue while on.
 - **Up/Down**: Move the note pads an octave up or down.
-- **Notes/Settings**: Switch columns 11–14 between the note pads and the settings.
+- **View**: Switch columns 11–14 between the note pads and the settings.
 - **Copy**: Hold, press a step, then press steps to paste it onto.
 - **Delete**: Hold, then press a step to clear it, or a note pad to remove that note from the clip.
-- **Session**: Back to Session Mode.
-- **Mixer**: Mixer Mode.
-- **FX**: FX Mode.
-- **Seq**: Back to Session Mode.
-- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source.
+- **Press and hold a step**: Change the velocity by sliding left (lower) or right (higher).
+- **Shift + press and hold a step**: Nudge the note forward or backward by sliding left and right.
 <!-- /callouts:sequencer-functions -->
-
-![Sequencer Mode with Shift held](manual/sequencer-shift.svg)
-
-<!-- callouts:sequencer-nav-shift -->
-- **Window up**: Move the window up.
-- **Window down**: Move the window down.
-- **Window left**: Move the window left.
-- **Window right**: Move the window right.
-- **Tempo**: Tempo +1 or -1 BPM.
-<!-- /callouts:sequencer-nav-shift -->
 
 ![Sequencer Mode, settings](manual/sequencer-settings.svg)
 
@@ -199,26 +229,35 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Pages**: Pages 1–16 of 64 steps: 1–8 in column 12, 9–16 in column 13. Press one to show it, or hold one and press another to loop both.
 <!-- /callouts:sequencer-settings -->
 
-- Tap Seq to sequence Live's highlighted clip slot, or, in Session Mode, hold Seq and press a slot.
-- The track is armed alone while you sequence it; Device/Clip + Tracks steps to another. Leaving puts every arm back.
-- The Global column works as in Linnstrument Mode: Record Clip, Capture MIDI, and with Shift held, Stop track, Session Record and the scene page on pad 7. Pad 7 switches to Linnstrument Mode keeping the arm, and its Back returns here.
-- Column 15, pad 8 switches columns 11–14 between the note pads and the settings.
-
 ### Linnstrument Mode
+
+- Columns 2–16 and the panel buttons are your instrument again. Column 1 keeps its controls, always opening on the controls page.
+- Back (pad 7) returns to the mode you came from: Session, Mixer, FX or Sequencer.
+- Shift + Record is Session Record, and Shift + Back opens the scene page.
+- Changing a setting on the panel can save BleakLoop's control split as your own: read the warning under Using BleakLoop first.
 
 <img src="manual/linnstrument.svg" alt="Linnstrument Mode's Global column: controls, Shift held and the scene page" align="right">
 
 Only the Global column stays: on its controls page, with Shift held, and on the scene page.
 
 <!-- callouts:linnstrument -->
-- **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop the selected track's clips)*
-- **Record Clip**: Record a new clip on the selected track. *(Shift: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording)*
-- **Capture MIDI**: Capture MIDI. *(Shift: Quantize the current MIDI clip to 1/16 notes)*
-- **Metronome**: Metronome on/off. Blinks while on. *(Shift: Launch quantization on/off; red while off)*
+- **Play**: Start/stop. Blinks on the beat while playing.
+- **Record Clip**: Record a new clip on the selected track.
+- **Capture MIDI**: Capture MIDI.
+- **Metronome**: Metronome on/off. Blinks while on.
 - **Fixed Length**: Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, then off.
-- **Undo**: Undo. *(Shift: Redo)*
-- **Back**: Back to the mode you came from: Session, Mixer, FX or Sequencer. *(Shift: Show the scene page)*
+- **Undo**: Undo.
+- **Back**: Back to the mode you came from: Session, Mixer, FX or Sequencer.
 - **Shift**: Hold for the Shift layer.
+
+With **Shift** held:
+
+- **Stop track**: Stop the selected track's clips.
+- **Record**: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording.
+- **Quantize**: Quantize the current MIDI clip to 1/16 notes.
+- **Launch quantization**: Launch quantization on/off; red while off.
+- **Redo**: Redo.
+- **Scene page**: Show the scene page.
 <!-- /callouts:linnstrument -->
 
 On the scene page:
@@ -227,11 +266,6 @@ On the scene page:
 - **Scenes**: Launch a scene and its FX snapshot, and go back to the controls.
 - **Back**: Back to the controls without launching.
 <!-- /callouts:linnstrument-scenes -->
-
-- Columns 2–16 and the panel buttons are your instrument again. Column 1 keeps its controls, always opening on the controls page.
-- Back (pad 7) returns to the mode you came from: Session, Mixer, FX or Sequencer.
-- Shift + Record is Session Record, and Shift + Back opens the scene page.
-- Changing a setting on the panel can save BleakLoop's control split as your own: read the warning under Using BleakLoop first.
 
 <br clear="right">
 
