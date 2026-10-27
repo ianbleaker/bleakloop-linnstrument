@@ -2,7 +2,7 @@
 
 BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for Ableton Live 12. One pad hands the surface back to you as an instrument.
 
-> **Heads-up:** if a press seems to do nothing, look at Live's status bar. When BleakLoop refuses something, it says why there.
+> **Heads-up:** for more information, look at Live's status bar. BleakLoop will tell you what it's doing or give a hint about what's not working.
 
 ## 1. Setup
 
@@ -24,6 +24,8 @@ While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 
 - **Linnstrument Mode** gives the LinnStrument back to you as an instrument, its panel buttons in column 0 included. Only the Global column stays.
 
 How to read the surface:
+
+![The surface in Session Mode, split into the Global column, the session window, the View column and the Navigation column](manual/surface.svg)
 
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
 - Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it in every mode, so you can always see which scenes the scene pads launch. Pads 7 and 8 of each column mute and arm that track. The split view narrows the window to 8 tracks.
@@ -166,7 +168,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 
 ![Sequencer Mode with Shift held](manual/sequencer-shift.svg)
 
-![Sequencer Mode, settings|700](manual/sequencer-settings.svg)
+![Sequencer Mode, settings](manual/sequencer-settings.svg)
 
 <!-- callouts:sequencer-side -->
 - **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop the selected track's clips)*

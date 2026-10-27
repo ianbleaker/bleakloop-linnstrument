@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from ..markers import read, replace_between
-from . import columns, draw
+from . import columns, draw, surface
 from .pads import LISTS, ordered, shift_note
 from .scenes import Layer
 
@@ -36,6 +36,7 @@ def expected():
         files[MAPS / f"{layer.slug}.svg"] = draw.map_svg(layer)
     for slug in columns.FIGURES:
         files[MAPS / f"{slug}.svg"] = columns.figure_svg(slug)
+    files[MAPS / f"{surface.SLUG}.svg"] = surface.svg()
     files[MANUAL] = manual_text(read(MANUAL) or "")
     return files
 
@@ -44,4 +45,5 @@ def strays():
     # Maps left over from a renamed or removed layer.
     expected_maps = {MAPS / f"{layer.slug}.svg" for layer in Layer}
     expected_maps |= {MAPS / f"{slug}.svg" for slug in columns.FIGURES}
+    expected_maps.add(MAPS / f"{surface.SLUG}.svg")
     return sorted(set(MAPS.glob("*.svg")) - expected_maps)
