@@ -92,6 +92,7 @@ Pads 6–8 of column 16 are dark and do nothing: they're kept for Drum, Chord an
 **Copying:**
 
 - Clips copy MIDI to MIDI and audio to audio, into an empty slot.
+- A group track's slot copies its members' clips to another row of the same group, as long as none of those members has a clip there.
 - To copy a scene, press it, then press an empty scene.
 - Keep holding Copy to make more copies.
 

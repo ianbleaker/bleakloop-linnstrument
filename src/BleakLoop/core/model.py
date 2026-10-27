@@ -16,6 +16,9 @@ class SlotView:
     is_triggered: bool = False
     is_recording: bool = False
     controls_other_clips: bool = False  # a group slot whose members have clips here
+    # A group slot: one bool per leaf member, in song.tracks order, true if that member has a
+    # clip here. Read only while Copy is held.
+    member_clips: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -257,6 +260,14 @@ class CopyClip:
     source_track: int
     source_scene: int
     track: int
+    scene: int
+
+
+@dataclass(frozen=True)
+class CopyGroupClips:
+    # Each leaf member of the group track copies its own clip from source_scene to scene.
+    track: int
+    source_scene: int
     scene: int
 
 

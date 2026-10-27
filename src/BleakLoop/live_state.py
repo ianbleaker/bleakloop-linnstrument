@@ -37,7 +37,10 @@ def read(song, application, window, scene_clips=False, selected=False):
         read_transport(song, application),
         track_count=len(tracks),
         scene_count=len(scenes),
-        tracks=tuple(_track(i, tracks[i], rows, selected_track) for i in columns),
+        # Group members' clips are costly too: only while Copy is held.
+        tracks=tuple(
+            _track(song, i, tracks[i], rows, selected_track, scene_clips) for i in columns
+        ),
         can_undo=song.can_undo,
         can_redo=song.can_redo,
         launch_quantization=int(song.clip_trigger_quantization),
@@ -78,6 +81,20 @@ def candidate_clip(song, target):
     return slot.clip if slot.has_clip else None
 
 
+def group_members(song, group):
+    # The leaf tracks under a group, nested groups included, in song.tracks order. live_actions
+    # resolves CopyGroupClips with this too, so the snapshot and the action can't disagree.
+    return [track for track in song.tracks if not track.is_foldable and _in_group(track, group)]
+
+
+def _in_group(track, group):
+    while track.is_grouped:
+        track = track.group_track
+        if track == group:
+            return True
+    return False
+
+
 def _clip(clip):
     return None if clip is None else ClipView(is_midi=clip.is_midi_clip)
 
@@ -105,8 +122,9 @@ def _selected_track(song, tracks, scenes):
     )
 
 
-def _track(index, track, rows, selected_track):
+def _track(song, index, track, rows, selected_track, read_members=False):
     slots = track.clip_slots
+    members = group_members(song, track) if read_members and track.is_foldable else []
     # Live raises on reading arm state from a track that can't be armed.
     can_be_armed = track.can_be_armed
     return TrackView(
@@ -122,17 +140,18 @@ def _track(index, track, rows, selected_track):
         is_foldable=track.is_foldable,
         selected=track == selected_track,
         volume=track.mixer_device.volume.value,
-        slots=tuple(_slot(slots[scene]) for scene in rows),
+        slots=tuple(_slot(slots[scene], members, scene) for scene in rows),
     )
 
 
-def _slot(slot):
+def _slot(slot, members, scene):
     return SlotView(
         has_clip=slot.has_clip,
         is_playing=slot.is_playing,
         is_triggered=slot.is_triggered,
         is_recording=slot.is_recording,
         controls_other_clips=slot.is_group_slot and slot.controls_other_clips,
+        member_clips=tuple(member.clip_slots[scene].has_clip for member in members),
     )
 
 

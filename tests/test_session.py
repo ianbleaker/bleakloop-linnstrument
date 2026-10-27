@@ -26,6 +26,7 @@ from BleakLoop.core.model import (
     ClipTarget,
     ClipView,
     CopyClip,
+    CopyGroupClips,
     CopyScene,
     DeleteClip,
     DeleteScene,
@@ -59,7 +60,7 @@ from BleakLoop.core.model import (
     UnmuteAll,
     UnsoloAll,
 )
-from BleakLoop.core.modes import ClipSource, Mode, SceneSource, State
+from BleakLoop.core.modes import ClipSource, GroupSource, Mode, SceneSource, State
 
 
 def session_snapshot(track_count=20, scene_count=10, window=Window(), **k):
@@ -876,7 +877,6 @@ def test_copy_to_slot_with_clip_drops_source(key):
     [
         (ClipSource(0, 0, True), (5, 2)),  # MIDI to audio
         (ClipSource(1, 0, False), (4, 2)),  # audio to MIDI
-        (ClipSource(0, 0, True), (6, 2)),  # MIDI to a group track
     ],
 )
 def test_copy_mismatch_drops_source(source, key):
@@ -884,6 +884,14 @@ def test_copy_mismatch_drops_source(source, key):
     assert handle(state, key, COPY_SNAP) == (
         COPY,
         [ShowMessage("Cannot copy between MIDI and audio tracks")],
+    )
+
+
+def test_copy_clip_to_group_track_drops_source():
+    state = replace(COPY, copy_source=ClipSource(0, 0, True))
+    assert handle(state, (6, 2), COPY_SNAP) == (
+        COPY,
+        [ShowMessage("Cannot copy into a group track")],
     )
 
 
@@ -924,6 +932,72 @@ def test_copy_and_shift_held_follow_copy():
     assert actions == [ShowMessage("Copy: pick a clip or scene")]
 
 
+# Copy: group track slots
+
+
+def group_snapshot(*rows):
+    # rows: member_clips per window row of the group track at index 4 (column 6).
+    slots = tuple(
+        SlotView(member_clips=rows[row] if row < len(rows) else ())
+        for row in range(layout.WINDOW_SCENES)
+    )
+    return with_track(COPY_SNAP, 6, slots=slots)
+
+
+def test_copy_group_slot_with_member_clips_becomes_source():
+    state, actions = handle(COPY, (6, 2), group_snapshot((False, False), (True, False)))
+    assert state.copy_source == GroupSource(4, 1)
+    assert actions == [ShowMessage("Copy: pick an empty slot")]
+
+
+@pytest.mark.parametrize("members", [(False, False), ()])
+def test_copy_group_slot_without_member_clips_hints(members):
+    snapshot = group_snapshot(members)
+    assert handle(COPY, (6, 1), snapshot) == (COPY, [ShowMessage("Copy: pick a clip or scene")])
+
+
+GROUP_COPY = replace(COPY, copy_source=GroupSource(4, 0))
+
+
+def test_copy_group_to_another_track_drops_source():
+    snapshot = group_snapshot((True, False))
+    assert handle(GROUP_COPY, (4, 2), snapshot) == (
+        COPY,
+        [ShowMessage("Pick a slot in the same group")],
+    )
+
+
+@pytest.mark.parametrize("pad", [2, 1])  # a source member filled, and the source itself
+def test_copy_group_to_filled_member_drops_source(pad):
+    snapshot = group_snapshot((True, False), (True, True))
+    assert handle(GROUP_COPY, (6, pad), snapshot) == (COPY, [ShowMessage("Target not empty")])
+
+
+@pytest.mark.parametrize("target", [(False, False), (False, True)])
+def test_copy_group_clips(target):
+    # A member without a source clip may have a clip in the target row.
+    snapshot = group_snapshot((True, False), target)
+    assert handle(GROUP_COPY, (6, 2), snapshot) == (
+        COPY,
+        [CopyGroupClips(4, 0, 1), ShowMessage("Clips copied")],
+    )
+
+
+def test_copy_group_clips_with_window_offset():
+    window = Window(0, 3)
+    state = State(copy=True, window=window, copy_source=GroupSource(4, 4))
+    snapshot = group_snapshot((), (True, False), (False, True))
+    assert handle(state, (6, 3), snapshot) == (
+        replace(state, copy_source=None),
+        [CopyGroupClips(4, 4, 5), ShowMessage("Clips copied")],
+    )
+
+
+def test_copy_group_source_outside_window_drops_source():
+    state = replace(COPY, copy_source=GroupSource(4, 9))
+    assert handle(state, (6, 2), group_snapshot((True, False))) == (COPY, [])
+
+
 # Copy: scenes
 
 
@@ -945,8 +1019,9 @@ def test_copy_empty_scene_without_source_hints():
     assert handle(COPY, (layout.SCENE_COLUMN, 2), SCENES) == (COPY, [ShowMessage("Scene is empty")])
 
 
-def test_copy_scene_with_clip_source_keeps_source():
-    state = replace(COPY, copy_source=ClipSource(0, 0, True))
+@pytest.mark.parametrize("source", [ClipSource(0, 0, True), GroupSource(4, 0)])
+def test_copy_scene_with_clip_source_keeps_source(source):
+    state = replace(COPY, copy_source=source)
     assert handle(state, (layout.SCENE_COLUMN, 2), SCENES) == (
         state,
         [ShowMessage("Pick a clip target")],
@@ -1301,6 +1376,13 @@ def test_clip_source_blinks_over_playing_clip():
     assert frame[(2, 1)] == Light(RED, Blink.FAST)
 
 
+def test_group_source_blinks():
+    window = Window(0, 2)
+    state = State(copy=True, window=window, copy_source=GroupSource(1, 3))
+    frame = session.render(state, session_snapshot(window=window))
+    assert frame[(3, 2)] == Light(RED, Blink.FAST)
+
+
 def test_scene_source_blinks_over_lime():
     snapshot = slot_snapshot(SlotView(has_clip=True, is_playing=True))
     assert session.render(SESSION, snapshot)[(layout.SCENE_COLUMN, 1)] == Light(LIME, Blink.TEMPO)
@@ -1310,7 +1392,7 @@ def test_scene_source_blinks_over_lime():
 
 @pytest.mark.parametrize(
     "source", [ClipSource(0, 9, True), ClipSource(13, 0, True), ClipSource(3, 0, True),
-               SceneSource(9), SceneSource(0)],
+               GroupSource(4, 9), GroupSource(3, 2), SceneSource(9), SceneSource(0)],
 )
 def test_source_outside_window_not_drawn(source):
     window = Window(4, 2)

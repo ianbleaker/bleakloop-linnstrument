@@ -15,6 +15,8 @@ def fake_track(name, mute=False, solo=False):
         solo=solo,
         has_midi_input=False,
         is_foldable=False,
+        is_grouped=False,
+        group_track=None,
         mixer_device=SimpleNamespace(volume=SimpleNamespace(value=0.85)),
         clip_slots=[SimpleNamespace(
             has_clip=False, is_playing=False, is_triggered=False, is_recording=False,
@@ -117,3 +119,64 @@ def test_group_slot_with_member_clips():
     slots = read(fake_song([group], scenes=scenes)).tracks[0].slots
     assert slots[0].controls_other_clips and not slots[0].has_clip
     assert not slots[1].controls_other_clips
+
+
+def grouped(track, group):
+    track.is_grouped, track.group_track = True, group
+    return track
+
+
+def fake_group(name):
+    group = fake_track(name)
+    group.is_foldable = True
+    return group
+
+
+def test_group_members_direct():
+    group = fake_group("g")
+    a, b = grouped(fake_track("a"), group), grouped(fake_track("b"), group)
+    song = fake_song([group, a, b])
+    assert live_state.group_members(song, group) == [a, b]
+
+
+def test_group_members_nested():
+    group = fake_group("g")
+    inner = grouped(fake_group("inner"), group)
+    a, b = grouped(fake_track("a"), inner), grouped(fake_track("b"), group)
+    song = fake_song([group, inner, a, b])
+    assert live_state.group_members(song, group) == [a, b]
+
+
+def test_group_members_excludes_other_tracks():
+    group, other = fake_group("g"), fake_group("other")
+    a = grouped(fake_track("a"), group)
+    outside, loose = grouped(fake_track("outside"), other), fake_track("loose")
+    song = fake_song([group, a, other, outside, loose])
+    assert live_state.group_members(song, group) == [a]
+
+
+def with_clip(track, scene):
+    slot = SimpleNamespace(**vars(track.clip_slots[scene]))
+    slot.has_clip = True
+    track.clip_slots = track.clip_slots[:scene] + [slot] + track.clip_slots[scene + 1 :]
+    return track
+
+
+def read_members(song, scene_clips):
+    snapshot = live_state.read(song, APPLICATION, Window(), scene_clips=scene_clips)
+    return [track.slots[0].member_clips for track in snapshot.tracks]
+
+
+def group_song():
+    group = fake_group("g")
+    a = with_clip(grouped(fake_track("a"), group), 0)
+    b = grouped(fake_track("b"), group)
+    return fake_song([group, a, b], scenes=[SimpleNamespace(is_triggered=False)] * 2)
+
+
+def test_group_member_clips_while_copy_held():
+    assert read_members(group_song(), True) == [(True, False), (), ()]
+
+
+def test_group_member_clips_not_read_otherwise():
+    assert read_members(group_song(), False) == [(), (), ()]

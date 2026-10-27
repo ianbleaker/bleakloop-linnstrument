@@ -7,17 +7,42 @@ import pytest
 sys.modules.setdefault("Live", ModuleType("Live"))
 
 from BleakLoop import live_actions  # noqa: E402
-from BleakLoop.core.model import SetArm, ToggleSolo, UnmuteAll, UnsoloAll  # noqa: E402
+from BleakLoop.core.model import (  # noqa: E402
+    CopyGroupClips,
+    SetArm,
+    ToggleSolo,
+    UnmuteAll,
+    UnsoloAll,
+)
 
 
-def fake_track(arm=False, mute=False, solo=False):
-    return SimpleNamespace(can_be_armed=True, arm=arm, mute=mute, solo=solo)
+class FakeSlot:
+    def __init__(self, has_clip=False):
+        self.has_clip = has_clip
+        self.copied_to = None
+
+    def duplicate_clip_to(self, target):
+        self.copied_to = target
 
 
-def fake_song(tracks, returns=(), exclusive_solo=False):
+def fake_track(arm=False, mute=False, solo=False, clips=(), is_foldable=False, group=None):
+    # clips: the scenes that have a clip; group: the group track this one sits in.
+    return SimpleNamespace(
+        can_be_armed=True,
+        arm=arm,
+        mute=mute,
+        solo=solo,
+        clip_slots=[FakeSlot(scene in clips) for scene in range(4)],
+        is_foldable=is_foldable,
+        is_grouped=group is not None,
+        group_track=group,
+    )
+
+
+def fake_song(tracks, returns=(), exclusive_solo=False, visible=None):
     return SimpleNamespace(
         tracks=list(tracks),
-        visible_tracks=list(tracks),
+        visible_tracks=list(tracks if visible is None else visible),
         return_tracks=list(returns),
         exclusive_solo=exclusive_solo,
     )
@@ -66,3 +91,17 @@ def test_unsolo_leaves_the_rest(exclusive_solo):
     a, b = fake_track(solo=True), fake_track(solo=True)
     apply(ToggleSolo(1), fake_song([a, b], exclusive_solo=exclusive_solo))
     assert (a.solo, b.solo) == (True, False)
+
+
+def test_copy_group_clips_copies_each_member_to_its_own_slot():
+    group = fake_track(is_foldable=True)
+    inner = fake_track(is_foldable=True, group=group)
+    folded = fake_track(clips=(0,), group=inner)  # in a folded nested group
+    direct = fake_track(clips=(0, 2), group=group)  # already filled in the target row
+    empty = fake_track(clips=(2,), group=group)  # no source clip
+    outside = fake_track(clips=(0,))
+    tracks = [outside, group, inner, folded, direct, empty]
+    apply(CopyGroupClips(1, 0, 2), fake_song(tracks, visible=[outside, group, inner, direct, empty]))
+    assert folded.clip_slots[0].copied_to is folded.clip_slots[2]
+    assert direct.clip_slots[0].copied_to is None
+    assert all(slot.copied_to is None for slot in empty.clip_slots + outside.clip_slots)

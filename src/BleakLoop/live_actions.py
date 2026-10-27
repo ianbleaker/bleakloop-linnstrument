@@ -15,6 +15,7 @@ from .core.model import (
     CaptureMidi,
     ClearBackToArrangement,
     CopyClip,
+    CopyGroupClips,
     CopyScene,
     DeleteClip,
     DeleteScene,
@@ -129,6 +130,14 @@ def apply(action, song, surface):
     elif isinstance(action, CopyClip):
         source = _slot(song, action.source_track, action.source_scene)
         source.duplicate_clip_to(_slot(song, action.track, action.scene))
+    elif isinstance(action, CopyGroupClips):
+        # Folded members aren't in visible_tracks: resolve them through song.tracks.
+        group = song.visible_tracks[action.track]
+        for member in live_state.group_members(song, group):
+            source = member.clip_slots[action.source_scene]
+            target = member.clip_slots[action.scene]
+            if source.has_clip and not target.has_clip:
+                source.duplicate_clip_to(target)
     elif isinstance(action, CopyScene):
         for track in song.tracks:
             if not track.is_foldable and track.clip_slots[action.source].has_clip:

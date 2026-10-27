@@ -22,6 +22,7 @@ from .leds import (
 from .model import (
     ArmExclusive,
     CopyClip,
+    CopyGroupClips,
     CopyScene,
     DeleteClip,
     DeleteScene,
@@ -42,7 +43,7 @@ from .model import (
     UnmuteAll,
     UnsoloAll,
 )
-from .modes import ClipSource, Mode, SceneSource
+from .modes import ClipSource, GroupSource, Mode, SceneSource
 from .values import TEMPO_MAX, TEMPO_MIN
 
 def handle(state, event, snapshot):
@@ -181,16 +182,37 @@ def _copy_slot(state, event, snapshot):
         if slot.has_clip:
             source = ClipSource(track.index, scene, track.has_midi_input)
             return replace(state, copy_source=source), [ShowMessage("Copy: pick an empty slot")]
+        if track.is_foldable and any(slot.member_clips):
+            source = GroupSource(track.index, scene)
+            return replace(state, copy_source=source), [ShowMessage("Copy: pick an empty slot")]
         return state, [ShowMessage("Copy: pick a clip or scene")]
     if isinstance(source, SceneSource):
         return state, [ShowMessage("Pick a scene target")]
     dropped = replace(state, copy_source=None)
+    if isinstance(source, GroupSource):
+        return dropped, _copy_group(state, source, track, scene, slot)
     if slot.has_clip:
         return dropped, [ShowMessage("Target not empty")]
-    if track.is_foldable or track.has_midi_input != source.midi:
+    if track.is_foldable:
+        return dropped, [ShowMessage("Cannot copy into a group track")]
+    if track.has_midi_input != source.midi:
         return dropped, [ShowMessage("Cannot copy between MIDI and audio tracks")]
     copy = CopyClip(source.track, source.scene, track.index, scene)
     return dropped, [copy, ShowMessage("Clip copied")]
+
+
+def _copy_group(state, source, track, scene, slot):
+    # Each member copies to its own slot: every member with a clip in the source row needs an
+    # empty slot in the target row, or nothing copies.
+    if track.index != source.track:
+        return [ShowMessage("Pick a slot in the same group")]
+    row = source.scene - state.window.scene
+    if not 0 <= row < len(track.slots):
+        return []
+    sources = track.slots[row].member_clips
+    if any(a and b for a, b in zip(sources, slot.member_clips)):
+        return [ShowMessage("Target not empty")]
+    return [CopyGroupClips(source.track, source.scene, scene), ShowMessage("Clips copied")]
 
 
 def _copy_scene(state, event, snapshot):
@@ -205,7 +227,7 @@ def _copy_scene(state, event, snapshot):
             state = replace(state, copy_source=SceneSource(scene))
             return state, [ShowMessage("Copy: pick an empty scene")]
         return state, [ShowMessage("Scene is empty")]
-    if isinstance(source, ClipSource):
+    if isinstance(source, (ClipSource, GroupSource)):
         return state, [ShowMessage("Pick a clip target")]
     dropped = replace(state, copy_source=None)
     if has:
@@ -349,7 +371,7 @@ def _render_copy_source(frame, state):
     # The copy source: on top of everything else, and only while in the window.
     source = state.copy_source
     window = state.window
-    if isinstance(source, ClipSource):
+    if isinstance(source, (ClipSource, GroupSource)):
         column = source.track - window.track + layout.GRID_COLUMNS[0]
         pad = source.scene - window.scene + 1
         if column in layout.GRID_COLUMNS and 1 <= pad <= layout.WINDOW_SCENES:

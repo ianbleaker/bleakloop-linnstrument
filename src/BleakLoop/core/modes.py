@@ -26,6 +26,13 @@ class ClipSource:
 
 
 @dataclass(frozen=True)
+class GroupSource:
+    # A group track's slot: its members' clips in that row.
+    track: int
+    scene: int
+
+
+@dataclass(frozen=True)
 class SceneSource:
     scene: int
 
@@ -99,7 +106,7 @@ class State:
     quantization_memory: int | None = None
     copy: bool = False
     delete: bool = False
-    copy_source: ClipSource | SceneSource | None = None
+    copy_source: ClipSource | GroupSource | SceneSource | None = None
     stop: bool = False  # Stop is held
     fixed_length: int | None = None  # bars; Linnstrument Mode's Record Clip uses it too
     touches: tuple = ()  # Touch per held fader column
