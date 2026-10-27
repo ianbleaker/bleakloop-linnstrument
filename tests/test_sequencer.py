@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, layout, modes, sequencer
+from BleakLoop.core import column_1, engine, layout, modes, sequencer
 from BleakLoop.core.leds import (
     BLUE,
     CYAN,
@@ -19,6 +19,7 @@ from BleakLoop.core.leds import (
     Light,
 )
 from BleakLoop.core.model import (
+    ToggleDetailView,
     DrumView,
     DuplicateLoop,
     EditNotes,
@@ -305,6 +306,36 @@ def test_device_clip_layer_steps_tracks_and_devices():
     # Not Seq: Device/Clip's layer has nothing on pad 7.
     assert handle(held, layout.SEQ) == (held, [])
     assert handle(held, layout.DEVICE_CLIP, pressed=False)[0] == ENTERED
+
+
+def engine_presses(state, *presses):
+    actions = []
+    for key, pressed in presses:
+        state, more = engine.handle(state, press(key, pressed), SNAP_IN)
+        actions += more
+    return state, actions
+
+
+def test_device_clip_tap_flips_the_detail_view():
+    state, actions = engine_presses(
+        ENTERED, (layout.DEVICE_CLIP, True), (layout.DEVICE_CLIP, False)
+    )
+    assert actions == [ToggleDetailView()] and state == ENTERED
+
+
+@pytest.mark.parametrize("key", [(16, 2), layout.SHIFT])
+def test_device_clip_with_another_press_does_not_flip(key):
+    _, actions = engine_presses(
+        ENTERED, (layout.DEVICE_CLIP, True), (key, True), (key, False), (layout.DEVICE_CLIP, False)
+    )
+    assert ToggleDetailView() not in actions
+
+
+def test_device_clip_on_shifts_layer_never_flips():
+    _, actions = engine_presses(
+        replace(ENTERED, shift=True), (layout.DEVICE_CLIP, True), (layout.DEVICE_CLIP, False)
+    )
+    assert ToggleDetailView() not in actions
 
 
 def test_device_clip_layer_lights():

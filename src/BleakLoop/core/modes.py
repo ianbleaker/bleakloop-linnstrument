@@ -178,6 +178,7 @@ class State:
     fader_undo_open: bool = False  # a fader gesture's undo step is open in Live
     fader_source: str = "device"  # "device" or "mapped"
     device_clip: bool = False  # Device/Clip is held
+    device_clip_used: bool = False  # a press during the hold: its release doesn't flip the view
     split: bool = False  # Session Mode's split view
     fader_bindings: tuple = (None,) * 8  # Mapped FX: FaderBinding or None per row
     seq_held: bool = False  # Seq is held in Session Mode
@@ -236,6 +237,7 @@ def enter(state, mode):
         fx=False,
         fx_length=None,
         device_clip=False,
+        device_clip_used=False,
         fader_touches=(),
         seq_held=False,
         seq_used=False,

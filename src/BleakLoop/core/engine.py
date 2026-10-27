@@ -1,6 +1,8 @@
 """handle() and render(): all behaviour, no side effects."""
 
-from . import faders, fx, mixer, linnstrument_mode, sequencer, session
+from dataclasses import replace
+
+from . import faders, fx, layout, mixer, linnstrument_mode, sequencer, session
 from .model import FaderBound, PadPress, RacksRead, ScenesChanged
 from .modes import Mode
 
@@ -14,6 +16,14 @@ def handle(state, event, snapshot):
         return fx.scenes_changed(state, event)
     if isinstance(event, FaderBound):
         return faders.bound(state, event)
+    if (
+        state.device_clip
+        and isinstance(event, PadPress)
+        and event.pressed
+        and (event.column, event.pad) != layout.DEVICE_CLIP
+    ):
+        # Any other press during a Device/Clip hold makes it a hold, not a tap.
+        state = replace(state, device_clip_used=True)
     if state.mode is Mode.SESSION:
         return session.handle(state, event, snapshot)
     if state.mode is Mode.SEQUENCER:

@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, fx, layout, session
+from BleakLoop.core import column_1, engine, fx, layout, modes, session
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -20,6 +20,8 @@ from BleakLoop.core.leds import (
     Light,
 )
 from BleakLoop.core.model import (
+    BindFader,
+    ToggleDetailView,
     ArmExclusive,
     CaptureAndInsertScene,
     ClearBackToArrangement,
@@ -537,7 +539,54 @@ DEVICE_CLIP = State(device_clip=True)
 def test_device_clip_is_held(state):
     held, actions = handle(state, layout.DEVICE_CLIP)
     assert held.device_clip and actions == []
-    assert handle(held, layout.DEVICE_CLIP, pressed=False) == (state, [])
+    assert handle(held, layout.DEVICE_CLIP, pressed=False) == (state, [ToggleDetailView()])
+
+
+def engine_presses(state, *presses, snapshot=SNAP):
+    # Through engine.handle, which marks a Device/Clip hold used; returns every action.
+    actions = []
+    for key, pressed in presses:
+        state, more = engine.handle(state, press(key, pressed), snapshot)
+        actions += more
+    return state, actions
+
+
+DOWN, UP = True, False
+
+
+def test_device_clip_tap_flips_the_detail_view():
+    state, actions = engine_presses(SESSION, (layout.DEVICE_CLIP, DOWN), (layout.DEVICE_CLIP, UP))
+    assert actions == [ToggleDetailView()]
+    assert not state.device_clip and not state.device_clip_used
+
+
+@pytest.mark.parametrize("key", [(16, 2), layout.SHIFT, (3, 1), (1, 4)])
+def test_device_clip_with_another_press_does_not_flip(key):
+    state, actions = engine_presses(
+        SESSION, (layout.DEVICE_CLIP, DOWN), (key, DOWN), (key, UP), (layout.DEVICE_CLIP, UP)
+    )
+    assert ToggleDetailView() not in actions
+    assert not state.device_clip and not state.device_clip_used
+
+
+def test_device_clip_and_a_mapped_fx_row_binds_without_flipping():
+    mapped = replace(FX_ON, fader_source="mapped")
+    _, actions = engine_presses(
+        mapped, (layout.DEVICE_CLIP, DOWN), ((5, 3), DOWN), ((5, 3), UP), (layout.DEVICE_CLIP, UP)
+    )
+    assert actions == [BindFader(2)]
+
+
+def test_device_clip_on_shifts_layer_never_flips():
+    state, actions = engine_presses(SHIFT, (layout.DEVICE_CLIP, DOWN), (layout.DEVICE_CLIP, UP))
+    assert actions == [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")]
+    assert not state.device_clip
+
+
+@pytest.mark.parametrize("mode", [Mode.SESSION, Mode.LINNSTRUMENT, Mode.SEQUENCER])
+def test_mode_entry_clears_the_device_clip_hold(mode):
+    state = modes.enter(State(device_clip=True, device_clip_used=True), mode)
+    assert not state.device_clip and not state.device_clip_used
 
 
 @pytest.mark.parametrize(
@@ -586,7 +635,7 @@ def test_device_clip_layer_lights(state):
     ]
 
 
-def test_entering_a_mode_drops_dev():
+def test_entering_a_mode_drops_device_clip():
     state = session.handle(DEVICE_CLIP, press(layout.MODE_PAD), SNAP)[0]
     assert state.mode is Mode.LINNSTRUMENT and not state.device_clip
 

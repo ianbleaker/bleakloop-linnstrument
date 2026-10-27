@@ -63,6 +63,7 @@ from .core.model import (
     StopAllClips,
     StopTrackClips,
     StoreFxSnapshot,
+    ToggleDetailView,
     ToggleMetronome,
     ToggleMute,
     TogglePlay,
@@ -250,6 +251,15 @@ def _top_level(device, track, devices):
         if device == track:
             return None
     return device
+
+
+def _toggle_detail_view(view):
+    # Read Live's view, not a flag of our own, so a mouse click in between counts. Showing
+    # Detail/Clip also opens a hidden Detail view.
+    if view.is_view_visible("Detail/Clip"):
+        view.show_view("Detail/DeviceChain")
+    else:
+        view.show_view("Detail/Clip")
 
 
 def apply(action, song, surface):
@@ -450,6 +460,8 @@ def apply(action, song, surface):
         song.begin_undo_step()
     elif isinstance(action, EndUndoStep):
         song.end_undo_step()
+    elif isinstance(action, ToggleDetailView):
+        _toggle_detail_view(Live.Application.get_application().view)
     elif isinstance(action, SetMixer):
         surface.set_mixer(action.on)
     elif isinstance(action, ShowMessage):

@@ -77,7 +77,7 @@ def handle(state, event, snapshot):
     shift_layer = state.shift and not state.copy and not state.delete
     if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
         # On Shift's layer the pad is a tempo step.
-        return replace(state, device_clip=event.pressed), []
+        return controls.device_clip(state, event)
     if state.device_clip and event.column == layout.NAV_COLUMN and event.pressed:
         # Device/Clip's layer replaces column 16's normal and Shift layers.
         return controls.device_clip_layer(state, key)

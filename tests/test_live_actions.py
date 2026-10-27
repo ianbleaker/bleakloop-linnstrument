@@ -33,6 +33,7 @@ from BleakLoop.core.model import (  # noqa: E402
     StepDevice,
     StepTrack,
     StoreFxSnapshot,
+    ToggleDetailView,
     ToggleSolo,
     UnmuteAll,
     UnsoloAll,
@@ -486,6 +487,39 @@ def test_set_arms_skips_tracks_that_cant_be_armed():
     song = seq_song()
     apply(SetArms(((0, True), (2, True), (9, True))), song)
     assert song.tracks[0].arm and not song.tracks[2].arm
+
+
+class FakeAppView:
+    def __init__(self, visible):
+        self.visible = visible
+        self.shown = []
+
+    def is_view_visible(self, name):
+        return name in self.visible
+
+    def show_view(self, name):
+        self.shown.append(name)
+
+
+@pytest.mark.parametrize(
+    "visible, shown",
+    [
+        ({"Detail", "Detail/Clip"}, "Detail/DeviceChain"),
+        ({"Detail", "Detail/DeviceChain"}, "Detail/Clip"),
+        (set(), "Detail/Clip"),
+    ],
+)
+def test_toggle_detail_view_follows_lives_view(monkeypatch, visible, shown):
+    view = FakeAppView(visible)
+    app = SimpleNamespace(view=view)
+    monkeypatch.setattr(
+        live_actions.Live,
+        "Application",
+        SimpleNamespace(get_application=lambda: app),
+        raising=False,
+    )
+    apply(ToggleDetailView(), fake_song([]))
+    assert view.shown == [shown]
 
 
 def test_select_set_track():

@@ -14,6 +14,7 @@ from .model import (
     ShowMessage,
     StepDevice,
     StepTrack,
+    ToggleDetailView,
     ToggleMetronome,
     Undo,
 )
@@ -51,6 +52,16 @@ def tempo_step(snapshot, step):
     # Shift + column 16 pads 7 and 8.
     bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + step))
     return [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
+
+
+def device_clip(state, event):
+    # A hold pad: held, the Device/Clip layer; a tap with no other press during it flips
+    # Live's Detail view.
+    if event.pressed:
+        return replace(state, device_clip=True, device_clip_used=False), []
+    tapped = state.device_clip and not state.device_clip_used
+    state = replace(state, device_clip=False, device_clip_used=False)
+    return state, [ToggleDetailView()] if tapped else []
 
 
 def device_clip_layer(state, key):

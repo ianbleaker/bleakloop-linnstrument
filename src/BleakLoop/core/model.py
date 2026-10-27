@@ -529,6 +529,12 @@ class SetArms:
 
 
 @dataclass(frozen=True)
+class ToggleDetailView:
+    # Clip view if the Detail view shows anything else or is hidden, else Device view.
+    pass
+
+
+@dataclass(frozen=True)
 class SelectSetTrack:
     track: int
 
