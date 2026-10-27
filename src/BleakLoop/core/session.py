@@ -36,10 +36,10 @@ from .model import (
     SetArm,
     ShowClip,
     ShowMessage,
-    StopAllClips,
     StopTrackClips,
     ToggleMute,
     ToggleSolo,
+    UnarmAll,
     UnmuteAll,
     UnsoloAll,
 )
@@ -326,13 +326,14 @@ def _seq_press(state, event, snapshot):
 
 
 def _stop(state, event):
-    # A hold pad: hold it and press a track's pad to stop that track. Shift + Stop stops all.
+    # A hold pad: hold it and press a track's pad to stop that track. Shift + Stop disarms
+    # every track in the Set.
     if not event.pressed:
         return replace(state, stop=False), []
     if state.copy or state.delete:
         return state, []
     if state.shift:
-        return state, [StopAllClips(), ShowMessage("Stop all clips")]
+        return state, [UnarmAll(), ShowMessage("Unarm all")]
     return replace(state, stop=True), []
 
 
@@ -459,7 +460,11 @@ def render(state, snapshot):
         frame[layout.UNMUTE_ALL] = Light(ORANGE if snapshot.any_muted else OFF)
     if state.device_clip:
         controls.render_device_clip_layer(frame)
-    frame[layout.STOP] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
+    if shift_layer and not state.stop:
+        # Unarm all: lit while there's an arm to undo.
+        frame[layout.STOP] = Light(RED if snapshot.any_armed else OFF)
+    else:
+        frame[layout.STOP] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
     frame.update(column_1.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame

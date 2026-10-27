@@ -86,6 +86,17 @@ def test_nothing_muted_or_soloed():
     assert not snapshot.any_soloed
 
 
+def test_any_armed_reads_armable_tracks_only():
+    armed = fake_track("b")
+    armed.arm = True
+    # Live raises on reading arm from a track that can't be armed.
+    unarmable = fake_track("c")
+    unarmable.can_be_armed = False
+    del unarmable.arm
+    assert not read(fake_song([fake_track("a"), unarmable])).any_armed
+    assert read(fake_song([fake_track("a"), unarmable, armed])).any_armed
+
+
 def test_muted_track():
     snapshot = read(fake_song([fake_track("a"), fake_track("b", mute=True)]))
     assert snapshot.any_muted

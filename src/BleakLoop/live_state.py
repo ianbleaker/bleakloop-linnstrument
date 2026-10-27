@@ -82,6 +82,8 @@ def read(
         can_capture_midi=song.can_capture_midi,
         any_muted=any(track.mute for track in mixable),
         any_soloed=any(track.solo for track in mixable),
+        # Live raises on reading arm from a track that can't be armed.
+        any_armed=any(track.can_be_armed and track.arm for track in song.tracks),
         faders=read_faders(song, faders) if faders is not None else (),
         arms=_arms(set_tracks) if set_tracks is not None else (),
         sequencer=sequencer,

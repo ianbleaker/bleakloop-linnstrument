@@ -35,6 +35,7 @@ from BleakLoop.core.model import (  # noqa: E402
     StoreFxSnapshot,
     ToggleDetailView,
     ToggleSolo,
+    UnarmAll,
     UnmuteAll,
     UnsoloAll,
 )
@@ -97,6 +98,15 @@ def test_unmute_all_covers_tracks_and_returns():
     returns = [fake_track(mute=True)]
     apply(UnmuteAll(), fake_song(tracks, returns))
     assert not any(track.mute for track in tracks + returns)
+
+
+def test_unarm_all_disarms_only_armed_armable_tracks():
+    armed, idle = fake_track(arm=True), fake_track()
+    # Live raises on reading arm from a track that can't be armed.
+    unarmable = SimpleNamespace(can_be_armed=False)
+    apply(UnarmAll(), fake_song([armed, unarmable, idle]))
+    assert not armed.arm and not idle.arm
+    assert not hasattr(unarmable, "arm")
 
 
 def test_unsolo_all_covers_tracks_and_returns():

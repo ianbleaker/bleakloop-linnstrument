@@ -90,6 +90,7 @@ SNAPSHOT = Snapshot(
     tracks=TRACKS,
     any_muted=True,
     any_soloed=True,
+    any_armed=True,
     selected_track=SelectedTrack(
         index=3, name="Lead", armed=True, clips=(True, True, False, False)
     ),

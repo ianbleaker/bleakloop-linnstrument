@@ -70,6 +70,7 @@ from .core.model import (
     ToggleSolo,
     Undo,
     UnmuteAll,
+    UnarmAll,
     UnsoloAll,
 )
 
@@ -311,6 +312,10 @@ def apply(action, song, surface):
         for track in _mixable(song):
             if track.solo:
                 track.solo = False
+    elif isinstance(action, UnarmAll):
+        for track in song.tracks:
+            if track.can_be_armed and track.arm:
+                track.arm = False
     elif isinstance(action, StopTrackClips):
         song.visible_tracks[action.track].stop_all_clips()
     elif isinstance(action, StopAllClips):

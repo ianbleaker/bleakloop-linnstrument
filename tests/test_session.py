@@ -67,6 +67,7 @@ from BleakLoop.core.model import (
     ToggleSolo,
     TrackView,
     Undo,
+    UnarmAll,
     UnmuteAll,
     UnsoloAll,
 )
@@ -712,7 +713,7 @@ def test_unmute_all_in_mixer_and_fx(state):
 
 
 STOPPING = State(stop=True)
-STOP_ALL = [StopAllClips(), ShowMessage("Stop all clips")]
+UNARM_ALL = [UnarmAll(), ShowMessage("Unarm all")]
 
 
 def test_stop_press_holds():
@@ -727,8 +728,8 @@ def test_stop_tap_does_nothing(state):
 
 
 @pytest.mark.parametrize("state", [SHIFT, State(mixer=True, shift=True), State(fx=True, shift=True)])
-def test_shift_stop_stops_all_clips(state):
-    assert handle(state, layout.STOP) == (state, STOP_ALL)
+def test_shift_stop_unarms_all(state):
+    assert handle(state, layout.STOP) == (state, UNARM_ALL)
     assert handle(state, layout.STOP, pressed=False) == (state, [])
 
 
@@ -1514,10 +1515,24 @@ def test_shift_unmute_all_light_shows_solo(soloed, light):
     assert session.render(SHIFT, snapshot)[layout.UNMUTE_ALL] == light
 
 
-@pytest.mark.parametrize("state", [SESSION, SHIFT, State(mixer=True), State(fx=True)])
-def test_stop_light(state):
-    assert session.render(state, SNAP)[layout.STOP] == Light(RED)
-    assert session.render(replace(state, stop=True), SNAP)[layout.STOP] == Light(RED, Blink.FAST)
+@pytest.mark.parametrize("state", [SESSION, State(mixer=True), State(fx=True)])
+@pytest.mark.parametrize("armed", [False, True])
+def test_stop_light(state, armed):
+    snapshot = replace(SNAP, any_armed=armed)
+    assert session.render(state, snapshot)[layout.STOP] == Light(RED)
+    held = replace(state, stop=True)
+    assert session.render(held, snapshot)[layout.STOP] == Light(RED, Blink.FAST)
+
+
+@pytest.mark.parametrize("state", [SHIFT, State(mixer=True, shift=True), State(fx=True, shift=True)])
+@pytest.mark.parametrize("armed, light", [(False, Light(OFF)), (True, Light(RED))])
+def test_shift_stop_light_shows_an_arm(state, armed, light):
+    assert session.render(state, replace(SNAP, any_armed=armed))[layout.STOP] == light
+
+
+def test_stop_held_keeps_its_light_under_shift():
+    state = State(stop=True, shift=True)
+    assert session.render(state, SNAP)[layout.STOP] == Light(RED, Blink.FAST)
 
 
 def test_normal_layer_column_1():
