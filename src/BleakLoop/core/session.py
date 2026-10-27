@@ -143,7 +143,10 @@ def handle(state, event, snapshot):
     if _is_scene(event):
         scene = state.window.scene + event.pad - 1
         if scene < snapshot.scene_count:
-            return state, [FireScene(scene, legato=state.shift)]
+            # A legato launch leaves the macros alone.
+            if state.shift:
+                return state, [FireScene(scene, legato=True)]
+            return state, [FireScene(scene, legato=False), *fx.scene_launch(state, scene, snapshot)]
     return state, []
 
 

@@ -787,3 +787,93 @@ def test_render_scene_snapshots_past_the_last_scene_are_dark():
 def test_render_scene_snapshots_under_shift_are_dark():
     state = replace(with_scene(FX, 0), shift=True)
     assert fx.render(state, SCENES)[layout.FX_SCENE_SLOTS[0]] == Light(OFF)
+
+
+# Scene launch
+
+
+def launching(beats, quantization=4, numerator=4, denominator=4, is_playing=True):
+    return replace(
+        playing(beats, numerator, denominator),
+        is_playing=is_playing,
+        launch_quantization=quantization,
+        scene_count=8,
+    )
+
+
+def test_launch_end_beats_unquantized():
+    assert fx.launch_end_beats(launching(5.5, quantization=0)) is None
+
+
+@pytest.mark.parametrize(
+    "beats, quantization, signature, end",
+    [
+        (5.5, 4, (4, 4), 8.0),  # 1 Bar in 4/4
+        (4.0, 4, (6, 8), 6.0),  # 1 Bar in 6/8: 3 beats
+        (5.0, 3, (4, 4), 8.0),  # 2 Bars, mid-bar
+        (13.0, 1, (4, 4), 32.0),  # 8 Bars
+        (1.0, 8, (4, 4), 4 / 3),  # 1/4T
+        (4.0, 4, (4, 4), 8.0),  # on a boundary: the next one
+    ],
+)
+def test_launch_end_beats(beats, quantization, signature, end):
+    snapshot = launching(beats, quantization, *signature)
+    assert fx.launch_end_beats(snapshot) == pytest.approx(end)
+
+
+def test_scene_launch_without_a_snapshot_does_nothing():
+    assert fx.scene_launch(with_scene(FX, 1), 2, launching(5.5)) == []
+
+
+def test_scene_launch_while_playing_lands_on_the_boundary_at_the_press():
+    actions = fx.scene_launch(with_scene(FX, 2), 2, launching(5.5))
+    assert actions == [RecallFxSnapshot(2, None, scene=True, end_beats=8.0)]
+
+
+@pytest.mark.parametrize("snapshot", [launching(5.5, is_playing=False), launching(5.5, 0)])
+def test_scene_launch_stopped_or_unquantized_recalls_at_once(snapshot):
+    actions = fx.scene_launch(with_scene(FX, 2), 2, snapshot)
+    assert actions == [RecallFxSnapshot(2, None, scene=True)]
+
+
+def test_scene_launch_ignores_a_held_length():
+    actions = fx.scene_launch(replace(with_scene(FX, 2), fx_length=4), 2, launching(5.5))
+    assert actions == [RecallFxSnapshot(2, None, scene=True, end_beats=8.0)]
+
+
+def launch_read(state, scene, end, snapshot):
+    event = RacksRead(scene, NOW_AB, True, None, scene=True, end_beats=end)
+    return engine.handle(state, event, snapshot)
+
+
+def test_a_launch_recall_morphs_to_the_end_set_at_the_press():
+    state = with_scene(FX, 2, STORED_AB)
+    # The follow-up's snapshot is a little later, and its quantization changed: ignored.
+    state, actions = launch_read(state, 2, 8.0, launching(5.6, quantization=1))
+    assert actions == [BeginUndoStep(), ShowMessage("Scene 3 snapshot on launch")]
+    assert (state.morph.start_beats, state.morph.end_beats) == (5.6, 8.0)
+    assert state.morph.scene
+
+
+def test_a_launch_recall_past_its_end_recalls_at_once():
+    state = with_scene(FX, 2, STORED_AB)
+    state, actions = launch_read(state, 2, 8.0, launching(8.0))
+    assert actions[-1] == ShowMessage("Scene 3 snapshot recalled")
+    assert (state.morph, state.fx_landed_scene) == (None, 2)
+
+
+def test_a_launch_from_stopped_recalls_at_once_though_the_follow_up_plays():
+    # FireScene started the transport before the rack read.
+    state = with_scene(FX, 2, STORED_AB)
+    (recall,) = fx.scene_launch(state, 2, launching(0.0, is_playing=False))
+    event = RacksRead(2, NOW_AB, True, recall.bars, scene=True, end_beats=recall.end_beats)
+    state, actions = engine.handle(state, event, launching(0.0))
+    assert actions[-1] == ShowMessage("Scene 3 snapshot recalled")
+    assert state.morph is None
+
+
+def test_a_launch_recall_replaces_a_running_morph():
+    state = with_scene(replace(MORPHING), 2, STORED_AB)
+    state, actions = launch_read(state, 2, 8.0, launching(5.5))
+    assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
+    assert (state.morph.slot, state.morph.scene) == (2, True)

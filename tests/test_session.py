@@ -38,6 +38,7 @@ from BleakLoop.core.model import (
     FireSlot,
     PadPress,
     QuantizeClip,
+    RecallFxSnapshot,
     Redo,
     SceneSelected,
     SelectTrack,
@@ -66,7 +67,7 @@ from BleakLoop.core.model import (
     UnmuteAll,
     UnsoloAll,
 )
-from BleakLoop.core.modes import ClipSource, GroupSource, Mode, SceneSource, State
+from BleakLoop.core.modes import ClipSource, FxRack, GroupSource, Mode, SceneSource, State
 
 
 def session_snapshot(track_count=20, scene_count=10, window=Window(), **k):
@@ -608,6 +609,37 @@ def test_scene_launch_with_offset():
 def test_scene_past_the_end_does_nothing():
     snapshot = session_snapshot(scene_count=4)
     assert handle(SESSION, (layout.SCENE_COLUMN, 5), snapshot) == (SESSION, [])
+
+
+SCENE_SNAPSHOT = (FxRack("A", "R", 0, (1.0,)),)
+
+
+def with_scene_snapshot(state, scene):
+    return replace(state, fx_scenes=(None,) * scene + (SCENE_SNAPSHOT,))
+
+
+@pytest.mark.parametrize(
+    "state",
+    [State(), State(mixer=True), State(fx=True), State(split=True)],
+    ids=["session", "mixer", "fx", "split"],
+)
+def test_scene_launch_fires_the_scenes_snapshot(state):
+    state = with_scene_snapshot(replace(state, window=Window(0, 1)), 2)
+    snapshot = replace(session_snapshot(window=Window(0, 1)), is_playing=True, song_beats=5.5)
+    assert handle(state, (layout.SCENE_COLUMN, 2), snapshot) == (
+        state,
+        [FireScene(2, legato=False), RecallFxSnapshot(2, None, scene=True, end_beats=8.0)],
+    )
+
+
+def test_legato_scene_launch_leaves_the_snapshot():
+    state = with_scene_snapshot(SHIFT, 2)
+    assert handle(state, (layout.SCENE_COLUMN, 3)) == (state, [FireScene(2, legato=True)])
+
+
+def test_scene_launch_without_a_snapshot_fires_only_the_scene():
+    state = with_scene_snapshot(SESSION, 1)
+    assert handle(state, (layout.SCENE_COLUMN, 3)) == (state, [FireScene(2, legato=False)])
 
 
 # Unmute all and Stop

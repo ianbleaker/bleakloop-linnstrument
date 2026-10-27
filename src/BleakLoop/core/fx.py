@@ -22,6 +22,10 @@ from .values import FX_TOUCH_TOLERANCE
 
 SLOTS = 16
 
+# Launch quantization values (column_1.QUANTIZATION_NAMES) to their length: bars, then beats.
+LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
+LAUNCH_BEATS = {5: 2, 6: 4 / 3, 7: 1, 8: 2 / 3, 9: 1 / 2, 10: 1 / 3, 11: 1 / 4, 12: 1 / 6, 13: 1 / 8}
+
 
 def keys(racks):
     # (track name, rack name, n) per rack, n counting the earlier racks with both names.
@@ -245,17 +249,24 @@ def racks_read(state, event, snapshot):
     # A new recall replaces a running morph and its undo step.
     if state.fx_undo_open:
         actions.append(EndUndoStep())
-    if event.bars is None or not snapshot.is_playing:
+    launch = event.end_beats is not None
+    if launch:
+        # The press decided the landing: the follow-up's transport may already have started.
+        instant = snapshot.song_beats >= event.end_beats
+    else:
+        instant = event.bars is None or not snapshot.is_playing
+    if instant:
         writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
         actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
         state = replace(state, morph=None, fx_undo_open=False)
         state = _landed(state, event.slot, event.scene)
         return state, actions + [ShowMessage(f"{name} recalled{note}")]
     start = snapshot.song_beats
-    end = end_beats(snapshot, event.bars)
+    end = event.end_beats if launch else end_beats(snapshot, event.bars)
     morph = Morph(event.slot, start, end, start, macros, scene=event.scene)
     state = replace(state, morph=morph, fx_undo_open=True)
-    message = ShowMessage(f"{name} in {_count(event.bars, 'bar')}{note}")
+    timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
+    message = ShowMessage(f"{name} {timing}{note}")
     return state, actions + [BeginUndoStep(), message]
 
 
@@ -295,6 +306,28 @@ def end_beats(snapshot, bars):
     # The Nth bar line after now.
     bar = snapshot.signature_numerator * 4 / snapshot.signature_denominator
     return math.floor(snapshot.song_beats / bar) * bar + bars * bar
+
+
+def launch_end_beats(snapshot):
+    # When a scene launched now starts: the next quantization boundary strictly after now.
+    # None when launches are unquantized.
+    q = snapshot.launch_quantization
+    if q in LAUNCH_BARS:
+        step = LAUNCH_BARS[q] * snapshot.signature_numerator * 4 / snapshot.signature_denominator
+    elif q in LAUNCH_BEATS:
+        step = LAUNCH_BEATS[q]
+    else:
+        return None
+    return (math.floor(snapshot.song_beats / step) + 1) * step
+
+
+def scene_launch(state, scene, snapshot):
+    # After a scene launch from the pads, with the press's snapshot: the scene's snapshot lands
+    # as the scene starts, or at once when stopped or unquantized. A Bars pad held is ignored.
+    if scene_snapshot(state, scene) is None:
+        return []
+    end = launch_end_beats(snapshot) if snapshot.is_playing else None
+    return [RecallFxSnapshot(scene, None, scene=True, end_beats=end)]
 
 
 def _match(stored, racks):
