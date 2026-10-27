@@ -143,12 +143,29 @@ def _ring(x, y, size, dash):
 
 def _bubble(cx, cy, label, size, width):
     # A dark pill behind the label keeps it readable on any light colour.
+    if "\n" in label:
+        return _stacked(cx, cy, label.split("\n"), size, width)
     height = size + 6
     return [
         f'<rect x="{cx - width // 2}" y="{cy - height // 2}" width="{width}" '
         f'height="{height}" rx="{height // 2}" fill="{BUBBLE}" '
         f'fill-opacity="{BUBBLE_OPACITY}"/>',
         text(cx, cy + size // 2 - 1, label, size, "#ffffff"),
+    ]
+
+
+def _stacked(cx, cy, lines, size, width):
+    # A held pad's label, one word per line in a rounded box.
+    step = size + 2
+    height = len(lines) * step + 6
+    top = cy - height // 2
+    return [
+        f'<rect x="{cx - width // 2}" y="{top}" width="{width}" height="{height}" rx="5" '
+        f'fill="{BUBBLE}" fill-opacity="{BUBBLE_OPACITY}"/>',
+        *(
+            text(cx, top + 3 + size + i * step, line, size, "#ffffff")
+            for i, line in enumerate(lines)
+        ),
     ]
 
 

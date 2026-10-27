@@ -160,8 +160,9 @@
 <text x="36" y="201" font-size="9" fill="#ffffff" text-anchor="middle">LaunchQ</text>
 <rect x="18" y="283" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="36" y="293" font-size="9" fill="#ffffff" text-anchor="middle">Redo</text>
-<rect x="18" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="36" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Shift</text>
+<rect x="18" y="368" width="36" height="28" rx="5" fill="#000000" fill-opacity="0.72"/>
+<text x="36" y="380" font-size="9" fill="#ffffff" text-anchor="middle">SHIFT</text>
+<text x="36" y="391" font-size="9" fill="#ffffff" text-anchor="middle">HELD</text>
 <rect x="662" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="680" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
 <rect x="662" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>

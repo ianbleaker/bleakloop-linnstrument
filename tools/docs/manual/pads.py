@@ -77,7 +77,8 @@ LAUNCH_QUANTIZATION = _one(
     label="LaunchQ",
 )
 REDO = _one("Redo", layout.UNDO, "Redo.")
-SHIFT_HELD = Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False)
+# A held pad's label names it and says so, one word per line.
+SHIFT_HELD = Item("Shift", {layout.SHIFT: "SHIFT\nHELD"}, "Held.", variant=False)
 DEVICE_CLIP = _one(
     "Device/Clip",
     layout.DEVICE_CLIP,
@@ -303,7 +304,7 @@ _DEVICE_CLIP = (
         "Switch the faders between Device FX and Mapped FX.",
         label="Source",
     ),
-    Item("Device/Clip", {layout.DEVICE_CLIP: "DevClip"}, "Held.", variant=False),
+    Item("Device/Clip", {layout.DEVICE_CLIP: "DEV\nHELD"}, "Held.", variant=False),
 )
 
 RECORD_CLIP = _one(
