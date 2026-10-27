@@ -17,7 +17,8 @@ def fake_track(name, mute=False, solo=False):
         is_foldable=False,
         mixer_device=SimpleNamespace(volume=SimpleNamespace(value=0.85)),
         clip_slots=[SimpleNamespace(
-            has_clip=False, is_playing=False, is_triggered=False, is_recording=False
+            has_clip=False, is_playing=False, is_triggered=False, is_recording=False,
+            is_group_slot=False, controls_other_clips=False,
         )] * 8,
         playing_slot_index=-1,
     )
@@ -104,3 +105,15 @@ def test_track_outside_the_window_counts():
     snapshot = read(fake_song(tracks))
     assert len(snapshot.tracks) == 13
     assert snapshot.any_soloed
+
+
+def test_group_slot_with_member_clips():
+    group = fake_track("g")
+    group.is_foldable = True
+    slot = SimpleNamespace(**vars(group.clip_slots[0]))
+    slot.is_group_slot = slot.controls_other_clips = True
+    group.clip_slots = [slot] + group.clip_slots[1:]
+    scenes = [SimpleNamespace(is_triggered=False)] * 2
+    slots = read(fake_song([group], scenes=scenes)).tracks[0].slots
+    assert slots[0].controls_other_clips and not slots[0].has_clip
+    assert not slots[1].controls_other_clips

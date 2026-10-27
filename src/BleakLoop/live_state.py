@@ -132,6 +132,7 @@ def _slot(slot):
         is_playing=slot.is_playing,
         is_triggered=slot.is_triggered,
         is_recording=slot.is_recording,
+        controls_other_clips=slot.is_group_slot and slot.controls_other_clips,
     )
 
 

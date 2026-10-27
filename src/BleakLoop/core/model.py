@@ -15,6 +15,7 @@ class SlotView:
     is_playing: bool = False
     is_triggered: bool = False
     is_recording: bool = False
+    controls_other_clips: bool = False  # a group slot whose members have clips here
 
 
 @dataclass(frozen=True)

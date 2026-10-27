@@ -369,7 +369,8 @@ def _render_fader(frame, column, track):
 
 
 def _slot_light(track, row):
-    # Highest priority first; the same on both layers.
+    # Highest priority first; the same on both layers. A group slot's playing, triggered
+    # and recording state is its members'.
     if track is None or row >= len(track.slots):
         return Light(OFF)
     slot = track.slots[row]
@@ -379,7 +380,7 @@ def _slot_light(track, row):
         return Light(YELLOW)
     if slot.is_playing:
         return Light(track_colour(track.colour), Blink.TEMPO)
-    if slot.has_clip:
+    if slot.has_clip or slot.controls_other_clips:
         return Light(track_colour(track.colour))
     if track.arm or track.implicit_arm:
         return Light(WHITE)

@@ -38,6 +38,8 @@ While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 
 - Red: recording.
 - White: empty, ready to record.
 
+A group track's slots show the clips of its member tracks, in the group's colour, so a folded group still shows what it holds. A slot is lit if any member has a clip in that scene, blinks while one plays, and turns yellow or red while one is about to launch or recording. Pressing it launches the scene's clips on every member track.
+
 Recording on a MIDI track switches to Linnstrument Mode, so you can play straight away.
 
 **Mute row** (pad 7): pink while the track is audible, orange while muted. With Shift held it shows solo instead: cyan, blue while soloed. Solo follows Live's Exclusive Solo preference: while it's on, soloing a track unsolos the others, as Live's own solo button does.

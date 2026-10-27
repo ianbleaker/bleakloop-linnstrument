@@ -1081,6 +1081,29 @@ def test_slot_uses_track_colour():
     assert session.render(SESSION, snapshot)[(2, 1)] == Light(BLUE)
 
 
+GROUP = SlotView(controls_other_clips=True)
+
+
+@pytest.mark.parametrize(
+    "slot, light",
+    [
+        (SlotView(controls_other_clips=True, is_playing=True, is_recording=True), Light(RED)),
+        (SlotView(controls_other_clips=True, is_playing=True, is_triggered=True),
+         Light(YELLOW)),
+        (SlotView(controls_other_clips=True, is_playing=True), Light(RED, Blink.TEMPO)),
+        (GROUP, Light(RED)),
+    ],
+)
+def test_group_slot_shows_its_members(slot, light):
+    snapshot = slot_snapshot(slot, is_foldable=True, can_be_armed=False)
+    assert session.render(SESSION, snapshot)[(2, 1)] == light
+
+
+def test_group_slot_press_fires_it():
+    snapshot = slot_snapshot(GROUP, is_foldable=True, can_be_armed=False)
+    assert handle(SESSION, (2, 1), snapshot) == (SESSION, [FireSlot(0, 0, legato=False)])
+
+
 @pytest.mark.parametrize("arm", [{"arm": True}, {"implicit_arm": True}])
 def test_empty_slot_on_armed_track_is_white(arm):
     assert session.render(SESSION, slot_snapshot(SlotView(), **arm))[(2, 1)] == Light(WHITE)
