@@ -33,11 +33,11 @@ How to read the surface:
 
 ### Columns
 
-- **Global column** (column 1): the transport, recording, Undo and Shift, the same in every mode. In Linnstrument and Sequencer Mode, Record, Capture and Shift + Play act on the selected track.
-- **View column** (column 15, next to the grid): the window's scenes, Unmute all and Stop, in Session, Mixer and FX Mode. Sequencer Mode has its own.
-- **Navigation column** (column 16, the outer edge): Copy, Delete and the mode pads. Its last pad is **Device/Clip**: tap it to flip Live between Device and Clip view, or hold it for the Device/Clip layer of tracks, devices and the fader source.
+#### Global - Left
 
-![Global column](manual/columns-global.svg)
+<img src="manual/columns-global.svg" alt="Global column" align="right">
+
+Column 1 holds the transport, recording, Undo and Shift, the same in every mode. In Linnstrument and Sequencer Mode, Record, Capture and Shift + Play act on the selected track.
 
 <!-- callouts:global -->
 - **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop all clips. In Linnstrument Mode, stops the selected track's clips)*
@@ -50,7 +50,13 @@ How to read the surface:
 - **Shift**: Hold for the Shift layer.
 <!-- /callouts:global -->
 
-![View column](manual/columns-view.svg)
+<br clear="right">
+
+#### View - Inner Right
+
+<img src="manual/columns-view.svg" alt="View column" align="right">
+
+Column 15, next to the grid, holds the window's scenes, Unmute all and Stop, in Session, Mixer and FX Mode. Sequencer Mode has its own.
 
 <!-- callouts:view -->
 - **Scenes**: Launch a scene. Its FX snapshot, if it has one, lands as it starts. *(Shift: Launch with legato, leaving the FX snapshot alone)*
@@ -58,7 +64,13 @@ How to read the surface:
 - **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Disarm every track in the Set. Red while any is armed)*
 <!-- /callouts:view -->
 
-![Navigation column](manual/columns-navigation.svg)
+<br clear="right">
+
+#### Navigation - Right
+
+<img src="manual/columns-navigation.svg" alt="Navigation column" align="right">
+
+Column 16, the outer edge, holds Copy, Delete and the mode pads. Its last pad is **Device/Clip**: tap it to flip Live between Device and Clip view, or hold it for the Device/Clip layer of tracks, devices and the fader source.
 
 <!-- callouts:navigation -->
 - **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
@@ -78,6 +90,8 @@ With Device/Clip held:
 - **Fader source**: Switch the faders between Device FX and Mapped FX.
 - **Device/Clip**: Held.
 <!-- /callouts:device-clip -->
+
+<br clear="right">
 
 ### Session Mode
 
@@ -152,7 +166,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 
 ![Sequencer Mode with Shift held](manual/sequencer-shift.svg)
 
-![Sequencer Mode, settings](manual/sequencer-settings.svg)
+![Sequencer Mode, settings|700](manual/sequencer-settings.svg)
 
 <!-- callouts:sequencer-side -->
 - **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop the selected track's clips)*
@@ -195,11 +209,9 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 
 ### Linnstrument Mode
 
-![Linnstrument Mode controls page](manual/linnstrument.svg)
+<img src="manual/linnstrument.svg" alt="Linnstrument Mode's Global column: controls, Shift held and the scene page" align="right">
 
-![Linnstrument Mode with Shift held](manual/linnstrument-shift.svg)
-
-![Linnstrument Mode scene page](manual/linnstrument-scenes.svg)
+Only the Global column stays: on its controls page, with Shift held, and on the scene page.
 
 <!-- callouts:linnstrument -->
 - **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop the selected track's clips)*
@@ -223,6 +235,8 @@ On the scene page:
 - Back (pad 7) returns to the mode you came from: Session, Mixer, FX or Sequencer.
 - Shift + Record is Session Record, and Shift + Back opens the scene page.
 - Changing a setting on the panel can save BleakLoop's control split as your own: read the warning under Using BleakLoop first.
+
+<br clear="right">
 
 ## 3. Using BleakLoop
 

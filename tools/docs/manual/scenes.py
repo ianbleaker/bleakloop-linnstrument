@@ -25,9 +25,6 @@ class Layer(enum.Enum):
     FX = "fx"
     FX_SHIFT = "fx-shift"
     MAPPED_FX = "fx-mapped"
-    LINNSTRUMENT = "linnstrument"
-    LINNSTRUMENT_SHIFT = "linnstrument-shift"
-    LINNSTRUMENT_SCENES = "linnstrument-scenes"
     SEQUENCER = "sequencer"
     SEQUENCER_SETTINGS = "sequencer-settings"
     SEQUENCER_SHIFT = "sequencer-shift"
@@ -178,6 +175,11 @@ SEQ_DRUM_SNAPSHOT = replace(
     ),
 )
 
+# Linnstrument Mode's column 1, for its own column figure: the rest is the instrument.
+LINNSTRUMENT = (State(mode=Mode.LINNSTRUMENT), SNAPSHOT)
+LINNSTRUMENT_SHIFT = (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT)
+LINNSTRUMENT_SCENES = (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT)
+
 # Device/Clip held over Session Mode, for the Navigation column figure.
 DEVICE_CLIP_HELD = (State(device_clip=True, fixed_length=2), SNAPSHOT)
 
@@ -197,9 +199,6 @@ SCENES = {
         State(fx=True, fx_slots=FX_SLOTS, fader_source="mapped"),
         MAPPED_SNAPSHOT,
     ),
-    Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
-    Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
-    Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),
     Layer.SEQUENCER: (SEQUENCER, SEQ_SNAPSHOT),
     Layer.SEQUENCER_SETTINGS: (replace(SEQUENCER, seq_settings=True), SEQ_SNAPSHOT),
     Layer.SEQUENCER_SHIFT: (replace(SEQUENCER, shift=True), SEQ_SNAPSHOT),

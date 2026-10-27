@@ -9,7 +9,6 @@ from BleakLoop.core.leds import OFF, Blink
 from ..svg import (
     BACKGROUND,
     GAP,
-    INSTRUMENT,
     MUTED,
     PAD,
     STEP,
@@ -39,18 +38,21 @@ TITLES = {
     Layer.FX: "FX Mode",
     Layer.FX_SHIFT: "FX Mode with Shift held",
     Layer.MAPPED_FX: "FX Mode, Mapped FX",
-    Layer.LINNSTRUMENT: "Linnstrument Mode controls page",
-    Layer.LINNSTRUMENT_SHIFT: "Linnstrument Mode with Shift held",
-    Layer.LINNSTRUMENT_SCENES: "Linnstrument Mode scene page",
     Layer.SEQUENCER: "Sequencer Mode",
     Layer.SEQUENCER_SETTINGS: "Sequencer Mode, settings",
     Layer.SEQUENCER_SHIFT: "Sequencer Mode with Shift held",
     Layer.SEQUENCER_DRUMS: "Sequencer Mode on a Drum Rack",
 }
 
-INSTRUMENT_COLUMNS = range(2, 17)
 CAPTION = 20
+CAPTION_MARGIN = 16  # extra side margin so a held panel's caption fits
 LEGEND_STEP = 140
+
+# Per hold: the words, a background tint a shade off BACKGROUND, and the words' colour.
+HOLDS = {
+    "shift": ("SHIFT HELD", "#1b1d30", "#a3abff"),
+    "device-clip": ("DEV HELD", "#281e14", "#ffb46b"),
+}
 
 
 @dataclass(frozen=True)
@@ -62,44 +64,81 @@ class Panel:
     blocks: tuple
     caption: str | None
     dimmed: tuple
+    held: str | None  # a HOLDS key: the pad held in this panel's frame
 
 
-def panel(frame, columns, labels, blocks, caption=None, dimmed=()):
-    return Panel(frame, tuple(columns), dict(labels), tuple(blocks), caption, tuple(dimmed))
+def panel(frame, columns, labels, blocks, caption=None, dimmed=(), held=None):
+    return Panel(
+        frame, tuple(columns), dict(labels), tuple(blocks), caption, tuple(dimmed), held
+    )
+
+
+def held_of(state):
+    # The held pad a frame shows: Device/Clip's layer sits over Shift's.
+    if state.device_clip:
+        return "device-clip"
+    return "shift" if state.shift else None
 
 
 def map_svg(layer):
-    frame = engine.render(*SCENES[layer])
+    state, snapshot = SCENES[layer]
+    frame = engine.render(state, snapshot)
     columns = range(1, 17)
     return figure(
         TITLES[layer],
-        [panel(frame, columns, labels(layer), blocks(layer), dimmed=DIMMED.get(layer, ()))],
+        [
+            panel(
+                frame,
+                columns,
+                labels(layer),
+                blocks(layer),
+                dimmed=DIMMED.get(layer, ()),
+                held=held_of(state),
+            )
+        ],
     )
 
 
 def figure(title, panels):
-    # Panels left to right, one STEP apart; the legend once, under them all.
-    top = GRID_TOP + (CAPTION if any(p.caption for p in panels) else 0)
-    width = 2 * MARGIN + sum(len(p.columns) * STEP for p in panels) + (len(panels) - 1) * STEP
+    # Panels left to right, one STEP apart; the legend once, under them all. A single held
+    # panel tints the whole figure and says so opposite the legend; several panels each tint
+    # their own backdrop and say so in their caption.
+    whole = panels[0].held if len(panels) == 1 else None
+    captioned = [p for p in panels if p.caption or (p.held and not whole)]
+    margin = MARGIN + (CAPTION_MARGIN if captioned else 0)
+    top = GRID_TOP + (CAPTION if captioned else 0)
+    width = 2 * margin + sum(len(p.columns) * STEP for p in panels) + (len(panels) - 1) * STEP
     width -= GAP
     legend_rows = 1 if MARGIN + 2 * LEGEND_STEP <= width else 2
     height = top + GRID_HEIGHT + 56 + (legend_rows - 1) * 24
-    lines = _open(title, width, height)
-    x = MARGIN
+    background = HOLDS[whole][1] if whole else BACKGROUND
+    lines = _open(title, width, height, background)
+    x = margin
     for p in panels:
-        lines += _panel(p, x, top)
+        lines += _panel(p, x, top, tinted=not whole)
         x += (len(p.columns) + 1) * STEP
-    lines += _legend(top + GRID_HEIGHT + 20, legend_rows)
+    legend_y = top + GRID_HEIGHT + 20
+    lines += _legend(legend_y, legend_rows)
+    if whole:
+        words, _, colour = HOLDS[whole]
+        lines.append(
+            f'<text x="{width - MARGIN}" y="{legend_y + 12}" font-size="13" font-weight="bold" '
+            f'fill="{colour}" text-anchor="end" letter-spacing="1">{escape(words)}</text>'
+        )
     return "\n".join(lines + ["</svg>"]) + "\n"
 
 
-def _panel(p, left, top):
+def _panel(p, left, top, tinted):
     def xy(column, pad):
         return left + p.columns.index(column) * STEP, top + (pad - 1) * STEP
 
     lines = []
-    if p.caption:
-        width = len(p.columns) * STEP - GAP
+    width = len(p.columns) * STEP - GAP
+    if p.held and tinted:
+        words, tint, colour = HOLDS[p.held]
+        lines.append(rect(left - 10, top - 50, width + 20, GRID_HEIGHT + 60, tint, radius=8))
+        lines.append(text(left + width // 2, top - 32, p.caption or words, 12, colour))
+    elif p.caption:
         lines.append(text(left + width // 2, top - 32, p.caption, 12, MUTED))
     for column in p.columns:
         x, _ = xy(column, 1)
@@ -121,16 +160,15 @@ def _panel(p, left, top):
         columns = [column for column in block.columns if column in p.columns]
         if columns:
             lines += _block(block.name, xy(columns[0], block.pads[0]), len(columns), block.pads)
-    lines += _instrument(p, xy)
     return lines
 
 
-def _open(title, width, height):
+def _open(title, width, height, background):
     return [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
         f'viewBox="0 0 {width} {height}" font-family="Helvetica, Arial, sans-serif">',
         f"<title>{escape(title)}</title>",
-        rect(0, 0, width, height, BACKGROUND, radius=8),
+        rect(0, 0, width, height, background, radius=8),
     ]
 
 
@@ -178,19 +216,6 @@ def _block(label, origin, column_count, pads):
         f'<rect x="{x - 3}" y="{y - 3}" width="{width + 6}" height="{height + 6}" rx="6" '
         f'fill="none" stroke="{TEXT}" stroke-width="1" stroke-opacity="0.6"/>',
         *_bubble(x + width // 2, y + height // 2, label, 13, 8 * len(label) + 20),
-    ]
-
-
-def _instrument(p, xy):
-    # Linnstrument Mode owns column 1 only; the rest of the surface is the player's instrument.
-    columns = [column for column in p.columns if column in INSTRUMENT_COLUMNS]
-    if not columns or any(key[0] in INSTRUMENT_COLUMNS for key in p.frame):
-        return []
-    x, y = xy(columns[0], 1)
-    width = len(columns) * STEP - GAP
-    return [
-        rect(x, y, width, GRID_HEIGHT, INSTRUMENT),
-        text(x + width // 2, y + GRID_HEIGHT // 2 + 5, "Your instrument", 14, TEXT),
     ]
 
 

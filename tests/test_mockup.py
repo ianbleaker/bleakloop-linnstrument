@@ -18,7 +18,7 @@ def run(tmp_path, spec):
     return code, out.read_text() if out.exists() else None
 
 
-@pytest.mark.parametrize("layer", [Layer.SESSION, Layer.FX, Layer.LINNSTRUMENT])
+@pytest.mark.parametrize("layer", [Layer.SESSION, Layer.FX, Layer.SEQUENCER_SHIFT])
 def test_a_layer_alone_is_its_map(tmp_path, layer):
     code, svg = run(tmp_path, {"panels": [{"layer": layer.slug}]})
     assert code == 0

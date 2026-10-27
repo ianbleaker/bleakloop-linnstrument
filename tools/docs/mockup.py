@@ -73,6 +73,7 @@ def _panel(spec, layer):
         blocks(layer) + extra,
         caption=spec.get("caption"),
         dimmed=DIMMED.get(layer, ()),
+        held=draw.held_of(state),
     )
 
 
