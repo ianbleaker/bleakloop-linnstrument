@@ -1,7 +1,7 @@
 """handle() and render(): all behaviour, no side effects."""
 
 from . import faders, fx, mixer, linnstrument_mode, sequencer, session
-from .model import FaderBound, PadPress, RacksRead
+from .model import FaderBound, PadPress, RacksRead, ScenesChanged
 from .modes import Mode
 
 
@@ -9,6 +9,9 @@ def handle(state, event, snapshot):
     if isinstance(event, RacksRead):
         # A morph runs in every mode.
         return fx.racks_read(state, event, snapshot)
+    if isinstance(event, ScenesChanged):
+        # The scene snapshots follow the Set in every mode.
+        return fx.scenes_changed(state, event)
     if isinstance(event, FaderBound):
         return faders.bound(state, event)
     if state.mode is Mode.SESSION:

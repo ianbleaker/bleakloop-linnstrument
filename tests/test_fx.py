@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.leds import BLUE, CYAN, OFF, WHITE, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, WHITE, Blink, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
     EndUndoStep,
@@ -13,6 +13,8 @@ from BleakLoop.core.model import (
     RacksRead,
     RackView,
     RecallFxSnapshot,
+    SaveFxScenes,
+    ScenesChanged,
     SaveFxSnapshots,
     SetMacros,
     SetMixer,
@@ -22,7 +24,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     TrackView,
 )
-from BleakLoop.core.modes import FxRack, Glide, Morph, MorphMacro, State
+from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, State
 from BleakLoop.core.values import FX_TOUCH_TOLERANCE
 
 
@@ -95,6 +97,53 @@ def test_dump_format():
 )
 def test_invalid_store_gives_empty_slots(text):
     assert fx.parse(text) == (None,) * 16
+
+
+def test_scene_store_round_trip():
+    scenes = (None, (FxRack("A", "R", 0, (0.5, 1.0)), FxRack("A", "R", 1, ())), None)
+    text = fx.dump_scenes(scenes)
+    assert json.loads(text) == {
+        "v": 1,
+        "scenes": [
+            None,
+            [
+                {"track": "A", "rack": "R", "n": 0, "macros": [0.5, 1.0]},
+                {"track": "A", "rack": "R", "n": 1, "macros": []},
+            ],
+            None,
+        ],
+    }
+    assert fx.parse_scenes(text) == scenes
+
+
+def test_an_empty_scene_store_round_trips():
+    text = fx.dump_scenes(())
+    assert json.loads(text) == {"v": 1, "scenes": []}
+    assert fx.parse_scenes(text) == ()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "{",
+        "null",
+        "[]",
+        '{"v": 2, "scenes": []}',
+        '{"v": 1}',
+        '{"v": 1, "scenes": {}}',
+        '{"v": 1, "scenes": [[{"track": "A"}]]}',
+    ],
+)
+def test_invalid_scene_store_gives_no_scene_snapshots(text):
+    assert fx.parse_scenes(text) == ()
+
+
+def test_scene_snapshot_past_the_end_is_none():
+    state = State(fx_scenes=(None, (FxRack("A", "R", 0, (1.0,)),)))
+    assert fx.scene_snapshot(state, 0) is None
+    assert fx.scene_snapshot(state, 1) == (FxRack("A", "R", 0, (1.0,)),)
+    assert fx.scene_snapshot(state, 2) is None
 
 
 # FX Mode toggle and input
@@ -205,13 +254,13 @@ def test_delete_on_an_empty_slot_does_nothing():
 
 
 def test_slot_numbers():
-    assert handle(FX, (12, 1))[1] == [StoreFxSnapshot(0)]
-    assert handle(FX, (12, 8))[1] == [StoreFxSnapshot(7)]
-    assert handle(FX, (13, 1))[1] == [StoreFxSnapshot(8)]
-    assert handle(FX, (13, 8))[1] == [StoreFxSnapshot(15)]
+    assert handle(FX, (11, 1))[1] == [StoreFxSnapshot(0)]
+    assert handle(FX, (11, 8))[1] == [StoreFxSnapshot(7)]
+    assert handle(FX, (12, 1))[1] == [StoreFxSnapshot(8)]
+    assert handle(FX, (12, 8))[1] == [StoreFxSnapshot(15)]
 
 
-@pytest.mark.parametrize("key", [(2, 1), (11, 8), (2, 8), (14, 6), (14, 8)])
+@pytest.mark.parametrize("key", [(2, 1), (13, 7), (13, 8), (2, 8), (14, 6), (14, 8)])
 def test_other_grid_pads_do_nothing(key):
     assert handle(FX, key) == (FX, [])
     assert handle(FX, key, pressed=False) == (FX, [])
@@ -521,7 +570,7 @@ def test_an_unreadable_macro_drops_out():
 def test_render_slots_and_lengths():
     state = with_slot(with_slot(with_slot(replace(FX, fx_length=4), 0), 9), 5)
     state = replace(state, fx_landed=9, morph=Morph(5, 0.0, 16.0, 0.0))
-    frame = fx.render(state)
+    frame = fx.render(state, SNAP)
     assert frame[layout.FX_SLOTS[0]] == Light(CYAN)
     assert frame[layout.FX_SLOTS[9]] == Light(CYAN, Blink.TEMPO)
     assert frame[layout.FX_SLOTS[5]] == Light(CYAN, Blink.FAST)
@@ -533,18 +582,23 @@ def test_render_slots_and_lengths():
     assert lit == {layout.FX_SLOTS[i] for i in (0, 5, 9)} | set(layout.FX_LENGTHS)
 
 
+def test_render_column_13_is_dark_with_no_scene_snapshots():
+    frame = fx.render(with_slot(FX, 2), SNAP)
+    assert all(frame[(13, pad)] == Light(OFF) for pad in range(1, layout.ROWS + 1))
+
+
 def test_render_landed_slot_that_was_cleared_is_dark():
-    assert fx.render(replace(FX, fx_landed=2))[SLOT_3] == Light(OFF)
+    assert fx.render(replace(FX, fx_landed=2), SNAP)[SLOT_3] == Light(OFF)
 
 
 def test_render_morph_target_blinks_over_landed():
     state = replace(with_slot(FX, 2), fx_landed=2, morph=Morph(2, 0.0, 4.0, 0.0))
-    assert fx.render(state)[SLOT_3] == Light(CYAN, Blink.FAST)
+    assert fx.render(state, SNAP)[SLOT_3] == Light(CYAN, Blink.FAST)
 
 
 def test_render_under_shift_is_dark():
     state = replace(with_slot(FX, 2), shift=True, fx_length=1)
-    assert set(fx.render(state).values()) == {Light(OFF)}
+    assert set(fx.render(state, SNAP).values()) == {Light(OFF)}
 
 
 def test_session_render_in_fx_mode():
@@ -557,7 +611,7 @@ def test_session_render_in_fx_mode():
         if column in layout.FX_FADER_COLUMNS:
             continue
         for pad in range(1, layout.ROWS + 1):
-            assert frame[(column, pad)] == fx.render(state)[(column, pad)]
+            assert frame[(column, pad)] == fx.render(state, snapshot)[(column, pad)]
 
 
 def test_session_render_fx_pad_off():
@@ -568,3 +622,388 @@ def test_session_render_shift_layer_in_fx():
     frame = session.render(replace(with_slot(FX, 2), shift=True), SNAP)
     assert frame[layout.FX] == Light(OFF)
     assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))
+
+
+# Scene snapshots
+
+SCENES = replace(SNAP, scene_count=8)
+SCENE_2 = layout.FX_SCENE_SLOTS[1]
+
+
+def with_scene(state, scene, value=STORED):
+    scenes = state.fx_scenes + (None,) * (scene + 1 - len(state.fx_scenes))
+    return replace(state, fx_scenes=fx._put(scenes, scene, value))
+
+
+def test_empty_scene_pad_stores():
+    assert handle(FX, SCENE_2, snapshot=SCENES) == (FX, [StoreFxSnapshot(1, scene=True)])
+
+
+def test_stored_scene_pad_recalls_with_held_length():
+    state = replace(with_scene(FX, 1), fx_length=4)
+    assert handle(state, SCENE_2, snapshot=SCENES) == (
+        state,
+        [RecallFxSnapshot(1, 4, scene=True)],
+    )
+
+
+@pytest.mark.parametrize("stored", [False, True])
+def test_copy_stores_over_a_scene_snapshot(stored):
+    state = replace(FX, copy=True)
+    if stored:
+        state = with_scene(state, 1)
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [StoreFxSnapshot(1, scene=True)])
+
+
+def test_delete_clears_a_scene_snapshot():
+    state = with_scene(replace(FX, delete=True), 1)
+    state, actions = handle(state, SCENE_2, snapshot=SCENES)
+    assert state.fx_scenes == (None,) * 8
+    assert actions == [
+        SaveFxScenes(fx.dump_scenes((None,) * 8)),
+        ShowMessage("Scene 2 snapshot cleared"),
+    ]
+
+
+def test_delete_on_an_empty_scene_pad_does_nothing():
+    state = replace(FX, delete=True)
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
+
+
+def test_scene_pads_follow_the_window():
+    state = replace(FX, window=layout.Window(0, 2))
+    assert handle(state, SCENE_2, snapshot=SCENES)[1] == [StoreFxSnapshot(3, scene=True)]
+
+
+def test_a_scene_pad_past_the_last_scene_does_nothing():
+    snapshot = replace(SNAP, scene_count=3)
+    assert handle(FX, layout.FX_SCENE_SLOTS[2], snapshot=snapshot)[1] == [
+        StoreFxSnapshot(2, scene=True)
+    ]
+    assert handle(FX, layout.FX_SCENE_SLOTS[3], snapshot=snapshot) == (FX, [])
+
+
+def test_shift_scene_pad_does_nothing():
+    state = replace(with_scene(FX, 1), shift=True)
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
+
+
+def scene_read(state, scene, racks, recall=False, bars=None, snapshot=SCENES):
+    event = RacksRead(scene, racks, recall, bars, scene=True)
+    return engine.handle(state, event, snapshot)
+
+
+def test_scene_store():
+    racks = (rack("A", "R", 1.0, 2.0, path=P0),)
+    state, actions = scene_read(FX, 2, racks)
+    scenes = (None, None, fx.capture(racks)) + (None,) * 5
+    assert state.fx_scenes == scenes
+    assert state.fx_slots == FX.fx_slots
+    assert actions == [
+        SaveFxScenes(fx.dump_scenes(scenes)),
+        ShowMessage("Scene 3 snapshot stored (1 rack)"),
+    ]
+
+
+def test_scene_store_keeps_the_other_scenes():
+    state = with_scene(FX, 5)
+    state, _ = scene_read(state, 1, (rack("A", "R", 1.0, path=P0),))
+    assert state.fx_scenes[5] == STORED
+    assert len(state.fx_scenes) == 8
+
+
+def test_scene_instant_recall_lands_and_clears_the_global_landed():
+    state = replace(with_scene(FX, 2, STORED_AB), fx_landed=4)
+    state, actions = scene_read(state, 2, NOW_AB, recall=True, snapshot=playing(3.0))
+    assert actions[-1] == ShowMessage("Scene 3 snapshot recalled")
+    assert (state.fx_landed, state.fx_landed_scene, state.morph) == (None, 2, None)
+
+
+def test_scene_morph_recall():
+    state = with_scene(FX, 2, STORED_AB)
+    snapshot = replace(playing(3.0), scene_count=8)
+    state, actions = scene_read(state, 2, NOW_AB, recall=True, bars=2, snapshot=snapshot)
+    assert actions == [BeginUndoStep(), ShowMessage("Scene 3 snapshot in 2 bars")]
+    assert (state.morph.slot, state.morph.scene, state.morph.end_beats) == (2, True, 8.0)
+
+
+def test_a_global_recall_clears_the_scene_landed():
+    state = replace(with_slot(FX, 4, STORED_AB), fx_landed_scene=2)
+    state, _ = racks_read(state, 4, NOW_AB, recall=True)
+    assert (state.fx_landed, state.fx_landed_scene) == (4, None)
+
+
+def test_a_scene_morph_lands_as_the_scene():
+    state = replace(MORPHING, morph=replace(MORPH, slot=2, scene=True), fx_landed=5)
+    state, _, _ = tick(state, 16.0, (0.0, 0.0, 50.0))
+    assert (state.fx_landed, state.fx_landed_scene) == (None, 2)
+
+
+def test_a_global_morph_lands_and_clears_the_scene_landed():
+    state, _, _ = tick(replace(MORPHING, fx_landed_scene=2), 16.0, (0.0, 0.0, 50.0))
+    assert (state.fx_landed, state.fx_landed_scene) == (3, None)
+
+
+def test_render_scene_snapshots():
+    state = with_scene(with_scene(with_scene(FX, 0), 2), 4)
+    state = replace(state, fx_landed_scene=2, morph=Morph(4, 0.0, 16.0, 0.0, scene=True))
+    frame = fx.render(state, SCENES)
+    keys = layout.FX_SCENE_SLOTS
+    assert frame[keys[0]] == Light(LIME)
+    assert frame[keys[1]] == Light(OFF)
+    assert frame[keys[2]] == Light(LIME, Blink.TEMPO)
+    assert frame[keys[4]] == Light(LIME, Blink.FAST)
+    assert frame[(13, 7)] == frame[(13, 8)] == Light(OFF)
+
+
+def test_a_scene_morph_does_not_blink_the_global_slot_with_its_number():
+    state = with_scene(with_slot(FX, 4), 4)
+    state = replace(state, morph=Morph(4, 0.0, 16.0, 0.0, scene=True))
+    frame = fx.render(state, SCENES)
+    assert frame[layout.FX_SLOTS[4]] == Light(CYAN)
+    assert frame[layout.FX_SCENE_SLOTS[4]] == Light(LIME, Blink.FAST)
+
+
+def test_a_global_morph_does_not_blink_the_scene_pad_with_its_number():
+    state = with_scene(with_slot(FX, 4), 4)
+    state = replace(state, morph=Morph(4, 0.0, 16.0, 0.0))
+    frame = fx.render(state, SCENES)
+    assert frame[layout.FX_SLOTS[4]] == Light(CYAN, Blink.FAST)
+    assert frame[layout.FX_SCENE_SLOTS[4]] == Light(LIME)
+
+
+def test_render_scene_snapshots_follow_the_window():
+    state = replace(with_scene(FX, 3), window=layout.Window(0, 2))
+    frame = fx.render(state, SCENES)
+    assert frame[layout.FX_SCENE_SLOTS[1]] == Light(LIME)
+    assert frame[layout.FX_SCENE_SLOTS[3]] == Light(OFF)
+
+
+def test_render_scene_snapshots_past_the_last_scene_are_dark():
+    # A stale entry past the Set's end, kept until the next save, lights nothing.
+    state = with_scene(FX, 3)
+    assert fx.render(state, replace(SNAP, scene_count=3))[layout.FX_SCENE_SLOTS[3]] == Light(OFF)
+
+
+def test_render_scene_snapshots_under_shift_are_dark():
+    state = replace(with_scene(FX, 0), shift=True)
+    assert fx.render(state, SCENES)[layout.FX_SCENE_SLOTS[0]] == Light(OFF)
+
+
+# Scene launch
+
+
+def launching(beats, quantization=4, numerator=4, denominator=4, is_playing=True):
+    return replace(
+        playing(beats, numerator, denominator),
+        is_playing=is_playing,
+        launch_quantization=quantization,
+        scene_count=8,
+    )
+
+
+def test_launch_end_beats_unquantized():
+    assert fx.launch_end_beats(launching(5.5, quantization=0)) is None
+
+
+@pytest.mark.parametrize(
+    "beats, quantization, signature, end",
+    [
+        (5.5, 4, (4, 4), 8.0),  # 1 Bar in 4/4
+        (4.0, 4, (6, 8), 6.0),  # 1 Bar in 6/8: 3 beats
+        (5.0, 3, (4, 4), 8.0),  # 2 Bars, mid-bar
+        (13.0, 1, (4, 4), 32.0),  # 8 Bars
+        (1.0, 8, (4, 4), 4 / 3),  # 1/4T
+        (4.0, 4, (4, 4), 8.0),  # on a boundary: the next one
+    ],
+)
+def test_launch_end_beats(beats, quantization, signature, end):
+    snapshot = launching(beats, quantization, *signature)
+    assert fx.launch_end_beats(snapshot) == pytest.approx(end)
+
+
+def test_scene_launch_without_a_snapshot_does_nothing():
+    assert fx.scene_launch(with_scene(FX, 1), 2, launching(5.5)) == []
+
+
+def test_scene_launch_while_playing_lands_on_the_boundary_at_the_press():
+    actions = fx.scene_launch(with_scene(FX, 2), 2, launching(5.5))
+    assert actions == [RecallFxSnapshot(2, None, scene=True, end_beats=8.0)]
+
+
+@pytest.mark.parametrize("snapshot", [launching(5.5, is_playing=False), launching(5.5, 0)])
+def test_scene_launch_stopped_or_unquantized_recalls_at_once(snapshot):
+    actions = fx.scene_launch(with_scene(FX, 2), 2, snapshot)
+    assert actions == [RecallFxSnapshot(2, None, scene=True)]
+
+
+def test_scene_launch_ignores_a_held_length():
+    actions = fx.scene_launch(replace(with_scene(FX, 2), fx_length=4), 2, launching(5.5))
+    assert actions == [RecallFxSnapshot(2, None, scene=True, end_beats=8.0)]
+
+
+def launch_read(state, scene, end, snapshot):
+    event = RacksRead(scene, NOW_AB, True, None, scene=True, end_beats=end)
+    return engine.handle(state, event, snapshot)
+
+
+def test_a_launch_recall_morphs_to_the_end_set_at_the_press():
+    state = with_scene(FX, 2, STORED_AB)
+    # The follow-up's snapshot is a little later, and its quantization changed: ignored.
+    state, actions = launch_read(state, 2, 8.0, launching(5.6, quantization=1))
+    assert actions == [BeginUndoStep(), ShowMessage("Scene 3 snapshot on launch")]
+    assert (state.morph.start_beats, state.morph.end_beats) == (5.6, 8.0)
+    assert state.morph.scene
+
+
+def test_a_launch_recall_past_its_end_recalls_at_once():
+    state = with_scene(FX, 2, STORED_AB)
+    state, actions = launch_read(state, 2, 8.0, launching(8.0))
+    assert actions[-1] == ShowMessage("Scene 3 snapshot recalled")
+    assert (state.morph, state.fx_landed_scene) == (None, 2)
+
+
+def test_a_launch_from_stopped_recalls_at_once_though_the_follow_up_plays():
+    # FireScene started the transport before the rack read.
+    state = with_scene(FX, 2, STORED_AB)
+    (recall,) = fx.scene_launch(state, 2, launching(0.0, is_playing=False))
+    event = RacksRead(2, NOW_AB, True, recall.bars, scene=True, end_beats=recall.end_beats)
+    state, actions = engine.handle(state, event, launching(0.0))
+    assert actions[-1] == ShowMessage("Scene 3 snapshot recalled")
+    assert state.morph is None
+
+
+def test_a_launch_recall_replaces_a_running_morph():
+    state = with_scene(replace(MORPHING), 2, STORED_AB)
+    state, actions = launch_read(state, 2, 8.0, launching(5.5))
+    assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
+    assert (state.morph.slot, state.morph.scene) == (2, True)
+
+
+# Scene changes in the Set
+
+
+def never(i):
+    return False
+
+
+def always(i):
+    return True
+
+
+def test_scene_origins_unchanged():
+    assert fx.scene_origins(["a", "b"], ["a", "b"], never) == ((0, 1), (None, None))
+
+
+def test_scene_origins_insert():
+    assert fx.scene_origins(["a", "b"], ["a", "x", "b"], never) == ((0, None, 1), (None,) * 3)
+
+
+def test_scene_origins_delete():
+    assert fx.scene_origins(["a", "b", "c"], ["a", "c"], never) == ((0, 2), (None, None))
+
+
+def test_scene_origins_move():
+    assert fx.scene_origins(["a", "b", "c"], ["b", "c", "a"], never) == ((1, 2, 0), (None,) * 3)
+
+
+def test_scene_origins_live_drag_recreates_the_scene():
+    # Live's drag of scene 3 to slot 6: the moved scene comes back as a new object.
+    old = list("abcdefghijk")
+    new = list("abdefXghijk")
+    assert fx.scene_origins(old, new, always) == ((0, 1, 3, 4, 5, 2, 6, 7, 8, 9, 10), (None,) * 11)
+
+
+def test_scene_origins_drag_of_two_scenes_pairs_them_in_order():
+    old = list("abcde")
+    new = list("adXYe")
+    assert fx.scene_origins(old, new, never) == ((0, 3, 1, 2, 4), (None,) * 5)
+
+
+def test_scene_origins_duplicate():
+    asked = []
+
+    def duplicate(i):
+        asked.append(i)
+        return True
+
+    result = fx.scene_origins(["a", "b"], ["a", "a2", "b"], duplicate)
+    assert result == ((0, None, 1), (None, 0, None))
+    assert asked == [1]  # only new scenes are checked
+
+
+def test_scene_origins_insert_at_the_top_is_never_a_duplicate():
+    assert fx.scene_origins(["a"], ["x", "a"], always) == ((None, 0), (None, None))
+
+
+def test_scene_origins_insert_after_an_insert_is_not_a_duplicate():
+    assert fx.scene_origins(["a"], ["a", "x", "y"], always) == ((0, None, None), (None, 0, None))
+
+
+def test_scene_origins_of_a_different_set_is_none():
+    assert fx.scene_origins(["a", "b"], ["x", "y"], always) is None
+
+
+A_SNAP = (FxRack("A", "R", 0, (1.0,)),)
+B_SNAP = (FxRack("B", "R", 0, (2.0,)),)
+
+
+def changed(state, origin, copies=None):
+    copies = copies or (None,) * len(origin)
+    return engine.handle(state, ScenesChanged(origin, copies), SNAP)
+
+
+@pytest.mark.parametrize("state", [FX, State(), State(mode=Mode.SEQUENCER)])
+def test_a_move_keeps_each_snapshot_in_every_mode(state):
+    state = replace(state, fx_scenes=(A_SNAP, None, B_SNAP))
+    state, actions = changed(state, (2, 0, 1))
+    assert state.fx_scenes == (B_SNAP, A_SNAP, None)
+    assert actions == [SaveFxScenes(fx.dump_scenes((B_SNAP, A_SNAP, None)))]
+
+
+def test_a_delete_drops_its_snapshot():
+    state, actions = changed(replace(FX, fx_scenes=(A_SNAP, B_SNAP)), (1,))
+    assert state.fx_scenes == (B_SNAP,)
+    assert actions == [SaveFxScenes(fx.dump_scenes((B_SNAP,)))]
+
+
+def test_an_insert_starts_empty():
+    state, _ = changed(replace(FX, fx_scenes=(A_SNAP, B_SNAP)), (0, None, 1))
+    assert state.fx_scenes == (A_SNAP, None, B_SNAP)
+
+
+def test_a_duplicate_copies_its_source():
+    state, _ = changed(replace(FX, fx_scenes=(A_SNAP,)), (0, None), (None, 0))
+    assert state.fx_scenes == (A_SNAP, A_SNAP)
+
+
+def test_an_empty_scene_added_at_the_end_saves_nothing():
+    state, actions = changed(replace(FX, fx_scenes=(A_SNAP,)), (0, None))
+    assert state.fx_scenes == (A_SNAP, None)
+    assert actions == []
+
+
+def test_a_change_remaps_the_morph_and_the_landed_scene():
+    morph = Morph(1, 0.0, 16.0, 0.0, scene=True)
+    state = replace(FX, fx_scenes=(A_SNAP, B_SNAP), morph=morph, fx_landed_scene=0)
+    state, _ = changed(state, (None, 0, 1))
+    assert (state.morph.slot, state.fx_landed_scene) == (2, 1)
+
+
+def test_a_change_leaves_a_global_morph_and_landed_alone():
+    state = replace(FX, fx_scenes=(A_SNAP,), morph=Morph(0, 0.0, 16.0, 0.0), fx_landed=0)
+    state, _ = changed(state, (None, 0))
+    assert (state.morph.slot, state.fx_landed) == (0, 0)
+
+
+def test_a_deleted_morphing_scene_still_lands_and_blinks_nothing():
+    morph = replace(MORPH, slot=1, scene=True)
+    state = replace(MORPHING, fx_scenes=(A_SNAP, B_SNAP), morph=morph, fx_landed_scene=1)
+    state, _ = changed(state, (0,))
+    assert (state.morph.slot, state.fx_landed_scene) == (None, None)
+    frame = fx.render(state, replace(SNAP, scene_count=1))
+    blinking = [light for light in frame.values() if light.blink is Blink.FAST]
+    assert blinking == []
+    state, actions, _ = tick(state, 16.0, (0.0, 0.0, 50.0))
+    assert state.morph is None and actions[-1] == EndUndoStep()
+    assert (state.fx_landed, state.fx_landed_scene) == (None, None)

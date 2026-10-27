@@ -41,11 +41,14 @@ UNMUTE_ALL = (SCENE_COLUMN, 7)
 STOP = (SCENE_COLUMN, 8)
 
 # FX Mode: slot N is FX_SLOTS[N - 1].
-FX_SLOTS = tuple((12, pad) for pad in range(1, 9)) + tuple((13, pad) for pad in range(1, 9))
+FX_SLOTS = tuple((11, pad) for pad in range(1, 9)) + tuple((12, pad) for pad in range(1, 9))
+# FX Mode column 13: scene N in the window's snapshot is FX_SCENE_SLOTS[N - 1]. Pads 7-8 are
+# unused.
+FX_SCENE_SLOTS = tuple((13, pad) for pad in range(1, WINDOW_SCENES + 1))
 # Column 14: morph length in bars.
 FX_LENGTHS = {(14, 1): 1, (14, 2): 2, (14, 3): 4, (14, 4): 8, (14, 5): 16}
 # FX Mode: one horizontal fader per pad row.
-FX_FADER_COLUMNS = range(2, 12)
+FX_FADER_COLUMNS = range(2, 11)
 
 # Session split view: an 8-track window, then one horizontal fader per pad row.
 SPLIT_TRACKS = 8

@@ -453,6 +453,10 @@ def read_fx_store(song):
     return song.get_data(values.FX_DATA_KEY, "")
 
 
+def read_fx_scenes_store(song):
+    return song.get_data(values.FX_SCENES_DATA_KEY, "")
+
+
 def rack_at(song, path, rack_name):
     # The device at path, if it's still a rack with that name.
     kind, index, position = path

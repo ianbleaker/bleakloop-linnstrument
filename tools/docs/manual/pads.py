@@ -104,7 +104,7 @@ _SIDE = (
     UNDO,
     _one("Linnstrument Mode", layout.MODE_PAD, "Switch to Linnstrument Mode.", label="Linn"),
     SHIFT,
-    _scenes(layout.SCENE_COLUMN, "Launch a scene."),
+    _scenes(layout.SCENE_COLUMN, "Launch a scene. Its FX snapshot, if it has one, lands as it starts."),
     _one(
         "Unmute all",
         layout.UNMUTE_ALL,
@@ -143,7 +143,7 @@ _SIDE_SHIFT = (
     QUANTIZE,
     LAUNCH_QUANTIZATION,
     REDO,
-    _scenes(layout.SCENE_COLUMN, "Launch with legato."),
+    _scenes(layout.SCENE_COLUMN, "Launch with legato, leaving the FX snapshot alone."),
     _one(
         "Unsolo all",
         layout.UNMUTE_ALL,
@@ -244,8 +244,14 @@ _FX = (
         "Snapshots",
         range(layout.FX_SLOTS[0][0], layout.FX_SLOTS[-1][0] + 1),
         ALL_PADS,
-        "Sixteen snapshots of every rack's macros: slots 1–8 in column 12, 9–16 in column 13. "
+        "Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. "
         "Press an empty slot to store, a stored one to recall.",
+    ),
+    Item(
+        "Scene snapshots",
+        {key: f"Scene {pad}" for key, pad in zip(layout.FX_SCENE_SLOTS, SCENE_PADS)},
+        "A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a "
+        "stored one to recall. Launching the scene morphs to it.",
     ),
     Block(
         "Bars",
@@ -315,7 +321,7 @@ _LINNSTRUMENT_SHIFT = (
 )
 
 _LINNSTRUMENT_SCENES = (
-    _scenes(1, "Launch a scene and go back to the controls."),
+    _scenes(1, "Launch a scene and its FX snapshot, and go back to the controls."),
     _one("Back", layout.SHIFT, "Back to the controls without launching."),
 )
 

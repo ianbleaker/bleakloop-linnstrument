@@ -38,6 +38,7 @@ from .core.model import (
     Redo,
     RemovePitch,
     SaveFaderBindings,
+    SaveFxScenes,
     SaveFxSnapshots,
     SceneSelected,
     SelectDrumPad,
@@ -369,8 +370,9 @@ def apply(action, song, surface):
         start = time.monotonic()
         racks = live_state.read_racks(song)
         logger.info("FX: read %d racks in %.1f ms", len(racks), (time.monotonic() - start) * 1000)
-        recall = isinstance(action, RecallFxSnapshot)
-        return RacksRead(action.slot, racks, recall, action.bars if recall else None)
+        if isinstance(action, RecallFxSnapshot):
+            return RacksRead(action.slot, racks, True, action.bars, action.scene, action.end_beats)
+        return RacksRead(action.slot, racks, False, scene=action.scene)
     elif isinstance(action, SetMacros):
         # The Set can change mid-morph: a rack that has moved or gone is skipped.
         targets = live_state.macro_parameters(song, (write[:3] for write in action.writes))
@@ -397,6 +399,8 @@ def apply(action, song, surface):
         surface.show_message(_step_device(song, action.step))
     elif isinstance(action, SaveFxSnapshots):
         song.set_data(values.FX_DATA_KEY, action.text)
+    elif isinstance(action, SaveFxScenes):
+        song.set_data(values.FX_SCENES_DATA_KEY, action.text)
     elif isinstance(action, HighlightSlot):
         slot = _set_slot(song, action.track, action.scene)
         if slot is None:

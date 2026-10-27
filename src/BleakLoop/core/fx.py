@@ -5,11 +5,12 @@ import math
 from dataclasses import replace
 
 from . import faders, layout, mixer
-from .leds import CYAN, OFF, WHITE, Blink, Light
+from .leds import CYAN, LIME, OFF, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
     EndUndoStep,
     RecallFxSnapshot,
+    SaveFxScenes,
     SaveFxSnapshots,
     SetMacros,
     SetMixer,
@@ -20,6 +21,10 @@ from .modes import FxRack, Morph, MorphMacro
 from .values import FX_TOUCH_TOLERANCE
 
 SLOTS = 16
+
+# Launch quantization values (column_1.QUANTIZATION_NAMES) to their length: bars, then beats.
+LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
+LAUNCH_BEATS = {5: 2, 6: 4 / 3, 7: 1, 8: 2 / 3, 9: 1 / 2, 10: 1 / 3, 11: 1 / 4, 12: 1 / 6, 13: 1 / 8}
 
 
 def keys(racks):
@@ -42,11 +47,7 @@ def capture(racks):
 
 
 def dump(slots):
-    def rack(item):
-        return {"track": item.track, "rack": item.rack, "n": item.n, "macros": list(item.values)}
-
-    data = [None if slot is None else [rack(item) for item in slot] for slot in slots]
-    return json.dumps({"v": 1, "slots": data}, separators=(",", ":"))
+    return json.dumps({"v": 1, "slots": [_encode(slot) for slot in slots]}, separators=(",", ":"))
 
 
 def parse(text):
@@ -56,26 +57,138 @@ def parse(text):
         data = json.loads(text)
         if data.get("v") != 1 or len(data["slots"]) != SLOTS:
             return empty
-        return tuple(
-            None
-            if slot is None
-            else tuple(
-                FxRack(
-                    str(item["track"]),
-                    str(item["rack"]),
-                    int(item["n"]),
-                    tuple(float(value) for value in item["macros"]),
-                )
-                for item in slot
-            )
-            for slot in data["slots"]
-        )
+        return tuple(_decode(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):
         return empty
 
 
+def dump_scenes(scenes):
+    # Exactly the entries given: callers fit them to the Set's scene count first.
+    data = [_encode(snapshot) for snapshot in scenes]
+    return json.dumps({"v": 1, "scenes": data}, separators=(",", ":"))
+
+
+def parse_scenes(text):
+    # Any length; anything unreadable gives no scene snapshots.
+    try:
+        data = json.loads(text)
+        if data.get("v") != 1 or not isinstance(data["scenes"], list):
+            return ()
+        return tuple(_decode(snapshot) for snapshot in data["scenes"])
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return ()
+
+
+def scene_snapshot(state, scene):
+    return state.fx_scenes[scene] if scene < len(state.fx_scenes) else None
+
+
+def scene_origins(old, new, duplicate):
+    # (origin, copies) per new scene, or None when no scene is kept: a different Set.
+    # duplicate(i) says whether new scene i has scene i - 1's clips, as Live's Duplicate
+    # inserts it.
+    origin = tuple(next((i for i, scene in enumerate(old) if scene == item), None) for item in new)
+    if all(i is None for i in origin):
+        return None
+    # Live re-creates a dragged scene as a new object. With the count unchanged, the scenes
+    # that vanished are the ones that moved: pair them, in order, with the new ones.
+    if len(old) == len(new):
+        vanished = iter(i for i in range(len(old)) if i not in origin)
+        origin = tuple(next(vanished) if i is None else i for i in origin)
+    copies = tuple(
+        origin[i - 1]
+        if origin[i] is None and i > 0 and origin[i - 1] is not None and duplicate(i)
+        else None
+        for i in range(len(new))
+    )
+    return origin, copies
+
+
+def scenes_changed(state, event):
+    # A moved scene keeps its snapshot, a deleted one's goes, a duplicate copies its source's.
+    def kept(old):
+        return scene_snapshot(state, old) if old is not None else None
+
+    scenes = tuple(
+        kept(old) if old is not None else kept(copy)
+        for old, copy in zip(event.origin, event.copies)
+    )
+    moved = {old: new for new, old in enumerate(event.origin) if old is not None}
+    morph = state.morph
+    if morph is not None and morph.scene and morph.slot is not None:
+        morph = replace(morph, slot=moved.get(morph.slot))
+    landed = state.fx_landed_scene
+    if landed is not None:
+        landed = moved.get(landed)
+    changed = scenes != _fit(state.fx_scenes, len(scenes))
+    state = replace(state, fx_scenes=scenes, morph=morph, fx_landed_scene=landed)
+    return state, [SaveFxScenes(dump_scenes(scenes))] if changed else []
+
+
+def copy_scene(state, source, target, scene_count):
+    # Session Mode's scene copy: the target takes the source's snapshot, if it has one.
+    snapshot = scene_snapshot(state, source)
+    if snapshot is None:
+        return state, []
+    state, save = _set(state, target, True, snapshot, scene_count)
+    return state, [save]
+
+
+def _encode(snapshot):
+    if snapshot is None:
+        return None
+    return [
+        {"track": item.track, "rack": item.rack, "n": item.n, "macros": list(item.values)}
+        for item in snapshot
+    ]
+
+
+def _decode(snapshot):
+    if snapshot is None:
+        return None
+    return tuple(
+        FxRack(
+            str(item["track"]),
+            str(item["rack"]),
+            int(item["n"]),
+            tuple(float(value) for value in item["macros"]),
+        )
+        for item in snapshot
+    )
+
+
 def _put(slots, slot, value):
     return slots[:slot] + (value,) + slots[slot + 1 :]
+
+
+def _fit(scenes, count):
+    # One entry per scene in the Set, as each save writes.
+    return (tuple(scenes) + (None,) * count)[:count]
+
+
+def _stored(state, slot, scene):
+    return scene_snapshot(state, slot) if scene else state.fx_slots[slot]
+
+
+def _set(state, slot, scene, value, scene_count):
+    # The state with the snapshot set or cleared, and the save.
+    if scene:
+        padded = state.fx_scenes + (None,) * (slot + 1 - len(state.fx_scenes))
+        scenes = _fit(_put(padded, slot, value), scene_count)
+        return replace(state, fx_scenes=scenes), SaveFxScenes(dump_scenes(scenes))
+    slots = _put(state.fx_slots, slot, value)
+    return replace(state, fx_slots=slots), SaveFxSnapshots(dump(slots))
+
+
+def _name(slot, scene):
+    return f"Scene {slot + 1} snapshot" if scene else f"Snapshot {slot + 1}"
+
+
+def _landed(state, slot, scene):
+    # Only the last snapshot to land blinks, global or scene.
+    if scene:
+        return replace(state, fx_landed=None, fx_landed_scene=slot)
+    return replace(state, fx_landed=slot, fx_landed_scene=None)
 
 
 
@@ -106,23 +219,32 @@ def press(state, event, snapshot):
             return replace(state, fx_length=None), []
         return state, []
     # Under Shift the grid is dark and does nothing, as Mixer's faders.
-    if not event.pressed or state.shift or key not in layout.FX_SLOTS:
+    if not event.pressed or state.shift:
         return state, []
-    slot = layout.FX_SLOTS.index(key)
-    stored = state.fx_slots[slot] is not None
+    if key in layout.FX_SLOTS:
+        return _slot_press(state, layout.FX_SLOTS.index(key), False, snapshot)
+    if key in layout.FX_SCENE_SLOTS:
+        # Column 13 follows the scene pads.
+        scene = state.window.scene + layout.FX_SCENE_SLOTS.index(key)
+        if scene < snapshot.scene_count:
+            return _slot_press(state, scene, True, snapshot)
+    return state, []
+
+
+def _slot_press(state, slot, scene, snapshot):
+    stored = _stored(state, slot, scene) is not None
     # Copy over Delete, as in Session Mode.
     if state.copy or (not state.delete and not stored):
-        return state, [StoreFxSnapshot(slot)]
+        return state, [StoreFxSnapshot(slot, scene=scene)]
     if state.delete:
         if not stored:
             return state, []
-        slots = _put(state.fx_slots, slot, None)
-        message = ShowMessage(f"Snapshot {slot + 1} cleared")
-        return replace(state, fx_slots=slots), [SaveFxSnapshots(dump(slots)), message]
-    return state, [RecallFxSnapshot(slot, state.fx_length)]
+        state, save = _set(state, slot, scene, None, snapshot.scene_count)
+        return state, [save, ShowMessage(f"{_name(slot, scene)} cleared")]
+    return state, [RecallFxSnapshot(slot, state.fx_length, scene=scene)]
 
 
-def render(state):
+def render(state, snapshot):
     # The grid columns right of the faders in FX Mode; dark under Shift, as Mixer's faders.
     frame = {
         (column, pad): Light(OFF)
@@ -132,12 +254,23 @@ def render(state):
     }
     if state.shift and not state.copy and not state.delete:
         return frame
-    target = state.morph.slot if state.morph is not None else None
+    morph = state.morph
+    target = morph.slot if morph is not None and not morph.scene else None
     for slot, key in enumerate(layout.FX_SLOTS):
         if slot == target:
             frame[key] = Light(CYAN, Blink.FAST)
         elif state.fx_slots[slot] is not None:
             frame[key] = Light(CYAN, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
+    target = morph.slot if morph is not None and morph.scene else None
+    for row, key in enumerate(layout.FX_SCENE_SLOTS):
+        scene = state.window.scene + row
+        if scene >= snapshot.scene_count:
+            continue
+        if scene == target:
+            frame[key] = Light(LIME, Blink.FAST)
+        elif scene_snapshot(state, scene) is not None:
+            landed = scene == state.fx_landed_scene
+            frame[key] = Light(LIME, Blink.TEMPO if landed else Blink.STEADY)
     for key, bars in layout.FX_LENGTHS.items():
         frame[key] = Light(WHITE, Blink.FAST if bars == state.fx_length else Blink.STEADY)
     return frame
@@ -145,20 +278,20 @@ def render(state):
 
 def racks_read(state, event, snapshot):
     # The adapter's rack read after a store or a recall, in any mode.
-    number = event.slot + 1
+    name = _name(event.slot, event.scene)
     if not event.recall:
         if not event.racks:
             return state, [ShowMessage("No racks to store")]
-        slots = _put(state.fx_slots, event.slot, capture(event.racks))
-        message = ShowMessage(f"Snapshot {number} stored ({_count(len(event.racks), 'rack')})")
-        return replace(state, fx_slots=slots), [SaveFxSnapshots(dump(slots)), message]
-    stored = state.fx_slots[event.slot]
+        value = capture(event.racks)
+        state, save = _set(state, event.slot, event.scene, value, snapshot.scene_count)
+        return state, [save, ShowMessage(f"{name} stored ({_count(len(event.racks), 'rack')})")]
+    stored = _stored(state, event.slot, event.scene)
     if stored is None:
         return state, []
     macros, missing = _match(stored, event.racks)
     note = f", {_count(missing, 'rack')} not found" if missing else ""
     if not macros:
-        return state, [ShowMessage(f"Snapshot {number}: nothing to recall{note}")]
+        return state, [ShowMessage(f"{name}: nothing to recall{note}")]
     # A recall closes a fader gesture's undo step; the finger carries on in a new one.
     actions = []
     if state.fader_undo_open:
@@ -167,15 +300,24 @@ def racks_read(state, event, snapshot):
     # A new recall replaces a running morph and its undo step.
     if state.fx_undo_open:
         actions.append(EndUndoStep())
-    if event.bars is None or not snapshot.is_playing:
+    launch = event.end_beats is not None
+    if launch:
+        # The press decided the landing: the follow-up's transport may already have started.
+        instant = snapshot.song_beats >= event.end_beats
+    else:
+        instant = event.bars is None or not snapshot.is_playing
+    if instant:
         writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
         actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
-        state = replace(state, morph=None, fx_undo_open=False, fx_landed=event.slot)
-        return state, actions + [ShowMessage(f"Snapshot {number} recalled{note}")]
+        state = replace(state, morph=None, fx_undo_open=False)
+        state = _landed(state, event.slot, event.scene)
+        return state, actions + [ShowMessage(f"{name} recalled{note}")]
     start = snapshot.song_beats
-    morph = Morph(event.slot, start, end_beats(snapshot, event.bars), start, macros)
+    end = event.end_beats if launch else end_beats(snapshot, event.bars)
+    morph = Morph(event.slot, start, end, start, macros, scene=event.scene)
     state = replace(state, morph=morph, fx_undo_open=True)
-    message = ShowMessage(f"Snapshot {number} in {_count(event.bars, 'bar')}{note}")
+    timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
+    message = ShowMessage(f"{name} {timing}{note}")
     return state, actions + [BeginUndoStep(), message]
 
 
@@ -195,7 +337,7 @@ def tick(state, transport, values):
         actions = [SetMacros(writes)] if writes else []
         if state.fx_undo_open:
             actions.append(EndUndoStep())
-        state = replace(state, morph=None, fx_undo_open=False, fx_landed=morph.slot)
+        state = _landed(replace(state, morph=None, fx_undo_open=False), morph.slot, morph.scene)
         return state, actions, True
     # Linear in song beats; quantized macros switch only when the morph lands.
     fraction = (now - morph.start_beats) / (morph.end_beats - morph.start_beats)
@@ -215,6 +357,28 @@ def end_beats(snapshot, bars):
     # The Nth bar line after now.
     bar = snapshot.signature_numerator * 4 / snapshot.signature_denominator
     return math.floor(snapshot.song_beats / bar) * bar + bars * bar
+
+
+def launch_end_beats(snapshot):
+    # When a scene launched now starts: the next quantization boundary strictly after now.
+    # None when launches are unquantized.
+    q = snapshot.launch_quantization
+    if q in LAUNCH_BARS:
+        step = LAUNCH_BARS[q] * snapshot.signature_numerator * 4 / snapshot.signature_denominator
+    elif q in LAUNCH_BEATS:
+        step = LAUNCH_BEATS[q]
+    else:
+        return None
+    return (math.floor(snapshot.song_beats / step) + 1) * step
+
+
+def scene_launch(state, scene, snapshot):
+    # After a scene launch from the pads, with the press's snapshot: the scene's snapshot lands
+    # as the scene starts, or at once when stopped or unquantized. A Bars pad held is ignored.
+    if scene_snapshot(state, scene) is None:
+        return []
+    end = launch_end_beats(snapshot) if snapshot.is_playing else None
+    return [RecallFxSnapshot(scene, None, scene=True, end_beats=end)]
 
 
 def _match(stored, racks):

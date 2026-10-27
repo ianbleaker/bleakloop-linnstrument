@@ -555,3 +555,10 @@ def test_a_drum_rack_s_own_pads_arent_searched():
     outer.chains = [fake_chain(fake_rack(scroll=5))]
     track = SimpleNamespace(devices=[outer])
     assert live_state.drum_rack(track) is outer
+
+
+def test_read_fx_scenes_store():
+    stored = {"BleakLoop.fx.scenes": "text"}
+    song = SimpleNamespace(get_data=lambda key, default: stored.get(key, default))
+    assert live_state.read_fx_scenes_store(song) == "text"
+    assert live_state.read_fx_scenes_store(SimpleNamespace(get_data=lambda k, d: d)) == ""

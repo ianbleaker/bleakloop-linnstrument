@@ -162,7 +162,8 @@ def _scene_page(state, key, pressed, snapshot):
     scene = state.window.scene + key[1] - 1
     if scene >= snapshot.scene_count:
         return state, []  # past the end of the Set: nothing launched, the page stays
-    return replace(state, scene_page=False), [FireScene(scene, legato=False)]
+    actions = [FireScene(scene, legato=False), *fx.scene_launch(state, scene, snapshot)]
+    return replace(state, scene_page=False), actions
 
 
 def _fixed_length(state):

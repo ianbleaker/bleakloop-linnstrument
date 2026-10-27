@@ -143,7 +143,10 @@ def handle(state, event, snapshot):
     if _is_scene(event):
         scene = state.window.scene + event.pad - 1
         if scene < snapshot.scene_count:
-            return state, [FireScene(scene, legato=state.shift)]
+            # A legato launch leaves the macros alone.
+            if state.shift:
+                return state, [FireScene(scene, legato=True)]
+            return state, [FireScene(scene, legato=False), *fx.scene_launch(state, scene, snapshot)]
     return state, []
 
 
@@ -262,7 +265,8 @@ def _copy_scene(state, event, snapshot):
     dropped = replace(state, copy_source=None)
     if has:
         return dropped, [ShowMessage("Target scene not empty")]
-    return dropped, [CopyScene(source.scene, scene), ShowMessage("Scene copied")]
+    dropped, save = fx.copy_scene(dropped, source.scene, scene, snapshot.scene_count)
+    return dropped, [CopyScene(source.scene, scene), *save, ShowMessage("Scene copied")]
 
 
 def _delete(state, event, snapshot):
@@ -440,7 +444,7 @@ def render(state, snapshot):
             frame[(column, pad)] = _slot_light(track, pad - 1)
         _render_rows(frame, column, track, shift_layer)
     if state.fx:
-        frame.update(fx.render(state))
+        frame.update(fx.render(state, snapshot))
     if faders.visible(state):
         frame.update(faders.render(state, snapshot))
     for pad in range(1, layout.WINDOW_SCENES + 1):

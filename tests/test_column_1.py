@@ -28,6 +28,7 @@ from BleakLoop.core.model import (
     FireSlot,
     PadPress,
     QuantizeClip,
+    RecallFxSnapshot,
     SelectedTrack,
     SetLaunchQuantization,
     SetMixer,
@@ -40,7 +41,7 @@ from BleakLoop.core.model import (
     TogglePlay,
     TrackView,
 )
-from BleakLoop.core.modes import Mode, State
+from BleakLoop.core.modes import FxRack, Mode, State
 
 BASE = Snapshot(
     is_playing=False,
@@ -400,6 +401,14 @@ def test_scene_page_launches_from_the_window():
     assert handle(state, (1, 2), replace(BASE, scene_count=10)) == (
         replace(state, scene_page=False),
         [FireScene(4, legato=False)],
+    )
+
+
+def test_scene_page_launch_fires_the_scenes_snapshot():
+    state = replace(SCENES, fx_scenes=(None, None, (FxRack("A", "R", 0, (1.0,)),)))
+    assert handle(state, (1, 3), replace(BASE, scene_count=10)) == (
+        replace(state, scene_page=False),
+        [FireScene(2, legato=False), RecallFxSnapshot(2, None, scene=True)],
     )
 
 

@@ -16,7 +16,7 @@ While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 
 ## 2. Finding your way
 
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
-- Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it. Pads 7 and 8 of each column mute and arm that track. The split view (section 3) narrows the window to 8 tracks.
+- Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it in every mode, so you can always see which scenes the scene pads launch. Pads 7 and 8 of each column mute and arm that track. The split view (section 3) narrows the window to 8 tracks.
 - Shift, Copy, Delete and Dev work while held.
 - Each map shows the pads' names over their colours in an example Set. A dashed ring blinks with the beat; a dotted ring blinks fast.
 
@@ -84,6 +84,8 @@ Columns 1, 15 and 16 work the same in Session, Mixer and FX Mode. Column 1 is al
 
 Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to come. Pad 7 is **Seq**, which opens Sequencer Mode (section 8), and pad 8 is **Dev** (below).
 
+**Scenes** (column 15, pads 1–6) launch the window's scenes. A scene with an FX snapshot (section 7) morphs the macros to it, landing as the scene starts. Shift + a scene launches it legato and leaves the macros alone, and so does a launch from Live's mouse or another controller.
+
 **Unmute all** (column 15, pad 7) acts on every track and return track in the Set, not just the window. With Shift held it's **Unsolo all**.
 
 **Stop** (column 15, pad 8) is held like Copy and Delete. Hold it and press any pad in a track's column to stop that track's clips; a tap on its own does nothing. Shift + Stop stops all clips. In FX Mode, holding Stop leaves the grid alone.
@@ -99,7 +101,7 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 - **Undo**: Undo. *(Shift: Redo)*
 - **Linnstrument Mode**: Switch to Linnstrument Mode.
 - **Shift**: Hold for the Shift layer.
-- **Scenes**: Launch a scene. *(Shift: Launch with legato)*
+- **Scenes**: Launch a scene. Its FX snapshot, if it has one, lands as it starts. *(Shift: Launch with legato, leaving the FX snapshot alone)*
 - **Unmute all**: Unmute every track and return track in the Set. Orange while any is muted. *(Shift: Unsolo every track and return track in the Set. Blue while any is soloed)*
 - **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Stop all clips)*
 - **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
@@ -174,14 +176,15 @@ FX Mode has eight horizontal faders for the selected device, and stores snapshot
 
 <!-- callouts:fx -->
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
-- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 12, 9–16 in column 13. Press an empty slot to store, a stored one to recall.
+- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall.
+- **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.
 <!-- /callouts:fx -->
 
-**Faders** (columns 2–11): one fader per row. They have two sources, switched with Dev + Fader source: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Dev + Devices, moves the blue hand there; so does another controller's device navigation.
+**Faders** (columns 2–10): one fader per row. They have two sources, switched with Dev + Fader source: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Dev + Devices, moves the blue hand there; so does another controller's device navigation.
 
 - In Device FX, a rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
-- Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 11 the maximum. Slide along the row to move it.
+- Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 10 the maximum. Slide along the row to move it.
 - The lit pads, counted from the left, show the value. Rows alternate magenta and blue so you can count them. The bar follows the parameter, so automation, a morph or a turn of the knob in Live move it too.
 - Slide past either end and the value stays at that end. Your finger can go on over column 1 or the snapshots without pressing them, until you lift it.
 - One touch is one undo, however many rows you move at once.
@@ -208,6 +211,18 @@ FX Mode has eight horizontal faders for the selected device, and stores snapshot
 - While the transport is stopped, a recall always happens at once.
 - Hold Delete and press a stored slot to clear it.
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
+- Snapshots 1–8 are in column 11 and 9–16 in column 12.
+
+**Scene snapshots** (column 13, pads 1–6):
+
+- Each scene can hold one snapshot. Pad N is the snapshot of the scene on column 15's pad N, so the column scrolls with the window. Pads past the last scene, and pads 7 and 8, are dark.
+- Store, recall, morph with a Bars pad, store over with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
+- A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not.
+- Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. A Bars pad held during the launch is ignored.
+- Shift + a scene (legato) doesn't fire the snapshot, and neither do launches from Live's mouse or another controller. A scene without a snapshot leaves the macros, and any running morph, alone.
+- The snapshots follow Live's scenes. Move a scene and its snapshot moves with it; delete a scene and its snapshot goes; a new scene starts empty.
+- Live's Duplicate copies the scene's snapshot to the copy. So does any new scene inserted straight below a scene with a snapshot, when it has the same clips on the same tracks and at least one clip, such as Capture and Insert Scene. Copy + scene (section 4) copies the snapshot too; if the source has none, the target keeps its own.
+- Undoing a scene delete in Live brings the scene back without its snapshot.
 
 **During a morph:**
 
@@ -358,10 +373,10 @@ Shift + Record is Session Record, and Shift + Back opens the scene page.
 
 ![Linnstrument Mode scene page](manual/linnstrument-scenes.svg)
 
-Shift + Back opens it. It shows the window's 6 scenes on pads 1–6. Press a scene to launch it, or press Shift again to go back without launching.
+Shift + Back opens it. It shows the window's 6 scenes on pads 1–6. Press a scene to launch it, along with its FX snapshot (section 7), or press Shift again to go back without launching.
 
 <!-- callouts:linnstrument-scenes -->
-- **Scenes**: Launch a scene and go back to the controls.
+- **Scenes**: Launch a scene and its FX snapshot, and go back to the controls.
 - **Back**: Back to the controls without launching.
 <!-- /callouts:linnstrument-scenes -->
 
