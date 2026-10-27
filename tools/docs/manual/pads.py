@@ -78,7 +78,13 @@ LAUNCH_QUANTIZATION = _one(
 )
 REDO = _one("Redo", layout.UNDO, "Redo.")
 SHIFT_HELD = Item("Shift", {layout.SHIFT: "Shift"}, "Held.", variant=False)
-DEVICE_CLIP = _one("Dev", layout.DEVICE_CLIP, "Hold for the Dev layer: tracks, devices and the fader source.")
+DEVICE_CLIP = _one(
+    "Device/Clip",
+    layout.DEVICE_CLIP,
+    "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, "
+    "devices and the fader source.",
+    label="DevClip",
+)
 TEMPO = Item(
     "Tempo",
     {key: "Tempo+" if step > 0 else "Tempo-" for key, step in layout.TEMPO_STEPS.items()},
@@ -91,7 +97,7 @@ WINDOW_MOVES = tuple(
 )
 
 # Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
-_SIDE = (
+_GLOBAL = (
     PLAY,
     _one(
         "Record",
@@ -109,6 +115,22 @@ _SIDE = (
     UNDO,
     _one("Linnstrument Mode", layout.MODE_PAD, "Switch to Linnstrument Mode.", label="Linn"),
     SHIFT,
+)
+
+_GLOBAL_SHIFT = (
+    _one(
+        "Stop all",
+        layout.PLAY_STOP,
+        "Stop all clips. In Linnstrument Mode, stops the selected track's clips.",
+        label="StopAll",
+    ),
+    QUANTIZE,
+    LAUNCH_QUANTIZATION,
+    REDO,
+    SHIFT_HELD,
+)
+
+_VIEW = (
     _scenes(layout.SCENE_COLUMN, "Launch a scene. Its FX snapshot, if it has one, lands as it starts."),
     _one(
         "Unmute all",
@@ -121,6 +143,25 @@ _SIDE = (
         layout.STOP,
         "Hold, then press a track's pad to stop that track's clips.",
     ),
+)
+
+_VIEW_SHIFT = (
+    _scenes(layout.SCENE_COLUMN, "Launch with legato, leaving the FX snapshot alone."),
+    _one(
+        "Unsolo all",
+        layout.UNMUTE_ALL,
+        "Unsolo every track and return track in the Set. Blue while any is soloed.",
+        label="Unsolo",
+    ),
+    _one(
+        "Unarm all",
+        layout.STOP,
+        "Disarm every track in the Set. Red while any is armed.",
+        label="Unarm",
+    ),
+)
+
+_NAVIGATION = (
     _one(
         "Copy",
         layout.COPY,
@@ -138,27 +179,9 @@ _SIDE = (
     DEVICE_CLIP,
 )
 
-_SIDE_SHIFT = (
-    _one(
-        "Stop all",
-        layout.PLAY_STOP,
-        "Stop all clips. In Linnstrument Mode, stops the selected track's clips.",
-        label="StopAll",
-    ),
-    QUANTIZE,
-    LAUNCH_QUANTIZATION,
-    REDO,
-    _scenes(layout.SCENE_COLUMN, "Launch with legato, leaving the FX snapshot alone."),
-    _one(
-        "Unsolo all",
-        layout.UNMUTE_ALL,
-        "Unsolo every track and return track in the Set. Blue while any is soloed.",
-        label="Unsolo",
-    ),
-    _one("Stop all", layout.STOP, "Stop all clips.", label="StopAll"),
+_NAVIGATION_SHIFT = (
     *WINDOW_MOVES,
     TEMPO,
-    SHIFT_HELD,
 )
 
 MUTE = Block(
@@ -207,7 +230,7 @@ _SPLIT = (
         "Faders",
         layout.SPLIT_FADER_COLUMNS,
         ALL_PADS,
-        "One fader per row, as in FX Mode, from the source Dev + Fader source picks.",
+        "One fader per row, as in FX Mode, from the source Device/Clip + Fader source picks.",
     ),
 )
 
@@ -263,7 +286,7 @@ _FX = (
     ),
 )
 
-_DEV = (
+_DEVICE_CLIP = (
     Item(
         "Tracks",
         {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEVICE_CLIP_TRACK_STEPS.items()},
@@ -280,7 +303,7 @@ _DEV = (
         "Switch the faders between Device FX and Mapped FX.",
         label="Source",
     ),
-    Item("Dev", {layout.DEVICE_CLIP: "Dev"}, "Held.", variant=False),
+    Item("Device/Clip", {layout.DEVICE_CLIP: "DevClip"}, "Held.", variant=False),
 )
 
 RECORD_CLIP = _one(
@@ -426,8 +449,12 @@ _SEQUENCER_SETTINGS = (
 
 # The manual's sections, by marker slug.
 SECTIONS = {
-    "side": _SIDE,
-    "side-shift": _SIDE_SHIFT,
+    "global": _GLOBAL,
+    "global-shift": _GLOBAL_SHIFT,
+    "view": _VIEW,
+    "view-shift": _VIEW_SHIFT,
+    "navigation": _NAVIGATION,
+    "navigation-shift": _NAVIGATION_SHIFT,
     "session": _SESSION,
     "session-shift": _SESSION_SHIFT,
     "split": _SPLIT,
@@ -435,7 +462,7 @@ SECTIONS = {
     "mixer": _MIXER,
     "mixer-shift": _MIXER_SHIFT,
     "fx": _FX,
-    "dev": _DEV,
+    "device-clip": _DEVICE_CLIP,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
     "linnstrument-scenes": _LINNSTRUMENT_SCENES,
@@ -448,12 +475,14 @@ SECTIONS = {
 
 # The sections the manual lists, each with the section holding its Shift layer.
 LISTS = {
-    "side": "side-shift",
+    "global": "global-shift",
+    "view": "view-shift",
+    "navigation": "navigation-shift",
     "session": "session-shift",
     "split": "split-shift",
     "mixer": "mixer-shift",
     "fx": None,
-    "dev": None,
+    "device-clip": None,
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,
     "sequencer-side": "sequencer-shift",
@@ -463,14 +492,14 @@ LISTS = {
 
 # The sections each map is drawn from.
 LAYERS = {
-    Layer.SESSION: ("side", "session"),
-    Layer.SIDE: ("side",),
-    Layer.SESSION_SHIFT: ("side-shift", "session-shift"),
-    Layer.SPLIT: ("side", "split"),
-    Layer.MIXER: ("side", "mixer"),
-    Layer.FX: ("side", "fx"),
-    Layer.MAPPED_FX: ("side", "fx"),
-    Layer.DEVICE_CLIP: ("dev",),
+    Layer.SESSION: ("global", "view", "navigation", "session"),
+    Layer.SIDE: ("global", "view", "navigation"),
+    Layer.SESSION_SHIFT: ("global-shift", "view-shift", "navigation-shift", "session-shift"),
+    Layer.SPLIT: ("global", "view", "navigation", "split"),
+    Layer.MIXER: ("global", "view", "navigation", "mixer"),
+    Layer.FX: ("global", "view", "navigation", "fx"),
+    Layer.MAPPED_FX: ("global", "view", "navigation", "fx"),
+    Layer.DEVICE_CLIP: ("device-clip",),
     Layer.LINNSTRUMENT: ("linnstrument",),
     Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
     Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),
@@ -480,8 +509,8 @@ LAYERS = {
     Layer.SEQUENCER_DRUMS: ("sequencer-side", "sequencer"),
 }
 
-# Columns a map shows dimmed and unlabelled: the side columns map dims the grid, and the Dev
-# layer's map everything but column 16.
+# Columns a map shows dimmed and unlabelled: the side columns map dims the grid, and the
+# Device/Clip layer's map everything but column 16.
 DIMMED = {Layer.SIDE: layout.GRID_COLUMNS, Layer.DEVICE_CLIP: range(1, layout.NAV_COLUMN)}
 
 

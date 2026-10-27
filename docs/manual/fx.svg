@@ -208,7 +208,7 @@
 <rect x="708" y="329" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="726" y="339" font-size="9" fill="#ffffff" text-anchor="middle">Seq</text>
 <rect x="708" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="726" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Dev</text>
+<text x="726" y="385" font-size="9" fill="#ffffff" text-anchor="middle">DevClip</text>
 <rect x="59" y="37" width="414" height="368" rx="6" fill="none" stroke="#e8e8ec" stroke-width="1" stroke-opacity="0.6"/>
 <rect x="232" y="212" width="68" height="19" rx="9" fill="#000000" fill-opacity="0.72"/>
 <text x="266" y="226" font-size="13" fill="#ffffff" text-anchor="middle">Faders</text>

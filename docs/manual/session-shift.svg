@@ -177,7 +177,7 @@
 <rect x="662" y="329" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="680" y="339" font-size="9" fill="#ffffff" text-anchor="middle">Unsolo</text>
 <rect x="662" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="680" y="385" font-size="9" fill="#ffffff" text-anchor="middle">StopAll</text>
+<text x="680" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Unarm</text>
 <rect x="708" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="726" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Up</text>
 <rect x="708" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>

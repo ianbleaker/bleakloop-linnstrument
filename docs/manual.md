@@ -64,7 +64,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records. *(Shift: Launch with legato)*
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted. *(Shift: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed)*
 - **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it. *(Shift: Arm or disarm the track alone, keeping the selection)*
-- **Faders**: One fader per row, as in FX Mode, from the source Dev + Fader source picks.
+- **Faders**: One fader per row, as in FX Mode, from the source Device/Clip + Fader source picks.
 <!-- /callouts:split -->
 
 - Columns 2–9 work as in Session Mode for an 8-track window, and Live's ring shrinks to match. The window moves as usual; turning the split view off keeps it where it is, unless it then runs past the last track.
@@ -92,7 +92,7 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 
 ![Side columns](manual/side.svg)
 
-<!-- callouts:side -->
+<!-- callouts:global -->
 - **Play**: Start/stop. Blinks on the beat while playing. *(Shift: Stop all clips. In Linnstrument Mode, stops the selected track's clips)*
 - **Record**: Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording. In Linnstrument Mode, records a new clip on the selected track.
 - **Capture**: Capture and Insert Scene. In Linnstrument Mode, captures MIDI. *(Shift: Quantize the current MIDI clip to 1/16 notes)*
@@ -101,17 +101,23 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 - **Undo**: Undo. *(Shift: Redo)*
 - **Linnstrument Mode**: Switch to Linnstrument Mode.
 - **Shift**: Hold for the Shift layer.
+<!-- /callouts:global -->
+
+<!-- callouts:view -->
 - **Scenes**: Launch a scene. Its FX snapshot, if it has one, lands as it starts. *(Shift: Launch with legato, leaving the FX snapshot alone)*
 - **Unmute all**: Unmute every track and return track in the Set. Orange while any is muted. *(Shift: Unsolo every track and return track in the Set. Blue while any is soloed)*
-- **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Stop all clips)*
+- **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Disarm every track in the Set. Red while any is armed)*
+<!-- /callouts:view -->
+
+<!-- callouts:navigation -->
 - **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
 - **Delete**: Hold, then press a clip or scene to delete it. *(Shift: Move the window down)*
 - **Session**: Session Mode. In Session Mode, toggles the split view. *(Shift: Move the window left)*
 - **Mixer**: Mixer Mode. Press again for Session Mode. *(Shift: Move the window right)*
 - **FX**: FX Mode. Press again for Session Mode.
 - **Seq**: Hold and press a clip, or tap, for Sequencer Mode. *(Shift: Tempo +1 or -1 BPM)*
-- **Dev**: Hold for the Dev layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
-<!-- /callouts:side -->
+- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
+<!-- /callouts:navigation -->
 
 **Copying:**
 
@@ -130,12 +136,12 @@ Dev (column 16, pad 8, orange) is held, like Shift. While you hold it, its pad b
 
 ![Dev](manual/dev.svg)
 
-<!-- callouts:dev -->
+<!-- callouts:device-clip -->
 - **Tracks**: Select the previous or next track, through the returns and master.
 - **Devices**: Select the previous or next device on the selected track.
 - **Fader source**: Switch the faders between Device FX and Mapped FX.
-- **Dev**: Held.
-<!-- /callouts:dev -->
+- **Device/Clip**: Held.
+<!-- /callouts:device-clip -->
 
 - The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.
 - Devices are the ones directly on the track. With a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
@@ -266,7 +272,7 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 - **Mixer**: Mixer Mode. *(Shift: Move the window right)*
 - **FX**: FX Mode.
 - **Seq**: Back to Session Mode. *(Shift: Tempo +1 or -1 BPM)*
-- **Dev**: Hold for the Dev layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
+- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
 <!-- /callouts:sequencer-side -->
 
 <!-- callouts:sequencer -->
