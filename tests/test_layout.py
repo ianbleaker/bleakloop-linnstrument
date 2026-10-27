@@ -123,9 +123,9 @@ def test_rows_7_and_8_follow_the_window():
     assert (layout.MUTE_ROW, layout.SELECT_ROW) == (7, 8)
 
 
-def test_fx_slots_are_columns_12_and_13():
-    assert layout.FX_SLOTS[0] == (12, 1)
-    assert layout.FX_SLOTS[7] == (12, 8)
-    assert layout.FX_SLOTS[8] == (13, 1)
-    assert layout.FX_SLOTS[15] == (13, 8)
+def test_fx_slots_are_columns_11_and_12():
+    assert layout.FX_SLOTS[0] == (11, 1)
+    assert layout.FX_SLOTS[7] == (11, 8)
+    assert layout.FX_SLOTS[8] == (12, 1)
+    assert layout.FX_SLOTS[15] == (12, 8)
     assert len(set(layout.FX_SLOTS)) == 16

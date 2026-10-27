@@ -205,13 +205,13 @@ def test_delete_on_an_empty_slot_does_nothing():
 
 
 def test_slot_numbers():
-    assert handle(FX, (12, 1))[1] == [StoreFxSnapshot(0)]
-    assert handle(FX, (12, 8))[1] == [StoreFxSnapshot(7)]
-    assert handle(FX, (13, 1))[1] == [StoreFxSnapshot(8)]
-    assert handle(FX, (13, 8))[1] == [StoreFxSnapshot(15)]
+    assert handle(FX, (11, 1))[1] == [StoreFxSnapshot(0)]
+    assert handle(FX, (11, 8))[1] == [StoreFxSnapshot(7)]
+    assert handle(FX, (12, 1))[1] == [StoreFxSnapshot(8)]
+    assert handle(FX, (12, 8))[1] == [StoreFxSnapshot(15)]
 
 
-@pytest.mark.parametrize("key", [(2, 1), (11, 8), (2, 8), (14, 6), (14, 8)])
+@pytest.mark.parametrize("key", [(2, 1), (13, 7), (13, 8), (2, 8), (14, 6), (14, 8)])
 def test_other_grid_pads_do_nothing(key):
     assert handle(FX, key) == (FX, [])
     assert handle(FX, key, pressed=False) == (FX, [])
@@ -531,6 +531,11 @@ def test_render_slots_and_lengths():
         assert frame[key] == Light(WHITE)
     lit = {key for key, light in frame.items() if light != Light(OFF)}
     assert lit == {layout.FX_SLOTS[i] for i in (0, 5, 9)} | set(layout.FX_LENGTHS)
+
+
+def test_render_column_13_is_dark_with_no_scene_snapshots():
+    frame = fx.render(with_slot(FX, 2))
+    assert all(frame[(13, pad)] == Light(OFF) for pad in range(1, layout.ROWS + 1))
 
 
 def test_render_landed_slot_that_was_cleared_is_dark():
