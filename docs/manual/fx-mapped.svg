@@ -165,6 +165,18 @@
 <text x="36" y="339" font-size="9" fill="#ffffff" text-anchor="middle">Linn</text>
 <rect x="18" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="36" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Shift</text>
+<rect x="570" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
+<rect x="570" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="109" font-size="9" fill="#ffffff" text-anchor="middle">Scene 2</text>
+<rect x="570" y="145" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="155" font-size="9" fill="#ffffff" text-anchor="middle">Scene 3</text>
+<rect x="570" y="191" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="201" font-size="9" fill="#ffffff" text-anchor="middle">Scene 4</text>
+<rect x="570" y="237" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="247" font-size="9" fill="#ffffff" text-anchor="middle">Scene 5</text>
+<rect x="570" y="283" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="293" font-size="9" fill="#ffffff" text-anchor="middle">Scene 6</text>
 <rect x="662" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="680" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
 <rect x="662" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
