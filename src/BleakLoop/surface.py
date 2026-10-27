@@ -734,12 +734,10 @@ class BleakLoop(ControlSurface):
         return self._seq_view
 
     def _update_ring(self, force=False):
-        if self._state.mode is Mode.SESSION:
-            window = self._state.window
-            width = session.window_tracks(self._state)
-            want = (window.track, window.scene, width, layout.WINDOW_SCENES)
-        else:
-            want = (-1, -1, -1, -1)
+        # In every mode: Live's ring shows which scenes the pads, and FX Mode's column 13, show.
+        window = self._state.window
+        width = session.window_tracks(self._state)
+        want = (window.track, window.scene, width, layout.WINDOW_SCENES)
         if force or want != self._ring:
             self._c_instance.set_session_highlight(*want, False)
             self._ring = want
