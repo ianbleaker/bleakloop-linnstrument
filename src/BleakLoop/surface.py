@@ -14,15 +14,19 @@ from ableton.v3.control_surface import (
 )
 
 from . import device, live_actions, live_state
-from .core import engine, fx, layout, values
+from .core import engine, faders, fx, layout, session, values
 from .core.leds import Clock, phase_key
-from .core.model import PadPress, YAxis
+from .core.model import PadPress, SlideMoved, YAxis
 from .core.modes import Mode, State
 
 logger = logging.getLogger(__name__)
 
 Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column
+X_LSB_CC_BASE = 32  # X: MSB on CC column, LSB on CC 32 + column
+CC_SLIDE_TRANSFER = 119  # value = the column a finger slid from
 NRPN_REPLY_CCS = (99, 98, 6, 38, 101, 100)
+# X for device row 0, column 6 is CC 6 / 38 on channel 1: the NRPN reply elements carry it.
+X_ON_NRPN = (0, 6)
 
 
 class Elements(ElementsBase):
@@ -41,6 +45,16 @@ class Elements(ElementsBase):
                 self.add_button(
                     Y_AXIS_CC_BASE + column, f"Y {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
+        # X values and slide transfers, listened while faders show.
+        for row in range(layout.ROWS):
+            for column in range(1, layout.COLUMNS):
+                if (row, column) == X_ON_NRPN:
+                    continue
+                self.add_button(column, f"X {row} {column}", channel=row, msg_type=MIDI_CC_TYPE)
+                self.add_button(
+                    X_LSB_CC_BASE + column, f"Xl {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
+                )
+            self.add_button(CC_SLIDE_TRANSFER, f"Slide {row}", channel=row, msg_type=MIDI_CC_TYPE)
         # Linnstrument Mode column 1: every note on every channel. The control channel is chosen
         # from the right split after load, and elements must exist before it.
         for channel in range(16):
@@ -66,6 +80,11 @@ class BleakLoop(ControlSurface):
         self._driver = device.LedDriver()
         self._listeners = []
         self._reader = device.NrpnReader()
+        self._slides = device.SlideDecoder()
+        self._x_rows = None  # the X and slide rows last sent; None after User Firmware Mode on
+        self._x_listened = False
+        self._x_reports = 0  # in the current fader gesture
+        self._longest_x_ms = 0.0
         self._saved_split = {}  # the first reply per NRPN: the player's settings
         self._reads = {}  # the latest reply per NRPN
         self._set_numbers = []  # NRPNs BleakLoop set, in setup order
@@ -90,9 +109,11 @@ class BleakLoop(ControlSurface):
         self._phase = None
         self._longest_tick_ms = 0.0  # of the running morph
         self._fx_text = None  # the stored FX snapshots as last read
+        self._faders_text = None  # the stored Mapped FX bindings as last read
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
         self._pending_fresh = False
+        self._selected_device = None  # the selected track's selected device, last tick
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
         logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
@@ -102,6 +123,11 @@ class BleakLoop(ControlSurface):
         # Elements intercept MIDI only while listened to; listeners are per mode.
         return False
 
+    @property
+    def core_state(self):
+        # For the adapters: the faders resolve their parameters from the source in it.
+        return self._state
+
     # Lifecycle
 
     def update_display(self):
@@ -109,6 +135,8 @@ class BleakLoop(ControlSurface):
         if self._started:
             self._check_pending_clip()
             self._load_fx()
+            self._load_faders()
+            self._follow_selected_device()
             if self._state.mode is Mode.LINNSTRUMENT:
                 self._poll_tick()
             self._refresh()
@@ -133,6 +161,7 @@ class BleakLoop(ControlSurface):
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
             self._load_fx()
+            self._load_faders()
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
                 self.show_message(self._refusal)
@@ -141,6 +170,21 @@ class BleakLoop(ControlSurface):
                 callback=self._on_blink_timer, interval=values.BLINK_TIMER_MS, repeat=True
             )
             self._timer.start()
+
+    def _follow_selected_device(self):
+        # Device FX follows the blue hand, which other control surfaces may move. A click on
+        # a device in Live moves it here, so the faders follow what was clicked. Only on a
+        # change: a device another controller picked stays until the next click.
+        try:
+            device = self.song.view.selected_track.view.selected_device
+        except Exception:
+            logger.exception("FADERS: reading the selected device failed")
+            return
+        if device == self._selected_device:
+            return
+        self._selected_device = device
+        if device is not None:
+            self.song.appointed_device = device
 
     def _load_fx(self):
         # At load, and on every display tick: Live's Undo and Redo change the stored text
@@ -155,6 +199,17 @@ class BleakLoop(ControlSurface):
             logger.warning("FX: stored snapshots unreadable, starting empty")
         self._state = replace(self._state, fx_slots=slots)
 
+    def _load_faders(self):
+        # As _load_fx: Undo and Redo of a bind or unbind change the stored text.
+        text = live_state.read_fader_store(self.song)
+        if text == self._faders_text:
+            return
+        self._faders_text = text
+        bindings = faders.parse(text)
+        if text and faders.dump(bindings) != text:
+            logger.warning("FADERS: stored bindings unreadable, starting empty")
+        self._state = replace(self._state, fader_bindings=bindings)
+
     def disconnect(self):
         if self._timer is not None:
             self._timer.stop()
@@ -163,9 +218,12 @@ class BleakLoop(ControlSurface):
             self.song.end_undo_step()
         if self._state.fx_undo_open:
             self.song.end_undo_step()
+        if self._state.fader_undo_open:
+            self.song.end_undo_step()
         # Hand the device back for playing, with the player's own split.
         self._send(
             device.y_axis(False)
+            + device.x_rows(())
             + device.user_firmware_mode(False)
             + self._driver.release_column_1()
         )
@@ -307,9 +365,13 @@ class BleakLoop(ControlSurface):
             self._poll_due = 0  # re-check at once
         if mode is Mode.SESSION:
             self._send(device.user_firmware_mode(True))
+            # The device turns X and slide mode off on entering User Firmware Mode.
+            self._x_rows = None
         else:
-            self._send(device.y_axis(False) + device.user_firmware_mode(False))
+            self._send(device.y_axis(False) + device.x_rows(()) + device.user_firmware_mode(False))
+            self._x_rows = ()
         self._listen_for(mode)
+        self._sync_x_rows()
         self._update_ring(force=True)
         self._driver.reset()
         self._refresh()
@@ -318,9 +380,24 @@ class BleakLoop(ControlSurface):
         # One burst, no driver reset; _handle's refresh sends only the changed pads.
         self._send(device.y_axis(on))
         self._listen_for(Mode.SESSION)
+        self._sync_x_rows()
+
+    def _sync_x_rows(self):
+        # X and slide mode only on the rows that want them, sent only on a change.
+        if self._state.mode is not Mode.SESSION:
+            return
+        rows = engine.x_rows(self._state)
+        if rows == self._x_rows:
+            return
+        self._send(device.x_rows(rows))
+        self._x_rows = rows
+        self._slides.reset()
+        if bool(rows) != self._x_listened:
+            self._listen_for(Mode.SESSION)
 
     def _listen_for(self, mode):
         self._remove_listeners()
+        self._x_listened = False
         if mode is Mode.SESSION:
             for row in range(layout.ROWS):
                 for column in range(layout.COLUMNS):
@@ -335,6 +412,8 @@ class BleakLoop(ControlSurface):
                         self._add_listener(
                             element, lambda v, c=column, r=row: self._on_y_axis(c, r, v)
                         )
+            if engine.x_rows(self._state):
+                self._listen_for_x()
         else:
             # All 128 notes, so column 1 never plays Live's tracks whatever Row Offset sends.
             # None while the right split uses the control channel: its notes are the player's.
@@ -345,6 +424,22 @@ class BleakLoop(ControlSurface):
                     self._add_listener(element, lambda v, n=note: self._on_control_note(n, v))
             self._listen_for_nrpn_replies()
         self.request_rebuild_midi_map()
+
+    def _listen_for_x(self):
+        self._x_listened = True
+        for row in range(layout.ROWS):
+            for column in range(1, layout.COLUMNS):
+                if (row, column) == X_ON_NRPN:
+                    msb, lsb = self.elements.nrpn_6, self.elements.nrpn_38
+                else:
+                    msb = getattr(self.elements, f"x_{row}_{column}")
+                    lsb = getattr(self.elements, f"xl_{row}_{column}")
+                self._add_listener(msb, lambda v, c=column, r=row: self._on_x(c, r, v))
+                self._add_listener(
+                    lsb, lambda v, c=column, r=row: self._slides.x_lsb(r, c, v)
+                )
+            element = getattr(self.elements, f"slide_{row}")
+            self._add_listener(element, lambda v, r=row: self._on_slide_transfer(r, v))
 
     def _listen_for_nrpn_replies(self):
         for number in NRPN_REPLY_CCS:
@@ -370,7 +465,36 @@ class BleakLoop(ControlSurface):
             self._saved_split.setdefault(parameter, setting)
 
     def _on_pad(self, column, row, value):
-        self._handle(PadPress(column, layout.pad_of(row), value > 0))
+        event = self._slides.pad(row, column, value)
+        if isinstance(event, SlideMoved):
+            self._handle(event, engine.slide)
+        elif event is not None:
+            self._handle(event)
+
+    def _on_slide_transfer(self, row, value):
+        self._slides.transfer(row, value)
+
+    def _on_x(self, column, row, value):
+        # At the firmware's scan rate: no snapshot, and a refresh only on redraw.
+        start = time.monotonic()
+        event = self._slides.x_msb(row, column, value)
+        state, actions, redraw = engine.x_axis(self._state, event)
+        self._state = state
+        for action in actions:
+            live_actions.apply(action, self.song, self)
+        if redraw:
+            self._refresh()
+        if self._state.fader_touches:
+            self._x_reports += 1
+            self._longest_x_ms = max(self._longest_x_ms, (time.monotonic() - start) * 1000)
+
+    def _log_fader_gesture(self):
+        # Once the last touch ends: the gesture's X load, for the device check.
+        if self._x_reports and not self._state.fader_touches:
+            logger.info(
+                "FADERS: %d reports, longest %.1f ms", self._x_reports, self._longest_x_ms
+            )
+            self._x_reports, self._longest_x_ms = 0, 0.0
 
     def _on_y_axis(self, column, row, value):
         # 50-100 reports a second per finger: no snapshot or refresh, since only the 10 ms
@@ -394,8 +518,8 @@ class BleakLoop(ControlSurface):
             return
         self._handle(PadPress(1, pad, value > 0))
 
-    def _handle(self, event):
-        state, actions = engine.handle(self._state, event, self._snapshot())
+    def _handle(self, event, entry=engine.handle):
+        state, actions = entry(self._state, event, self._snapshot())
         # Store first: EnterMode renders, and must render the new mode.
         self._state = state
         follow_ups = [live_actions.apply(action, self.song, self) for action in actions]
@@ -407,6 +531,8 @@ class BleakLoop(ControlSurface):
                 self._state = state
                 for action in more:
                     live_actions.apply(action, self.song, self)
+        self._sync_x_rows()
+        self._log_fader_gesture()
         self._update_ring()
         self._refresh()
 
@@ -444,12 +570,15 @@ class BleakLoop(ControlSurface):
             self._state.window,
             scene_clips=self._state.copy,
             selected=self._state.mode is Mode.LINNSTRUMENT,
+            faders=self._state if faders.visible(self._state) else None,
+            width=session.window_tracks(self._state),
         )
 
     def _update_ring(self, force=False):
         if self._state.mode is Mode.SESSION:
             window = self._state.window
-            want = (window.track, window.scene, layout.WINDOW_TRACKS, layout.WINDOW_SCENES)
+            width = session.window_tracks(self._state)
+            want = (window.track, window.scene, width, layout.WINDOW_SCENES)
         else:
             want = (-1, -1, -1, -1)
         if force or want != self._ring:

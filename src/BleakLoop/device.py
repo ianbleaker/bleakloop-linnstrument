@@ -14,6 +14,7 @@ from .core.leds import (
     YELLOW,
     resolve,
 )
+from .core.model import PadPress, SlideMoved, XAxis
 from .core.values import SPLIT_POINT
 
 CC_STATUS = 0xB0
@@ -21,6 +22,8 @@ CC_STATUS = 0xB0
 # Device protocol numbers.
 NRPN_USER_FIRMWARE_MODE = 245
 NRPN_QUERY = 299
+CC_SLIDE_MODE = 9
+CC_X_AXIS = 10
 CC_Y_AXIS = 11
 CC_LIGHT_COLUMN = 20
 CC_LIGHT_ROW = 21
@@ -123,6 +126,16 @@ def user_firmware_mode(on):
 
 def y_axis(on):
     return [m for channel in range(layout.ROWS) for m in cc(channel, CC_Y_AXIS, int(on))]
+
+
+def x_rows(rows):
+    # X and slide mode on for the device rows in rows, off for the others.
+    return [
+        m
+        for channel in range(layout.ROWS)
+        for number in (CC_X_AXIS, CC_SLIDE_MODE)
+        for m in cc(channel, number, int(channel in rows))
+    ]
 
 
 # Column 1's notes (architecture section 5, "Note numbers in a playing split").
@@ -322,6 +335,41 @@ class NrpnReader:
             seen = self._seen
             return (seen[99] << 7) | seen[98], (seen[6] << 7) | value
         return None
+
+
+class SlideDecoder:
+    """Turns X CCs, slide transfers (CC 119) and pad notes into core events."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self._lsb = {}  # (row, column) -> the latest X LSB
+        self._armed = {}  # row -> the source column of a transfer, until its target's Note On
+        self._swallow = set()  # (row, column): a transfer's source release, still to come
+
+    def x_lsb(self, row, column, value):
+        # The LSB comes first; the MSB completes the report.
+        self._lsb[(row, column)] = value
+
+    def x_msb(self, row, column, value):
+        return XAxis(column, layout.pad_of(row), value << 7 | self._lsb.get((row, column), 0))
+
+    def transfer(self, row, from_column):
+        self._armed[row] = from_column
+
+    def pad(self, row, column, value):
+        # None for a swallowed message: a transfer's source Note Off, whose velocity is the
+        # target column, so Live may hand it over with any value.
+        if (row, column) in self._swallow:
+            self._swallow.discard((row, column))
+            return None
+        source = self._armed.get(row)
+        if source is not None and value > 0:
+            del self._armed[row]
+            self._swallow.add((row, source))
+            return SlideMoved(layout.pad_of(row), source, column)
+        return PadPress(column, layout.pad_of(row), value > 0)
 
 
 class LedDriver:

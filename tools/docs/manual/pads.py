@@ -1,6 +1,6 @@
 """The manual's pad labels: short labels for the pad map, grouped into items for the list."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from BleakLoop.core import layout
 
@@ -116,9 +116,10 @@ _SIDE = (
         "Hold, press a clip, then an empty slot.",
     ),
     _one("Delete", layout.DELETE, "Hold, then press a clip or scene to delete it."),
-    _one("Session", layout.SESSION, "Session Mode."),
+    _one("Session", layout.SESSION, "Session Mode. In Session Mode, toggles the split view."),
     _one("Mixer", layout.MIXER, "Mixer Mode. Press again for Session Mode."),
     _one("FX", layout.FX, "FX Mode. Press again for Session Mode."),
+    _one("Dev", layout.DEV, "Hold for the Dev layer: tracks, devices and the fader source."),
 )
 
 _SIDE_SHIFT = (
@@ -188,6 +189,19 @@ _SESSION = (
     SELECT,
 )
 
+# The split view: 8 tracks, then the faders.
+SPLIT_TRACK_COLUMNS = range(layout.GRID_COLUMNS[0], layout.GRID_COLUMNS[0] + layout.SPLIT_TRACKS)
+
+_SPLIT = (
+    *(replace(block, columns=SPLIT_TRACK_COLUMNS) for block in _SESSION),
+    Block(
+        "Faders",
+        layout.SPLIT_FADER_COLUMNS,
+        ALL_PADS,
+        "One fader per row, as in FX Mode, from the source Dev + Fader source picks.",
+    ),
+)
+
 _SESSION_SHIFT = (
     Block("Clip slots: legato", layout.GRID_COLUMNS, SLOT_PADS, "Launch with legato."),
     SOLO,
@@ -205,10 +219,20 @@ _MIXER = (
     SELECT,
 )
 
+# Not drawn: the Shift notes of the split view's list.
+_SPLIT_SHIFT = tuple(replace(block, columns=SPLIT_TRACK_COLUMNS) for block in _SESSION_SHIFT)
+
 # Not drawn: the Shift notes of Mixer Mode's list.
 _MIXER_SHIFT = (SOLO, ARM)
 
 _FX = (
+    Block(
+        "Faders",
+        layout.FX_FADER_COLUMNS,
+        ALL_PADS,
+        "One fader per row: touch or slide along a row to set the selected device's macro "
+        "or parameter.",
+    ),
     Block(
         "Snapshots",
         range(layout.FX_SLOTS[0][0], layout.FX_SLOTS[-1][0] + 1),
@@ -222,6 +246,26 @@ _FX = (
         range(1, len(layout.FX_LENGTHS) + 1),
         "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.",
     ),
+)
+
+_DEV = (
+    Item(
+        "Tracks",
+        {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEV_TRACK_STEPS.items()},
+        "Select the previous or next track, through the returns and master.",
+    ),
+    Item(
+        "Devices",
+        {key: "Device-" if step < 0 else "Device+" for key, step in layout.DEV_DEVICE_STEPS.items()},
+        "Select the previous or next device on the selected track.",
+    ),
+    _one(
+        "Fader source",
+        layout.DEV_SOURCE,
+        "Switch the faders between Device FX and Mapped FX.",
+        label="Source",
+    ),
+    Item("Dev", {layout.DEV: "Dev"}, "Held.", variant=False),
 )
 
 _LINNSTRUMENT = (
@@ -268,9 +312,12 @@ SECTIONS = {
     "side-shift": _SIDE_SHIFT,
     "session": _SESSION,
     "session-shift": _SESSION_SHIFT,
+    "split": _SPLIT,
+    "split-shift": _SPLIT_SHIFT,
     "mixer": _MIXER,
     "mixer-shift": _MIXER_SHIFT,
     "fx": _FX,
+    "dev": _DEV,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,
     "linnstrument-scenes": _LINNSTRUMENT_SCENES,
@@ -280,8 +327,10 @@ SECTIONS = {
 LISTS = {
     "side": "side-shift",
     "session": "session-shift",
+    "split": "split-shift",
     "mixer": "mixer-shift",
     "fx": None,
+    "dev": None,
     "linnstrument": "linnstrument-shift",
     "linnstrument-scenes": None,
 }
@@ -291,15 +340,19 @@ LAYERS = {
     Layer.SESSION: ("side", "session"),
     Layer.SIDE: ("side",),
     Layer.SESSION_SHIFT: ("side-shift", "session-shift"),
+    Layer.SPLIT: ("side", "split"),
     Layer.MIXER: ("side", "mixer"),
     Layer.FX: ("side", "fx"),
+    Layer.MAPPED_FX: ("side", "fx"),
+    Layer.DEV: ("dev",),
     Layer.LINNSTRUMENT: ("linnstrument",),
     Layer.LINNSTRUMENT_SHIFT: ("linnstrument-shift",),
     Layer.LINNSTRUMENT_SCENES: ("linnstrument-scenes",),
 }
 
-# Columns a map shows dimmed and unlabelled: the side columns map dims the grid.
-DIMMED = {Layer.SIDE: layout.GRID_COLUMNS}
+# Columns a map shows dimmed and unlabelled: the side columns map dims the grid, and the Dev
+# layer's map everything but column 16.
+DIMMED = {Layer.SIDE: layout.GRID_COLUMNS, Layer.DEV: range(1, layout.NAV_COLUMN)}
 
 
 def items(layer):

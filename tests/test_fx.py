@@ -554,6 +554,8 @@ def test_session_render_in_fx_mode():
     assert frame[layout.FX] == Light(BLUE)
     assert frame[SLOT_3] == Light(CYAN)
     for column in layout.GRID_COLUMNS:
+        if column in layout.FX_FADER_COLUMNS:
+            continue
         for pad in range(1, layout.ROWS + 1):
             assert frame[(column, pad)] == fx.render(state)[(column, pad)]
 

@@ -34,3 +34,7 @@ CONTINUE_MS = 600
 
 FX_DATA_KEY = "BleakLoop.fx"  # song.set_data key for the FX snapshots
 FX_TOUCH_TOLERANCE = 0.005  # of a macro's range: further from the last write is a hand turn
+
+# Firmware FXD_CALX_FULL_UNIT (4095 / 24): column c's centre is X_COLUMN_WIDTH * (c - 0.5).
+X_COLUMN_WIDTH = 170.625
+FADERS_DATA_KEY = "BleakLoop.faders"  # song.set_data key for the Mapped FX bindings

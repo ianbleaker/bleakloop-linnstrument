@@ -16,8 +16,8 @@ While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 
 ## 2. Finding your way
 
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
-- Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it. Pads 7 and 8 of each column mute and arm that track.
-- Shift, Copy and Delete work while held.
+- Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it. Pads 7 and 8 of each column mute and arm that track. The split view (section 3) narrows the window to 8 tracks.
+- Shift, Copy, Delete and Dev work while held.
 - Each map shows the pads' names over their colours in an example Set. A dashed ring blinks with the beat; a dotted ring blinks fast.
 
 ## 3. Session Mode
@@ -54,15 +54,35 @@ Recording on a MIDI track switches to Linnstrument Mode, so you can play straigh
 
 With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop can't undo that, so after you disarm the selected MIDI track its pad may stay red.
 
+### Split view
+
+The split view shows 8 tracks and eight faders side by side. Press Session (column 16, pad 3) while in Session Mode to turn it on or off, with a message. Session is pink while the split view is on.
+
+![Session Mode, split view](manual/session-split.svg)
+
+<!-- callouts:split -->
+- **Clip slots**: Launch a clip. On an armed track, an empty slot records. *(Shift: Launch with legato)*
+- **Mute**: Mute or unmute the track: pink while audible, orange while muted. *(Shift: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed)*
+- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it. *(Shift: Arm or disarm the track alone, keeping the selection)*
+- **Faders**: One fader per row, as in FX Mode, from the source Dev + Fader source picks.
+<!-- /callouts:split -->
+
+- Columns 2–9 work as in Session Mode for an 8-track window, and Live's ring shrinks to match. The window moves as usual; turning the split view off keeps it where it is, unless it then runs past the last track.
+- Columns 10–14 are the faders, five pads wide, in every row: they work as FX Mode's (section 7), Device FX or Mapped FX. They have no mute or arm pads.
+- A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
+- The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
+- Mixer and FX Mode always show 13 tracks; near the last track, the window moves left to fill them. Pressing Session from them returns to whichever view you were in.
+- The split view is off each time Live starts or a Set opens.
+
 ## 4. Side columns
 
 Columns 1, 15 and 16 work the same in Session, Mixer and FX Mode. Column 1 is also the same in Linnstrument Mode (section 8), where Record, Capture and Shift + Play act on the selected track. Column 16, on the outer edge, holds Copy, Delete and the mode pads in every mode, and column 15, next to the grid, holds the scenes.
 
 **Fixed Length** is one pad: its colour shows the length, dark while off, then cyan, blue, magenta and pink. The length stays when you change mode.
 
-**Session, Mixer and FX** (column 16, pads 3–5) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode.
+**Session, Mixer and FX** (column 16, pads 3–5) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode. In Session Mode, Session toggles the split view (section 3), and is pink while it's on.
 
-Pads 6–8 of column 16 are dark and do nothing: they're kept for Drum, Chord and Sequencer modes still to come.
+Pads 6 and 7 of column 16 are dark and do nothing: they're kept for Chord and Sequencer modes still to come. Pad 8 is **Dev** (below).
 
 **Unmute all** (column 15, pad 7) acts on every track and return track in the Set, not just the window. With Shift held it's **Unsolo all**.
 
@@ -84,9 +104,10 @@ Pads 6–8 of column 16 are dark and do nothing: they're kept for Drum, Chord an
 - **Stop**: Hold, then press a track's pad to stop that track's clips. *(Shift: Stop all clips)*
 - **Copy**: Hold, press a clip, then an empty slot. *(Shift: Move the window up)*
 - **Delete**: Hold, then press a clip or scene to delete it. *(Shift: Move the window down)*
-- **Session**: Session Mode. *(Shift: Move the window left)*
+- **Session**: Session Mode. In Session Mode, toggles the split view. *(Shift: Move the window left)*
 - **Mixer**: Mixer Mode. Press again for Session Mode. *(Shift: Move the window right)*
 - **FX**: FX Mode. Press again for Session Mode.
+- **Dev**: Hold for the Dev layer: tracks, devices and the fader source. *(Shift: Tempo +1 or -1 BPM)*
 <!-- /callouts:side -->
 
 **Copying:**
@@ -100,9 +121,27 @@ Pads 6–8 of column 16 are dark and do nothing: they're kept for Drum, Chord an
 
 **Scenes** are lime and blinking while playing, steady lime once launched until they start at the next quantization boundary, and white if they hold clips.
 
+### Dev
+
+Dev (column 16, pad 8, orange) is held, like Shift. While you hold it, its pad blinks fast and column 16 shows the Dev layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual. Dev works in Session, Mixer and FX Mode.
+
+![Dev](manual/dev.svg)
+
+<!-- callouts:dev -->
+- **Tracks**: Select the previous or next track, through the returns and master.
+- **Devices**: Select the previous or next device on the selected track.
+- **Fader source**: Switch the faders between Device FX and Mapped FX.
+- **Dev**: Held.
+<!-- /callouts:dev -->
+
+- The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.
+- Devices are the ones directly on the track. With a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
+- The fader source starts on Device FX each time Live starts or a Set opens.
+- With Shift's layer showing, Dev's pad is Tempo −1, as before.
+
 ## 5. Shift
 
-Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a second layer. The lists above give each pad's Shift function in italics: Shift + Undo is Redo, Shift + Play stops all clips, column 16's top four pads move the window, and its bottom two step the tempo by 1 BPM. Unlit pads do nothing. In Mixer Mode the faders go dark and pads 7 and 8 show their Shift layer; in FX Mode the grid goes dark.
+Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a second layer. The lists above give each pad's Shift function in italics: Shift + Undo is Redo, Shift + Play stops all clips, column 16's top four pads move the window, and its bottom two step the tempo by 1 BPM. Unlit pads do nothing. In Mixer Mode the faders go dark and pads 7 and 8 show their Shift layer; in FX Mode the grid, faders included, goes dark and ignores presses, and so do the split view's faders.
 
 ![Shift](manual/session-shift.svg)
 
@@ -128,14 +167,38 @@ Shift is pad 8 of column 1, nearest you, and works in every mode. Hold it for a 
 
 ## 7. FX Mode
 
-FX Mode stores snapshots of every rack's macros and brings them back, at once or as a morph over a number of bars. The snapshots are saved in the Set. Press FX (column 16, pad 5) to turn it on, and press it again, or Session, to turn it off. FX and Mixer Mode replace each other.
+FX Mode has eight horizontal faders for the selected device, and stores snapshots of every rack's macros and brings them back, at once or as a morph over a number of bars. The snapshots are saved in the Set. Press FX (column 16, pad 5) to turn it on, and press it again, or Session, to turn it off. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
 
 <!-- callouts:fx -->
+- **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
 - **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 12, 9–16 in column 13. Press an empty slot to store, a stored one to recall.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.
 <!-- /callouts:fx -->
+
+**Faders** (columns 2–11): one fader per row. They have two sources, switched with Dev + Fader source: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Dev + Devices, moves the blue hand there; so does another controller's device navigation.
+
+- In Device FX, a rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
+- Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 11 the maximum. Slide along the row to move it.
+- The lit pads, counted from the left, show the value. Rows alternate magenta and blue so you can count them. The bar follows the parameter, so automation, a morph or a turn of the knob in Live move it too.
+- Slide past either end and the value stays at that end. Your finger can go on over column 1 or the snapshots without pressing them, until you lift it.
+- One touch is one undo, however many rows you move at once.
+- A fader on a macro that's morphing takes that macro out of the morph; the rest of the morph carries on.
+- Holding Stop or Copy, a fader does nothing.
+
+**Mapped FX** gives each row a parameter of your choice, from anywhere in the Set.
+
+![FX Mode, Mapped FX](manual/fx-mapped.svg)
+
+- To bind a row, click a parameter in Live, then hold Dev and press any pad of the row. The status bar names what it bound, such as "Fader 3: Auto Filter Frequency". Binding a row again replaces its parameter.
+- Any parameter of a device directly on a track, group, return or master can be bound, and so can a track's volume, pan and sends. A parameter of a device inside a rack can't: map it to one of the rack's macros, and bind the macro. Other mixer controls, such as the crossfader or the tempo, can't be bound either.
+- To unbind a row, hold Delete and press any pad of it.
+- Unbound rows are dark. Binding and unbinding only work while the faders show Mapped FX; in Device FX, Dev + a row says "Dev + FX for Mapped FX".
+- The bindings are saved in the Set. Undo doesn't bring back a bind or unbind yet (#63): bind or unbind the row again.
+- A binding finds its parameter again by the track's name, the device's name and the parameter's name, counting same-named tracks and devices in order. If you rename the track or device, or delete it, the row goes dark, and touching it says "Fader N: parameter not found". Renaming it back brings the row back.
+
+**Snapshots:**
 
 - A snapshot holds the visible macros of every rack on the Set's tracks, groups, returns and master. Racks inside other racks aren't included.
 - Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it.
@@ -153,7 +216,7 @@ FX Mode stores snapshots of every rack's macros and brings them back, at once or
 - Stopping the transport, or jumping back in the song, lands the morph at once.
 - The morph carries on when you leave FX Mode.
 
-A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A recall is one undo, and so is a whole morph. Storing or clearing a snapshot is an undo of its own too, and the pads follow it.
+A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot yet (#63).
 
 ## 8. Linnstrument Mode
 

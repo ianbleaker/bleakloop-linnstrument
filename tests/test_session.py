@@ -48,6 +48,8 @@ from BleakLoop.core.model import (
     SetTempo,
     ShowClip,
     ShowMessage,
+    StepDevice,
+    StepTrack,
     SlotView,
     Snapshot,
     StopAllClips,
@@ -372,8 +374,84 @@ def test_mode_pads_switch(state, key, mixer, fx):
     assert (new.mixer, new.fx) == (mixer, fx)
 
 
-def test_session_pad_in_session_does_nothing():
-    assert handle(SESSION, layout.SESSION) == (SESSION, [])
+# Split view
+
+
+SPLIT = State(split=True)
+
+
+def test_session_pad_toggles_the_split_view():
+    state, actions = handle(SESSION, layout.SESSION)
+    assert state.split and actions == [ShowMessage("Split view ON")]
+    state, actions = handle(state, layout.SESSION)
+    assert not state.split and actions == [ShowMessage("Split view OFF")]
+
+
+@pytest.mark.parametrize("key", [layout.MIXER, layout.FX])
+def test_session_from_mixer_or_fx_returns_to_the_split_view(key):
+    state, _ = handle(SPLIT, key)
+    state, _ = handle(state, layout.SESSION)
+    assert state.split and not state.mixer and not state.fx
+
+
+def test_the_split_window_is_8_tracks_wide():
+    snapshot = session_snapshot(track_count=20)
+    state, actions = handle(replace(SPLIT, shift=True, window=Window(11, 0)), layout.MIXER, snapshot)
+    assert state.window == Window(12, 0)
+    assert actions == [ShowMessage("Tracks 13–20, Scenes 1–6")]
+    assert handle(state, layout.MIXER, snapshot)[0].window == Window(12, 0)
+
+
+def test_turning_the_split_off_reclamps_the_window():
+    snapshot = session_snapshot(track_count=20)
+    state, _ = handle(replace(SPLIT, window=Window(12, 0)), layout.SESSION, snapshot)
+    assert state.window == Window(7, 0)
+    state, _ = handle(replace(SPLIT, window=Window(3, 0)), layout.SESSION, snapshot)
+    assert state.window == Window(3, 0)
+
+
+@pytest.mark.parametrize("key", [layout.MIXER, layout.FX])
+def test_mixer_or_fx_from_the_split_view_reclamps_the_window(key):
+    snapshot = session_snapshot(track_count=20)
+    state, _ = handle(replace(SPLIT, window=Window(12, 0)), key, snapshot)
+    assert state.window == Window(7, 0)
+    state, _ = handle(state, key, snapshot)
+    assert state.split and state.window == Window(7, 0)
+
+
+def test_window_tracks():
+    assert session.window_tracks(SPLIT) == 8
+    assert session.window_tracks(SESSION) == 13
+    assert session.window_tracks(replace(SPLIT, mixer=True)) == 13
+    assert session.window_tracks(replace(SPLIT, fx=True)) == 13
+
+
+def test_split_routes_column_9_to_the_clips_and_10_to_the_faders():
+    assert handle(SPLIT, (9, 1)) == (SPLIT, [FireSlot(7, 0, legato=False)])
+    assert handle(SPLIT, (9, layout.MUTE_ROW)) == (SPLIT, [ToggleMute(7)])
+    # Pad 1 of column 10 is a fader row here: no parameter in SNAP, so nothing.
+    assert handle(SPLIT, (10, 1)) == (SPLIT, [])
+    assert handle(SPLIT, (10, layout.MUTE_ROW)) == (SPLIT, [])
+
+
+def test_stop_and_a_split_fader_column_does_nothing():
+    state = replace(SPLIT, stop=True)
+    assert handle(state, (12, 3)) == (state, [])
+    assert handle(state, (9, 3))[1] == [StopTrackClips(7), ShowMessage("Stop clips: T8")]
+
+
+def test_split_render():
+    frame = session.render(SPLIT, SNAP)
+    assert frame[layout.SESSION] == Light(PINK)
+    assert frame[(9, layout.MUTE_ROW)] == Light(PINK)
+    assert all(frame[(column, pad)] == Light(OFF) for column in range(10, 15) for pad in (7, 8))
+
+
+def test_mixer_mode_ignores_the_split():
+    state = replace(SPLIT, mixer=True)
+    frame = session.render(state, SNAP)
+    assert frame[layout.MIXER] == Light(BLUE) and frame[layout.SESSION] == Light(CYAN)
+    assert frame[(14, layout.MUTE_ROW)] == Light(PINK)
 
 
 @pytest.mark.parametrize("key", [layout.SESSION, layout.FX, layout.MIXER])
@@ -399,7 +477,7 @@ def test_normal_layer_column_16():
     frame = session.render(SESSION, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
         Light(MAGENTA), Light(RED), Light(BLUE), Light(CYAN),
-        Light(CYAN), Light(OFF), Light(OFF), Light(OFF),
+        Light(CYAN), Light(OFF), Light(OFF), Light(ORANGE),
     ]
 
 
@@ -442,6 +520,70 @@ def test_tempo_clamps_at_20():
         SHIFT,
         [SetTempo(20), ShowMessage("Tempo 20.0 BPM")],
     )
+
+
+# Dev
+
+
+DEV = State(dev=True)
+
+
+@pytest.mark.parametrize("state", [SESSION, MIXING, FX_ON])
+def test_dev_is_held(state):
+    held, actions = handle(state, layout.DEV)
+    assert held.dev and actions == []
+    assert handle(held, layout.DEV, pressed=False) == (state, [])
+
+
+@pytest.mark.parametrize(
+    "key, actions",
+    [
+        ((16, 1), [StepTrack(-1)]),
+        ((16, 2), [StepTrack(1)]),
+        ((16, 3), [StepDevice(-1)]),
+        ((16, 4), [StepDevice(1)]),
+        ((16, 6), []),
+        ((16, 7), []),
+    ],
+)
+@pytest.mark.parametrize("state", [DEV, replace(DEV, shift=True), replace(DEV, fx=True)])
+def test_dev_layer(state, key, actions):
+    assert handle(state, key) == (state, actions)
+
+
+def test_dev_toggles_the_fader_source():
+    state, actions = handle(DEV, layout.DEV_SOURCE)
+    assert state.fader_source == "mapped"
+    assert actions == [ShowMessage("Mapped FX")]
+    state, actions = handle(state, layout.DEV_SOURCE)
+    assert state.fader_source == "device"
+    assert actions == [ShowMessage("Device FX")]
+
+
+def test_dev_on_shifts_layer_steps_the_tempo():
+    assert handle(SHIFT, layout.DEV) == (
+        SHIFT,
+        [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")],
+    )
+
+
+def test_dev_pad_lights():
+    assert session.render(SESSION, SNAP)[layout.DEV] == Light(ORANGE)
+    assert session.render(SHIFT, SNAP)[layout.DEV] == Light(GREEN)
+
+
+@pytest.mark.parametrize("state", [DEV, replace(DEV, shift=True)])
+def test_dev_layer_lights(state):
+    frame = session.render(state, SNAP)
+    assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
+        Light(LIME), Light(LIME), Light(MAGENTA), Light(MAGENTA),
+        Light(ORANGE), Light(OFF), Light(OFF), Light(ORANGE, Blink.FAST),
+    ]
+
+
+def test_entering_a_mode_drops_dev():
+    state = session.handle(DEV, press(layout.MODE_PAD), SNAP)[0]
+    assert state.mode is Mode.LINNSTRUMENT and not state.dev
 
 
 # Column 15
@@ -814,7 +956,7 @@ DELETE = State(delete=True)
 
 INERT_WHILE_HELD = (
     [(c, p) for c in layout.GRID_COLUMNS for p in (layout.MUTE_ROW, layout.SELECT_ROW)]
-    + [(layout.NAV_COLUMN, p) for p in range(3, 9)]
+    + [(layout.NAV_COLUMN, p) for p in range(3, 8)]
     + [layout.UNMUTE_ALL, layout.STOP]
     + [(1, p) for p in range(1, 8)]
 )

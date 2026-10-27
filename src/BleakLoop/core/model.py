@@ -94,6 +94,8 @@ class Snapshot:
     # Over every track and return track in the Set, not just the window.
     any_muted: bool = False
     any_soloed: bool = False
+    # FaderView or None per fader row, pad 1 first; read only while the faders show.
+    faders: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -102,6 +104,17 @@ class MacroView:
     min: float
     max: float
     is_quantized: bool = False  # on/off or chooser: switches, never glides
+
+
+@dataclass(frozen=True)
+class FaderView:
+    # The parameter one horizontal fader row controls.
+    name: str
+    value: float
+    min: float
+    max: float
+    is_quantized: bool = False
+    macro: tuple | None = None  # (path, rack name, index) for a top-level rack's macro
 
 
 @dataclass(frozen=True)
@@ -130,6 +143,30 @@ class YAxis:
     column: int
     pad: int
     value: int
+
+
+@dataclass(frozen=True)
+class XAxis:
+    # X position across the whole surface, 0-2730 (architecture section 5).
+    column: int
+    pad: int
+    value: int
+
+
+@dataclass(frozen=True)
+class SlideMoved:
+    # A finger held on a pad crossed into the next column of the same row.
+    pad: int
+    from_column: int
+    to_column: int
+
+
+@dataclass(frozen=True)
+class FaderBound:
+    # Fed back by the adapter after BindFader.
+    row: int  # 0-7, pad 1 first
+    binding: object  # FaderBinding, or None when the parameter can't be bound
+    message: str
 
 
 @dataclass(frozen=True)
@@ -371,6 +408,33 @@ class SetMacros:
 @dataclass(frozen=True)
 class SaveFxSnapshots:
     text: str
+
+
+@dataclass(frozen=True)
+class SetFaderParameter:
+    row: int  # 0-7, pad 1 first
+    name: str  # the parameter's name at the press: a different parameter isn't written
+    value: float
+
+
+@dataclass(frozen=True)
+class BindFader:
+    row: int  # 0-7: bind Live's selected parameter to this row
+
+
+@dataclass(frozen=True)
+class SaveFaderBindings:
+    text: str
+
+
+@dataclass(frozen=True)
+class StepTrack:
+    step: int  # -1 previous, 1 next
+
+
+@dataclass(frozen=True)
+class StepDevice:
+    step: int  # -1 previous, 1 next
 
 
 @dataclass(frozen=True)

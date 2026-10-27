@@ -3,7 +3,7 @@
 import enum
 from dataclasses import replace
 
-from BleakLoop.core.model import SelectedTrack, SlotView, Snapshot, TrackView
+from BleakLoop.core.model import FaderView, SelectedTrack, SlotView, Snapshot, TrackView
 from BleakLoop.core.modes import FxRack, Mode, State
 
 
@@ -11,8 +11,11 @@ class Layer(enum.Enum):
     SESSION = "session"
     SIDE = "side"
     SESSION_SHIFT = "session-shift"
+    SPLIT = "session-split"
     MIXER = "mixer"
     FX = "fx"
+    MAPPED_FX = "fx-mapped"
+    DEV = "dev"
     LINNSTRUMENT = "linnstrument"
     LINNSTRUMENT_SHIFT = "linnstrument-shift"
     LINNSTRUMENT_SCENES = "linnstrument-scenes"
@@ -90,12 +93,38 @@ MIXER_SNAPSHOT = replace(
 _STORED = (FxRack("Drums", "FX Rack", 0, (0.0,) * 8),)
 FX_SLOTS = tuple(_STORED if slot in (0, 1, 2, 8, 9) else None for slot in range(16))
 
+# Device FX on an eight-macro rack, at varied values.
+FADER_VALUES = (100, 30, 64, 127, 0, 85, 45, 110)
+FX_SNAPSHOT = replace(
+    SNAPSHOT,
+    faders=tuple(
+        FaderView(f"Macro {row + 1}", value, 0.0, 127.0)
+        for row, value in enumerate(FADER_VALUES)
+    ),
+)
+
+# Mapped FX with rows 3 and 7 unbound.
+MAPPED_VALUES = (0.85, 0.5, None, 0.3, 0.7, 1.0, None, 0.15)
+MAPPED_SNAPSHOT = replace(
+    SNAPSHOT,
+    faders=tuple(
+        None if value is None else FaderView("Bound", value, 0.0, 1.0)
+        for value in MAPPED_VALUES
+    ),
+)
+
 SCENES = {
     Layer.SESSION: (State(fixed_length=2), SNAPSHOT),
     Layer.SIDE: (State(fixed_length=2), SNAPSHOT),
     Layer.SESSION_SHIFT: (State(fixed_length=2, shift=True), SNAPSHOT),
+    Layer.SPLIT: (State(split=True, fixed_length=2), FX_SNAPSHOT),
     Layer.MIXER: (State(mixer=True), MIXER_SNAPSHOT),
-    Layer.FX: (State(fx=True, fx_slots=FX_SLOTS, fx_landed=1, fx_length=4), SNAPSHOT),
+    Layer.FX: (State(fx=True, fx_slots=FX_SLOTS, fx_landed=1, fx_length=4), FX_SNAPSHOT),
+    Layer.MAPPED_FX: (
+        State(fx=True, fx_slots=FX_SLOTS, fader_source="mapped"),
+        MAPPED_SNAPSHOT,
+    ),
+    Layer.DEV: (State(dev=True, fixed_length=2), SNAPSHOT),
     Layer.LINNSTRUMENT: (State(mode=Mode.LINNSTRUMENT), SNAPSHOT),
     Layer.LINNSTRUMENT_SHIFT: (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT),
     Layer.LINNSTRUMENT_SCENES: (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT),

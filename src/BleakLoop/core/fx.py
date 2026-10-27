@@ -4,7 +4,7 @@ import json
 import math
 from dataclasses import replace
 
-from . import layout, mixer
+from . import faders, layout, mixer
 from .leds import CYAN, OFF, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
@@ -81,11 +81,14 @@ def _put(slots, slot, value):
 
 def toggle(state):
     if state.fx:
-        return replace(state, fx=False, fx_length=None), [ShowMessage("FX Mode OFF")]
-    # FX and Mixer Mode replace each other.
-    actions = []
+        state, actions = faders.reset(state)
+        state = replace(state, fx=False, fx_length=None)
+        return state, actions + [ShowMessage("FX Mode OFF")]
+    # FX and Mixer Mode replace each other. Split view faders give way to FX Mode's.
+    state, actions = faders.reset(state)
     if state.mixer:
-        state, actions = mixer.reset(state)
+        state, more = mixer.reset(state)
+        actions += more
         state = replace(state, mixer=False)
         actions.append(SetMixer(False))
     state = replace(state, fx=True, copy_source=None)
@@ -120,10 +123,11 @@ def press(state, event, snapshot):
 
 
 def render(state):
-    # The grid columns in FX Mode; dark under Shift, as Mixer's faders.
+    # The grid columns right of the faders in FX Mode; dark under Shift, as Mixer's faders.
     frame = {
         (column, pad): Light(OFF)
         for column in layout.GRID_COLUMNS
+        if column not in layout.FX_FADER_COLUMNS
         for pad in range(1, layout.ROWS + 1)
     }
     if state.shift and not state.copy and not state.delete:
@@ -155,8 +159,14 @@ def racks_read(state, event, snapshot):
     note = f", {_count(missing, 'rack')} not found" if missing else ""
     if not macros:
         return state, [ShowMessage(f"Snapshot {number}: nothing to recall{note}")]
+    # A recall closes a fader gesture's undo step; the finger carries on in a new one.
+    actions = []
+    if state.fader_undo_open:
+        state = replace(state, fader_undo_open=False)
+        actions.append(EndUndoStep())
     # A new recall replaces a running morph and its undo step.
-    actions = [EndUndoStep()] if state.fx_undo_open else []
+    if state.fx_undo_open:
+        actions.append(EndUndoStep())
     if event.bars is None or not snapshot.is_playing:
         writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
         actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]

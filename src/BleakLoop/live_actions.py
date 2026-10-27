@@ -8,10 +8,12 @@ import Live
 
 from . import live_state
 from .core import values
+from .core.modes import FaderBinding
 from .core.model import (
     AddScene,
     ArmExclusive,
     BeginUndoStep,
+    BindFader,
     CaptureAndInsertScene,
     CaptureMidi,
     ClearBackToArrangement,
@@ -23,17 +25,20 @@ from .core.model import (
     DeleteScene,
     EndUndoStep,
     EnterMode,
+    FaderBound,
     FireScene,
     FireSlot,
     QuantizeClip,
     RacksRead,
     RecallFxSnapshot,
     Redo,
+    SaveFaderBindings,
     SaveFxSnapshots,
     SceneSelected,
     SelectTrack,
     SetArm,
     SetArrangementRecord,
+    SetFaderParameter,
     SetLaunchQuantization,
     SetMacros,
     SetMixer,
@@ -42,6 +47,8 @@ from .core.model import (
     SetVolume,
     ShowClip,
     ShowMessage,
+    StepDevice,
+    StepTrack,
     StopAllClips,
     StopTrackClips,
     StoreFxSnapshot,
@@ -74,6 +81,99 @@ def _undo_step(song):
 def _mixable(song):
     # Every track that has mute and solo: the tracks and return tracks, not master.
     return list(song.tracks) + list(song.return_tracks)
+
+
+def _binding(song, row):
+    # (FaderBinding, message) for Live's selected parameter, or (None, the refusal).
+    parameter = song.view.selected_parameter
+    if parameter is None:
+        return None, "Click a parameter in Live first"
+    owner = getattr(parameter, "canonical_parent", None)
+    track = getattr(owner, "canonical_parent", None)
+    tracks = [entry[2] for entry in live_state.fx_tracks(song)]
+    if not any(track == other for other in tracks):
+        # Inside a rack chain, or not on a track at all.
+        if _on_a_track(track, tracks):
+            return None, "Map it to a macro instead"
+        return None, "Can't bind this parameter"
+    tn = _earlier_named(tracks, track)
+    if hasattr(owner, "sends"):
+        # The track's mixer: volume, pan and sends only.
+        index = _index(live_state.mixer_parameters(track), parameter)
+        if index is None:
+            return None, "Can't bind this parameter"
+        binding = FaderBinding(track.name, tn, None, 0, index, parameter.name)
+        return binding, f"Fader {row + 1}: {track.name} {parameter.name}"
+    index = _index(list(owner.parameters), parameter)
+    if index is None:
+        return None, "Can't bind this parameter"
+    devices = list(track.devices)
+    binding = FaderBinding(
+        track.name, tn, owner.name, _earlier_named(devices, owner), index, parameter.name
+    )
+    return binding, f"Fader {row + 1}: {owner.name} {parameter.name}"
+
+
+def _on_a_track(item, tracks):
+    # Whether item sits somewhere under one of the tracks: a chain, a nested device. Racks
+    # nest a few levels at most; the limit only guards against an unexpected parent loop.
+    for _ in range(32):
+        if item is None:
+            return False
+        if any(item == track for track in tracks):
+            return True
+        item = getattr(item, "canonical_parent", None)
+    return False
+
+
+def _earlier_named(items, item):
+    # The count of items before item with its name.
+    position = _index(items, item)
+    return sum(1 for other in items[:position] if other.name == item.name)
+
+
+def _index(items, item):
+    return next((i for i, other in enumerate(items) if other == item), None)
+
+
+def _step(items, current, step):
+    # The item step places from current, or None past either end. With nothing current,
+    # the first or the last.
+    index = next((i for i, item in enumerate(items) if item == current), None)
+    if index is None:
+        index = -1 if step > 0 else len(items)
+    index += step
+    return items[index] if 0 <= index < len(items) else None
+
+
+def _step_track(song, step):
+    tracks = list(song.visible_tracks) + list(song.return_tracks) + [song.master_track]
+    track = _step(tracks, song.view.selected_track, step)
+    if track is None:
+        return "No more tracks"
+    song.view.selected_track = track
+    return track.name
+
+
+def _step_device(song, step):
+    track = song.view.selected_track
+    devices = list(track.devices)
+    device = _step(devices, _top_level(track.view.selected_device, track, devices), step)
+    if device is None:
+        return "No more devices"
+    song.view.select_device(device)
+    # The blue hand too: Device FX follows it, and a selection doesn't always move it.
+    song.appointed_device = device
+    return device.name
+
+
+def _top_level(device, track, devices):
+    # A device inside a rack steps from the rack on the track: up through chains and racks.
+    while device is not None and not any(device == other for other in devices):
+        device = getattr(device, "canonical_parent", None)
+        if device == track:
+            return None
+    return device
 
 
 def apply(action, song, surface):
@@ -204,6 +304,22 @@ def apply(action, song, surface):
                 logger.info("FX: skipped %s macro %d of %r", path, index + 1, rack_name)
                 continue
             parameter.value = min(max(value, parameter.min), parameter.max)
+    elif isinstance(action, SetFaderParameter):
+        # The parameter can change under a touch: a different one is skipped.
+        parameter = live_state.fader_parameter(song, surface.core_state, action.row)
+        if parameter is None or parameter.name != action.name:
+            logger.info("FADERS: skipped row %d, %r not found", action.row + 1, action.name)
+        else:
+            parameter.value = min(max(action.value, parameter.min), parameter.max)
+    elif isinstance(action, BindFader):
+        binding, message = _binding(song, action.row)
+        return FaderBound(action.row, binding, message)
+    elif isinstance(action, SaveFaderBindings):
+        song.set_data(values.FADERS_DATA_KEY, action.text)
+    elif isinstance(action, StepTrack):
+        surface.show_message(_step_track(song, action.step))
+    elif isinstance(action, StepDevice):
+        surface.show_message(_step_device(song, action.step))
     elif isinstance(action, SaveFxSnapshots):
         song.set_data(values.FX_DATA_KEY, action.text)
     elif isinstance(action, BeginUndoStep):

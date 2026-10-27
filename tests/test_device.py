@@ -30,6 +30,13 @@ def test_y_axis_off_on_all_rows():
     assert device.y_axis(False) == [(0xB0 + ch, 11, 0) for ch in range(8)]
 
 
+def test_x_rows_on_listed_rows_only():
+    messages = device.x_rows((0, 7))
+    assert len(messages) == 16
+    assert messages[:2] == [(0xB0, 10, 1), (0xB0, 9, 1)]
+    assert {m[0] - 0xB0 for m in messages if m[2] == 1} == {0, 7}
+
+
 def test_loading_column_lights_one_column_per_tick():
     for tick, column in ((0, 1), (15, 16), (16, 1)):
         messages = device.loading_column(tick)

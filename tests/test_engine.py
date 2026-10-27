@@ -1,7 +1,7 @@
 import pytest
 
 from BleakLoop.core import engine, layout
-from BleakLoop.core.model import EnterMode, PadPress, Snapshot
+from BleakLoop.core.model import EnterMode, PadPress, SlideMoved, Snapshot
 from BleakLoop.core.modes import Mode, State
 
 STOPPED = Snapshot(
@@ -30,6 +30,16 @@ def test_session_input_goes_to_session_module():
     state, actions = engine.handle(SESSION, press(layout.MODE_PAD), STOPPED)
     assert state.mode is Mode.LINNSTRUMENT
     assert actions == [EnterMode(Mode.LINNSTRUMENT)]
+
+
+def test_unowned_slide_releases_the_pad_it_left():
+    # Sliding off Stop ends the hold, as releasing it does.
+    stopping = State(Mode.SESSION, stop=True)
+    slide = SlideMoved(pad=layout.STOP[1], from_column=layout.STOP[0], to_column=16)
+    assert engine.slide(stopping, slide, STOPPED) == engine.handle(
+        stopping, press(layout.STOP, False), STOPPED
+    )
+    assert not engine.slide(stopping, slide, STOPPED)[0].stop
 
 
 # Linnstrument Mode input

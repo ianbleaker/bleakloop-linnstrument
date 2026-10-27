@@ -68,6 +68,33 @@ class Glide:
 
 
 @dataclass(frozen=True)
+class FaderTouch:
+    # One finger on a horizontal fader row. The parameter is taken at the press, so an X
+    # report needs no snapshot.
+    pad: int
+    column: int  # the cell the finger is on, which a slide moves
+    first: int  # the fader's first and last column
+    last: int
+    name: str
+    min: float
+    max: float
+    is_quantized: bool
+    macro: tuple | None  # as FaderView.macro
+    norm: float | None = None  # the last position written, None before the first
+
+
+@dataclass(frozen=True)
+class FaderBinding:
+    # A Mapped FX row's parameter, found again by names: the LOM has no stable IDs.
+    track: str
+    tn: int  # the count of earlier tracks with this name, tracks then returns then master
+    device: str | None  # a top-level device's name; None for the track's mixer
+    dn: int  # the count of earlier devices with this name on the track
+    param: int  # index into device.parameters, or into [volume, panning, *sends]
+    name: str  # the parameter's name: a renamed or moved parameter isn't found
+
+
+@dataclass(frozen=True)
 class FxRack:
     # One rack's macros in a stored snapshot, keyed as fx.keys gives them.
     track: str
@@ -123,6 +150,12 @@ class State:
     morph: Morph | None = None  # runs in every mode
     fx_undo_open: bool = False  # a recall's undo step is open in Live
     fx_landed: int | None = None  # the slot of the last recall that landed
+    fader_touches: tuple = ()  # FaderTouch per touched fader row
+    fader_undo_open: bool = False  # a fader gesture's undo step is open in Live
+    fader_source: str = "device"  # "device" or "mapped"
+    dev: bool = False  # Dev is held
+    split: bool = False  # Session Mode's split view
+    fader_bindings: tuple = (None,) * 8  # Mapped FX: FaderBinding or None per row
 
 
 def enter(state, mode):
@@ -131,7 +164,9 @@ def enter(state, mode):
     # Entering Linnstrument Mode clears Shift: a Shift held then was pressed in User Firmware
     # Mode, and the firmware sends its release as a User Firmware note, not on the control
     # channel, so BleakLoop never sees it.
-    # A caller leaving Mixer Mode closes an open undo step first (mixer.reset).
+    # A caller leaving Mixer Mode closes an open undo step first (mixer.reset), and one
+    # leaving the faders closes theirs (faders.reset). The split view, the fader source and
+    # the bindings survive.
     # FX Mode turns off, but a running morph, its undo step and the snapshots carry on.
     if mode is Mode.LINNSTRUMENT and state.mode is Mode.SESSION:
         origin = Origin.MIXER if state.mixer else Origin.FX if state.fx else Origin.SESSION
@@ -153,6 +188,8 @@ def enter(state, mode):
         scene_page=False,
         fx=False,
         fx_length=None,
+        dev=False,
+        fader_touches=(),
     )
     if mode is not Mode.SESSION:
         state = replace(state, shift=False)

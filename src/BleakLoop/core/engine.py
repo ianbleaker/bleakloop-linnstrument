@@ -1,7 +1,7 @@
 """handle() and render(): all behaviour, no side effects."""
 
-from . import fx, mixer, linnstrument_mode, session
-from .model import RacksRead
+from . import faders, fx, mixer, linnstrument_mode, session
+from .model import FaderBound, PadPress, RacksRead
 from .modes import Mode
 
 
@@ -9,6 +9,8 @@ def handle(state, event, snapshot):
     if isinstance(event, RacksRead):
         # A morph runs in every mode.
         return fx.racks_read(state, event, snapshot)
+    if isinstance(event, FaderBound):
+        return faders.bound(state, event)
     if state.mode is Mode.SESSION:
         return session.handle(state, event, snapshot)
     return linnstrument_mode.handle(state, event, snapshot)
@@ -19,6 +21,26 @@ def y_axis(state, event):
     if state.mode is not Mode.SESSION:
         return state
     return mixer.y_axis(state, event)
+
+
+def x_rows(state):
+    # The device rows that want X and slide mode: every row while the faders show.
+    return tuple(range(8)) if faders.visible(state) else ()
+
+
+def x_axis(state, event):
+    # An X report: no snapshot, and a redraw flag.
+    if state.mode is not Mode.SESSION:
+        return state, [], False
+    return faders.x_axis(state, event)
+
+
+def slide(state, event, snapshot):
+    # A slide no fader owns releases the pad it left.
+    state, owned = faders.slide(state, event)
+    if owned:
+        return state, []
+    return handle(state, PadPress(event.from_column, event.pad, False), snapshot)
 
 
 def tick(state, now_ms):

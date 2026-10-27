@@ -7,11 +7,18 @@ import pytest
 sys.modules.setdefault("Live", ModuleType("Live"))
 
 from BleakLoop import live_actions  # noqa: E402
+from BleakLoop.core.modes import FaderBinding  # noqa: E402
 from BleakLoop.core.model import (  # noqa: E402
+    BindFader,
     CopyGroupClips,
     CopyScene,
     DeleteGroupClips,
+    FaderBound,
+    SaveFaderBindings,
     SetArm,
+    SetFaderParameter,
+    StepDevice,
+    StepTrack,
     ToggleSolo,
     UnmuteAll,
     UnsoloAll,
@@ -153,3 +160,207 @@ def test_delete_group_clips_closes_its_undo_step_on_failure():
     with pytest.raises(ZeroDivisionError):
         apply(DeleteGroupClips(0, 0), song)
     assert song.undo == ["begin", "end"]
+
+
+# Faders and Dev
+
+
+class FakeParameter:
+    def __init__(self, name, value=0.0):
+        self.name, self.value, self.min, self.max = name, value, 0.0, 1.0
+
+
+def fader_song(parameters):
+    device = SimpleNamespace(
+        can_have_chains=False, parameters=[FakeParameter("Device On")] + parameters
+    )
+    return SimpleNamespace(appointed_device=device)
+
+
+FADER_SURFACE = SimpleNamespace(core_state=SimpleNamespace(fader_source="device"))
+
+
+def test_set_fader_parameter_writes_clamped():
+    parameter = FakeParameter("Cutoff")
+    song = fader_song([parameter])
+    live_actions.apply(SetFaderParameter(0, "Cutoff", 1.5), song, FADER_SURFACE)
+    assert parameter.value == 1.0
+
+
+def test_set_fader_parameter_skips_a_different_parameter():
+    parameter = FakeParameter("Resonance", 0.25)
+    song = fader_song([parameter])
+    live_actions.apply(SetFaderParameter(0, "Cutoff", 0.9), song, FADER_SURFACE)
+    assert parameter.value == 0.25
+
+
+def test_set_fader_parameter_skips_a_missing_row():
+    song = fader_song([FakeParameter("Cutoff")])
+    live_actions.apply(SetFaderParameter(5, "Cutoff", 0.9), song, FADER_SURFACE)
+
+
+class Messages:
+    def __init__(self):
+        self.shown = []
+
+    def show_message(self, text):
+        self.shown.append(text)
+
+
+def dev_song(selected, device=None):
+    a, b = SimpleNamespace(name="A"), SimpleNamespace(name="B")
+    ret, master = SimpleNamespace(name="Reverb"), SimpleNamespace(name="Master")
+    tracks = {"A": a, "B": b, "Reverb": ret, "Master": master}
+    return SimpleNamespace(
+        visible_tracks=[a, b],
+        return_tracks=[ret],
+        master_track=master,
+        view=SimpleNamespace(selected_track=tracks[selected]),
+    )
+
+
+@pytest.mark.parametrize(
+    "selected, step, expected",
+    [("A", 1, "B"), ("B", 1, "Reverb"), ("Reverb", 1, "Master"), ("B", -1, "A")],
+)
+def test_step_track_through_tracks_returns_and_master(selected, step, expected):
+    song, surface = dev_song(selected), Messages()
+    live_actions.apply(StepTrack(step), song, surface)
+    assert song.view.selected_track.name == expected
+    assert surface.shown == [expected]
+
+
+@pytest.mark.parametrize("selected, step", [("A", -1), ("Master", 1)])
+def test_step_track_stops_at_the_ends(selected, step):
+    song, surface = dev_song(selected), Messages()
+    live_actions.apply(StepTrack(step), song, surface)
+    assert song.view.selected_track.name == selected
+    assert surface.shown == ["No more tracks"]
+
+
+def device_song(selected_index=None, nested=False):
+    track = SimpleNamespace()
+    devices = [SimpleNamespace(name=n, canonical_parent=track) for n in ("Synth", "Rack", "EQ")]
+    selected = None if selected_index is None else devices[selected_index]
+    if nested:
+        chain = SimpleNamespace(canonical_parent=devices[1])
+        selected = SimpleNamespace(name="Inner", canonical_parent=chain)
+    track.devices = devices
+    track.view = SimpleNamespace(selected_device=selected)
+    chosen = []
+    song = SimpleNamespace(view=SimpleNamespace(selected_track=track, select_device=chosen.append))
+    return song, chosen
+
+
+def test_step_device_next_and_previous():
+    song, chosen = device_song(0)
+    surface = Messages()
+    live_actions.apply(StepDevice(1), song, surface)
+    assert [d.name for d in chosen] == ["Rack"] and surface.shown == ["Rack"]
+    assert song.appointed_device.name == "Rack"
+
+
+def test_step_device_from_inside_a_rack_steps_from_the_rack():
+    song, chosen = device_song(nested=True)
+    live_actions.apply(StepDevice(1), song, Messages())
+    assert [d.name for d in chosen] == ["EQ"]
+
+
+def test_step_device_stops_at_the_end():
+    song, chosen = device_song(2)
+    surface = Messages()
+    live_actions.apply(StepDevice(1), song, surface)
+    assert chosen == [] and surface.shown == ["No more devices"]
+
+
+
+# Binding
+
+
+class Param:
+    def __init__(self, name, parent=None):
+        self.name, self.canonical_parent = name, parent
+
+
+def bind_song(selected_parameter):
+    return SimpleNamespace(
+        view=SimpleNamespace(selected_parameter=selected_parameter),
+        tracks=BIND_TRACKS,
+        return_tracks=[BIND_RETURN],
+        master_track=BIND_MASTER,
+    )
+
+
+def bind_track(name, devices=(), sends=1):
+    track = SimpleNamespace(name=name, devices=[])
+    mixer = SimpleNamespace(canonical_parent=track)
+    mixer.volume = Param("Track Volume", mixer)
+    mixer.panning = Param("Track Panning", mixer)
+    mixer.sends = [Param(f"Send {i}", mixer) for i in range(sends)]
+    mixer.crossfader = Param("Crossfader", mixer)
+    track.mixer_device = mixer
+    for device_name in devices:
+        device = SimpleNamespace(name=device_name, canonical_parent=track)
+        device.parameters = [Param("Device On", device), Param("Frequency", device)]
+        track.devices.append(device)
+    return track
+
+
+BIND_TRACKS = [bind_track("Bass", ["EQ", "EQ"]), bind_track("Bass", ["Comp"])]
+BIND_RETURN = bind_track("A Reverb")
+BIND_MASTER = bind_track("Main", sends=0)
+
+
+def bind(parameter, row=2):
+    return apply(BindFader(row), bind_song(parameter))
+
+
+def test_bind_a_top_level_device_parameter():
+    parameter = BIND_TRACKS[0].devices[1].parameters[1]
+    assert bind(parameter) == FaderBound(
+        2, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Fader 3: EQ Frequency"
+    )
+
+
+def test_bind_on_the_second_same_named_track():
+    parameter = BIND_TRACKS[1].devices[0].parameters[1]
+    assert bind(parameter).binding == FaderBinding("Bass", 1, "Comp", 0, 1, "Frequency")
+
+
+@pytest.mark.parametrize(
+    "track, attribute, index",
+    [(BIND_RETURN, "volume", 0), (BIND_TRACKS[0], "panning", 1), (BIND_MASTER, "volume", 0)],
+)
+def test_bind_mixer_volume_and_pan(track, attribute, index):
+    parameter = getattr(track.mixer_device, attribute)
+    event = bind(parameter)
+    assert event.binding.device is None and event.binding.param == index
+    assert event.message == f"Fader 3: {track.name} {parameter.name}"
+
+
+def test_bind_a_send():
+    event = bind(BIND_RETURN.mixer_device.sends[0])
+    assert event.binding == FaderBinding("A Reverb", 0, None, 0, 2, "Send 0")
+
+
+def test_bind_refuses_other_mixer_parameters():
+    event = bind(BIND_MASTER.mixer_device.crossfader)
+    assert event == FaderBound(2, None, "Can't bind this parameter")
+
+
+def test_bind_refuses_a_nested_device():
+    chain = SimpleNamespace(canonical_parent=BIND_TRACKS[0].devices[0])
+    nested = SimpleNamespace(name="Inner", canonical_parent=chain)
+    event = bind(Param("Frequency", nested))
+    assert event == FaderBound(2, None, "Map it to a macro instead")
+
+
+def test_bind_with_nothing_selected():
+    assert bind(None) == FaderBound(2, None, "Click a parameter in Live first")
+
+
+def test_save_fader_bindings():
+    stored = {}
+    song = SimpleNamespace(set_data=lambda key, text: stored.update({key: text}))
+    apply(SaveFaderBindings("{}"), song)
+    assert stored == {"BleakLoop.faders": "{}"}

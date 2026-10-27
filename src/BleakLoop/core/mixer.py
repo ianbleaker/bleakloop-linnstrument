@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import layout
+from . import faders, layout
 from .model import BeginUndoStep, EndUndoStep, SetMixer, SetVolume, ShowMessage
 from .modes import Glide, Lift, Touch
 from .values import (
@@ -68,9 +68,10 @@ def reset(state):
 
 def toggle(state):
     if not state.mixer:
-        # FX and Mixer Mode replace each other.
+        # FX and Mixer Mode replace each other. Mixer Mode has no horizontal faders.
+        state, actions = faders.reset(state)
         state = replace(state, mixer=True, copy_source=None, fx=False, fx_length=None)
-        return state, [SetMixer(True), ShowMessage("Mixer Mode ON")]
+        return state, actions + [SetMixer(True), ShowMessage("Mixer Mode ON")]
     state, actions = reset(state)
     return replace(state, mixer=False), actions + [SetMixer(False), ShowMessage("Mixer Mode OFF")]
 

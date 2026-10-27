@@ -6,6 +6,7 @@ from .core import layout, values
 from .core.model import (
     ClipTarget,
     ClipView,
+    FaderView,
     MacroView,
     RackView,
     SelectedTrack,
@@ -26,11 +27,20 @@ def read_transport(song, application):
     )
 
 
-def read(song, application, window, scene_clips=False, selected=False):
+def read(
+    song,
+    application,
+    window,
+    scene_clips=False,
+    selected=False,
+    faders=None,
+    width=layout.WINDOW_TRACKS,
+):
+    # faders: the core state whose faders show, or None while they're hidden.
     tracks = list(song.visible_tracks)
     scenes = list(song.scenes)
     rows = range(window.scene, min(window.scene + layout.WINDOW_SCENES, len(scenes)))
-    columns = range(window.track, min(window.track + layout.WINDOW_TRACKS, len(tracks)))
+    columns = range(window.track, min(window.track + width, len(tracks)))
     selected_track = song.view.selected_track
     mixable = list(song.tracks) + list(song.return_tracks)
     return replace(
@@ -62,7 +72,119 @@ def read(song, application, window, scene_clips=False, selected=False):
         can_capture_midi=song.can_capture_midi,
         any_muted=any(track.mute for track in mixable),
         any_soloed=any(track.solo for track in mixable),
+        faders=read_faders(song, faders) if faders is not None else (),
     )
+
+
+FADER_ROWS = 8
+
+
+def read_faders(song, state):
+    # FaderView or None per fader row. A top-level rack's macro carries its identity in
+    # read_racks's terms, so a fader can take its macro out of a morph.
+    return tuple(
+        None
+        if target is None
+        else FaderView(
+            target[0].name,
+            target[0].value,
+            target[0].min,
+            target[0].max,
+            target[0].is_quantized,
+            target[1],
+        )
+        for target in fader_targets(song, state, range(FADER_ROWS))
+    )
+
+
+def fader_parameter(song, state, row):
+    # live_actions resolves SetFaderParameter with this, so the faders and their writes
+    # can't disagree.
+    target = fader_targets(song, state, (row,))[0]
+    return None if target is None else target[0]
+
+
+def fader_targets(song, state, rows):
+    # (parameter, macro identity or None), or None, per row asked for.
+    if state.fader_source == "mapped":
+        return [_bound(song, state.fader_bindings[row]) for row in rows]
+    # Device FX: the device with Live's blue hand.
+    device = song.appointed_device
+    if device is None:
+        return [None for _ in rows]
+    path = None
+    if device.can_have_chains:
+        parameters = macros(device)[:FADER_ROWS]
+        path = _rack_path(song, device)
+    else:
+        # Parameter 0 is Device On.
+        parameters = list(device.parameters)[1 : 1 + FADER_ROWS]
+    return [
+        None
+        if row >= len(parameters)
+        else (parameters[row], None if path is None else (path, device.name, row))
+        for row in rows
+    ]
+
+
+def _bound(song, binding):
+    # A Mapped FX binding's parameter, found again by names; None if it's gone or renamed.
+    if binding is None:
+        return None
+    found = nth_named(fx_tracks(song), binding.track, binding.tn, lambda item: item[2].name)
+    if found is None:
+        return None
+    kind, index, track = found
+    macro = None
+    if binding.device is None:
+        parameters = mixer_parameters(track)
+    else:
+        devices = list(track.devices)
+        device = nth_named(devices, binding.device, binding.dn, lambda item: item.name)
+        if device is None:
+            return None
+        parameters = list(device.parameters)
+        if device.can_have_chains and 1 <= binding.param <= device.visible_macro_count:
+            position = next(i for i, other in enumerate(devices) if other == device)
+            macro = ((kind, index, position), device.name, binding.param - 1)
+    if binding.param >= len(parameters):
+        return None
+    parameter = parameters[binding.param]
+    if parameter.name != binding.name:
+        return None
+    return parameter, macro
+
+
+def mixer_parameters(track):
+    # A track's bindable mixer parameters, in binding index order.
+    mixer = track.mixer_device
+    return [mixer.volume, mixer.panning, *mixer.sends]
+
+
+def nth_named(items, name, n, name_of):
+    # The item that is the n-th (from 0) with this name, or None.
+    count = 0
+    for item in items:
+        if name_of(item) == name:
+            if count == n:
+                return item
+            count += 1
+    return None
+
+
+def read_fader_store(song):
+    return song.get_data(values.FADERS_DATA_KEY, "")
+
+
+def _rack_path(song, device):
+    # (kind, track index, device index) of a rack directly on a track, return or master.
+    parent = device.canonical_parent
+    for kind, index, track in fx_tracks(song):
+        if track == parent:
+            for position, other in enumerate(track.devices):
+                if other == device:
+                    return kind, index, position
+    return None
 
 
 def candidate_clip(song, target):
@@ -158,7 +280,7 @@ def _slot(slot, members, scene):
 def read_racks(song):
     # Every top-level rack in Set order: tracks, returns, then master, devices left to right.
     racks = []
-    for kind, index, track in _fx_tracks(song):
+    for kind, index, track in fx_tracks(song):
         for position, device in enumerate(track.devices):
             if device.can_have_chains:
                 views = tuple(_macro(parameter) for parameter in macros(device))
@@ -210,7 +332,8 @@ def rack_at(song, path, rack_name):
     return device
 
 
-def _fx_tracks(song):
+def fx_tracks(song):
+    # (kind, index, track) for every track, return and master, in Set order.
     for index, track in enumerate(song.tracks):
         yield "track", index, track
     for index, track in enumerate(song.return_tracks):

@@ -20,7 +20,7 @@ flowchart LR
     live_actions["live_actions: writes"]
   end
   live["Live"]
-  linnstrument -->|"pad, Y-axis, CC"| surface
+  linnstrument -->|"pad, Y-axis, X, CC"| surface
   surface -->|"event"| handle
   live --> live_state
   live_state -->|"snapshot"| handle
@@ -37,10 +37,10 @@ flowchart LR
 | --- | --- |
 | `create_instance` | `__init__.py` |
 | Plumbing: `ControlSurface` subclass, elements, MIDI routing per mode, tick | `surface.py` |
-| NRPN, split setup and LED message building, LED driver | `device.py` |
+| NRPN, split setup and LED message building, LED driver, X and slide decoding | `device.py` |
 | Reading Live into a `Snapshot` | `live_state.py` |
 | Carrying out an `Action` as Live calls | `live_actions.py` |
-| Geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping | `core/layout.py` |
+| Geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping | `core/layout.py` |
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
 | Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers | `core/modes.py` |
 | Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights | `core/controls.py` |
@@ -48,6 +48,7 @@ flowchart LR
 | Column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/column_1.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
 | FX Mode: snapshot storage format, rack identity, store, recall, morph timing and tick, FX lights | `core/fx.py` |
+| Horizontal faders: X maths, touches and slides, undo, fader lights | `core/faders.py` |
 | Linnstrument Mode: column 1 only, handed to `column_1` | `core/linnstrument_mode.py` |
 | Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
 | Tuned numbers: every value in section 8, by name | `core/values.py` |
@@ -88,7 +89,7 @@ The plumbing uses v3's elements, MIDI map handling and lifecycle. v3's behaviour
 The core is a state machine plus a renderer, with no side effects of its own.
 
 - **Input:** `handle(state, event, snapshot) -> (state, actions)`.
-  - `event` is a pad press or release, or a tick. A Y-axis value takes its own entry, `y_axis(state, event) -> state`.
+  - `event` is a pad press or release, or a tick. A Y-axis value takes its own entry, `y_axis(state, event) -> state`, and so does an X value, `x_axis(state, event) -> (state, actions, redraw)`. A slide transfer goes to `slide(state, event, snapshot) -> (state, actions)`.
   - `snapshot` is a plain, read-only view of the Live state the decision needs.
   - `actions` are plain values such as `FireSlot(track, scene, legato, record_length)`, `Undo()`, `SetVolume(track, value)` or `ShowMessage(text)`. The adapters carry them out.
 - **Output:** `render(state, snapshot) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, column 1 in Linnstrument Mode. A pad may blink; the LED driver resolves blinking pads with a `clock` that gives the tempo-blink and fast-blink phase.
@@ -125,7 +126,7 @@ sequenceDiagram
   surface->>LinnStrument: only the pads that differ
 ```
 
-Snapshots are read fresh on each tick and each event, except Mixer Mode Y reports (section 6, Fader glide). Polling is chosen for simplicity: 78 clip slots with several properties each, plus 13 tracks, 6 scenes and transport state, a few times a second. A full snapshot costs about 0.5 ms (3 ms at worst).
+Snapshots are read fresh on each tick and each event, except Mixer Mode Y reports (section 6, Fader glide) and X reports (section 6, Faders). Polling is chosen for simplicity: 78 clip slots with several properties each, plus 13 tracks, 6 scenes and transport state, a few times a second. A full snapshot costs about 0.5 ms (3 ms at worst).
 
 ## 4. Module layout
 
@@ -135,17 +136,19 @@ The core starts coarse and a module is split when it grows.
 src/BleakLoop/
   __init__.py          create_instance
   surface.py           plumbing: ControlSurface subclass, elements, MIDI routing per mode, tick
-  device.py            pure: NRPN, split setup and LED message building, LED driver
+  device.py            pure: NRPN, split setup and LED message building, LED driver, X and slide decoding
   live_state.py        adapter: Live -> Snapshot
   live_actions.py      adapter: Action -> Live calls
   core/
-    layout.py          geometry: pad <-> device row, column roles, 13 x 7 window, window movement and clamping
+    layout.py          geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Linnstrument, Linnstrument Mode pages, modifiers
     controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length and scene lights
     session.py         clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table
     column_1.py        column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page
     mixer.py           Mixer toggle, coarse steps, bands, smoothing
+    fx.py              FX Mode: snapshot storage, rack identity, store, recall, morph timing and tick, FX lights
+    faders.py          horizontal faders: X maths, touches and slides, undo, fader lights
     linnstrument_mode.py  Linnstrument Mode: column 1 only, handed to column_1
     leds.py            device colours, track colour matching, tempo and fast blink
     values.py          every value in section 8, by name
@@ -191,6 +194,7 @@ flowchart TD
     core_column_1["column_1"]
     core_controls["controls"]
     core_engine["engine"]
+    core_faders["faders"]
     core_fx["fx"]
     core_layout["layout"]
     core_leds["leds"]
@@ -207,6 +211,7 @@ flowchart TD
   end
   __init__ -.->|lazy| surface
   core_column_1 --> core_controls
+  core_column_1 --> core_faders
   core_column_1 --> core_fx
   core_column_1 --> core_layout
   core_column_1 --> core_leds
@@ -215,12 +220,19 @@ flowchart TD
   core_column_1 --> core_modes
   core_controls --> core_leds
   core_controls --> core_model
+  core_engine --> core_faders
   core_engine --> core_fx
   core_engine --> core_linnstrument_mode
   core_engine --> core_mixer
   core_engine --> core_model
   core_engine --> core_modes
   core_engine --> core_session
+  core_faders --> core_layout
+  core_faders --> core_leds
+  core_faders --> core_model
+  core_faders --> core_modes
+  core_faders --> core_values
+  core_fx --> core_faders
   core_fx --> core_layout
   core_fx --> core_leds
   core_fx --> core_mixer
@@ -230,6 +242,7 @@ flowchart TD
   core_leds --> core_values
   core_linnstrument_mode --> core_column_1
   core_linnstrument_mode --> core_model
+  core_mixer --> core_faders
   core_mixer --> core_layout
   core_mixer --> core_model
   core_mixer --> core_modes
@@ -238,6 +251,7 @@ flowchart TD
   core_modes --> core_layout
   core_session --> core_column_1
   core_session --> core_controls
+  core_session --> core_faders
   core_session --> core_fx
   core_session --> core_layout
   core_session --> core_leds
@@ -247,9 +261,11 @@ flowchart TD
   core_session --> core_values
   device --> core_layout
   device --> core_leds
+  device --> core_model
   device --> core_values
   live_actions --> Live
   live_actions --> core_model
+  live_actions --> core_modes
   live_actions --> core_values
   live_actions --> live_state
   live_state --> core_layout
@@ -258,11 +274,13 @@ flowchart TD
   surface --> Live
   surface --> ableton_v3
   surface --> core_engine
+  surface --> core_faders
   surface --> core_fx
   surface --> core_layout
   surface --> core_leds
   surface --> core_model
   surface --> core_modes
+  surface --> core_session
   surface --> core_values
   surface --> device
   surface --> live_actions
@@ -284,6 +302,9 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **Pad input** (User Firmware Mode): Note On for a press, Note Off (or Note On velocity 0) for a release. The channel is the device row (channel 1 = device row 0, the nearest) and the note number is the column. Column 0 reports like any pad and is ignored.
 - **Lights:** CC 20 (column, from 0), CC 21 (device row, from 0), CC 22 (colour value).
 - **Y-axis:** CC 11 = 1 on channels 1–8 turns reporting on per row, CC 11 = 0 off. Reports arrive as CC (64 + column) on the row's channel.
+- **X-axis:** CC 10 = 1 on a row's channel turns X on for that row. X is 14-bit, sent LSB first on CC 32 + column, then MSB on CC column, on the row's channel. The value is global across the surface, about 0–2730: column c's reference X is `X_COLUMN_WIDTH × (c − 1)` (`FXD_CALX_FULL_UNIT` = 4095 / 24 in `ls_calibration.ino`), so its centre is `X_COLUMN_WIDTH × (c − 0.5)`. Row 0's column 6 uses CC 6 and 38 on channel 1, the NRPN reply CCs: those elements carry its X while X is listened, with no duplicate elements.
+- **Slide mode:** CC 9 = 1 on a row's channel turns on slide transfers. A finger crossing into the next cell sends CC 119 (value = source column) on the row's channel, then a Note On for the target cell with the first cell's velocity, then a Note Off for the source cell with velocity = the target column. With slide mode off, a crossing is a release and a fresh press with a gap between (below).
+- **Clean slate:** each time User Firmware Mode turns on, the device turns X, Y, Z and slide mode off, so they're re-sent after every NRPN 245 = 1. Source: `ls_handleTouches.ino` and [User Firmware Mode](https://github.com/rogerlinndesign/linnstrument-firmware/blob/master/user_firmware_mode.md).
 - **Control split** (Linnstrument Mode): set up on load as a one-column note split, column 1 only, in one-channel mode on the control channel (NRPNs in section 8). The setup runs in three phases:
   - **Reads:** Row Offset (227, 253, 263–270) and the right split's channels (100, 101, 102–117, 118), two NRPN 299 queries per step.
   - **Fixed sets:** split on at column 1, one channel, Send X/Y/Z off, no Played colour (a pressed pad would light red over BleakLoop's colour), LowRow off, no special mode, Transpose at 0.
@@ -306,7 +327,9 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 
 - **Control split pads are notes.** Column 1 sends Note On for a press and Note Off for a release on the control channel. The note number follows "Note numbers in a playing split" below, with Transpose at 0 and BleakLoop's Octave.
 - **Y is relative and dense.** Every press reports 64 first, after the note-on. Y swings to 127 or 0 over about half a pad and then stays saturated until the release. Reports arrive every 10–20 ms, 1–3 units apart.
-- **A slide never overlaps pads.** The old pad's release comes first, then 160–460 ms of silence, then the next pad's press.
+- **A slide never overlaps pads.** With slide mode off, the old pad's release comes first, then 160–460 ms of silence, then the next pad's press.
+- **X matches the firmware.** Measured 2026-10-27: column centres 2, 11 and 14 read 230–257, 1782–1812 and 2309–2348; in a slow slide each column's first X was within 6 of `X_COLUMN_WIDTH × (c − 1)`, up to 2747 at column 16's far edge. After a transfer, X arrives on the target column's CC from the first report, and the source's Note Off comes 1–3 ms after the target's Note On, as value 0.
+- **Slide mode reads close presses as slides.** Two adjacent pads pressed near their shared edge can arrive as one transfer, so only one press is seen; pressed near their centres, both are. A roll from one pad onto the next is a transfer, so the second pad isn't pressed.
 - **A still finger rolls.** Y drifts from 64 to about 85 within 100 ms of a press, and further over seconds.
 
 **Note numbers in a playing split.** Outside User Firmware Mode, a pad sends its row note + (column − 1) + 12 × (Octave NRPN 36 − 5) + (Transpose Pitch NRPN 37 − 7) − (Transpose Lights NRPN 38 − 7). Rows count from the nearest, row 0. Notes above 127 aren't sent. The row note comes from the global Row Offset (NRPN 227). Source: `determineRowOffsetNote` in the [firmware](https://github.com/rogerlinndesign/linnstrument-firmware/blob/master/ls_handleTouches.ino). Note names below are Live's (C3 = 60).
@@ -328,6 +351,7 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
 - **Elements in User Firmware Mode:**
   - Pad presses: notes 0–16 on channels 1–8.
   - Y-axis values: CC 64 + column on channels 1–8, claimed only in Mixer Mode. Columns 2–14 (CC 66–78) become fader input; the other columns are claimed and dropped, because Y reporting is per row and their reports would otherwise reach Live's tracks.
+  - X values (CC column and CC 32 + column, columns 1–16) and slide transfers (CC 119) on channels 1–8, claimed only while the core wants X (`engine.x_rows`); X for row 0, column 6 comes through the `nrpn_6` / `nrpn_38` elements.
 
 > [!IMPORTANT]
 > **Elements in Linnstrument Mode:** notes 0–127 on every channel, 16 × 128 = 2048 note buttons. The control channel is chosen from the right split after load, and elements must be declared before it is known. Only the chosen channel's 128 are listened. All 128, not only the eight that column 1 sends, so column 1 never plays Live's tracks, even between a Row Offset change and the next poll. The build time is logged at load (`BleakLoop elements built in`).
@@ -341,7 +365,7 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
 
 ### Device lifecycle
 
-- **Device setup and mode.** On load, BleakLoop enters User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Linnstrument Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. The setup runs in User Firmware Mode so the device shows a loading rainbow instead of its note lights: NRPNs are answered in either mode, and the device doesn't redraw its note lights over the User Firmware lights. Each step also paints one column (`device.loading_column`), sweeping columns 1–16 with the diagonal hues shifted by one per sweep, so the rainbow rolls. Entering Session Mode redraws every pad over it, and leaving User Firmware Mode clears it. On unload, it turns Y-axis reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
+- **Device setup and mode.** On load, BleakLoop enters User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Linnstrument Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. The setup runs in User Firmware Mode so the device shows a loading rainbow instead of its note lights: NRPNs are answered in either mode, and the device doesn't redraw its note lights over the User Firmware lights. Each step also paints one column (`device.loading_column`), sweeping columns 1–16 with the diagonal hues shifted by one per sweep, so the rainbow rolls. Entering Session Mode redraws every pad over it, and leaving User Firmware Mode clears it. On unload, it turns Y-axis, X and slide reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
 
 ```mermaid
 sequenceDiagram
@@ -360,12 +384,13 @@ sequenceDiagram
   end
   Note over BleakLoop: enter_mode(SESSION)
   BleakLoop->>LinnStrument: user_firmware_mode(True), NRPN 245 = 1, already on
-  Note over BleakLoop: set_session_highlight(track, scene, 13, 7, False)
+  Note over BleakLoop: set_session_highlight(track, scene, 13, 6, False)
   BleakLoop->>LinnStrument: LED driver reset, then the whole frame (CC 20, 21, 22)
   Note over BleakLoop: start the Live.Base.Timer
   Note over BleakLoop,LinnStrument: Unload, disconnect()
   Note over BleakLoop: stop the timer, end_undo_step() if a step is open
   BleakLoop->>LinnStrument: y_axis(False), CC 11 = 0 on channels 1–8
+  BleakLoop->>LinnStrument: x_rows(()), CC 10 and 9 = 0 on channels 1–8
   BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
   BleakLoop->>LinnStrument: release_column_1(), column 1 lights to value 0
   loop split_restore(saved, set numbers), RESTORE_GAP_MS sleep before each
@@ -412,6 +437,12 @@ stateDiagram-v2
   Gliding --> Idle: glide reaches its target, EndUndoStep
   note right of Idle: leaving Mixer Mode or unload closes an open step
 ```
+### Faders
+
+- **X and slide rows.** `engine.x_rows(state)` names the device rows that want X and slide mode: all 8 while the horizontal faders show, else none. After each handled event, on mode entry and on a Mixer toggle, the surface sends `device.x_rows(rows)` only when the set changed, and re-listens when it switches between empty and not. Entering User Firmware Mode forgets the last set sent, so the next sync re-sends it.
+- **Decoding.** `device.SlideDecoder` keeps each cell's X LSB and turns the MSB into `XAxis(column, pad, value)`. A CC 119 arms a transfer for its row: the row's next Note On becomes `SlideMoved(pad, from_column, to_column)` instead of a press, and the next message for the source cell (its Note Off) is swallowed, whatever its value. `engine.slide` gives a slide to the fader whose touch is on the source cell; otherwise it becomes a release of the source pad, so a held pad (Stop, a Bars pad) never sticks. The target's own release later is a release of a pad never pressed, which every handler ignores.
+- **X input path.** X arrives at the firmware's scan rate, so `engine.x_axis(state, event)` needs no snapshot: the touch holds the parameter's name, range and quantization from its press, as Mixer's Y does. It returns `redraw` only when the lit pad count changes. A touch follows its finger through slides into any column, and ends on the release of the cell it's on: `session.handle` checks that before any column dispatch, so a release off the end of a fader never reaches the slot, scene or column 1 handler. The surface logs each gesture's report count and its longest `_on_x` (`FADERS: n reports, longest x ms`). Measured 2026-10-27 on racks and plugins: up to 769 reports in one long gesture, the longest `_on_x` 3.8 ms, most under 2 ms.
+
 ### Follow-up events
 
 - **Follow-up events.** `live_actions.apply` may return an event, which `_handle` feeds to the core once after the action loop. The follow-up's own actions are applied, but any events they return are dropped, so this never recurses. Used by Capture: after `song.capture_and_insert_scene()` the adapter returns `SceneSelected` with the index of `song.view.selected_scene` (already updated when the call returns), and the core scrolls the window the minimum distance.
@@ -443,7 +474,7 @@ stateDiagram-v2
 ```
 ### Session ring
 
-- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 7, False)` draws it from the core's window state whenever the window changes and on every Session entry; `(-1, -1, -1, -1, False)` removes it on Linnstrument Mode entry and on unload. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
+- **Session ring.** `c_instance.set_session_highlight(track, scene, 13, 6, False)` draws it from the core's window state whenever the window or its width changes and on every Session entry; the width is `session.window_tracks(state)`, 8 in the split view; `(-1, -1, -1, -1, False)` removes it on Linnstrument Mode entry and on unload. v3 draws no ring of its own. Live picks the ring's colour, not BleakLoop.
 
 ## 7. Adapters: Live mechanisms
 
@@ -468,8 +499,14 @@ stateDiagram-v2
 | Fader gesture undo | `song.begin_undo_step()` on the first coarse press and `song.end_undo_step()` once no touch, continuation window or glide is left, so one gesture is one undo step. The core tracks the open step (`State.undo_open`); leaving Mixer Mode and unload close it. |
 | Record Clip | `live_state` reads the selected track (`song.view.selected_track`, only if it's in `song.visible_tracks`) and every scene of its slots, plus `song.view.selected_scene`, only in Linnstrument Mode. The core searches from the highlighted scene down, wrapping. When no slot is empty, `song.create_scene(-1)` runs before `FireSlot`: actions resolve their slot when applied, so the new scene exists by then. |
 | Capture MIDI | `song.capture_midi()` with no argument, only when `song.can_capture_midi` is true; otherwise the core posts "Nothing to capture". |
-| FX snapshot storage | `song.set_data(FX_DATA_KEY, text)`, read with `song.get_data(FX_DATA_KEY, "")` at load and again on every display tick, reloading the slots when the text changed, so Live's Undo and Redo of a store or clear show on the pads. Confirmed on the device (Live 12.4.7) to survive save and reload, and the surface is recreated for each Set opened. Each write adds a "Changed Parameter List" Undo entry and marks the Set as changed; writes happen only on store and clear. The text is JSON, `{"v": 1, "slots": [null or [{"track", "rack", "n", "macros"}, ...] × 16]}`; anything unreadable loads as 16 empty slots, with a log warning. |
+| FX snapshot storage | `song.set_data(FX_DATA_KEY, text)`, read with `song.get_data(FX_DATA_KEY, "")` at load and again on every display tick, reloading the slots when the text changed. That was meant to let Live's Undo and Redo of a store or clear show on the pads, but on the device (2026-10-27) Undo leaves the stored text as it was (#63). Confirmed on the device (Live 12.4.7) to survive save and reload, and the surface is recreated for each Set opened. Each write adds a "Changed Parameter List" Undo entry and marks the Set as changed; writes happen only on store and clear. The text is JSON, `{"v": 1, "slots": [null or [{"track", "rack", "n", "macros"}, ...] × 16]}`; anything unreadable loads as 16 empty slots, with a log warning. |
 | Rack identity | Top-level racks (`device.can_have_chains`) on `song.tracks`, `song.return_tracks` and `song.master_track`, in that order, devices left to right; nested racks are skipped. Macros are `device.parameters[1 : 1 + visible_macro_count]`. A snapshot keys each rack by (track name, rack name, n), n counting the earlier racks with both names, because the LOM has no stable device IDs. A morph addresses a rack by its path (kind, track index, device index) and checks the rack name before each read and write, so a moved or renamed rack drops out. |
+| Fader parameter writes | `SetFaderParameter(row, name, value)` resolves the row's parameter with `live_state.fader_parameters`, the same function the snapshot reads, from the surface's current state: Device FX is `song.appointed_device` (the blue hand, so another controller's device navigation shows), a rack's macros 1–8 (`parameters[1 : 1 + visible_macro_count][:8]`) or any other device's `parameters[1:9]`. It writes only if the parameter still has the name taken at the press, clamped to `min`/`max`; otherwise it skips with a log line. A fader on a top-level rack's macro carries the macro's identity in `read_racks`'s terms, and its first write takes that macro out of a running morph. |
+| FX fader undo | One step from a touch's first write until no fader touch is left (`State.fader_undo_open`). Its first write closes a running morph's step first; a snapshot recall closes an open fader step first. Hiding the faders (a mode change, FX off) and unload close it. |
+| Mapped FX bindings | `song.set_data(FADERS_DATA_KEY, text)` on each bind and unbind, read with `song.get_data` at load and on every display tick, reloading the rows when the text changed, as the FX snapshots are; Undo doesn't revert the text either (#63). The text is JSON, `{"v": 1, "rows": [null or {"track", "tn", "device", "dn", "param", "name"} × 8]}`; anything unreadable loads as 8 unbound rows, with a log warning. A separate key from the snapshots, so neither format's version can wipe the other. |
+| Binding identity | `BindFader` reads `song.view.selected_parameter` and walks `canonical_parent`: a device whose parent is a track, return or master, or a track's `MixerDevice` (volume, panning and sends only, as `param` 0, 1, 2…). The track is (name, n) with n counting earlier same-named tracks in `song.tracks`, `song.return_tracks`, then master; a device is (name, n) among the track's same-named devices; `param` indexes `device.parameters`. A parameter under a rack chain is refused ("Map it to a macro instead"), anything else not on a track too. The adapter returns `FaderBound`, which `engine.handle` passes to `faders.bound` in any mode. A binding resolves only if the parameter at `param` still has the bound name. |
+| Blue hand | Other control surfaces, even in a slot with no ports, can hold `song.appointed_device` away from the device clicked in Live (seen with APC40_MkII and Launchkey_Mini_MK3 loaded). The surface polls `song.view.selected_track.view.selected_device` on the display tick and, when it changes, sets `song.appointed_device` to it, so a click moves the hand. Only on a change: a device another controller picked stays until the next click. |
+| Dev steps | Tracks: `song.visible_tracks`, then `song.return_tracks`, then `song.master_track`, set as `song.view.selected_track`. Devices: the selected track's `devices`, from the selected device's top-level ancestor (walking `canonical_parent` up through chains and racks), selected with `song.view.select_device` and appointed (`song.appointed_device`) at once, so the next fader write lands on it. The name, or "No more …", goes to the status bar. |
 | Macro writes | `parameter.value`, clamped to `min`/`max`, as a knob turn: it overrides automation and lights Live's Re-Enable Automation button (#47). A jump is one undo step, and so is a whole morph (`State.fx_undo_open`): a new recall, a Mixer fader press and unload close an open morph step. |
 
 ## 8. Values
@@ -489,6 +526,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Off colour value: 7 | `leds` | Device protocol | Confirmed; 0 also dark |
 | `FAST_BLINK_MS = 200`: fast blink, 200 ms on, 200 ms off | `leds` | Tuned | Confirmed on device |
 | Light refresh: Live's display callback, about 100 ms | `surface` | Mechanism | Measured |
+| X report handling: one `engine.x_axis` and its parameter write per report, no snapshot | `surface._on_x` | Mechanism | Measured: longest 3.8 ms per report, up to 769 reports per gesture |
 | `BLINK_TIMER_MS = 10`: blink clock, `Live.Base.Timer` | `surface` | Mechanism | Confirmed |
 | `TRACK_COLOUR_REFERENCES`: reference RGB per device colour, fitted to Live 12's 70-colour palette (pinned in `tests/test_leds.py`) | `leds` track colour matching | Tuned by eye | Tuned on device; refine if a swatch looks wrong |
 | `TEMPO_MIN = 20`, `TEMPO_MAX = 999`: tempo nudge limits | Shift + column 16 | Live's tempo range | Matches Live |
@@ -500,3 +538,5 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Slide pace: during a continued slide the glide moves one step per press-to-press period of the last pad crossed, never faster than `GLIDE_STEP` | `mixer` | Derived | Fine on device; retuning stays in #15 |
 | `FX_DATA_KEY = "BleakLoop.fx"`: the `song.set_data` key holding the FX snapshots | `live_state`, `live_actions` | Chosen | Confirmed on device: survives save and reload, per Set |
 | `FX_TOUCH_TOLERANCE = 0.005`: during a morph, a macro further than 0.5 % of its range from BleakLoop's last write was turned by hand and drops out | `fx` | Chosen | Fine on device: a hand-turned macro drops out, and BleakLoop's own writes never trip it |
+| `X_COLUMN_WIDTH = 170.625`: X units per column; column c's centre is `X_COLUMN_WIDTH × (c − 0.5)` | `faders` | From firmware (`FXD_CALX_FULL_UNIT` = 4095 / 24) | Confirmed on device: column starts within 6 units, centres within 26 (section 5) |
+| `FADERS_DATA_KEY = "BleakLoop.faders"`: the `song.set_data` key holding the Mapped FX bindings | `live_state`, `live_actions` | Chosen | Unchecked until stage 3's device check |

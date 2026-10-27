@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import column_1, controls, fx, layout, mixer, modes
+from . import column_1, controls, faders, fx, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -37,6 +37,8 @@ from .model import (
     SetTempo,
     ShowClip,
     ShowMessage,
+    StepDevice,
+    StepTrack,
     StopAllClips,
     StopTrackClips,
     ToggleMute,
@@ -47,20 +49,40 @@ from .model import (
 from .modes import ClipSource, GroupSource, Mode, SceneSource
 from .values import TEMPO_MAX, TEMPO_MIN
 
+def window_tracks(state):
+    # The split view shows 8 tracks; Mixer and FX Mode always 13.
+    if state.split and not state.mixer and not state.fx:
+        return layout.SPLIT_TRACKS
+    return layout.WINDOW_TRACKS
+
+
 def handle(state, event, snapshot):
     if isinstance(event, SceneSelected):
         # Keep the scene Capture selected in view.
         window = layout.scroll_to_scene(
-            state.window, event.scene, snapshot.track_count, snapshot.scene_count
+            state.window,
+            event.scene,
+            snapshot.track_count,
+            snapshot.scene_count,
+            window_tracks(state),
         )
         return replace(state, window=window), []
     if not isinstance(event, PadPress):
         return state, []
+    if not event.pressed and faders.holds(state, event):
+        # A fader touch ends on its cell's release, wherever the finger slid to.
+        return faders.press(state, event, snapshot)
     key = (event.column, event.pad)
     if key == layout.SHIFT:
         return column_1.handle(state, event, snapshot)
     # Under Shift, Copy and Delete's pads are window moves.
     shift_layer = state.shift and not state.copy and not state.delete
+    if key == layout.DEV and not (shift_layer and event.pressed):
+        # On Shift's layer the pad is a tempo step.
+        return replace(state, dev=event.pressed), []
+    if state.dev and event.column == layout.NAV_COLUMN and event.pressed:
+        # Dev's layer replaces column 16's normal and Shift layers.
+        return _dev_layer(state, key)
     if key == layout.COPY and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, copy=False, copy_source=None), []
@@ -77,6 +99,9 @@ def handle(state, event, snapshot):
         return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
     if key == layout.STOP:
         return _stop(state, event)
+    if faders.visible(state) and not state.fx and event.column in layout.SPLIT_FADER_COLUMNS:
+        # The split view's faders, releases included; Stop, Copy and Shift leave them alone.
+        return faders.press(state, event, snapshot)
     if state.stop and not state.fx and event.column in layout.GRID_COLUMNS and event.pressed:
         # Held Stop takes a track's pads, faders and rows included, before anything else.
         return _stop_track(state, _track(event.column, snapshot))
@@ -89,6 +114,8 @@ def handle(state, event, snapshot):
         if mixer.sliding(state, event.column):
             # A slide that runs off the fader moves nothing, not even the rows.
             return state, []
+    if state.fx and event.column in layout.FX_FADER_COLUMNS:
+        return faders.press(state, event, snapshot)
     if state.fx and event.column in layout.GRID_COLUMNS:
         return fx.press(state, event, snapshot)
     if not event.pressed:
@@ -159,8 +186,9 @@ def _slot(state, event, snapshot):
     if records:
         actions.append(ShowClip(track.index, scene))
         if track.has_midi_input:
+            state, more = faders.reset(state)
             state = modes.enter(state, Mode.LINNSTRUMENT)
-            actions.append(EnterMode(Mode.LINNSTRUMENT))
+            actions += more + [EnterMode(Mode.LINNSTRUMENT)]
     return state, actions
 
 
@@ -255,7 +283,12 @@ def _delete(state, event, snapshot):
         if snapshot.scene_count == 1:
             return state, [ShowMessage("Cannot delete last scene")]
         window = layout.move_window(
-            state.window, 0, 0, snapshot.track_count, snapshot.scene_count - 1
+            state.window,
+            0,
+            0,
+            snapshot.track_count,
+            snapshot.scene_count - 1,
+            window_tracks(state),
         )
         return replace(state, window=window), [DeleteScene(scene)]
     return state, []
@@ -314,19 +347,56 @@ def _nav_column(state, key, snapshot):
             return mixer.toggle(state)
         if state.fx:
             return fx.toggle(state)
-        return state, []
+        return _toggle_split(state, snapshot)
     if key == layout.MIXER:
-        return mixer.toggle(state)
+        return _widen(state, mixer.toggle, snapshot)
     if key == layout.FX:
-        return fx.toggle(state)
+        return _widen(state, fx.toggle, snapshot)
     return state, []
 
 
+def _widen(state, toggle, snapshot):
+    # Leaving the split view for 13 tracks keeps the last tracks filling the window.
+    width = window_tracks(state)
+    state, actions = toggle(state)
+    if window_tracks(state) > width:
+        window = layout.move_window(
+            state.window, 0, 0, snapshot.track_count, snapshot.scene_count
+        )
+        state = replace(state, window=window)
+    return state, actions
+
+
+def _dev_layer(state, key):
+    if key in layout.DEV_TRACK_STEPS:
+        return state, [StepTrack(layout.DEV_TRACK_STEPS[key])]
+    if key in layout.DEV_DEVICE_STEPS:
+        return state, [StepDevice(layout.DEV_DEVICE_STEPS[key])]
+    if key == layout.DEV_SOURCE:
+        mapped = state.fader_source == "device"
+        state = replace(state, fader_source="mapped" if mapped else "device")
+        return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
+    return state, []
+
+
+def _toggle_split(state, snapshot):
+    if not state.split:
+        return replace(state, split=True), [ShowMessage("Split view ON")]
+    # The wider window keeps the last tracks filling it; the faders stop showing.
+    state, actions = faders.reset(state)
+    state = replace(state, split=False)
+    window = layout.move_window(state.window, 0, 0, snapshot.track_count, snapshot.scene_count)
+    return replace(state, window=window), actions + [ShowMessage("Split view OFF")]
+
+
 def _move_window(state, steps, snapshot):
-    window = layout.move_window(state.window, *steps, snapshot.track_count, snapshot.scene_count)
+    width = window_tracks(state)
+    window = layout.move_window(
+        state.window, *steps, snapshot.track_count, snapshot.scene_count, width
+    )
     if window == state.window:
         return state, []
-    last_track = min(window.track + layout.WINDOW_TRACKS, snapshot.track_count)
+    last_track = min(window.track + width, snapshot.track_count)
     last_scene = min(window.scene + layout.WINDOW_SCENES, snapshot.scene_count)
     message = (
         f"Tracks {window.track + 1}–{last_track}, "
@@ -343,7 +413,7 @@ def render(state, snapshot):
         for column in range(1, layout.COLUMNS)
         for pad in range(1, layout.ROWS + 1)
     }
-    for column in layout.GRID_COLUMNS:
+    for column in _track_columns(state):
         track = _track(column, snapshot)
         if state.fx:
             break
@@ -357,6 +427,8 @@ def render(state, snapshot):
         _render_rows(frame, column, track, shift_layer)
     if state.fx:
         frame.update(fx.render(state))
+    if faders.visible(state):
+        frame.update(faders.render(state, snapshot))
     for pad in range(1, layout.WINDOW_SCENES + 1):
         frame[(layout.SCENE_COLUMN, pad)] = controls.scene_light(
             snapshot, state.window.scene, pad - 1
@@ -367,10 +439,16 @@ def render(state, snapshot):
     else:
         _render_normal_layer(frame, state)
         frame[layout.UNMUTE_ALL] = Light(ORANGE if snapshot.any_muted else OFF)
+    if state.dev:
+        _render_dev_layer(frame)
     frame[layout.STOP] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
     frame.update(column_1.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame
+
+
+def _track_columns(state):
+    return range(layout.GRID_COLUMNS[0], layout.GRID_COLUMNS[0] + window_tracks(state))
 
 
 def _render_copy_source(frame, state):
@@ -380,7 +458,7 @@ def _render_copy_source(frame, state):
     if isinstance(source, (ClipSource, GroupSource)):
         column = source.track - window.track + layout.GRID_COLUMNS[0]
         pad = source.scene - window.scene + 1
-        if column in layout.GRID_COLUMNS and 1 <= pad <= layout.WINDOW_SCENES:
+        if column in _track_columns(state) and 1 <= pad <= layout.WINDOW_SCENES:
             frame[(column, pad)] = Light(RED, Blink.FAST)
     elif isinstance(source, SceneSource):
         pad = source.scene - window.scene + 1
@@ -447,6 +525,21 @@ def _render_normal_layer(frame, state):
     current = layout.MIXER if state.mixer else layout.FX if state.fx else layout.SESSION
     for key in (layout.SESSION, layout.MIXER, layout.FX):
         frame[key] = Light(BLUE if key == current else CYAN)
+    if state.split and current == layout.SESSION:
+        frame[layout.SESSION] = Light(PINK)
+    frame[layout.DEV] = Light(ORANGE)
+
+
+def _render_dev_layer(frame):
+    # Over either layer: the whole of column 16.
+    for pad in range(1, layout.ROWS + 1):
+        frame[(layout.NAV_COLUMN, pad)] = Light(OFF)
+    for key in layout.DEV_TRACK_STEPS:
+        frame[key] = Light(LIME)
+    for key in layout.DEV_DEVICE_STEPS:
+        frame[key] = Light(MAGENTA)
+    frame[layout.DEV_SOURCE] = Light(ORANGE)
+    frame[layout.DEV] = Light(ORANGE, Blink.FAST)
 
 
 def _render_shift_layer(frame):

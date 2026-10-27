@@ -6,7 +6,7 @@ Shift + Play/Stop act on it.
 
 from dataclasses import replace
 
-from . import controls, fx, layout, mixer, modes
+from . import controls, faders, fx, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -95,9 +95,10 @@ def _normal(state, key, snapshot):
         if linnstrument:
             return _back(state)
         state, actions = mixer.reset(state)
+        state, more = faders.reset(state)
         return (
             modes.enter(state, Mode.LINNSTRUMENT),
-            actions + [EnterMode(Mode.LINNSTRUMENT)],
+            actions + more + [EnterMode(Mode.LINNSTRUMENT)],
         )
     return state, []
 
