@@ -144,13 +144,10 @@
 <text x="420" y="407" font-size="13" fill="#ffffff" text-anchor="middle">Select and arm</text>
 <text x="788" y="28" font-size="12" fill="#9a9aa4" text-anchor="middle">View</text>
 <text x="788" y="48" font-size="11" fill="#9a9aa4" text-anchor="middle">15</text>
-<rect x="768" y="60" width="40" height="40" rx="4" fill="#a6ff1a"/>
-<rect x="766" y="58" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
-<rect x="768" y="106" width="40" height="40" rx="4" fill="#a6ff1a"/>
-<rect x="766" y="104" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
+<rect x="768" y="60" width="40" height="40" rx="4" fill="#e82ae8"/>
+<rect x="768" y="106" width="40" height="40" rx="4" fill="#e82ae8"/>
 <rect x="768" y="152" width="40" height="40" rx="4" fill="#f2f2f2"/>
 <rect x="768" y="198" width="40" height="40" rx="4" fill="#a6ff1a"/>
-<rect x="766" y="196" width="44" height="44" rx="5" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="6 4"/>
 <rect x="768" y="244" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="768" y="290" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="768" y="336" width="40" height="40" rx="4" fill="#ff8a1a"/>

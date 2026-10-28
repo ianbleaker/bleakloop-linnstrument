@@ -1685,7 +1685,7 @@ def test_group_source_blinks():
 
 def test_scene_source_blinks_over_lime():
     snapshot = slot_snapshot(SlotView(has_clip=True, is_playing=True))
-    assert session.render(SESSION, snapshot)[(layout.SCENE_COLUMN, 1)] == Light(LIME, Blink.TEMPO)
+    assert session.render(SESSION, snapshot)[(layout.SCENE_COLUMN, 1)] == Light(LIME)
     state = State(copy=True, copy_source=SceneSource(0))
     assert session.render(state, snapshot)[(layout.SCENE_COLUMN, 1)] == Light(RED, Blink.FAST)
 

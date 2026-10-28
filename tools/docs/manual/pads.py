@@ -522,6 +522,14 @@ SECTIONS = {
     ),
 }
 
+# When each of controls.SCENE_LIGHTS shows, for the manual's Reading the lights.
+SCENE_LIGHTS = {
+    "launching": "once launched, until they start at the next quantization boundary",
+    "full": "while all their clips play",
+    "playing": "while some of their clips play",
+    "clips": "if they hold clips",
+}
+
 # The sections the manual lists, each with the section holding its Shift layer.
 LISTS = {
     "global": "global-shift",

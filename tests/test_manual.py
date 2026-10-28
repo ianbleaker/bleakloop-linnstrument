@@ -1,9 +1,10 @@
 import pytest
 
-from BleakLoop.core import engine
+from BleakLoop.core import controls, engine
 from BleakLoop.core.leds import OFF
 from tools.docs import __main__ as generator
 from tools.docs.manual.columns import FIGURES
+from tools.docs.manual import pads
 from tools.docs.manual.pads import DIMMED, blocks, items, labels, section_labels
 from tools.docs.manual.scenes import SCENES, Layer
 
@@ -72,6 +73,10 @@ def test_every_lit_pad_of_a_column_panel_is_labelled(column, scene, section):
 @pytest.mark.parametrize("column, scene, section", COLUMN_PANELS)
 def test_column_panel_labels_fit_on_a_pad(column, scene, section):
     assert [label for label in section_labels(section).values() if too_wide(label)] == []
+
+
+def test_every_scene_light_is_described():
+    assert set(pads.SCENE_LIGHTS) == set(controls.SCENE_LIGHTS)
 
 
 def test_generated_docs_are_current():
