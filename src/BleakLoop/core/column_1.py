@@ -162,8 +162,9 @@ def _scene_page(state, key, pressed, snapshot):
     scene = state.window.scene + key[1] - 1
     if scene >= snapshot.scene_count:
         return state, []  # past the end of the Set: nothing launched, the page stays
+    # The newest launch replaces a pending one.
     actions = [FireScene(scene, legato=False), *fx.scene_launch(state, scene, snapshot)]
-    return replace(state, scene_page=False), actions
+    return replace(state, scene_page=False, pending_launch=None), actions
 
 
 def _fixed_length(state):
@@ -249,7 +250,7 @@ def render(state, snapshot):
     shift_held = Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
     if state.scene_page:
         frame = {
-            (1, pad): controls.scene_light(snapshot, state.window.scene, pad - 1)
+            (1, pad): controls.scene_light(snapshot, state.window.scene, pad - 1, controls.waiting_scene(state))
             for pad in range(1, layout.WINDOW_SCENES + 1)
         }
         frame[layout.MODE_PAD] = Light(OFF)

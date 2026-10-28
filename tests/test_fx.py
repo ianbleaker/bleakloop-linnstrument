@@ -4,10 +4,11 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, WHITE, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
     EndUndoStep,
+    FireScene,
     MacroView,
     PadPress,
     RacksRead,
@@ -24,7 +25,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     TrackView,
 )
-from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, State
+from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, State
 from BleakLoop.core.values import FX_TOUCH_TOLERANCE
 
 
@@ -992,6 +993,14 @@ def test_a_change_remaps_the_morph_and_the_landed_scene():
     assert (state.morph.slot, state.fx_landed_scene) == (2, 1)
 
 
+def test_a_change_remaps_a_pending_launch_and_drops_a_deleted_one():
+    state = replace(FX, fx_scenes=(A_SNAP, B_SNAP), pending_launch=PendingLaunch(1, 6.0, 0.0))
+    state, _ = changed(state, (None, 0, 1))
+    assert state.pending_launch == PendingLaunch(2, 6.0, 0.0)
+    state, _ = changed(state, (0, 1))
+    assert state.pending_launch is None
+
+
 def test_a_change_leaves_a_global_morph_and_landed_alone():
     state = replace(FX, fx_scenes=(A_SNAP,), morph=Morph(0, 0.0, 16.0, 0.0), fx_landed=0)
     state, _ = changed(state, (None, 0))
@@ -1009,3 +1018,173 @@ def test_a_deleted_morphing_scene_still_lands_and_blinks_nothing():
     state, actions, _ = tick(state, 16.0, (0.0, 0.0, 50.0))
     assert state.morph is None and actions[-1] == EndUndoStep()
     assert (state.fx_landed, state.fx_landed_scene) == (None, None)
+
+
+# Timed scene launch: a scene pressed with a Bars pad held
+
+
+SCENE_3 = (layout.SCENE_COLUMN, 3)
+
+
+def timed(state, beats, quantization=4, bars=4):
+    snapshot = launching(beats, quantization)
+    return handle(replace(state, fx_length=bars), SCENE_3, snapshot=snapshot)
+
+
+def test_a_timed_launch_waits_for_the_bar_line():
+    # 1 Bar quantization: fired halfway through the bar before, at beat 14 of bar 4.
+    state, actions = timed(FX, 1.5)
+    assert state.pending_launch == PendingLaunch(2, 14.0, 1.5)
+    assert actions == [ShowMessage("Scene 3 in 4 bars")]
+
+
+def test_a_timed_launch_morphs_its_snapshot_to_land_as_the_scene_starts():
+    state, actions = timed(with_scene(FX, 2), 1.5)
+    assert actions == [
+        ShowMessage("Scene 3 in 4 bars"),
+        RecallFxSnapshot(2, None, scene=True, end_beats=16.0),
+    ]
+
+
+def test_a_timed_launch_snaps_to_a_coarser_quantization():
+    # 4 Bars quantization (2), 1 bar held at bar 1: the first 4-bar line after bar 2.
+    state, actions = timed(with_scene(FX, 2), 1.5, quantization=2, bars=1)
+    assert state.pending_launch == PendingLaunch(2, 8.0, 1.5)
+    assert actions[1] == RecallFxSnapshot(2, None, scene=True, end_beats=16.0)
+
+
+def test_a_timed_launch_unquantized_fires_on_the_bar_line():
+    state, _ = timed(FX, 1.5, quantization=0)
+    assert state.pending_launch == PendingLaunch(2, 16.0, 1.5)
+
+
+def test_a_timed_launch_inside_its_last_step_fires_at_once():
+    # 1 bar held past the bar's midpoint: Live's 1 Bar quantization starts it on the line.
+    state, actions = timed(with_scene(FX, 2), 2.5, bars=1)
+    assert state.pending_launch is None
+    assert actions == [
+        FireScene(2, legato=False),
+        RecallFxSnapshot(2, None, scene=True, end_beats=4.0),
+    ]
+
+
+def test_a_timed_launch_while_stopped_launches_at_once():
+    state, actions = handle(
+        replace(with_scene(FX, 2), fx_length=4),
+        SCENE_3,
+        snapshot=launching(1.5, is_playing=False),
+    )
+    assert state.pending_launch is None
+    assert actions == [FireScene(2, legato=False), RecallFxSnapshot(2, None, scene=True)]
+
+
+def test_a_new_scene_press_replaces_a_pending_launch():
+    state = replace(FX, pending_launch=PendingLaunch(0, 14.0, 1.5))
+    state, actions = handle(state, SCENE_3, snapshot=launching(2.0))
+    assert state.pending_launch is None
+    assert actions == [FireScene(2, legato=False)]
+    state, _ = timed(replace(FX, pending_launch=PendingLaunch(0, 14.0, 1.5)), 2.0)
+    assert state.pending_launch.scene == 2
+
+
+def test_a_legato_launch_ignores_a_held_length():
+    state = replace(FX, shift=True, fx_length=4, pending_launch=PendingLaunch(0, 14.0, 1.5))
+    state, actions = handle(state, SCENE_3, snapshot=launching(1.5))
+    assert state.pending_launch is None
+    assert actions == [FireScene(2, legato=True)]
+
+
+def tick_at(state, beats, is_playing=True):
+    return engine.launch_tick(state, replace(launching(beats), is_playing=is_playing))
+
+
+PENDING = replace(FX, pending_launch=PendingLaunch(2, 14.0, 1.5))
+
+
+def test_launch_tick_without_a_pending_launch_does_nothing():
+    assert tick_at(FX, 3.0) == (FX, [], False)
+
+
+def test_launch_tick_waits_then_fires():
+    state, actions, redraw = tick_at(PENDING, 10.0)
+    assert (state.pending_launch, actions, redraw) == (PendingLaunch(2, 14.0, 10.0), [], False)
+    state, actions, redraw = tick_at(state, 14.01)
+    assert (state.pending_launch, actions, redraw) == (None, [FireScene(2, legato=False)], True)
+
+
+@pytest.mark.parametrize("beats, is_playing", [(10.0, False), (1.0, True)])
+def test_launch_tick_cancels_on_a_stop_or_a_jump_back(beats, is_playing):
+    state, actions, redraw = tick_at(PENDING, beats, is_playing)
+    assert state.pending_launch is None
+    assert actions == [ShowMessage("Scene 3 launch cancelled")]
+    assert redraw
+
+
+def test_a_pending_scene_blinks_yellow():
+    frame = session.render(PENDING, launching(2.0))
+    assert frame[SCENE_3] == Light(YELLOW, Blink.TEMPO)
+
+
+# The split views' snapshot panel
+
+
+PANEL = State(split=True, split_snapshots=True)
+MIXER_PANEL = State(mixer=True, mixer_split=True, split_snapshots=True)
+
+
+@pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
+def test_the_panel_is_fx_modes_columns_11_to_14(state):
+    assert handle(state, SLOT_3) == (state, [StoreFxSnapshot(2)])
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [StoreFxSnapshot(1, scene=True)])
+    assert handle(state, (10, 3)) == (state, [])
+    held, _ = handle(state, (14, 3))
+    assert held.fx_length == 4
+    assert handle(held, (14, 3), pressed=False)[0] == state
+
+
+@pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
+def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
+    state = with_slot(state, 2)
+    copying, _ = handle(state, layout.COPY)
+    assert copying.copy
+    assert handle(copying, SLOT_3)[1] == [StoreFxSnapshot(2)]
+    deleting, _ = handle(state, layout.DELETE)
+    assert handle(deleting, SLOT_3)[1] == [
+        SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None))),
+        ShowMessage("Snapshot 3 cleared"),
+    ]
+
+
+def test_stop_leaves_the_panel_alone():
+    state = with_slot(replace(PANEL, stop=True), 2)
+    assert handle(state, SLOT_3)[1][0] == RecallFxSnapshot(2, None)
+
+
+def test_mixer_copy_and_delete_only_hold_for_the_panel():
+    state = State(mixer=True, mixer_split=True)
+    assert handle(state, layout.COPY) == (state, [])
+    copying, actions = handle(MIXER_PANEL, layout.COPY)
+    assert actions == [ShowMessage("Copy: press a slot to overwrite")]
+    copying = replace(MIXER_PANEL, copy=True)
+    assert handle(copying, (2, layout.MUTE_ROW)) == (copying, [])
+
+
+def test_a_timed_launch_from_the_panel():
+    state, _ = timed(PANEL, 1.5)
+    assert state.pending_launch == PendingLaunch(2, 14.0, 1.5)
+
+
+@pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
+def test_the_panel_renders_as_fx_mode_with_column_10_dark(state):
+    state = with_slot(state, 2)
+    frame = session.render(state, SCENES)
+    assert frame[SLOT_3] == Light(CYAN)
+    assert frame[(14, 1)] == Light(WHITE)
+    assert all(frame[(10, pad)] == Light(OFF) for pad in range(1, 9))
+
+
+def test_leaving_a_split_view_lets_go_of_a_held_length():
+    state, _ = handle(replace(PANEL, fx_length=4), layout.SESSION)
+    assert not state.split and state.fx_length is None
+    state, _ = handle(replace(MIXER_PANEL, fx_length=4), layout.MIXER)
+    assert not state.mixer_split and state.fx_length is None

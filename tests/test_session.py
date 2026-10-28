@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, controls, engine, fx, layout, modes, session
+from BleakLoop.core import column_1, controls, engine, fx, layout, mixer, modes, session
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -53,6 +53,7 @@ from BleakLoop.core.model import (
     SetMixer,
     SetSessionRecord,
     SetTempo,
+    SetVolume,
     ShowClip,
     ShowMessage,
     StepDevice,
@@ -397,7 +398,7 @@ FX_ON = State(fx=True)
         (SESSION, layout.FX, False, True),
         (MIXING, layout.SESSION, False, False),
         (MIXING, layout.FX, False, True),
-        (MIXING, layout.MIXER, False, False),
+        (MIXING, layout.MIXER, True, False),
         (FX_ON, layout.SESSION, False, False),
         (FX_ON, layout.MIXER, True, False),
         (FX_ON, layout.FX, False, False),
@@ -488,7 +489,57 @@ def test_mixer_mode_ignores_the_split():
     assert frame[(14, layout.MUTE_ROW)] == Light(PINK)
 
 
-@pytest.mark.parametrize("key", [layout.SESSION, layout.FX, layout.MIXER])
+# Mixer's split view
+
+
+MIXER_SPLIT = State(mixer=True, mixer_split=True)
+
+
+def test_mixer_pad_toggles_mixers_split_view():
+    state, actions = handle(MIXING, layout.MIXER)
+    assert state.mixer and state.mixer_split and actions == [ShowMessage("Split view ON")]
+    state, actions = handle(state, layout.MIXER)
+    assert state.mixer and not state.mixer_split and actions == [ShowMessage("Split view OFF")]
+
+
+def test_mixer_split_toggle_drops_a_volume_touch():
+    state = replace(MIXING, undo_open=True)
+    state, actions = handle(state, layout.MIXER)
+    assert not state.undo_open and actions == [EndUndoStep(), ShowMessage("Split view ON")]
+
+
+def test_each_mode_keeps_its_own_split_view():
+    assert controls.window_tracks(MIXER_SPLIT) == 8
+    assert controls.window_tracks(replace(MIXER_SPLIT, mixer=False)) == 13
+    state, _ = handle(MIXER_SPLIT, layout.SESSION)
+    assert not state.mixer and not state.split and state.mixer_split
+    state, _ = handle(state, layout.MIXER)
+    assert state.mixer and state.mixer_split
+
+
+def test_leaving_mixers_split_view_reclamps_the_window():
+    snapshot = session_snapshot(track_count=20)
+    state, _ = handle(replace(MIXER_SPLIT, window=Window(12, 0)), layout.SESSION, snapshot)
+    assert state.window == Window(7, 0)
+    state, _ = handle(replace(MIXER_SPLIT, window=Window(12, 0)), layout.MIXER, snapshot)
+    assert state.window == Window(7, 0)
+
+
+def test_mixer_split_routes_column_9_to_volume_and_10_to_the_faders():
+    state, actions = handle(MIXER_SPLIT, (9, 1))
+    assert actions[-1] == SetVolume(7, mixer.step(1))
+    # No parameter in SNAP, so nothing.
+    assert handle(MIXER_SPLIT, (10, 1)) == (MIXER_SPLIT, [])
+
+
+def test_mixer_split_render():
+    frame = session.render(MIXER_SPLIT, SNAP)
+    assert frame[layout.MIXER] == Light(PINK) and frame[layout.SESSION] == Light(CYAN)
+    assert frame[(9, layout.MUTE_ROW)] == Light(PINK)
+    assert all(frame[(column, pad)] == Light(OFF) for column in range(10, 15) for pad in (7, 8))
+
+
+@pytest.mark.parametrize("key", [layout.SESSION, layout.FX])
 def test_leaving_mixer_closes_its_undo_step(key):
     state = State(mixer=True, undo_open=True, touches=(), glides=())
     new, actions = handle(state, key)
@@ -525,15 +576,33 @@ def test_shift_column_16_keeps_window_moves_and_tempo(state):
     assert handle(state, layout.MIXER, snapshot)[1][0] == SetTempo(119.0)
 
 
-@pytest.mark.parametrize(
-    "state",
-    [SHIFT, replace(SHIFT, split=True), replace(MIXING, shift=True), replace(FX_ON, shift=True)],
-)
-def test_shift_fx_toggles_the_fader_source(state):
+def test_shift_fx_in_fx_mode_toggles_the_fader_source():
+    state = replace(FX_ON, shift=True)
     mapped, actions = handle(state, layout.FADER_SOURCE)
     assert mapped == replace(state, fader_source="mapped")
     assert actions == [ShowMessage("Mapped FX")]
     assert handle(mapped, layout.FADER_SOURCE) == (state, [ShowMessage("Device FX")])
+
+
+@pytest.mark.parametrize(
+    "state", [SHIFT, replace(SHIFT, split=True), replace(MIXING, shift=True, mixer_split=True)]
+)
+def test_shift_fx_in_session_or_mixer_cycles_through_the_snapshots(state):
+    mapped, actions = handle(state, layout.FADER_SOURCE)
+    assert mapped == replace(state, fader_source="mapped")
+    assert actions == [ShowMessage("Mapped FX")]
+    snapshots, actions = handle(mapped, layout.FADER_SOURCE)
+    assert snapshots == replace(mapped, split_snapshots=True)
+    assert actions == [ShowMessage("FX snapshots")]
+    held = replace(snapshots, fx_length=4)
+    assert handle(held, layout.FADER_SOURCE) == (state, [ShowMessage("Device FX")])
+
+
+def test_cycling_to_the_snapshots_ends_a_fader_touch():
+    state = replace(SHIFT, split=True, fader_source="mapped", fader_undo_open=True)
+    state, actions = handle(state, layout.FADER_SOURCE)
+    assert not state.fader_undo_open
+    assert actions == [EndUndoStep(), ShowMessage("FX snapshots")]
 
 
 def test_shift_pad_4_does_nothing():

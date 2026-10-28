@@ -80,19 +80,23 @@ def handle(state, event, snapshot):
     if key == layout.COPY and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, copy=False, copy_source=None), []
-        if state.mixer:
+        # In Mixer Mode, Copy and Delete only work on the split view's snapshots.
+        if state.mixer and not fx.panel_visible(state):
             return state, []
-        if state.fx:
+        if state.fx or state.mixer:
             return replace(state, copy=True), [ShowMessage("Copy: press a slot to overwrite")]
         return replace(state, copy=True), [ShowMessage("Copy: pick a clip or scene")]
     if key == layout.DELETE and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, delete=False), []
-        if state.mixer:
+        if state.mixer and not fx.panel_visible(state):
             return state, []
         return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
     if key == layout.STOP:
         return _stop(state, event)
+    if fx.panel_visible(state) and event.column in layout.SPLIT_FADER_COLUMNS:
+        # The split view's snapshots, releases included, as FX Mode's: Stop leaves them alone.
+        return fx.press(state, event, snapshot)
     if faders.visible(state) and not state.fx and event.column in layout.SPLIT_FADER_COLUMNS:
         # The split view's faders, releases included; Stop, Copy and Shift leave them alone.
         return faders.press(state, event, snapshot)
@@ -113,6 +117,9 @@ def handle(state, event, snapshot):
     if state.fx and event.column in layout.GRID_COLUMNS:
         return fx.press(state, event, snapshot)
     if not event.pressed:
+        return state, []
+    if state.mixer and (state.copy or state.delete):
+        # Held for the snapshots: the tracks and scenes ignore them.
         return state, []
     # Copy over Delete over Shift.
     if state.copy:
@@ -136,9 +143,13 @@ def handle(state, event, snapshot):
     if _is_scene(event):
         scene = state.window.scene + event.pad - 1
         if scene < snapshot.scene_count:
-            # A legato launch leaves the macros alone.
+            # The newest launch replaces a pending one. A legato launch leaves the macros alone,
+            # and ignores a held Bars pad.
+            state = replace(state, pending_launch=None)
             if state.shift:
                 return state, [FireScene(scene, legato=True)]
+            if state.fx_length is not None:
+                return fx.timed_launch(state, scene, snapshot)
             return state, [FireScene(scene, legato=False), *fx.scene_launch(state, scene, snapshot)]
     return state, []
 
@@ -370,11 +381,13 @@ def _nav_column(state, key, snapshot):
     # The reserved pad and Seq have no match here. The current mode's pad goes back to Session.
     if key == layout.SESSION:
         if state.mixer:
-            return mixer.toggle(state)
+            return _widen(state, mixer.toggle, snapshot)
         if state.fx:
             return fx.toggle(state)
         return _toggle_split(state, snapshot)
     if key == layout.MIXER:
+        if state.mixer:
+            return _toggle_split(state, snapshot)
         return _widen(state, mixer.toggle, snapshot)
     if key == layout.FX:
         return _widen(state, fx.toggle, snapshot)
@@ -382,7 +395,7 @@ def _nav_column(state, key, snapshot):
 
 
 def _widen(state, toggle, snapshot):
-    # Leaving the split view for 13 tracks keeps the last tracks filling the window.
+    # Leaving a split view for 13 tracks keeps the last tracks filling the window.
     width = controls.window_tracks(state)
     state, actions = toggle(state)
     if controls.window_tracks(state) > width:
@@ -394,11 +407,21 @@ def _widen(state, toggle, snapshot):
 
 
 def _toggle_split(state, snapshot):
-    if not state.split:
-        return replace(state, split=True), [ShowMessage("Split view ON")]
-    # The wider window keeps the last tracks filling it; the faders stop showing.
-    state, actions = faders.reset(state)
-    state = replace(state, split=False)
+    # Session or Mixer Mode's own split view.
+    on = not faders.split_view(state)
+    if state.mixer:
+        # Columns 10-14 change hands: no volume fader touch latches.
+        state, actions = mixer.reset(state)
+        state = replace(state, mixer_split=on)
+    else:
+        actions = []
+        state = replace(state, split=on)
+    if on:
+        return state, actions + [ShowMessage("Split view ON")]
+    # The wider window keeps the last tracks filling it; the faders and snapshots stop showing.
+    state, more = faders.reset(state)
+    state = replace(state, fx_length=None)
+    actions += more
     window = layout.move_window(state.window, 0, 0, snapshot.track_count, snapshot.scene_count)
     return replace(state, window=window), actions + [ShowMessage("Split view OFF")]
 
@@ -423,13 +446,13 @@ def render(state, snapshot):
         for pad in range(1, layout.WINDOW_SCENES + 1):
             frame[(column, pad)] = _slot_light(track, pad - 1)
         _render_rows(frame, column, track, shift_layer)
-    if state.fx:
+    if state.fx or fx.panel_visible(state):
         frame.update(fx.render(state, snapshot))
     if faders.visible(state):
         frame.update(faders.render(state, snapshot))
     for pad in range(1, layout.WINDOW_SCENES + 1):
         frame[(layout.SCENE_COLUMN, pad)] = controls.scene_light(
-            snapshot, state.window.scene, pad - 1
+            snapshot, state.window.scene, pad - 1, controls.waiting_scene(state)
         )
     if shift_layer:
         _render_shift_layer(frame)
@@ -527,8 +550,8 @@ def _render_normal_layer(frame, state):
     current = layout.MIXER if state.mixer else layout.FX if state.fx else layout.SESSION
     for key in (layout.SESSION, layout.MIXER, layout.FX, layout.SEQ):
         frame[key] = Light(BLUE if key == current else CYAN)
-    if state.split and current == layout.SESSION:
-        frame[layout.SESSION] = Light(PINK)
+    if faders.split_view(state):
+        frame[current] = Light(PINK)
     if state.seq_held:
         frame[layout.SEQ] = Light(CYAN, Blink.FAST)
     frame[layout.DEVICE_CLIP] = Light(ORANGE)

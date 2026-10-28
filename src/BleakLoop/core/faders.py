@@ -1,4 +1,4 @@
-"""Horizontal FX faders: one per pad row, in FX Mode and the Session split view."""
+"""Horizontal FX faders: one per pad row, in FX Mode and the Session and Mixer split views."""
 
 import json
 from dataclasses import replace
@@ -23,7 +23,14 @@ COLOURS = {"device": (MAGENTA, BLUE), "mapped": (ORANGE, YELLOW)}
 
 
 def visible(state):
-    return state.mode is Mode.SESSION and (state.fx or (state.split and not state.mixer))
+    if state.mode is not Mode.SESSION:
+        return False
+    return state.fx or (split_view(state) and not state.split_snapshots)
+
+
+def split_view(state):
+    # Session or Mixer Mode's split view is on; FX Mode has none.
+    return state.mixer_split if state.mixer else state.split and not state.fx
 
 
 def columns(state):

@@ -4,8 +4,9 @@ Device/Clip layer."""
 
 from dataclasses import replace
 
-from . import layout
-from .leds import BLUE, GREEN, LIME, MAGENTA, OFF, ORANGE, RED, WHITE, Blink, Light
+from . import faders, layout
+from .modes import Mode
+from .leds import BLUE, GREEN, LIME, MAGENTA, OFF, ORANGE, RED, WHITE, YELLOW, Blink, Light
 from .model import (
     ClearBackToArrangement,
     Redo,
@@ -50,11 +51,9 @@ def redo(snapshot):
 
 
 def window_tracks(state):
-    # The split view shows 8 tracks; Mixer and FX Mode always 13. Sequencer Mode keeps the
-    # split view's width, as the ring does.
-    if state.split and not state.mixer and not state.fx:
-        return layout.SPLIT_TRACKS
-    return layout.WINDOW_TRACKS
+    # The split views show 8 tracks, FX Mode always 13. Sequencer Mode keeps Session's
+    # split view width, as the ring does.
+    return layout.SPLIT_TRACKS if faders.split_view(state) else layout.WINDOW_TRACKS
 
 
 def move_window(state, steps, snapshot):
@@ -100,7 +99,16 @@ def device_clip_layer(state, key):
 
 
 def toggle_fader_source(state):
-    # Shift + FX: Device FX <-> Mapped FX.
+    # Shift + FX: Device FX <-> Mapped FX. Session and Mixer Mode's split panel adds the
+    # snapshots: Device FX -> Mapped FX -> FX snapshots -> Device FX.
+    panel = state.mode is Mode.SESSION and not state.fx
+    if state.split_snapshots and panel:
+        state = replace(state, split_snapshots=False, fader_source="device", fx_length=None)
+        return state, [ShowMessage("Device FX")]
+    if state.fader_source == "mapped" and panel:
+        # The faders stop showing.
+        state, actions = faders.reset(state)
+        return replace(state, split_snapshots=True), actions + [ShowMessage("FX snapshots")]
     mapped = state.fader_source == "device"
     state = replace(state, fader_source="mapped" if mapped else "device")
     return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
@@ -145,6 +153,9 @@ def record_light(snapshot):
 # A scene pad's light by the scene's state, first match wins; the manual's line is generated
 # from this.
 SCENE_LIGHTS = {
+    # held back to a Bars pad's bar line; it blinks with the beat, as lime looks yellow on the
+    # device
+    "waiting": Light(YELLOW, Blink.TEMPO),
     "launching": Light(LIME, Blink.FAST),  # waiting for the quantization boundary
     "full": Light(LIME),  # every clip in the window's row plays
     "playing": Light(MAGENTA),  # some do
@@ -152,10 +163,19 @@ SCENE_LIGHTS = {
 }
 
 
-def scene_light(snapshot, scene_offset, row):
-    # The scene light without the copy-source state; row is the window row 0-5.
+def waiting_scene(state):
+    # The scene of a pending launch, for scene_light.
+    pending = state.pending_launch
+    return None if pending is None else pending.scene
+
+
+def scene_light(snapshot, scene_offset, row, waiting=None):
+    # The scene light without the copy-source state; row is the window row 0-5, waiting the
+    # scene of a pending launch.
     if scene_offset + row >= snapshot.scene_count:
         return Light(OFF)
+    if scene_offset + row == waiting:
+        return SCENE_LIGHTS["waiting"]
     triggered = snapshot.scene_triggered
     if row < len(triggered) and triggered[row]:
         return SCENE_LIGHTS["launching"]

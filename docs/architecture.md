@@ -221,9 +221,11 @@ flowchart TD
   core_column_1 --> core_mixer
   core_column_1 --> core_model
   core_column_1 --> core_modes
+  core_controls --> core_faders
   core_controls --> core_layout
   core_controls --> core_leds
   core_controls --> core_model
+  core_controls --> core_modes
   core_controls --> core_values
   core_engine --> core_faders
   core_engine --> core_fx

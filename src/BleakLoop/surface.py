@@ -408,6 +408,8 @@ class BleakLoop(ControlSurface):
             transport = live_state.read_transport(self.song, Live.Application.get_application())
             if self._state.morph is not None:
                 self._morph_tick(transport)
+            if self._state.pending_launch is not None:
+                self._launch_tick(transport)
             key = phase_key(self._clock(transport))
             if self._state.mode is Mode.SEQUENCER:
                 key += (self._playhead(),)
@@ -432,6 +434,14 @@ class BleakLoop(ControlSurface):
         for action in actions:
             live_actions.apply(action, self.song, self)
         self._retranslate()
+
+    def _launch_tick(self, transport):
+        state, actions, redraw = engine.launch_tick(self._state, transport)
+        self._state = state
+        for action in actions:
+            live_actions.apply(action, self.song, self)
+        if redraw:
+            self._refresh()
 
     def _morph_tick(self, transport):
         start = time.monotonic()

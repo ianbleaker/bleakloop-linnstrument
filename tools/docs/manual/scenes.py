@@ -20,7 +20,9 @@ class Layer(enum.Enum):
     SESSION = "session"
     SESSION_SHIFT = "session-shift"
     SPLIT = "session-split"
+    SPLIT_SNAPSHOTS = "session-split-snapshots"
     MIXER = "mixer"
+    MIXER_SPLIT = "mixer-split"
     MIXER_SHIFT = "mixer-shift"
     FX = "fx"
     FX_SHIFT = "fx-shift"
@@ -180,7 +182,20 @@ SCENES = {
     Layer.SESSION: (State(fixed_length=2), SNAPSHOT),
     Layer.SESSION_SHIFT: (State(fixed_length=2, shift=True), SNAPSHOT),
     Layer.SPLIT: (State(split=True, fixed_length=2), FX_SNAPSHOT),
+    Layer.SPLIT_SNAPSHOTS: (
+        State(
+            split=True,
+            split_snapshots=True,
+            fader_source="mapped",
+            fx_slots=FX_SLOTS,
+            fx_scenes=FX_SCENES,
+            fx_landed_scene=2,
+            fixed_length=2,
+        ),
+        SNAPSHOT,
+    ),
     Layer.MIXER: (State(mixer=True), MIXER_SNAPSHOT),
+    Layer.MIXER_SPLIT: (State(mixer=True, mixer_split=True), replace(MIXER_SNAPSHOT, faders=FX_SNAPSHOT.faders)),
     Layer.MIXER_SHIFT: (State(mixer=True, shift=True), MIXER_SNAPSHOT),
     Layer.FX: (FX_STATE, FX_SNAPSHOT),
     Layer.FX_SHIFT: (replace(FX_STATE, shift=True), FX_SNAPSHOT),

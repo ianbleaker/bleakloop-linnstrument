@@ -67,13 +67,15 @@ def reset(state):
 
 
 def toggle(state):
+    # Either way the horizontal faders change hands, and a held Bars pad lets go.
+    state, actions = faders.reset(state)
     if not state.mixer:
-        # FX and Mixer Mode replace each other. Mixer Mode has no horizontal faders.
-        state, actions = faders.reset(state)
+        # FX and Mixer Mode replace each other.
         state = replace(state, mixer=True, copy_source=None, fx=False, fx_length=None)
         return state, actions + [SetMixer(True), ShowMessage("Mixer Mode ON")]
-    state, actions = reset(state)
-    return replace(state, mixer=False), actions + [SetMixer(False), ShowMessage("Mixer Mode OFF")]
+    state, more = reset(state)
+    state = replace(state, mixer=False, fx_length=None)
+    return state, actions + more + [SetMixer(False), ShowMessage("Mixer Mode OFF")]
 
 
 def press(state, event, snapshot):
