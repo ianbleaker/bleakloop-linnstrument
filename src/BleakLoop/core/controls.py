@@ -142,17 +142,28 @@ def record_light(snapshot):
     return Light(RED)
 
 
+# A scene pad's light by the scene's state, first match wins; the manual's line is generated
+# from this.
+SCENE_LIGHTS = {
+    "launching": Light(LIME, Blink.FAST),  # waiting for the quantization boundary
+    "full": Light(LIME),  # every clip in the window's row plays
+    "playing": Light(MAGENTA),  # some do
+    "clips": Light(WHITE),
+}
+
+
 def scene_light(snapshot, scene_offset, row):
     # The scene light without the copy-source state; row is the window row 0-5.
     if scene_offset + row >= snapshot.scene_count:
         return Light(OFF)
     triggered = snapshot.scene_triggered
     if row < len(triggered) and triggered[row]:
-        # Launched, waiting for the quantization boundary: steady, unlike a playing scene.
-        return Light(LIME)
+        return SCENE_LIGHTS["launching"]
     slots = [track.slots[row] for track in snapshot.tracks if len(track.slots) > row]
-    if any(slot.is_playing for slot in slots):
-        return Light(LIME, Blink.TEMPO)
-    if any(slot.has_clip for slot in slots):
-        return Light(WHITE)
-    return Light(OFF)
+    clips = [slot for slot in slots if slot.has_clip]
+    if not clips:
+        return Light(OFF)
+    playing = sum(slot.is_playing for slot in clips)
+    if playing == len(clips):
+        return SCENE_LIGHTS["full"]
+    return SCENE_LIGHTS["playing" if playing else "clips"]

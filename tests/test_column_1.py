@@ -426,7 +426,7 @@ def test_scene_page_lights():
     frame = column_1.render(state, snap)
     assert set(frame) == {(1, p) for p in range(1, 9)}
     assert frame[(1, 1)] == Light(WHITE)
-    assert frame[(1, 2)] == Light(LIME, Blink.TEMPO)
+    assert frame[(1, 2)] == Light(LIME)
     assert frame[(1, 3)] == Light(OFF)  # no clip
     assert frame[(1, 4)] == Light(OFF)  # past the end of the Set
     assert frame[layout.SHIFT] == Light(WHITE)

@@ -2,14 +2,23 @@
 
 from pathlib import Path
 
+from BleakLoop.core import controls, leds
+from BleakLoop.core.leds import Blink
+
 from ..markers import read, replace_between
-from . import columns, draw, surface
+from . import columns, draw, pads, surface
 from .pads import LISTS, ordered
 from .scenes import Layer
 
 ROOT = Path(__file__).resolve().parents[3]
 MANUAL = ROOT / "docs" / "manual.md"
 MAPS = ROOT / "docs" / "manual"
+
+COLOUR_NAMES = {
+    getattr(leds, name): name.lower()
+    for name in ("RED", "YELLOW", "GREEN", "CYAN", "BLUE", "MAGENTA", "WHITE", "ORANGE", "LIME", "PINK")
+}
+BLINK_NAMES = {Blink.STEADY: "", Blink.TEMPO: " and blinking with the beat", Blink.FAST: " and blinking fast"}
 
 
 def callouts(section):
@@ -27,13 +36,24 @@ def _line(item):
     return f"- **{item.name}**: {item.callout}\n"
 
 
+def scene_lights():
+    # The scene pads' colours, in the order scene_light tries them.
+    states = [
+        f"{COLOUR_NAMES[light.colour]}{BLINK_NAMES[light.blink]} {pads.SCENE_LIGHTS[state]}"
+        for state, light in controls.SCENE_LIGHTS.items()
+    ]
+    return f"- **Scenes:** {'; '.join(states)}.\n"
+
+
 def manual_text(text):
-    # Rewrite each callout section between its marker pair.
+    # Rewrite each callout section between its marker pair, then the scene lights.
     for section in LISTS:
         start = f"<!-- callouts:{section} -->"
         end = f"<!-- /callouts:{section} -->"
         text = replace_between(text, start, end, callouts(section), MANUAL)
-    return text
+    return replace_between(
+        text, "<!-- lights:scenes -->", "<!-- /lights:scenes -->", scene_lights(), MANUAL
+    )
 
 
 def expected():

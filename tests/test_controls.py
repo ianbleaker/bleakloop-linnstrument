@@ -3,7 +3,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import controls
-from BleakLoop.core.leds import BLUE, GREEN, LIME, OFF, ORANGE, RED, WHITE, Blink, Light
+from BleakLoop.core.leds import BLUE, GREEN, LIME, MAGENTA, OFF, ORANGE, RED, WHITE, Blink, Light
 from BleakLoop.core.model import (
     ClearBackToArrangement,
     Redo,
@@ -73,22 +73,25 @@ def test_scene_light_past_the_end():
     assert controls.scene_light(snapshot, 2, 3) == Light(OFF)
 
 
-def test_scene_light_playing_beats_has_clip():
-    snapshot = with_tracks((CLIP,), (PLAYING,))
-    assert controls.scene_light(snapshot, 0, 0) == Light(LIME, Blink.TEMPO)
-
-
-def test_scene_light_triggered_is_steady_lime():
-    snapshot = replace(with_tracks((CLIP,), (PLAYING,)), scene_triggered=(True, False))
+def test_scene_light_full_when_every_clip_plays():
+    snapshot = with_tracks((PLAYING,), (EMPTY,), (PLAYING,))
     assert controls.scene_light(snapshot, 0, 0) == Light(LIME)
-    assert controls.scene_light(replace(snapshot, scene_triggered=(False,)), 0, 0) == Light(
-        LIME, Blink.TEMPO
-    )
+
+
+def test_scene_light_playing_when_some_clips_play():
+    snapshot = with_tracks((PLAYING,), (CLIP,))
+    assert controls.scene_light(snapshot, 0, 0) == Light(MAGENTA)
+
+
+def test_scene_light_triggered_blinks_lime():
+    snapshot = replace(with_tracks((CLIP,), (PLAYING,)), scene_triggered=(True, False))
+    assert controls.scene_light(snapshot, 0, 0) == Light(LIME, Blink.FAST)
+    assert controls.scene_light(replace(snapshot, scene_triggered=(False,)), 0, 0) == Light(MAGENTA)
 
 
 def test_scene_light_triggered_empty_scene():
     snapshot = replace(with_tracks((EMPTY,)), scene_triggered=(True,))
-    assert controls.scene_light(snapshot, 0, 0) == Light(LIME)
+    assert controls.scene_light(snapshot, 0, 0) == Light(LIME, Blink.FAST)
 
 
 def test_scene_light_has_clip():
@@ -103,7 +106,7 @@ def test_scene_light_empty():
 
 def test_scene_light_skips_short_slots():
     snapshot = with_tracks((EMPTY,), (EMPTY, PLAYING))
-    assert controls.scene_light(snapshot, 0, 1) == Light(LIME, Blink.TEMPO)
+    assert controls.scene_light(snapshot, 0, 1) == Light(LIME)
     assert controls.scene_light(with_tracks((CLIP,)), 0, 1) == Light(OFF)
 
 

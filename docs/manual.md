@@ -307,8 +307,6 @@ Recording on a MIDI track switches to Linnstrument Mode, so you can play straigh
 
 **Deleting:** a group track's slot deletes its members' clips in that scene.
 
-**Scenes** are lime and blinking while playing, steady lime once launched until they start at the next quantization boundary, and white if they hold clips.
-
 **Quantize** (Shift + Capture) works on the highlighted clip. If there isn't one, it uses the clip in Live's Detail view, then the selected track's playing clip.
 
 ### Arming, mute and solo
@@ -481,6 +479,8 @@ The LinnStrument is your instrument again. Column 1 keeps the controls it has in
 - **Fast blink** (dotted ring): something held or chosen.
 - **Track colours** use the closest LinnStrument colour.
 - **Clip slots:** track colour, blinking while playing; track colour, has a clip; yellow, about to launch; red, recording; white, empty and ready to record.
-- **Scenes:** lime and blinking while playing, steady lime once launched until they start at the next quantization boundary, and white if they hold clips.
+<!-- lights:scenes -->
+- **Scenes:** lime and blinking fast once launched, until they start at the next quantization boundary; lime while all their clips play; magenta while some of their clips play; white if they hold clips.
+<!-- /lights:scenes -->
 - **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, and the playhead is white. A note pad lights yellow while its note plays, and the selected note blinks green.
 - On the LinnStrument, lime looks yellow and green looks lime.
