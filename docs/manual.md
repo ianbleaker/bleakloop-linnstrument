@@ -29,7 +29,7 @@ How to read the surface:
 
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
 - Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it in every mode, so you can always see which scenes the scene pads launch. Pads 7 and 8 of each column mute and arm that track. The split view narrows the window to 8 tracks.
-- Shift + column 16 pads 1–4 move the window in every mode but Linnstrument Mode.
+- Shift + column 16 pads 5–8 move the window in every mode but Linnstrument Mode.
 - Shift, Copy, Delete, Stop and Device/Clip work while held. Shift (column 1, pad 8, nearest you) works in every mode: each list is followed by what its pads do with Shift held, and each mode has a map with Shift held. Unlit pads do nothing.
 - Each map shows the pads' names over their colours in an example Set. A dashed ring blinks with the beat; a dotted ring blinks fast.
 
@@ -85,29 +85,29 @@ With **Shift** held:
 
 <img src="manual/columns-navigation.svg" alt="Navigation column" align="right">
 
-Column 16, the outer edge, holds Copy, Delete and the mode pads. Its last pad is **Device/Clip**: tap it to flip Live between Device and Clip view, or hold it for the Device/Clip layer of tracks, devices and the fader source.
+Column 16, the outer edge, holds the mode pads, then Delete and Copy. Its last pad is **Device/Clip**: tap it to flip Live between Device and Clip view, or hold it for the Device/Clip layer of tracks and devices.
 
 <!-- callouts:navigation -->
-- **Copy**: Hold, press a clip, then an empty slot.
-- **Delete**: Hold, then press a clip or scene to delete it.
 - **Session**: Session Mode. In Session Mode, toggles the split view.
 - **Mixer**: Mixer Mode. Press again for Session Mode.
 - **FX**: FX Mode. Press again for Session Mode.
 - **Seq**: Hold and press a clip, or tap, for Sequencer Mode.
-- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, devices and the fader source.
+- **Delete**: Hold, then press a clip or scene to delete it.
+- **Copy**: Hold, press a clip, then an empty slot.
+- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices.
 
 With **Shift** held:
 
-- **Window directions**: Move the Ableton session ring in the selected direction.
 - **Tempo**: Tempo +1 or -1 BPM.
+- **Fader source**: Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode.
+- **Window directions**: Move the Ableton session ring in the selected direction.
 <!-- /callouts:navigation -->
 
 With **Device/Clip** held:
 
 <!-- callouts:device-clip -->
-- **Tracks**: Select the previous or next track, through the returns and master.
 - **Devices**: Select the previous or next device on the selected track.
-- **Fader source**: Switch the faders between Device FX and Mapped FX.
+- **Tracks**: Select the previous or next track, through the returns and master.
 - **Device/Clip**: Hold it for this layer. A tap, pressing nothing else, flips Live between Device and Clip view instead.
 <!-- /callouts:device-clip -->
 
@@ -118,7 +118,7 @@ With **Device/Clip** held:
 - A slot shows its clip in the track's colour, blinking while it plays. Yellow is about to launch, red is recording, and white is an empty slot ready to record.
 - Recording on a MIDI track switches to Linnstrument Mode, so you can play straight away.
 - Pad 7 mutes the track, or solos it with Shift held. Pad 8 selects and arms it, or arms it alone with Shift held. Shift + Stop disarms every track.
-- Session (column 16, pad 3) turns the split view on and off.
+- Session (column 16, pad 1) turns the split view on and off.
 
 ![Session Mode](manual/session.svg)
 
@@ -138,7 +138,7 @@ With **Shift** held:
 
 #### Split view
 
-The split view shows 8 tracks and eight faders side by side. Press Session (column 16, pad 3) while in Session Mode to turn it on or off, with a message. Session is pink while the split view is on.
+The split view shows 8 tracks and eight faders side by side. Press Session (column 16, pad 1) while in Session Mode to turn it on or off, with a message. Session is pink while the split view is on.
 
 ![Session Mode, split view](manual/session-split.svg)
 
@@ -146,7 +146,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
-- **Faders**: One fader per row, as in FX Mode, from the source Device/Clip + Fader source picks.
+- **Faders**: One fader per row, as in FX Mode, from the source Shift + FX picks.
 
 With **Shift** held:
 
@@ -179,7 +179,7 @@ With **Shift** held:
 
 ### FX Mode
 
-- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Device/Clip and press Fader source (column 16, pad 5) to switch between them; the status bar names the one you switched to.
+- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX (column 16, pad 3) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to.
 - Snapshots are saved in the Set. A held Bars pad turns a recall into a morph.
 - With Shift held the grid, faders included, goes dark and ignores presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
@@ -215,8 +215,8 @@ With **Shift** held:
 - **Follow**: Follow on/off: the steps show the page that's playing. Blue while on.
 - **Up/Down**: Move the note pads an octave up or down.
 - **View**: Switch columns 11–14 between the note pads and the settings.
-- **Copy**: Hold, press a step, then press steps to paste it onto.
 - **Delete**: Hold, then press a step to clear it, or a note pad to remove that note from the clip.
+- **Copy**: Hold, press a step, then press steps to paste it onto.
 - **Press and hold a step**: Change the velocity by sliding left (lower) or right (higher).
 - **Shift + press and hold a step**: Nudge the note forward or backward by sliding left and right.
 <!-- /callouts:sequencer-functions -->
@@ -273,9 +273,9 @@ On the scene page:
 
 ### Moving around
 
-**Session, Mixer and FX** (column 16, pads 3–5) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode. In Session Mode, Session toggles the split view, and is pink while it's on.
+**Session, Mixer and FX** (column 16, pads 1–3) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode. In Session Mode, Session toggles the split view, and is pink while it's on.
 
-Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to come. Pad 7 is **Seq**, which opens Sequencer Mode, and pad 8 is **Device/Clip**.
+Pad 4 of column 16 is dark and does nothing: it's kept for a Chord mode still to come. Pad 5 is **Seq**, which opens Sequencer Mode, pads 6 and 7 are **Delete** and **Copy**, and pad 8 is **Device/Clip**.
 
 **Device/Clip** (column 16, pad 8, orange):
 
@@ -284,7 +284,7 @@ Pad 6 of column 16 is dark and does nothing: it's kept for a Chord mode still to
 - It works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
 - Tracks steps through every track, then the returns and master. Devices are the ones directly on the track; with a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
 - The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.
-- With Shift's layer showing, its pad is Tempo −1, and never flips the view.
+- With Shift's layer showing, its pad is Left, a window move, and never flips the view.
 
 ### Clips, scenes, copy and delete
 
@@ -350,7 +350,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 ### FX faders and Mapped FX
 
-**Faders** (columns 2–10): one fader per row. They have two sources, switched with Device/Clip + Fader source: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. The fader source starts on Device FX each time Live starts or a Set opens.
+**Faders** (columns 2–10): one fader per row. They have two sources, switched with Shift + FX: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. The fader source starts on Device FX each time Live starts or a Set opens.
 
 - In Device FX, a rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
 - Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 10 the maximum. Slide along the row to move it.
@@ -365,7 +365,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - To bind a row, click a parameter in Live, then hold Device/Clip and press any pad of the row. The status bar names what it bound, such as "Fader 3: Auto Filter Frequency". Binding a row again replaces its parameter.
 - Any parameter of a device directly on a track, group, return or master can be bound, and so can a track's volume, pan and sends. A parameter of a device inside a rack can't: map it to one of the rack's macros, and bind the macro. Other mixer controls, such as the crossfader or the tempo, can't be bound either.
 - To unbind a row, hold Delete and press any pad of it.
-- Unbound rows are dark. Binding and unbinding only work while the faders show Mapped FX; in Device FX, Device/Clip + a row says "Device/Clip + FX for Mapped FX".
+- Unbound rows are dark. Binding and unbinding only work while the faders show Mapped FX; in Device FX, Device/Clip + a row says "Shift + FX for Mapped FX".
 - The bindings are saved in the Set. Undo doesn't bring back a bind or unbind yet (#63): bind or unbind the row again.
 - A binding finds its parameter again by the track's name, the device's name and the parameter's name, counting same-named tracks and devices in order. If you rename the track or device, or delete it, the row goes dark, and touching it says "Fader N: parameter not found". Renaming it back brings the row back.
 
@@ -407,7 +407,7 @@ A recall overrides any automation on the macros, as turning the knob would: Live
 
 Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and hear notes. It works on Live's highlighted clip slot, and follows it when you click another slot in Live.
 
-**Opening it** with Seq (column 16, pad 7), which is cyan in Session, Mixer and FX Mode:
+**Opening it** with Seq (column 16, pad 5), which is cyan in Session, Mixer and FX Mode:
 
 - Tap Seq to open Sequencer Mode on the highlighted slot. If that slot is empty, it moves first to the clip in Live's Detail view, if that's a Session clip on a MIDI track, or else to the selected track's playing clip.
 - In Session Mode, hold Seq (it blinks fast) and press a clip slot to open Sequencer Mode on that slot. The clip doesn't launch, and an empty slot works too. In Mixer and FX Mode the grid ignores presses while Seq is held.

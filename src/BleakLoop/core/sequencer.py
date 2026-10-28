@@ -305,7 +305,7 @@ def _nav(state, event, snapshot):
     key = (event.column, event.pad)
     shift_layer = state.shift and not state.copy and not state.delete
     if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
-        # On Shift's layer the pad is a tempo step.
+        # On Shift's layer the pad is a window move.
         return controls.device_clip(state, event)
     if state.device_clip and event.pressed:
         # Device/Clip's layer replaces column 16's normal and Shift layers, as in Session Mode.
@@ -326,6 +326,8 @@ def _nav(state, event, snapshot):
             return controls.move_window(state, layout.WINDOW_MOVES[key], snapshot)
         if key in layout.TEMPO_STEPS:
             return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
+        if key == layout.FADER_SOURCE:
+            return controls.toggle_fader_source(state)
         return state, []
     if key in (layout.SEQ, layout.SESSION):
         return leave(state, snapshot)
@@ -769,6 +771,7 @@ def _render_nav(frame, state):
             frame[key] = Light(YELLOW)
         for key in layout.TEMPO_STEPS:
             frame[key] = Light(GREEN)
+        frame[layout.FADER_SOURCE] = Light(ORANGE)
     else:
         frame[layout.COPY] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
         frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)

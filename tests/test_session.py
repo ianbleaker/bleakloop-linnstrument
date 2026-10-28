@@ -124,7 +124,7 @@ def test_column_0_does_nothing(state, pad):
 
 @pytest.mark.parametrize(
     "key", [layout.UNDO, layout.METRONOME, layout.PLAY_STOP, layout.MODE_PAD, (2, 1), (2, 8),
-            (layout.NAV_COLUMN, 1), (layout.NAV_COLUMN, 6), (layout.SCENE_COLUMN, 1)]
+            layout.COPY, *layout.RESERVED, (layout.SCENE_COLUMN, 1)]
 )
 def test_release_does_nothing(key):
     assert handle(SESSION, key, pressed=False) == (SESSION, [])
@@ -326,31 +326,57 @@ def test_rows_without_track_do_nothing(state, pad):
 # Column 16
 
 
-@pytest.mark.parametrize(
-    "pad, window",
-    [(1, Window(3, 2)), (2, Window(3, 4)), (3, Window(2, 3)), (4, Window(4, 3))],
+def pad_for(table, value):
+    return next(key for key, step in table.items() if step == value)
+
+
+MOVE_UP, MOVE_DOWN, MOVE_RIGHT, MOVE_LEFT = (
+    pad_for(layout.WINDOW_MOVES, move) for move in ((0, -1), (0, 1), (1, 0), (-1, 0))
 )
-def test_shift_moves_window(pad, window):
+TEMPO_UP, TEMPO_DOWN = pad_for(layout.TEMPO_STEPS, 1), pad_for(layout.TEMPO_STEPS, -1)
+
+
+@pytest.mark.parametrize(
+    "key, window",
+    [(MOVE_UP, Window(3, 2)), (MOVE_DOWN, Window(3, 4)), (MOVE_LEFT, Window(2, 3)),
+     (MOVE_RIGHT, Window(4, 3))],
+)
+def test_shift_moves_window(key, window):
     state = replace(SHIFT, window=Window(3, 3))
-    new, _ = handle(state, (layout.NAV_COLUMN, pad), session_snapshot(scene_count=20))
+    new, _ = handle(state, key, session_snapshot(scene_count=20))
     assert new.window == window
 
 
 def test_window_message():
     state = replace(SHIFT, window=Window(0, 0))
-    _, actions = handle(state, (layout.NAV_COLUMN, 4))
+    _, actions = handle(state, MOVE_RIGHT)
     assert actions == [ShowMessage("Tracks 2–14, Scenes 1–6")]
 
 
 def test_window_message_capped_at_counts():
     snapshot = session_snapshot(track_count=5, scene_count=9)
-    _, actions = handle(SHIFT, (layout.NAV_COLUMN, 2), snapshot)
+    _, actions = handle(SHIFT, MOVE_DOWN, snapshot)
     assert actions == [ShowMessage("Tracks 1–5, Scenes 2–7")]
 
 
 def test_window_at_edge_does_nothing():
-    assert handle(SHIFT, (layout.NAV_COLUMN, 1)) == (SHIFT, [])
-    assert handle(SHIFT, (layout.NAV_COLUMN, 3)) == (SHIFT, [])
+    assert handle(SHIFT, MOVE_UP) == (SHIFT, [])
+    assert handle(SHIFT, MOVE_LEFT) == (SHIFT, [])
+
+
+def test_shift_left_is_pad_8_and_right_pad_7():
+    # Left covers Device/Clip's pad on Shift's layer.
+    state = replace(SHIFT, window=Window(3, 3))
+    snapshot = session_snapshot(scene_count=20)
+    for pad, window in ((8, Window(2, 3)), (7, Window(4, 3))):
+        new, actions = handle(state, (layout.NAV_COLUMN, pad), snapshot)
+        assert new == replace(state, window=window)
+        assert not any(isinstance(action, StepTrack) for action in actions)
+
+
+def test_shift_tempo_is_pads_1_and_2():
+    assert handle(SHIFT, (layout.NAV_COLUMN, 1))[1][0] == SetTempo(121.0)
+    assert handle(SHIFT, (layout.NAV_COLUMN, 2))[1][0] == SetTempo(119.0)
 
 
 def test_shift_stop_all_clips():
@@ -404,10 +430,10 @@ def test_session_from_mixer_or_fx_returns_to_the_split_view(key):
 
 def test_the_split_window_is_8_tracks_wide():
     snapshot = session_snapshot(track_count=20)
-    state, actions = handle(replace(SPLIT, shift=True, window=Window(11, 0)), layout.MIXER, snapshot)
+    state, actions = handle(replace(SPLIT, shift=True, window=Window(11, 0)), MOVE_RIGHT, snapshot)
     assert state.window == Window(12, 0)
     assert actions == [ShowMessage("Tracks 13–20, Scenes 1–6")]
-    assert handle(state, layout.MIXER, snapshot)[0].window == Window(12, 0)
+    assert handle(state, MOVE_RIGHT, snapshot)[0].window == Window(12, 0)
 
 
 def test_turning_the_split_off_reclamps_the_window():
@@ -484,8 +510,8 @@ def test_mode_pad_lights(state, current):
 def test_normal_layer_column_16():
     frame = session.render(SESSION, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
-        Light(MAGENTA), Light(RED), Light(BLUE), Light(CYAN),
-        Light(CYAN), Light(OFF), Light(CYAN), Light(ORANGE),
+        Light(BLUE), Light(CYAN), Light(CYAN), Light(OFF),
+        Light(CYAN), Light(RED), Light(MAGENTA), Light(ORANGE),
     ]
 
 
@@ -493,22 +519,33 @@ def test_normal_layer_column_16():
 def test_shift_column_16_keeps_window_moves_and_tempo(state):
     state = replace(state, window=Window(3, 3))
     snapshot = session_snapshot(scene_count=20)
-    assert handle(state, layout.SESSION, snapshot)[0].window == Window(2, 3)
-    assert handle(state, layout.MIXER, snapshot)[0].window == Window(4, 3)
-    assert handle(state, layout.FX, snapshot) == (state, [])
-    assert handle(state, (layout.NAV_COLUMN, 7), snapshot)[1][0] == SetTempo(121.0)
+    assert handle(state, MOVE_LEFT, snapshot)[0].window == Window(2, 3)
+    assert handle(state, MOVE_RIGHT, snapshot)[0].window == Window(4, 3)
+    assert handle(state, layout.SESSION, snapshot)[1][0] == SetTempo(121.0)
+    assert handle(state, layout.MIXER, snapshot)[1][0] == SetTempo(119.0)
 
 
-def test_shift_pad_6_does_nothing():
-    assert handle(SHIFT, (layout.NAV_COLUMN, 6)) == (SHIFT, [])
+@pytest.mark.parametrize(
+    "state",
+    [SHIFT, replace(SHIFT, split=True), replace(MIXING, shift=True), replace(FX_ON, shift=True)],
+)
+def test_shift_fx_toggles_the_fader_source(state):
+    mapped, actions = handle(state, layout.FADER_SOURCE)
+    assert mapped == replace(state, fader_source="mapped")
+    assert actions == [ShowMessage("Mapped FX")]
+    assert handle(mapped, layout.FADER_SOURCE) == (state, [ShowMessage("Device FX")])
+
+
+def test_shift_pad_4_does_nothing():
+    assert handle(SHIFT, (layout.NAV_COLUMN, 4)) == (SHIFT, [])
 
 
 def test_shift_tempo_up_and_down():
-    assert handle(SHIFT, (layout.NAV_COLUMN, 7)) == (
+    assert handle(SHIFT, TEMPO_UP) == (
         SHIFT,
         [SetTempo(121.0), ShowMessage("Tempo 121.0 BPM")],
     )
-    assert handle(SHIFT, (layout.NAV_COLUMN, 8)) == (
+    assert handle(SHIFT, TEMPO_DOWN) == (
         SHIFT,
         [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")],
     )
@@ -516,7 +553,7 @@ def test_shift_tempo_up_and_down():
 
 def test_tempo_clamps_at_999():
     snapshot = replace(SNAP, tempo=998.5)
-    assert handle(SHIFT, (layout.NAV_COLUMN, 7), snapshot) == (
+    assert handle(SHIFT, TEMPO_UP, snapshot) == (
         SHIFT,
         [SetTempo(999), ShowMessage("Tempo 999.0 BPM")],
     )
@@ -524,7 +561,7 @@ def test_tempo_clamps_at_999():
 
 def test_tempo_clamps_at_20():
     snapshot = replace(SNAP, tempo=20.5)
-    assert handle(SHIFT, (layout.NAV_COLUMN, 8), snapshot) == (
+    assert handle(SHIFT, TEMPO_DOWN, snapshot) == (
         SHIFT,
         [SetTempo(20), ShowMessage("Tempo 20.0 BPM")],
     )
@@ -534,6 +571,8 @@ def test_tempo_clamps_at_20():
 
 
 DEVICE_CLIP = State(device_clip=True)
+TRACK_PREV, TRACK_NEXT = (pad_for(layout.DEVICE_CLIP_TRACK_STEPS, step) for step in (-1, 1))
+DEVICE_PREV, DEVICE_NEXT = (pad_for(layout.DEVICE_CLIP_DEVICE_STEPS, step) for step in (-1, 1))
 
 
 @pytest.mark.parametrize("state", [SESSION, MIXING, FX_ON])
@@ -561,7 +600,7 @@ def test_device_clip_tap_flips_the_detail_view():
     assert not state.device_clip and not state.device_clip_used
 
 
-@pytest.mark.parametrize("key", [(16, 2), layout.SHIFT, (3, 1), (1, 4)])
+@pytest.mark.parametrize("key", [TRACK_NEXT, layout.SHIFT, (3, 1), (1, 4)])
 def test_device_clip_with_another_press_does_not_flip(key):
     state, actions = engine_presses(
         SESSION, (layout.DEVICE_CLIP, DOWN), (key, DOWN), (key, UP), (layout.DEVICE_CLIP, UP)
@@ -579,9 +618,12 @@ def test_device_clip_and_a_mapped_fx_row_binds_without_flipping():
 
 
 def test_device_clip_on_shifts_layer_never_flips():
-    state, actions = engine_presses(SHIFT, (layout.DEVICE_CLIP, DOWN), (layout.DEVICE_CLIP, UP))
-    assert actions == [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")]
-    assert not state.device_clip
+    state, actions = engine_presses(
+        replace(SHIFT, window=Window(3, 3)), (layout.DEVICE_CLIP, DOWN), (layout.DEVICE_CLIP, UP),
+        snapshot=session_snapshot(scene_count=20),
+    )
+    assert ToggleDetailView() not in actions
+    assert state.window == Window(2, 3) and not state.device_clip
 
 
 @pytest.mark.parametrize("mode", [Mode.SESSION, Mode.LINNSTRUMENT, Mode.SEQUENCER])
@@ -593,12 +635,13 @@ def test_mode_entry_clears_the_device_clip_hold(mode):
 @pytest.mark.parametrize(
     "key, actions",
     [
-        ((16, 1), [StepTrack(-1)]),
-        ((16, 2), [StepTrack(1)]),
-        ((16, 3), [StepDevice(-1)]),
-        ((16, 4), [StepDevice(1)]),
-        ((16, 6), []),
-        ((16, 7), []),
+        (TRACK_PREV, [StepTrack(-1)]),
+        (TRACK_NEXT, [StepTrack(1)]),
+        (DEVICE_PREV, [StepDevice(-1)]),
+        (DEVICE_NEXT, [StepDevice(1)]),
+        ((16, 1), []),
+        ((16, 2), []),
+        ((16, 3), []),
     ],
 )
 @pytest.mark.parametrize("state", [DEVICE_CLIP, replace(DEVICE_CLIP, shift=True), replace(DEVICE_CLIP, fx=True)])
@@ -606,33 +649,17 @@ def test_device_clip_layer(state, key, actions):
     assert handle(state, key) == (state, actions)
 
 
-def test_device_clip_toggles_the_fader_source():
-    state, actions = handle(DEVICE_CLIP, layout.DEVICE_CLIP_SOURCE)
-    assert state.fader_source == "mapped"
-    assert actions == [ShowMessage("Mapped FX")]
-    state, actions = handle(state, layout.DEVICE_CLIP_SOURCE)
-    assert state.fader_source == "device"
-    assert actions == [ShowMessage("Device FX")]
-
-
-def test_device_clip_on_shifts_layer_steps_the_tempo():
-    assert handle(SHIFT, layout.DEVICE_CLIP) == (
-        SHIFT,
-        [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")],
-    )
-
-
 def test_device_clip_pad_lights():
     assert session.render(SESSION, SNAP)[layout.DEVICE_CLIP] == Light(ORANGE)
-    assert session.render(SHIFT, SNAP)[layout.DEVICE_CLIP] == Light(GREEN)
+    assert session.render(SHIFT, SNAP)[layout.DEVICE_CLIP] == Light(YELLOW)
 
 
 @pytest.mark.parametrize("state", [DEVICE_CLIP, replace(DEVICE_CLIP, shift=True)])
 def test_device_clip_layer_lights(state):
     frame = session.render(state, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
-        Light(LIME), Light(LIME), Light(MAGENTA), Light(MAGENTA),
-        Light(ORANGE), Light(OFF), Light(OFF), Light(ORANGE, Blink.FAST),
+        Light(OFF), Light(OFF), Light(OFF), Light(MAGENTA),
+        Light(MAGENTA), Light(LIME), Light(LIME), Light(ORANGE, Blink.FAST),
     ]
 
 
@@ -858,7 +885,7 @@ def test_fixed_length_cycles(bars, after, text):
 
 def test_shift_fixed_length_pads_move_window():
     state, _ = handle(
-        replace(SHIFT, window=Window(3, 3)), (layout.NAV_COLUMN, 2), session_snapshot(scene_count=20)
+        replace(SHIFT, window=Window(3, 3)), MOVE_DOWN, session_snapshot(scene_count=20)
     )
     assert state.window == Window(3, 4)
     assert state.fixed_length is None
@@ -1003,7 +1030,8 @@ def test_delete_press():
 def test_copy_and_delete_pads_move_the_window_under_shift(key):
     state = replace(SHIFT, window=Window(3, 3))
     new, _ = handle(state, key, session_snapshot(scene_count=20))
-    assert new == replace(state, window=Window(3, layout.WINDOW_MOVES[key][1] + 3))
+    track_step, scene_step = layout.WINDOW_MOVES[key]
+    assert new == replace(state, window=Window(3 + track_step, 3 + scene_step))
 
 
 @pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
@@ -1042,7 +1070,7 @@ DELETE = State(delete=True)
 
 INERT_WHILE_HELD = (
     [(c, p) for c in layout.GRID_COLUMNS for p in (layout.MUTE_ROW, layout.SELECT_ROW)]
-    + [(layout.NAV_COLUMN, p) for p in range(3, 8)]
+    + [layout.SESSION, layout.MIXER, layout.FX, *layout.RESERVED, layout.SEQ]
     + [layout.UNMUTE_ALL, layout.STOP]
     + [(1, p) for p in range(1, 8)]
 )
@@ -1582,8 +1610,8 @@ def test_shift_layer_column_1(quantization, light):
 def test_shift_layer_column_16():
     frame = session.render(SHIFT, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
+        Light(GREEN), Light(GREEN), Light(ORANGE), Light(OFF),
         Light(YELLOW), Light(YELLOW), Light(YELLOW), Light(YELLOW),
-        Light(OFF), Light(OFF), Light(GREEN), Light(GREEN),
     ]
 
 
@@ -1626,7 +1654,7 @@ def test_fixed_length_colour(bars, colour):
 
 def test_shift_layer_hides_fixed_length():
     frame = session.render(replace(SHIFT, fixed_length=4), SNAP)
-    assert all(frame[(layout.NAV_COLUMN, p)] == Light(YELLOW) for p in range(1, 5))
+    assert all(frame[key] == Light(YELLOW) for key in layout.WINDOW_MOVES)
 
 
 @pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
@@ -1675,11 +1703,8 @@ def test_source_outside_window_not_drawn(source):
     )
 
 
-# Shift + 16/7 and 16/8 are the tempo steps.
 @pytest.mark.parametrize(
-    "state, key",
-    [(state, key) for state in (SESSION, SHIFT) for key in layout.RESERVED
-     if not (state.shift and key in layout.TEMPO_STEPS)],
+    "state, key", [(state, key) for state in (SESSION, SHIFT) for key in layout.RESERVED]
 )
 def test_reserved_pads(state, key):
     assert handle(state, key) == (state, [])
@@ -1789,12 +1814,12 @@ def test_seq_and_any_other_pad_does_nothing(key):
     assert handle(SEQ_HELD, key, seq_snapshot()) == (replace(SEQ_HELD, seq_used=True), [])
 
 
-def test_shift_and_seq_is_the_tempo_step():
-    snapshot = seq_snapshot(SeqEntry(selected=0, selected_midi=True, has_clip=True))
-    state, actions = handle(SHIFT, layout.SEQ, snapshot)
-    assert state == SHIFT
-    assert actions[0] == SetTempo(121.0)
-    assert handle(state, layout.SEQ, snapshot, pressed=False) == (SHIFT, [])
+def test_shift_and_seq_is_a_window_move():
+    snapshot = seq_snapshot(SeqEntry(selected=0, selected_midi=True, has_clip=True), scene_count=20)
+    shifted = replace(SHIFT, window=Window(3, 3))
+    state, _ = handle(shifted, layout.SEQ, snapshot)
+    assert state == replace(shifted, window=Window(3, 2))
+    assert handle(state, layout.SEQ, snapshot, pressed=False) == (state, [])
 
 
 @pytest.mark.parametrize("state", [MIXING, FX_ON])

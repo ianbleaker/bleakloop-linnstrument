@@ -69,13 +69,13 @@ def handle(state, event, snapshot):
     # Under Shift, Copy and Delete's pads are window moves.
     shift_layer = state.shift and not state.copy and not state.delete
     if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
-        # On Shift's layer the pad is a tempo step.
+        # On Shift's layer the pad is a window move.
         return controls.device_clip(state, event)
     if state.device_clip and event.column == layout.NAV_COLUMN and event.pressed:
         # Device/Clip's layer replaces column 16's normal and Shift layers.
         return controls.device_clip_layer(state, key)
     if key == layout.SEQ and not (shift_layer and event.pressed):
-        # On Shift's layer the pad is a tempo step.
+        # On Shift's layer the pad is a window move.
         return _seq(state, event, snapshot)
     if key == layout.COPY and not (shift_layer and event.pressed):
         if not event.pressed:
@@ -364,6 +364,8 @@ def _nav_column(state, key, snapshot):
             return controls.move_window(state, layout.WINDOW_MOVES[key], snapshot)
         if key in layout.TEMPO_STEPS:
             return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
+        if key == layout.FADER_SOURCE:
+            return controls.toggle_fader_source(state)
         return state, []
     # The reserved pad and Seq have no match here. The current mode's pad goes back to Session.
     if key == layout.SESSION:
@@ -537,3 +539,4 @@ def _render_shift_layer(frame):
         frame[key] = Light(YELLOW)
     for key in layout.TEMPO_STEPS:
         frame[key] = Light(GREEN)
+    frame[layout.FADER_SOURCE] = Light(ORANGE)

@@ -91,8 +91,8 @@ SHIFT_HELD = Item("Shift", {layout.SHIFT: "SHIFT\nHELD"}, "Held.", variant=False
 DEVICE_CLIP = _one(
     "Device/Clip",
     layout.DEVICE_CLIP,
-    "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks, "
-    "devices and the fader source.",
+    "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks "
+    "and devices.",
     label="DevClip",
 )
 TEMPO = Item(
@@ -108,6 +108,13 @@ WINDOW_MOVES = Item(
         for key, step in layout.WINDOW_MOVES.items()
     },
     "Move the Ableton session ring in the selected direction.",
+)
+
+FADER_SOURCE = _one(
+    "Fader source",
+    layout.FADER_SOURCE,
+    "Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode.",
+    label="Source",
 )
 
 # Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
@@ -196,6 +203,7 @@ _NAVIGATION = (
 _NAVIGATION_SHIFT = (
     WINDOW_MOVES,
     TEMPO,
+    FADER_SOURCE,
 )
 
 MUTE = Block(
@@ -244,7 +252,7 @@ _SPLIT = (
         "Faders",
         layout.SPLIT_FADER_COLUMNS,
         ALL_PADS,
-        "One fader per row, as in FX Mode, from the source Device/Clip + Fader source picks.",
+        "One fader per row, as in FX Mode, from the source Shift + FX picks.",
     ),
 )
 
@@ -309,12 +317,6 @@ _DEVICE_CLIP = (
         "Devices",
         {key: "Device-" if step < 0 else "Device+" for key, step in layout.DEVICE_CLIP_DEVICE_STEPS.items()},
         "Select the previous or next device on the selected track.",
-    ),
-    _one(
-        "Fader source",
-        layout.DEVICE_CLIP_SOURCE,
-        "Switch the faders between Device FX and Mapped FX.",
-        label="Source",
     ),
     Item(
         "Device/Clip",
@@ -416,6 +418,7 @@ _SEQUENCER_GLOBAL_SHIFT = (
 _SEQUENCER_NAV_SHIFT = (
     WINDOW_MOVES,
     TEMPO,
+    FADER_SOURCE,
 )
 
 # Steps and column 15, the same in both views.

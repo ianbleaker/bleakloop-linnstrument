@@ -410,7 +410,7 @@ def test_device_clip_and_a_row_binds_in_mapped_fx():
 
 def test_device_clip_and_a_row_in_device_fx_points_to_mapped_fx():
     state = replace(FX_ON, device_clip=True)
-    assert press(5, 3, state=state) == (state, [ShowMessage("Device/Clip + FX for Mapped FX")])
+    assert press(5, 3, state=state) == (state, [ShowMessage("Shift + FX for Mapped FX")])
 
 
 def test_a_bound_row_stores_and_saves():

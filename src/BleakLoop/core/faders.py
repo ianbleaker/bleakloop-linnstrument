@@ -72,7 +72,7 @@ def press(state, event, snapshot):
     row = event.pad - 1
     if state.device_clip:
         if not mapped:
-            return state, [ShowMessage("Device/Clip + FX for Mapped FX")]
+            return state, [ShowMessage("Shift + FX for Mapped FX")]
         return state, [BindFader(row)]
     if state.delete:
         return _unbind(state, row) if mapped else (state, [])
