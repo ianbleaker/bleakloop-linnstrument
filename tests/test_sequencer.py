@@ -293,17 +293,30 @@ def test_copy_and_delete_hold(key):
     assert handle(held, key, pressed=False) == (ENTERED, [])
 
 
-def test_chord_does_nothing():
-    assert handle(ENTERED, (16, 6)) == (ENTERED, [])
+def pad_for(table, value):
+    return next(key for key, step in table.items() if step == value)
+
+
+MOVE_UP, MOVE_DOWN, MOVE_RIGHT, MOVE_LEFT = (
+    pad_for(layout.WINDOW_MOVES, move) for move in ((0, -1), (0, 1), (1, 0), (-1, 0))
+)
+TEMPO_UP, TEMPO_DOWN = pad_for(layout.TEMPO_STEPS, 1), pad_for(layout.TEMPO_STEPS, -1)
+TRACK_PREV, TRACK_NEXT = (pad_for(layout.DEVICE_CLIP_TRACK_STEPS, step) for step in (-1, 1))
+DEVICE_PREV, DEVICE_NEXT = (pad_for(layout.DEVICE_CLIP_DEVICE_STEPS, step) for step in (-1, 1))
+
+
+@pytest.mark.parametrize("key", layout.RESERVED)
+def test_chord_does_nothing(key):
+    assert handle(ENTERED, key) == (ENTERED, [])
 
 
 def test_device_clip_layer_steps_tracks_and_devices():
     held, actions = handle(ENTERED, layout.DEVICE_CLIP)
     assert held.device_clip and actions == []
-    assert handle(held, (16, 1)) == (held, [StepTrack(-1)])
-    assert handle(held, (16, 4)) == (held, [StepDevice(1)])
-    # Not Seq: Device/Clip's layer has nothing on pad 7.
-    assert handle(held, layout.SEQ) == (held, [])
+    assert handle(held, TRACK_PREV) == (held, [StepTrack(-1)])
+    assert handle(held, DEVICE_NEXT) == (held, [StepDevice(1)])
+    # Not Seq: on Device/Clip's layer Seq's pad is Device-.
+    assert handle(held, layout.SEQ) == (held, [StepDevice(-1)])
     assert handle(held, layout.DEVICE_CLIP, pressed=False)[0] == ENTERED
 
 
@@ -322,7 +335,7 @@ def test_device_clip_tap_flips_the_detail_view():
     assert actions == [ToggleDetailView()] and state == ENTERED
 
 
-@pytest.mark.parametrize("key", [(16, 2), layout.SHIFT])
+@pytest.mark.parametrize("key", [TRACK_NEXT, layout.SHIFT])
 def test_device_clip_with_another_press_does_not_flip(key):
     _, actions = engine_presses(
         ENTERED, (layout.DEVICE_CLIP, True), (key, True), (key, False), (layout.DEVICE_CLIP, False)
@@ -341,43 +354,51 @@ def test_device_clip_layer_lights():
     held, _ = handle(ENTERED, layout.DEVICE_CLIP)
     frame = sequencer.render(held, SNAP_IN)
     assert [frame[(16, pad)] for pad in range(1, 9)] == [
-        Light(LIME), Light(LIME), Light(MAGENTA), Light(MAGENTA),
-        Light(ORANGE), Light(OFF), Light(OFF), Light(ORANGE, Blink.FAST),
+        Light(OFF), Light(OFF), Light(OFF), Light(MAGENTA),
+        Light(MAGENTA), Light(LIME), Light(LIME), Light(ORANGE, Blink.FAST),
     ]
 
 
 SHIFTED = replace(ENTERED, shift=True)
 
 
-@pytest.mark.parametrize("key", [(16, 5), (16, 6)])
+@pytest.mark.parametrize("key", layout.RESERVED)
 def test_shift_layer_dark_pads_do_nothing(key):
     assert handle(SHIFTED, key) == (SHIFTED, [])
 
 
 def test_shift_tempo_steps():
-    assert handle(SHIFTED, (16, 7))[1][0] == SetTempo(121.0)
-    assert handle(SHIFTED, (16, 8))[1][0] == SetTempo(119.0)
+    assert handle(SHIFTED, TEMPO_UP)[1][0] == SetTempo(121.0)
+    assert handle(SHIFTED, TEMPO_DOWN)[1][0] == SetTempo(119.0)
+
+
+def test_shift_fx_toggles_the_fader_source():
+    # With no faders on screen too: the source is kept for when they show.
+    mapped, actions = handle(SHIFTED, layout.FADER_SOURCE)
+    assert mapped == replace(SHIFTED, fader_source="mapped")
+    assert actions == [ShowMessage("Mapped FX")]
+    assert handle(mapped, layout.FADER_SOURCE) == (SHIFTED, [ShowMessage("Device FX")])
 
 
 def test_shift_moves_the_window():
     snapshot = replace(SNAP_IN, track_count=20, scene_count=10)
-    state, actions = handle(SHIFTED, (16, 4), snapshot)
+    state, actions = handle(SHIFTED, MOVE_RIGHT, snapshot)
     assert state == replace(SHIFTED, window=layout.Window(1, 0))
     assert actions == [ShowMessage("Tracks 2–14, Scenes 1–6")]
-    state, actions = handle(state, (16, 2), snapshot)
+    state, actions = handle(state, MOVE_DOWN, snapshot)
     assert state.window == layout.Window(1, 1)
     assert actions == [ShowMessage("Tracks 2–14, Scenes 2–7")]
-    assert handle(state, (16, 3), snapshot)[0].window == layout.Window(0, 1)
-    assert handle(state, (16, 1), snapshot)[0].window == layout.Window(1, 0)
+    assert handle(state, MOVE_LEFT, snapshot)[0].window == layout.Window(0, 1)
+    assert handle(state, MOVE_UP, snapshot)[0].window == layout.Window(1, 0)
 
 
 def test_shift_window_move_keeps_the_split_views_width():
     snapshot = replace(SNAP_IN, track_count=20, scene_count=10)
-    state, actions = handle(replace(SHIFTED, split=True), (16, 4), snapshot)
+    state, actions = handle(replace(SHIFTED, split=True), MOVE_RIGHT, snapshot)
     assert actions == [ShowMessage("Tracks 2–9, Scenes 1–6")]
 
 
-@pytest.mark.parametrize("key", [(16, 1), (16, 3)])
+@pytest.mark.parametrize("key", [MOVE_UP, MOVE_LEFT])
 def test_shift_window_move_at_the_edge_does_nothing(key):
     assert handle(SHIFTED, key) == (SHIFTED, [])
 
@@ -897,16 +918,16 @@ def test_column_15():
 def test_column_16():
     frame = render()
     assert [frame[(16, pad)] for pad in range(1, 9)] == [
-        Light(MAGENTA), Light(RED), Light(CYAN), Light(CYAN),
-        Light(CYAN), Light(OFF), Light(BLUE), Light(ORANGE),
+        Light(CYAN), Light(CYAN), Light(CYAN), Light(OFF),
+        Light(BLUE), Light(RED), Light(MAGENTA), Light(ORANGE),
     ]
 
 
 def test_column_16_shift_layer():
     frame = render(SHIFTED)
     assert [frame[(16, pad)] for pad in range(1, 9)] == [
+        Light(GREEN), Light(GREEN), Light(ORANGE), Light(OFF),
         Light(YELLOW), Light(YELLOW), Light(YELLOW), Light(YELLOW),
-        Light(OFF), Light(OFF), Light(GREEN), Light(GREEN),
     ]
 
 

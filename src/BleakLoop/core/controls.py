@@ -96,11 +96,14 @@ def device_clip_layer(state, key):
         return state, [StepTrack(layout.DEVICE_CLIP_TRACK_STEPS[key])]
     if key in layout.DEVICE_CLIP_DEVICE_STEPS:
         return state, [StepDevice(layout.DEVICE_CLIP_DEVICE_STEPS[key])]
-    if key == layout.DEVICE_CLIP_SOURCE:
-        mapped = state.fader_source == "device"
-        state = replace(state, fader_source="mapped" if mapped else "device")
-        return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
     return state, []
+
+
+def toggle_fader_source(state):
+    # Shift + FX: Device FX <-> Mapped FX.
+    mapped = state.fader_source == "device"
+    state = replace(state, fader_source="mapped" if mapped else "device")
+    return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
 
 
 def render_device_clip_layer(frame):
@@ -111,7 +114,6 @@ def render_device_clip_layer(frame):
         frame[key] = Light(LIME)
     for key in layout.DEVICE_CLIP_DEVICE_STEPS:
         frame[key] = Light(MAGENTA)
-    frame[layout.DEVICE_CLIP_SOURCE] = Light(ORANGE)
     frame[layout.DEVICE_CLIP] = Light(ORANGE, Blink.FAST)
 
 

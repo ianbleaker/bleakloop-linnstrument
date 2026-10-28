@@ -28,14 +28,15 @@ UNDO = (1, 6)
 MODE_PAD = (1, 7)
 SCENE_PAGE = MODE_PAD  # pad 7's Shift function in Linnstrument Mode
 SHIFT = (1, 8)
-COPY = (NAV_COLUMN, 1)
-DELETE = (NAV_COLUMN, 2)
-SESSION = (NAV_COLUMN, 3)
-MIXER = (NAV_COLUMN, 4)
-FX = (NAV_COLUMN, 5)
-# Unlit and unused until Chord (16/6) is built.
-RESERVED = ((NAV_COLUMN, 6),)
-SEQ = (NAV_COLUMN, 7)
+SESSION = (NAV_COLUMN, 1)
+MIXER = (NAV_COLUMN, 2)
+FX = (NAV_COLUMN, 3)
+FADER_SOURCE = FX  # FX's Shift function
+# Unlit and unused until Chord (16/4) is built.
+RESERVED = ((NAV_COLUMN, 4),)
+SEQ = (NAV_COLUMN, 5)
+DELETE = (NAV_COLUMN, 6)
+COPY = (NAV_COLUMN, 7)
 DEVICE_CLIP = (NAV_COLUMN, 8)
 UNMUTE_ALL = (SCENE_COLUMN, 7)
 STOP = (SCENE_COLUMN, 8)
@@ -57,16 +58,16 @@ SPLIT_FADER_COLUMNS = range(10, 15)
 # bars, in Fixed Length's cycle order
 FIXED_LENGTHS = (1, 2, 4, 8)
 
-# Shift + column 16 pads 1-4, in every mode but Linnstrument Mode: (track step, scene step).
+# Shift + column 16 pads 5-8, in every mode but Linnstrument Mode: (track step, scene step).
 WINDOW_MOVES = {
-    (NAV_COLUMN, 1): (0, -1),
-    (NAV_COLUMN, 2): (0, 1),
-    (NAV_COLUMN, 3): (-1, 0),
-    (NAV_COLUMN, 4): (1, 0),
+    (NAV_COLUMN, 5): (0, -1),
+    (NAV_COLUMN, 6): (0, 1),
+    (NAV_COLUMN, 7): (1, 0),
+    (NAV_COLUMN, 8): (-1, 0),
 }
 
-# Shift + column 16 pads 7 and 8: BPM step.
-TEMPO_STEPS = {(NAV_COLUMN, 7): 1, (NAV_COLUMN, 8): -1}
+# Shift + column 16 pads 1 and 2: BPM step.
+TEMPO_STEPS = {(NAV_COLUMN, 1): 1, (NAV_COLUMN, 2): -1}
 
 # Sequencer Mode: steps in columns 3-10, note pads or settings in 11-14.
 SEQ_STEP_COLUMNS = range(3, 11)
@@ -84,10 +85,9 @@ SEQ_UP = (SCENE_COLUMN, 6)
 SEQ_DOWN = (SCENE_COLUMN, 7)
 SEQ_VIEW = (SCENE_COLUMN, 8)
 
-# Device/Clip + column 16 pads 1-5: track step, device step, fader source.
-DEVICE_CLIP_TRACK_STEPS = {(NAV_COLUMN, 1): -1, (NAV_COLUMN, 2): 1}
-DEVICE_CLIP_DEVICE_STEPS = {(NAV_COLUMN, 3): -1, (NAV_COLUMN, 4): 1}
-DEVICE_CLIP_SOURCE = (NAV_COLUMN, 5)
+# Device/Clip + column 16 pads 7-4: track step, device step.
+DEVICE_CLIP_TRACK_STEPS = {(NAV_COLUMN, 7): -1, (NAV_COLUMN, 6): 1}
+DEVICE_CLIP_DEVICE_STEPS = {(NAV_COLUMN, 5): -1, (NAV_COLUMN, 4): 1}
 
 
 def device_row(pad):

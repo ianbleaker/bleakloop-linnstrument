@@ -42,19 +42,19 @@ def test_an_empty_label_removes_it(tmp_path):
 
 
 def test_a_layout_override_moves_a_pad_and_its_label(tmp_path):
-    # Session is blue on column 16 pad 3; moved to pad 1, its label and light go with it.
+    # Session is blue on column 16 pad 1; moved to pad 3, its label and light go with it.
     spec = {"panels": [{"layer": "session", "columns": [16]}]}
     _, before = run(tmp_path, spec)
-    _, after = run(tmp_path, {**spec, "layout": {"SESSION": "16,1", "COPY": "16,3"}})
-    assert rect(16, 40 + 2 * 46, 40, 40, SWATCHES[BLUE]) in before
-    assert rect(16, 40, 40, 40, SWATCHES[BLUE]) in after
-    assert after.index(">Session</text>") < after.index(">Copy</text>")
+    _, after = run(tmp_path, {**spec, "layout": {"SESSION": "16,3", "FX": "16,1"}})
+    assert rect(16, 40, 40, 40, SWATCHES[BLUE]) in before
+    assert rect(16, 40 + 2 * 46, 40, 40, SWATCHES[BLUE]) in after
+    assert after.index(">FX</text>") < after.index(">Session</text>")
 
 
 def test_ring_labels_follow_their_direction(tmp_path):
     # Listed out of the stock order, each pad still names its own step.
-    moves = {"16,5": [0, -1], "16,6": [0, 1], "16,7": [1, 0], "16,8": [-1, 0]}
-    tempo = {"16,1": 1, "16,2": -1}
+    moves = {"16,8": [0, -1], "16,7": [0, 1], "16,6": [-1, 0], "16,5": [1, 0]}
+    tempo = {"16,2": 1, "16,1": -1}
     _, svg = run(
         tmp_path,
         {
@@ -62,7 +62,8 @@ def test_ring_labels_follow_their_direction(tmp_path):
             "panels": [{"layer": "session-shift", "columns": [16]}],
         },
     )
-    names = [">Up</text>", ">Down</text>", ">Right</text>", ">Left</text>"]
+    names = [">Tempo-</text>", ">Tempo+</text>", ">Right</text>", ">Left</text>", ">Down</text>",
+             ">Up</text>"]
     assert sorted(names, key=svg.index) == names
 
 
@@ -71,7 +72,7 @@ def test_a_layout_override_is_undone(tmp_path):
     run(
         tmp_path,
         {
-            "layout": {"SESSION": "16,1", "DEVICE_CLIP_TRACK_STEPS": {"16,7": -1, "16,6": 1}},
+            "layout": {"SESSION": "16,3", "DEVICE_CLIP_TRACK_STEPS": {"16,1": -1, "16,2": 1}},
             "panels": [{"layer": "session"}],
         },
     )

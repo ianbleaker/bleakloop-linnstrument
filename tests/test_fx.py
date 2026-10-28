@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, WHITE, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, WHITE, Blink, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
     EndUndoStep,
@@ -199,9 +199,11 @@ def test_mixer_turns_fx_off():
     assert actions == [SetMixer(True), ShowMessage("Mixer Mode ON")]
 
 
-def test_shift_fx_pad_does_nothing():
+def test_shift_fx_pad_toggles_the_fader_source():
     state = replace(FX, shift=True)
-    assert handle(state, layout.FX) == (state, [])
+    assert handle(state, layout.FX) == (
+        replace(state, fader_source="mapped"), [ShowMessage("Mapped FX")]
+    )
 
 
 @pytest.mark.parametrize("key, bars", list(layout.FX_LENGTHS.items()))
@@ -620,7 +622,7 @@ def test_session_render_fx_pad_off():
 
 def test_session_render_shift_layer_in_fx():
     frame = session.render(replace(with_slot(FX, 2), shift=True), SNAP)
-    assert frame[layout.FX] == Light(OFF)
+    assert frame[layout.FX] == Light(ORANGE)
     assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))
 
 
