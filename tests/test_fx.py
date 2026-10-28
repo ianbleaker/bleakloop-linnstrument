@@ -1032,9 +1032,9 @@ def timed(state, beats, quantization=4, bars=4):
 
 
 def test_a_timed_launch_waits_for_the_bar_line():
-    # 1 Bar quantization: fired halfway through the bar before, at beat 14 of bar 4.
+    # 1 Bar quantization: fired in the bar before, at bar 4.
     state, actions = timed(FX, 1.5)
-    assert state.pending_launch == PendingLaunch(2, 14.0, 1.5)
+    assert state.pending_launch == PendingLaunch(2, 12.0, 1.5)
     assert actions == [ShowMessage("Scene 3 in 4 bars")]
 
 
@@ -1047,10 +1047,16 @@ def test_a_timed_launch_morphs_its_snapshot_to_land_as_the_scene_starts():
 
 
 def test_a_timed_launch_snaps_to_a_coarser_quantization():
-    # 4 Bars quantization (2), 1 bar held at bar 1: the first 4-bar line after bar 2.
+    # 4 Bars quantization (2), 1 bar held at bar 1: the first 4-bar line after bar 2, which
+    # Live's quantization already starts it on.
     state, actions = timed(with_scene(FX, 2), 1.5, quantization=2, bars=1)
-    assert state.pending_launch == PendingLaunch(2, 8.0, 1.5)
-    assert actions[1] == RecallFxSnapshot(2, None, scene=True, end_beats=16.0)
+    assert state.pending_launch is None
+    assert actions == [
+        FireScene(2, legato=False),
+        RecallFxSnapshot(2, None, scene=True, end_beats=16.0),
+    ]
+    state, _ = timed(FX, 1.5, quantization=2, bars=8)
+    assert state.pending_launch == PendingLaunch(2, 16.0, 1.5)
 
 
 def test_a_timed_launch_unquantized_fires_on_the_bar_line():
@@ -1059,7 +1065,7 @@ def test_a_timed_launch_unquantized_fires_on_the_bar_line():
 
 
 def test_a_timed_launch_inside_its_last_step_fires_at_once():
-    # 1 bar held past the bar's midpoint: Live's 1 Bar quantization starts it on the line.
+    # 1 bar held: Live's 1 Bar quantization starts it on the line.
     state, actions = timed(with_scene(FX, 2), 2.5, bars=1)
     assert state.pending_launch is None
     assert actions == [
@@ -1171,7 +1177,7 @@ def test_mixer_copy_and_delete_only_hold_for_the_panel():
 
 def test_a_timed_launch_from_the_panel():
     state, _ = timed(PANEL, 1.5)
-    assert state.pending_launch == PendingLaunch(2, 14.0, 1.5)
+    assert state.pending_launch == PendingLaunch(2, 12.0, 1.5)
 
 
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])

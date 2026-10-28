@@ -334,8 +334,15 @@ def _nav(state, event, snapshot):
     if key in (layout.MIXER, layout.FX):
         state, actions = leave(state, snapshot)
         state, more = (mixer.toggle if key == layout.MIXER else fx.toggle)(state)
-        # Mixer and FX Mode are 13 tracks wide, wider than the split view.
-        window = layout.move_window(state.window, 0, 0, snapshot.track_count, snapshot.scene_count)
+        # The new mode's width can be wider than Session's split view.
+        window = layout.move_window(
+            state.window,
+            0,
+            0,
+            snapshot.track_count,
+            snapshot.scene_count,
+            controls.window_tracks(state),
+        )
         return replace(state, window=window), actions + more
     return state, []
 

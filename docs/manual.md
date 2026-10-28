@@ -439,7 +439,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - The scene pad blinks yellow with the beat until BleakLoop fires the scene, then blinks lime as usual until it starts.
 - With the transport stopped, the scene launches at once.
 - Stopping the transport, or jumping back in the song, cancels a waiting launch, with a message.
-- A new scene press replaces a waiting launch. Shift + a scene launches it legato at once, whatever Bars pad is held.
+- A new scene press replaces a waiting launch; the replaced launch's morph still lands at its bar line. Shift + a scene launches it legato at once, whatever Bars pad is held.
 
 **During a morph:**
 

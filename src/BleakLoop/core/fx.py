@@ -410,9 +410,10 @@ def timed_launch(state, scene, snapshot):
     if step is None:
         fire = start
     else:
-        # Fired halfway through the last boundary's step: clear of the timer's jitter.
+        # Any time in the last step before it starts it there: the earliest is clearest of
+        # a late tick.
         start = math.ceil(start / step - 1e-9) * step
-        fire = start - step / 2
+        fire = start - step
     actions = []
     if scene_snapshot(state, scene) is not None:
         actions.append(RecallFxSnapshot(scene, None, scene=True, end_beats=start))
