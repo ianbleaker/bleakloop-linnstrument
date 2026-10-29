@@ -150,18 +150,18 @@ def test_entering_sequencer_resets_holds_follow_and_the_view():
 def test_entry_keeps_the_sequencer_arm_and_settings(target):
     state = State(
         mode=Mode.SEQUENCER,
-        seq_saved_arms=(True, False),
-        seq_set_arms=(False, True),
-        seq_track=1,
+        saved_arms=(True, False),
+        set_arms=(False, True),
+        arm_track=1,
         seq_rate=0.5,
         seq_triplet=True,
         seq_base=60,
         seq_pitch=62,
     )
     entered = modes.enter(state, target)
-    assert entered.seq_saved_arms == (True, False)
-    assert entered.seq_set_arms == (False, True)
-    assert entered.seq_track == 1
+    assert entered.saved_arms == (True, False)
+    assert entered.set_arms == (False, True)
+    assert entered.arm_track == 1
     assert (entered.seq_rate, entered.seq_triplet) == (0.5, True)
     assert (entered.seq_base, entered.seq_pitch) == (60, 62)
 

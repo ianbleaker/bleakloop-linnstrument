@@ -193,6 +193,7 @@ flowchart TD
     live_state["live_state"]
   end
   subgraph Core
+    core_arm["arm"]
     core_column_1["column_1"]
     core_controls["controls"]
     core_engine["engine"]
@@ -213,6 +214,7 @@ flowchart TD
     ableton_v3["ableton.v3"]
   end
   __init__ -.->|lazy| surface
+  core_arm --> core_model
   core_column_1 --> core_controls
   core_column_1 --> core_faders
   core_column_1 --> core_fx
@@ -227,6 +229,7 @@ flowchart TD
   core_controls --> core_model
   core_controls --> core_modes
   core_controls --> core_values
+  core_engine --> core_arm
   core_engine --> core_faders
   core_engine --> core_fx
   core_engine --> core_layout
@@ -259,6 +262,7 @@ flowchart TD
   core_model --> core_leds
   core_modes --> core_layout
   core_modes --> core_values
+  core_sequencer --> core_arm
   core_sequencer --> core_column_1
   core_sequencer --> core_controls
   core_sequencer --> core_faders
@@ -538,7 +542,7 @@ stateDiagram-v2
 | Blue hand | Other control surfaces, even in a slot with no ports, can hold `song.appointed_device` away from the device clicked in Live (seen with APC40_MkII and Launchkey_Mini_MK3 loaded). The surface polls `song.view.selected_track.view.selected_device` on the display tick and, when it changes, sets `song.appointed_device` to it, so a click moves the hand. Only on a change: a device another controller picked stays until the next click. |
 | Device/Clip steps | Tracks: `song.visible_tracks`, then `song.return_tracks`, then `song.master_track`, set as `song.view.selected_track`. Devices: the selected track's `devices`, from the selected device's top-level ancestor (walking `canonical_parent` up through chains and racks), selected with `song.view.select_device` and appointed (`song.appointed_device`) at once, so the next fader write lands on it. The name, or "No more …", goes to the status bar. |
 | Sequencer target clip | Live's highlighted slot, `song.view.selected_track` × `song.view.selected_scene`, read live; Sequencer Mode follows a click in Live. `live_state.read_seq_entry`, read only while Seq is held, gives a tap its fallbacks: the Detail-view clip when its `canonical_parent` is a clip slot on a MIDI track in `song.tracks` (an Arrangement clip's parent is its track), then the selected track's `playing_slot_index`. Sequencer actions index `song.tracks`, folded group members included, not `song.visible_tracks`; `TrackView.set_index` maps a window track to it, read only for Sequencer Mode and while Seq is held. A MIDI track is `has_midi_input` and not `is_foldable`. |
-| Sequencer arm | Entry saves `arm` for every track in `song.tracks` (None where `can_be_armed` is false) and arms the target alone (`SetArms`, only the changes). A selection change moves the arm (old off, new on). Leaving for Session, Mixer or FX, or unloading while the arms are saved (in Sequencer Mode, or in Linnstrument Mode entered from it; `sequencer.restore_arms`, in a try so the device hand-back still runs), sets each track back to its saved arm only if it still equals what BleakLoop set; with the track count changed, nothing is restored, since the indexes no longer line up. Linnstrument Mode keeps the arm. |
+| Sequencer arm | Entry saves `arm` for every track in `song.tracks` (None where `can_be_armed` is false) and arms the target alone (`SetArms`, only the changes). A selection change moves the arm (old off, new on). Leaving for Session, Mixer or FX, or unloading while the arms are saved (in Sequencer Mode, or in Linnstrument Mode entered from it; `arm.restore`, in a try so the device hand-back still runs), sets each track back to its saved arm only if it still equals what BleakLoop set; with the track count changed, nothing is restored, since the indexes no longer line up. Linnstrument Mode keeps the arm. |
 | Note reads | `clip.get_notes_extended(0, 128, 0.0, max(loop_end, end_marker))`, as plain `NoteView`s (`note_id`, `pitch`, `start_time`, `duration`, `velocity`, a float), only in Sequencer Mode, when a frame is drawn. The notes don't come back sorted. Measured: 45 notes in 0.02–0.06 ms, 250 in 0.5 ms. |
 | Note edits and undo | `EditNotes` is one undo step (`begin_undo_step` / `end_undo_step` in a `finally`): `slot.create_clip(length)` for an empty slot, `clip.remove_notes_by_id`, then `clip.add_new_notes` with `Live.Clip.MidiNoteSpecification`s. `RemovePitch` is `clip.remove_notes_extended(pitch, 1, 0.0, max(loop_end, end_marker))` in an undo step. Before any write the core closes a running morph's undo step, so undoing the morph doesn't undo the edit. A slide's `ModifyNotes` reads its notes with `clip.get_notes_by_id`, sets `start_time` and `velocity`, and writes them back with `clip.apply_note_modifications`, only when the values change; the whole slide is one undo step (`State.seq_undo_open`), opened when the slide starts and closed when the last sliding finger lifts, on leaving the mode, on a track change and on unload. An action whose track, slot or clip is gone skips with a log line. |
 | Loop writes | `SetLoop` writes `loop_end` first when the new start is at or past the current end, else `loop_start` first, since Live refuses a start past the end; both in one undo step. Double is `clip.duplicate_loop()`. |

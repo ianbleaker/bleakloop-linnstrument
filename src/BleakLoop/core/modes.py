@@ -194,11 +194,12 @@ class State:
     fader_bindings: tuple = (None,) * 8  # Mapped FX: FaderBinding or None per row
     seq_held: bool = False  # Seq is held in Session Mode
     seq_used: bool = False  # the Seq hold entered on a slot: its release does nothing
-    # Sequencer Mode's arm: per song.tracks, the arm before entry and what BleakLoop set.
-    seq_saved_arms: tuple | None = None
-    seq_set_arms: tuple | None = None
-    seq_track: int | None = None  # the song.tracks index BleakLoop last armed
-    seq_refused: int | None = None  # the non-MIDI track the selection last moved to
+    # The arm Sequencer Mode takes (core/arm.py): per song.tracks, the arm before entry and
+    # what BleakLoop set.
+    saved_arms: tuple | None = None
+    set_arms: tuple | None = None
+    arm_track: int | None = None  # the song.tracks index BleakLoop last armed
+    arm_refused: int | None = None  # the non-MIDI track the selection last moved to
     seq_rate: float = values.SEQ_DEFAULT_RATE  # beats per step, before Triplet
     seq_triplet: bool = False
     seq_follow: bool = True

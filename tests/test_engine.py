@@ -102,7 +102,7 @@ def test_blink_beats_uses_tempo_while_stopped():
 
 # Sequencer Mode
 
-SEQUENCER = State(Mode.SEQUENCER, seq_track=0)
+SEQUENCER = State(Mode.SEQUENCER, arm_track=0)
 
 
 def test_sequencer_input_goes_to_the_sequencer_module():
@@ -130,7 +130,7 @@ def test_seq_sync_runs_only_in_sequencer_mode():
     )
     assert engine.seq_sync(SESSION, snapshot) == (SESSION, [])
     state, actions = engine.seq_sync(SEQUENCER, snapshot)
-    assert state.seq_track == 1
+    assert state.arm_track == 1
     assert actions == [SetArms(((0, False), (1, True)))]
 
 

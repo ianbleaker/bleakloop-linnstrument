@@ -7,7 +7,7 @@ Steps are counted from clip time 0. Step s of the page in view is at column 3 + 
 import math
 from dataclasses import replace
 
-from . import column_1, controls, faders, fx, layout, mixer, modes, values
+from . import arm, column_1, controls, faders, fx, layout, mixer, modes, values
 from .leds import (
     BLUE,
     CYAN,
@@ -34,7 +34,6 @@ from .model import (
     RemovePitch,
     SelectDrumPad,
     SequencerView,
-    SetArms,
     SetDrumScroll,
     SetLoop,
     ShowMessage,
@@ -160,50 +159,20 @@ def enter_by_tap(state, snapshot):
 
 
 def _enter(state, snapshot, track):
-    # Arm the target alone, remembering every track's arm and what BleakLoop set.
     state, actions = mixer.reset(state)
     state, more = faders.reset(state)
     actions += more
-    arms = snapshot.arms
-    wanted = tuple(None if arm is None else i == track for i, arm in enumerate(arms))
-    changes = tuple(
-        (i, want)
-        for i, (arm, want) in enumerate(zip(arms, wanted))
-        if arm is not None and arm != want
-    )
-    state = replace(
-        state, seq_saved_arms=arms, seq_set_arms=wanted, seq_track=track, seq_refused=None
-    )
+    state, more = arm.take(state, snapshot, track)
     state = modes.enter(state, Mode.SEQUENCER)
-    if changes:
-        actions.append(SetArms(changes))
-    return state, actions + [EnterMode(Mode.SEQUENCER), ShowMessage("Sequencer")]
+    return state, actions + more + [EnterMode(Mode.SEQUENCER), ShowMessage("Sequencer")]
 
 
 def leave(state, snapshot):
     # Back to Session, putting the arms back.
     state, actions = _close_slide(state)
-    actions += restore_arms(state, snapshot.arms)
-    state = replace(
-        state, seq_saved_arms=None, seq_set_arms=None, seq_track=None, seq_refused=None
-    )
-    state = modes.enter(state, Mode.SESSION)
+    actions += arm.restore(state, snapshot.arms)
+    state = modes.enter(arm.release(state), Mode.SESSION)
     return state, actions + [EnterMode(Mode.SESSION)]
-
-
-def restore_arms(state, arms):
-    # On leaving, and on unload while the arms are saved (Linnstrument Mode keeps them). A
-    # track's arm goes back only if it's still what BleakLoop set; with the track count
-    # changed, the indexes don't line up and nothing is restored.
-    saved, wanted = state.seq_saved_arms, state.seq_set_arms
-    if saved is None or wanted is None or not len(saved) == len(arms) == len(wanted):
-        return []
-    changes = tuple(
-        (i, before)
-        for i, (before, set_, now) in enumerate(zip(saved, wanted, arms))
-        if now is not None and before is not None and now == set_ and now != before
-    )
-    return [SetArms(changes)] if changes else []
 
 
 def sync(state, snapshot):
@@ -211,40 +180,12 @@ def sync(state, snapshot):
     view = snapshot.sequencer
     if view is None:
         return state, []
-    if view.track is not None and view.track == state.seq_track:
-        return replace(state, seq_refused=None), []
-    if view.track is None or not view.is_midi:
-        refused = -1 if view.track is None else view.track
-        if state.seq_refused == refused:
-            return state, []
-        return replace(state, seq_refused=refused), [ShowMessage(NEEDS_MIDI)]
-    state, actions = _close_slide(state)
-    old, new, arms = state.seq_track, view.track, snapshot.arms
-    changes = []
-    if old is not None and old < len(arms) and arms[old]:
-        changes.append((old, False))
-    if new < len(arms) and arms[new] is False:
-        changes.append((new, True))
-    wanted = state.seq_set_arms
-    if wanted is not None:
-        wanted = list(wanted)
-        for i, arm in ((old, False), (new, True)):
-            if i is not None and i < len(wanted) and wanted[i] is not None:
-                wanted[i] = arm
-        wanted = tuple(wanted)
-    state = replace(
-        state,
-        seq_track=new,
-        seq_set_arms=wanted,
-        seq_refused=None,
-        seq_holds=(),
-        seq_copy_source=None,
-        seq_follow=True,
-        seq_page=0,
-    )
-    if changes:
-        actions.append(SetArms(tuple(changes)))
-    return state, actions
+    state, actions, moved = arm.follow(state, snapshot, view, NEEDS_MIDI)
+    if not moved:
+        return state, actions
+    state, closed = _close_slide(state)
+    state = replace(state, seq_holds=(), seq_copy_source=None, seq_follow=True, seq_page=0)
+    return state, closed + actions
 
 
 def _close_slide(state):

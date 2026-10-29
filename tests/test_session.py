@@ -1816,16 +1816,16 @@ def test_seq_tap_on_a_highlighted_clip():
     state, actions = tap(SESSION, snapshot)
     assert state.mode is Mode.SEQUENCER
     assert actions == ENTERED
-    assert state.seq_track == 0
-    assert state.seq_saved_arms == (False, True, None, False)
-    assert state.seq_set_arms == (True, False, None, False)
+    assert state.arm_track == 0
+    assert state.saved_arms == (False, True, None, False)
+    assert state.set_arms == (True, False, None, False)
 
 
 def test_seq_tap_on_an_empty_slot_moves_to_the_detail_clip():
     entry = SeqEntry(selected=0, selected_midi=True, scene=2, detail=(3, 5), playing_scene=1)
     state, actions = tap(SESSION, seq_snapshot(entry))
     assert actions[0] == HighlightSlot(3, 5)
-    assert state.seq_track == 3
+    assert state.arm_track == 3
     assert actions[1] == SetArms(((1, False), (3, True)))
 
 

@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, engine, layout, modes, sequencer
+from BleakLoop.core import arm, column_1, engine, layout, modes, sequencer
 from BleakLoop.core.leds import (
     BLUE,
     CYAN,
@@ -213,9 +213,9 @@ def snap(view=TARGET, arms=ARMS, **k):
 # Entered on track 2 with track 1 armed before: BleakLoop disarmed 1 and armed 2.
 ENTERED = State(
     mode=Mode.SEQUENCER,
-    seq_saved_arms=(False, True, False, None, False, False),
-    seq_set_arms=(False, False, True, None, False, False),
-    seq_track=2,
+    saved_arms=(False, True, False, None, False, False),
+    set_arms=(False, False, True, None, False, False),
+    arm_track=2,
 )
 SNAP_IN = snap(arms=(False, False, True, None, False, False))
 
@@ -231,8 +231,8 @@ def handle(state, key, snapshot=SNAP_IN, pressed=True, velocity=100):
 def test_seq_returns_to_session_restoring_the_arm():
     state, actions = handle(ENTERED, layout.SEQ)
     assert state.mode is Mode.SESSION
-    assert state.seq_saved_arms is None and state.seq_set_arms is None
-    assert state.seq_track is None
+    assert state.saved_arms is None and state.set_arms is None
+    assert state.arm_track is None
     assert actions == [SetArms(((1, True), (2, False))), EnterMode(Mode.SESSION)]
 
 
@@ -417,8 +417,8 @@ def test_sync_moves_the_arm_to_a_track_clicked_in_live():
     state = replace(ENTERED, seq_holds=(StepHold(0, 3, 1, 100),), seq_copy_source=(0, ()))
     synced, actions = sequencer.sync(state, snap(replace(TARGET, track=5), arms=SNAP_IN.arms))
     assert actions == [SetArms(((2, False), (5, True)))]
-    assert synced.seq_track == 5
-    assert synced.seq_set_arms == (False, False, False, None, False, True)
+    assert synced.arm_track == 5
+    assert synced.set_arms == (False, False, False, None, False, True)
     assert synced.seq_holds == () and synced.seq_copy_source is None
 
 
@@ -433,7 +433,7 @@ def test_sync_leaves_the_arm_on_a_non_midi_track_and_says_so_once():
     audio = snap(SequencerView(track=1, scene=1), arms=SNAP_IN.arms)
     state, actions = sequencer.sync(ENTERED, audio)
     assert actions == [ShowMessage("Sequencer needs a MIDI track")]
-    assert state.seq_track == 2
+    assert state.arm_track == 2
     assert sequencer.sync(state, audio) == (state, [])
 
 
@@ -459,9 +459,9 @@ def test_linnstrument_and_back_keep_the_arm():
     back, actions = column_1.handle(state, press(layout.MODE_PAD), SNAP_IN)
     assert back.mode is Mode.SEQUENCER
     assert actions == [EnterMode(Mode.SEQUENCER)]
-    assert back.seq_saved_arms == ENTERED.seq_saved_arms
-    assert back.seq_set_arms == ENTERED.seq_set_arms
-    assert back.seq_track == 2
+    assert back.saved_arms == ENTERED.saved_arms
+    assert back.set_arms == ENTERED.set_arms
+    assert back.arm_track == 2
 
 
 def test_linnstrument_closes_a_slide():
@@ -1241,14 +1241,14 @@ def test_a_rack_with_no_selected_pad_edits_seq_pitch():
 
 def test_unload_restores_the_saved_arms():
     arms = (False, False, True, None, False, False)
-    assert sequencer.restore_arms(ENTERED, arms) == [SetArms(((1, True), (2, False)))]
+    assert arm.restore(ENTERED, arms) == [SetArms(((1, True), (2, False)))]
 
 
 def test_unload_restores_the_arms_from_linnstrument_mode():
     linnstrument, _ = handle(ENTERED, layout.MODE_PAD)
     arms = (False, False, True, None, False, False)
-    assert sequencer.restore_arms(linnstrument, arms) == [SetArms(((1, True), (2, False)))]
+    assert arm.restore(linnstrument, arms) == [SetArms(((1, True), (2, False)))]
 
 
 def test_unload_outside_sequencer_mode_restores_nothing():
-    assert sequencer.restore_arms(State(), (True, False)) == []
+    assert arm.restore(State(), (True, False)) == []

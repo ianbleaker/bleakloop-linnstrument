@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import faders, fx, layout, mixer, linnstrument_mode, sequencer, session
+from . import arm, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
 from .model import FaderBound, PadPress, RacksRead, ScenesChanged
 from .modes import Mode
 
@@ -94,9 +94,9 @@ def seq_sync(state, snapshot):
     return sequencer.sync(state, snapshot)
 
 
-def seq_unload_arms(state, arms):
-    # On unload: the arm actions that put Sequencer Mode's saved arms back, if any are saved.
-    return sequencer.restore_arms(state, arms)
+def unload_arms(state, arms):
+    # On unload: the arm actions that put a mode's saved arms back, if any are saved.
+    return arm.restore(state, arms)
 
 
 def seq_phase(state, view):

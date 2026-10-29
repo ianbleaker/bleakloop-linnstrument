@@ -278,7 +278,7 @@ class BleakLoop(ControlSurface):
             self.song.end_undo_step()
         if self._state.seq_undo_open:
             self.song.end_undo_step()
-        self._restore_seq_arms()
+        self._restore_arms()
         # Hand the device back for playing, with the player's own split.
         self._send(
             device.y_axis(False)
@@ -295,17 +295,17 @@ class BleakLoop(ControlSurface):
         self._c_instance.set_session_highlight(-1, -1, -1, -1, False)
         super().disconnect()
 
-    def _restore_seq_arms(self):
+    def _restore_arms(self):
         # Unloaded in Sequencer Mode, or in Linnstrument Mode entered from it: the arms go
         # back as leaving the mode would put them. After this fails, the hand-back still runs.
-        if self._state.seq_saved_arms is None:
+        if self._state.saved_arms is None:
             return
         try:
             arms = live_state.read_arms(self.song)
-            for action in engine.seq_unload_arms(self._state, arms):
+            for action in engine.unload_arms(self._state, arms):
                 live_actions.apply(action, self.song, self)
         except Exception:
-            logger.exception("SEQ: restoring the arms on unload failed")
+            logger.exception("ARM: restoring the arms on unload failed")
 
     def _compute_settings(self):
         settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
