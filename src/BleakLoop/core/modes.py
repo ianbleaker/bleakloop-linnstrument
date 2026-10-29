@@ -11,15 +11,17 @@ class Mode(enum.Enum):
     SESSION = enum.auto()
     LINNSTRUMENT = enum.auto()
     SEQUENCER = enum.auto()
+    CHORD = enum.auto()
 
 
 class Origin(enum.Enum):
-    # The Session Mode layer, or Sequencer Mode, Linnstrument Mode was entered from, which
-    # Back returns to.
+    # The Session Mode layer, or Sequencer or Chord Mode, Linnstrument Mode was entered from,
+    # which Back returns to.
     SESSION = enum.auto()
     MIXER = enum.auto()
     FX = enum.auto()
     SEQUENCER = enum.auto()
+    CHORD = enum.auto()
 
 
 @dataclass(frozen=True)
@@ -194,8 +196,8 @@ class State:
     fader_bindings: tuple = (None,) * 8  # Mapped FX: FaderBinding or None per row
     seq_held: bool = False  # Seq is held in Session Mode
     seq_used: bool = False  # the Seq hold entered on a slot: its release does nothing
-    # The arm Sequencer Mode takes (core/arm.py): per song.tracks, the arm before entry and
-    # what BleakLoop set.
+    # The arm Sequencer and Chord Mode take (core/arm.py): per song.tracks, the arm before
+    # entry and what BleakLoop set.
     saved_arms: tuple | None = None
     set_arms: tuple | None = None
     arm_track: int | None = None  # the song.tracks index BleakLoop last armed
@@ -212,6 +214,15 @@ class State:
     # (step, notes) of the copied step, each note (pitch, offset in the step, duration, velocity)
     seq_copy_source: tuple | None = None
     seq_undo_open: bool = False  # a slide's undo step is open in Live
+    chord_qualities: tuple = ()  # held quality pads, in press order: the last one counts
+    chord_extensions: frozenset = frozenset()  # held extension pads
+    chord_inv: int = 0  # Inv's latched setting, an index into harmony.INVERSIONS
+    chord_spread: int = 0  # Spread's, an index into harmony.SPREADS
+    chord_bass: bool = False
+    chord_octave: int = 0  # in values.CHORD_OCTAVES, kept across entries
+    chord_holds: tuple = ()  # (column, pad, pitches) per sounding chord pad
+    chord_device_track: int | None = None  # the song.tracks index of BleakLoop's Chord device
+    chord_remove_pending: bool = False  # the device goes once no chord pad is held
 
 
 def enter(state, mode):
@@ -227,11 +238,15 @@ def enter(state, mode):
     # snapshots carry on.
     # Sequencer Mode's holds reset; its arm, rate, Triplet, note range and pitch survive. A
     # caller leaving it closes a slide's undo step first.
+    # Chord Mode's held pads reset, since Linnstrument Mode never sees their releases; its arm,
+    # voicing and octave survive.
     if mode is Mode.LINNSTRUMENT and state.mode is Mode.SESSION:
         origin = Origin.MIXER if state.mixer else Origin.FX if state.fx else Origin.SESSION
         state = replace(state, came_from=origin)
     elif mode is Mode.LINNSTRUMENT and state.mode is Mode.SEQUENCER:
         state = replace(state, came_from=Origin.SEQUENCER)
+    elif mode is Mode.LINNSTRUMENT and state.mode is Mode.CHORD:
+        state = replace(state, came_from=Origin.CHORD)
     state = replace(
         state,
         mode=mode,
@@ -257,6 +272,9 @@ def enter(state, mode):
         seq_holds=(),
         seq_copy_source=None,
         seq_page_held=None,
+        chord_qualities=(),
+        chord_extensions=frozenset(),
+        chord_holds=(),
     )
     if mode is Mode.SEQUENCER:
         # Page 1: a page pinned on another clip can lie past this one's end.

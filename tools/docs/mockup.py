@@ -3,7 +3,7 @@
 PYTHONPATH=src python3 -m tools.docs.mockup SPEC.json [-o OUT.svg]
 
 A top-level "layout" object moves pads for the figure, by core/layout.py constant name:
-{"SESSION": "16,1", "RESERVED": [], "DEVICE_CLIP_TRACK_STEPS": {"16,7": -1, "16,6": 1}}.
+{"SESSION": "16,1", "FX_SLOTS": ["11,1", "12,1"], "DEVICE_CLIP_TRACK_STEPS": {"16,7": -1, "16,6": 1}}.
 A moved pad takes its Shift aliases (FX's FADER_SOURCE) along unless they're overridden too.
 """
 

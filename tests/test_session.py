@@ -125,7 +125,7 @@ def test_column_0_does_nothing(state, pad):
 
 @pytest.mark.parametrize(
     "key", [layout.UNDO, layout.METRONOME, layout.PLAY_STOP, layout.MODE_PAD, (2, 1), (2, 8),
-            layout.COPY, *layout.RESERVED, (layout.SCENE_COLUMN, 1)]
+            layout.COPY, layout.CHORD, (layout.SCENE_COLUMN, 1)]
 )
 def test_release_does_nothing(key):
     assert handle(SESSION, key, pressed=False) == (SESSION, [])
@@ -555,7 +555,7 @@ def test_mode_pad_lights(state, current):
     frame = session.render(state, SNAP)
     for key in (layout.SESSION, layout.MIXER, layout.FX):
         assert frame[key] == Light(BLUE if key == current else CYAN)
-    assert all(frame[key] == Light(OFF) for key in layout.RESERVED)
+    assert frame[layout.CHORD] == Light(OFF)
 
 
 def test_normal_layer_column_16():
@@ -1139,7 +1139,7 @@ DELETE = State(delete=True)
 
 INERT_WHILE_HELD = (
     [(c, p) for c in layout.GRID_COLUMNS for p in (layout.MUTE_ROW, layout.SELECT_ROW)]
-    + [layout.SESSION, layout.MIXER, layout.FX, *layout.RESERVED, layout.SEQ]
+    + [layout.SESSION, layout.MIXER, layout.FX, layout.CHORD, layout.SEQ]
     + [layout.UNMUTE_ALL, layout.STOP]
     + [(1, p) for p in range(1, 8)]
 )
@@ -1773,7 +1773,7 @@ def test_source_outside_window_not_drawn(source):
 
 
 @pytest.mark.parametrize(
-    "state, key", [(state, key) for state in (SESSION, SHIFT) for key in layout.RESERVED]
+    "state, key", [(state, key) for state in (SESSION, SHIFT) for key in (layout.CHORD,)]
 )
 def test_reserved_pads(state, key):
     assert handle(state, key) == (state, [])

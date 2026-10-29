@@ -56,7 +56,7 @@ def test_a_layout_override_moves_the_pads_aliases(tmp_path):
     spec = {"panels": [{"layer": "session-shift", "columns": [16]}]}
     source = '<text x="36" y="{}" font-size="9" fill="#ffffff" text-anchor="middle">Source</text>'
     _, before = run(tmp_path, spec)
-    _, after = run(tmp_path, {**spec, "layout": {"FX": "16,4", "RESERVED": []}})
+    _, after = run(tmp_path, {**spec, "layout": {"FX": "16,4", "CHORD": "16,3"}})
     assert source.format(63 + 2 * 46) in before
     assert source.format(63 + 3 * 46) in after
     assert layout.FADER_SOURCE == layout.FX == (16, 3)
@@ -101,7 +101,7 @@ def test_a_layout_override_is_undone(tmp_path):
     [
         {"ROWS": 4},
         {"SESSION": [16, 1]},
-        {"RESERVED": "16,6"},
+        {"FX_SLOTS": "16,6"},
         {"WINDOW_MOVES": ["16,1"]},
         {"DEVICE_CLIP_TRACK_STEPS": {"16,7": {"step": -1}}},
     ],

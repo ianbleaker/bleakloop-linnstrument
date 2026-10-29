@@ -378,7 +378,7 @@ def _nav_column(state, key, snapshot):
         if key == layout.FADER_SOURCE:
             return controls.toggle_fader_source(state)
         return state, []
-    # The reserved pad and Seq have no match here. The current mode's pad goes back to Session.
+    # Chord and Seq have no match here. The current mode's pad goes back to Session.
     if key == layout.SESSION:
         if state.mixer:
             return _widen(state, mixer.toggle, snapshot)

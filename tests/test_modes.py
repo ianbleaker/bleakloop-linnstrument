@@ -121,6 +121,35 @@ def test_entering_linnstrument_from_sequencer_records_the_origin():
     assert modes.enter(state, Mode.LINNSTRUMENT).came_from is Origin.SEQUENCER
 
 
+def test_entering_linnstrument_from_chord_records_the_origin():
+    state = State(mode=Mode.CHORD)
+    assert modes.enter(state, Mode.LINNSTRUMENT).came_from is Origin.CHORD
+
+
+@pytest.mark.parametrize("target", [Mode.SESSION, Mode.LINNSTRUMENT, Mode.CHORD])
+def test_entry_resets_chord_holds_and_keeps_its_settings(target):
+    state = State(
+        mode=Mode.CHORD,
+        arm_track=1,
+        chord_qualities=("min",),
+        chord_extensions=frozenset({"7"}),
+        chord_holds=((6, 8, (60, 64, 67)),),
+        chord_inv=1,
+        chord_spread=2,
+        chord_bass=True,
+        chord_octave=-1,
+        chord_device_track=1,
+    )
+    entered = modes.enter(state, target)
+    assert (entered.chord_qualities, entered.chord_extensions, entered.chord_holds) == (
+        (),
+        frozenset(),
+        (),
+    )
+    assert (entered.chord_inv, entered.chord_spread, entered.chord_bass) == (1, 2, True)
+    assert (entered.chord_octave, entered.chord_device_track, entered.arm_track) == (-1, 1, 1)
+
+
 def test_entering_sequencer_keeps_shift():
     assert modes.enter(State(shift=True), Mode.SEQUENCER).shift
 

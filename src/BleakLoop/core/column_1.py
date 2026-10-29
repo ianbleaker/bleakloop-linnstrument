@@ -95,6 +95,9 @@ def _normal(state, key, snapshot):
     if key == layout.MODE_PAD:
         if state.mode is Mode.LINNSTRUMENT:
             return _back(state)
+        if state.mode is Mode.CHORD:
+            # The arm and the Chord device stay: the player plays the chord track.
+            return modes.enter(state, Mode.LINNSTRUMENT), [EnterMode(Mode.LINNSTRUMENT)]
         if state.mode is Mode.SEQUENCER:
             # The arm stays: the player plays the track they were sequencing.
             actions = []
@@ -138,6 +141,8 @@ def _back(state):
     # Back to the layer Linnstrument Mode was entered from, through its own entry path.
     if state.came_from is Origin.SEQUENCER:
         return modes.enter(state, Mode.SEQUENCER), [EnterMode(Mode.SEQUENCER)]
+    if state.came_from is Origin.CHORD:
+        return modes.enter(state, Mode.CHORD), [EnterMode(Mode.CHORD)]
     state = modes.enter(state, Mode.SESSION)
     actions = [EnterMode(Mode.SESSION)]
     if state.came_from is Origin.MIXER:

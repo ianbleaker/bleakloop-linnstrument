@@ -194,6 +194,7 @@ flowchart TD
   end
   subgraph Core
     core_arm["arm"]
+    core_chord["chord"]
     core_column_1["column_1"]
     core_controls["controls"]
     core_engine["engine"]
@@ -216,6 +217,10 @@ flowchart TD
   end
   __init__ -.->|lazy| surface
   core_arm --> core_model
+  core_chord --> core_column_1
+  core_chord --> core_layout
+  core_chord --> core_leds
+  core_chord --> core_model
   core_column_1 --> core_controls
   core_column_1 --> core_faders
   core_column_1 --> core_fx
@@ -231,6 +236,7 @@ flowchart TD
   core_controls --> core_modes
   core_controls --> core_values
   core_engine --> core_arm
+  core_engine --> core_chord
   core_engine --> core_faders
   core_engine --> core_fx
   core_engine --> core_layout

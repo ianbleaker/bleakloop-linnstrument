@@ -311,7 +311,7 @@ TRACK_PREV, TRACK_NEXT = (pad_for(layout.DEVICE_CLIP_TRACK_STEPS, step) for step
 DEVICE_PREV, DEVICE_NEXT = (pad_for(layout.DEVICE_CLIP_DEVICE_STEPS, step) for step in (-1, 1))
 
 
-@pytest.mark.parametrize("key", layout.RESERVED)
+@pytest.mark.parametrize("key", [layout.CHORD])
 def test_chord_does_nothing(key):
     assert handle(ENTERED, key) == (ENTERED, [])
 
@@ -368,7 +368,7 @@ def test_device_clip_layer_lights():
 SHIFTED = replace(ENTERED, shift=True)
 
 
-@pytest.mark.parametrize("key", layout.RESERVED)
+@pytest.mark.parametrize("key", [layout.CHORD])
 def test_shift_layer_dark_pads_do_nothing(key):
     assert handle(SHIFTED, key) == (SHIFTED, [])
 

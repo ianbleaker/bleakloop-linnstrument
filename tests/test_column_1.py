@@ -41,7 +41,7 @@ from BleakLoop.core.model import (
     TogglePlay,
     TrackView,
 )
-from BleakLoop.core.modes import FxRack, Mode, State
+from BleakLoop.core.modes import FxRack, Mode, Origin, State
 
 BASE = Snapshot(
     is_playing=False,
@@ -328,6 +328,21 @@ def test_back_returns_to_the_mode_left(start, mixer, fx, more):
     assert state.mode is Mode.SESSION
     assert (state.mixer, state.fx) == (mixer, fx)
     assert actions == [EnterMode(Mode.SESSION)] + more
+
+
+def test_chord_and_back_keep_the_arm_and_the_device():
+    chord = State(mode=Mode.CHORD, saved_arms=(True, False), set_arms=(False, True), arm_track=1,
+                  chord_device_track=1, chord_octave=1)
+    state, actions = handle(chord, layout.MODE_PAD)
+    assert (state.mode, state.came_from, actions) == (
+        Mode.LINNSTRUMENT,
+        Origin.CHORD,
+        [EnterMode(Mode.LINNSTRUMENT)],
+    )
+    back, actions = handle(state, layout.MODE_PAD)
+    assert (back.mode, actions) == (Mode.CHORD, [EnterMode(Mode.CHORD)])
+    assert (back.saved_arms, back.set_arms, back.arm_track) == ((True, False), (False, True), 1)
+    assert (back.chord_device_track, back.chord_octave) == (1, 1)
 
 
 def test_back_after_scene_page_still_returns_to_mixer():

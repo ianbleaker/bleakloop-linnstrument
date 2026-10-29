@@ -83,21 +83,6 @@ def test_column_1_has_one_pad_per_role():
     assert sorted(roles) == [(1, pad) for pad in range(1, 9)]
 
 
-def test_reserved_pads_have_no_normal_role():
-    used = {
-        layout.COPY,
-        layout.DELETE,
-        layout.SESSION,
-        layout.MIXER,
-        layout.FX,
-        layout.SEQ,
-        layout.DEVICE_CLIP,
-        layout.UNMUTE_ALL,
-        layout.STOP,
-    }
-    assert used.isdisjoint(layout.RESERVED)
-
-
 def test_column_16_has_one_pad_per_role():
     roles = [
         layout.COPY,
@@ -105,10 +90,11 @@ def test_column_16_has_one_pad_per_role():
         layout.SESSION,
         layout.MIXER,
         layout.FX,
+        layout.CHORD,
         layout.SEQ,
         layout.DEVICE_CLIP,
     ]
-    assert sorted(roles + list(layout.RESERVED)) == [(16, pad) for pad in range(1, 9)]
+    assert sorted(roles) == [(16, pad) for pad in range(1, 9)]
 
 
 def test_column_15_holds_scenes_unmute_and_stop():

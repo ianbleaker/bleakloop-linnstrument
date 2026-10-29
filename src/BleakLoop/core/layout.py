@@ -32,8 +32,7 @@ SESSION = (NAV_COLUMN, 1)
 MIXER = (NAV_COLUMN, 2)
 FX = (NAV_COLUMN, 3)
 FADER_SOURCE = FX  # FX's Shift function
-# Unlit and unused until Chord (16/4) is built.
-RESERVED = ((NAV_COLUMN, 4),)
+CHORD = (NAV_COLUMN, 4)
 SEQ = (NAV_COLUMN, 5)
 DELETE = (NAV_COLUMN, 6)
 COPY = (NAV_COLUMN, 7)
@@ -54,6 +53,20 @@ FX_FADER_COLUMNS = range(2, 11)
 # Session split view: an 8-track window, then one horizontal fader per pad row.
 SPLIT_TRACKS = 8
 SPLIT_FADER_COLUMNS = range(10, 15)
+
+# Chord Mode: held quality and extension pads, latched voicing pads, a chromatic degree row on
+# pad 1 (column 3 + semitone) and a three-octave piano on pads 3-8.
+CHORD_QUALITIES = {(3, 8): "maj", (3, 7): "min", (3, 6): "sus4", (3, 5): "sus2", (3, 4): "dim", (3, 3): "aug"}
+CHORD_EXTENSIONS = {(4, 8): "7", (4, 7): "maj7", (4, 6): "9", (4, 5): "6", (4, 4): "11", (4, 3): "13"}
+CHORD_INV = (5, 3)
+CHORD_SPREAD = (5, 4)
+CHORD_BASS = (5, 5)
+CHORD_LEAD = (5, 6)  # dark and inert until #71
+CHORD_DEGREE_COLUMNS = range(3, 15)
+CHORD_PIANO_COLUMNS = range(6, 15)
+CHORD_PIANO_PADS = range(3, 9)
+CHORD_OCT_UP = (15, 6)
+CHORD_OCT_DOWN = (15, 7)
 
 # bars, in Fixed Length's cycle order
 FIXED_LENGTHS = (1, 2, 4, 8)

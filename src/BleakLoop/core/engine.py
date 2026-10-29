@@ -2,9 +2,9 @@
 
 from dataclasses import replace
 
-from . import arm, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
+from . import arm, chord, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
 from .model import FaderBound, PadPress, RacksRead, ScenesChanged
-from .modes import Mode
+from .modes import Mode, Origin
 
 
 def handle(state, event, snapshot):
@@ -28,6 +28,8 @@ def handle(state, event, snapshot):
         return session.handle(state, event, snapshot)
     if state.mode is Mode.SEQUENCER:
         return sequencer.handle(state, event, snapshot)
+    if state.mode is Mode.CHORD:
+        return chord.handle(state, event, snapshot)
     return linnstrument_mode.handle(state, event, snapshot)
 
 
@@ -43,6 +45,8 @@ def x_rows(state):
     # Sequencer Mode the rows holding a step.
     if state.mode is Mode.SEQUENCER:
         return sequencer.x_rows(state)
+    if state.mode is Mode.CHORD:
+        return ()
     return tuple(range(8)) if faders.visible(state) else ()
 
 
@@ -94,6 +98,16 @@ def seq_sync(state, snapshot):
     return sequencer.sync(state, snapshot)
 
 
+def chord_sync(state, snapshot):
+    # On every display tick in Chord Mode, and in Linnstrument Mode entered from it: the arm
+    # and the Chord device follow Live's selected track.
+    if state.mode is Mode.CHORD or (
+        state.mode is Mode.LINNSTRUMENT and state.came_from is Origin.CHORD
+    ):
+        return chord.sync(state, snapshot)
+    return state, []
+
+
 def unload_arms(state, arms):
     # On unload: the arm actions that put a mode's saved arms back, if any are saved.
     return arm.restore(state, arms)
@@ -109,6 +123,8 @@ def render(state, snapshot):
         return session.render(state, snapshot)
     if state.mode is Mode.SEQUENCER:
         return sequencer.render(state, snapshot)
+    if state.mode is Mode.CHORD:
+        return chord.render(state, snapshot)
     return linnstrument_mode.render(state, snapshot)
 
 
