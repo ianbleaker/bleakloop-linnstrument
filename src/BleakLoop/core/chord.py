@@ -7,7 +7,7 @@ indexes are song.tracks indexes.
 
 from dataclasses import replace
 
-from . import arm, column_1, controls, faders, fx, harmony, layout, mixer, modes
+from . import arm, column_1, controls, faders, fx, harmony, layout, mixer, modes, values
 from .leds import OFF, Light
 from .model import (
     ChordView,
@@ -16,6 +16,7 @@ from .model import (
     PadPress,
     RemoveChord,
     SetChordDevice,
+    SetScale,
     ShowMessage,
 )
 from .modes import Mode
@@ -157,14 +158,173 @@ def sync(state, snapshot):
     return state, actions + more
 
 
+# Pads
+
+
+def chord_key(column, pad):
+    # ("degree", semitone above the key root) or ("piano", (pair, semitone)), else None.
+    if pad == 1 and column in layout.CHORD_DEGREE_COLUMNS:
+        return "degree", column - layout.CHORD_DEGREE_COLUMNS[0]
+    if column in layout.CHORD_PIANO_COLUMNS and pad in layout.CHORD_PIANO_PADS:
+        keys = harmony.WHITES if pad % 2 == 0 else harmony.BLACKS
+        semitone = keys[column - layout.CHORD_PIANO_COLUMNS[0]]
+        if semitone is not None:
+            return "piano", ((layout.ROWS - pad) // 2, semitone)
+    return None
+
+
+def root_note(state, view, column, pad):
+    # The note a chord pad's chord is built on, sounding or not; None off the chord pads.
+    found = chord_key(column, pad)
+    if found is None:
+        return None
+    kind, place = found
+    if kind == "degree":
+        return 60 + 12 * state.chord_octave + key_of(view).root + place
+    pair, semitone = place
+    return 48 + 12 * state.chord_octave + 12 * pair + semitone
+
+
+def pad_note(state, view, column, pad):
+    # The note a chord pad is translated to: None while Shift is held (its layer sets the key),
+    # off a MIDI track, and for an out-of-key pad while no quality is held, which is silent.
+    if state.mode is not Mode.CHORD or state.shift or view.track is None or not view.is_midi:
+        return None
+    note = root_note(state, view, column, pad)
+    if note is None or not 0 <= note <= 127:
+        return None
+    if not state.chord_qualities and key_of(view).degree_of(note % 12) is None:
+        return None
+    return note
+
+
 # Input
 
 
 def handle(state, event, snapshot):
     if not isinstance(event, PadPress):
         return state, []
+    view = snapshot.chord or ChordView()
+    key = (event.column, event.pad)
+    if not event.pressed and any(h[:2] == key for h in state.chord_holds):
+        state, _ = release_hold(state, event)
+        return state, []
+    if key == layout.SHIFT:
+        return column_1.handle(state, event, snapshot)
+    if event.column == layout.NAV_COLUMN:
+        return _nav(state, event, snapshot)
+    if key in layout.CHORD_QUALITIES or key in layout.CHORD_EXTENSIONS:
+        return _modifier(state, event, view)
+    if not event.pressed:
+        return state, []
     if event.column == 1:
         return column_1.handle(state, event, snapshot)
+    if state.shift:
+        return _shift(state, key, view)
+    if key in (layout.CHORD_INV, layout.CHORD_SPREAD, layout.CHORD_BASS):
+        return _voicing(state, key, view)
+    if key in (layout.CHORD_OCT_UP, layout.CHORD_OCT_DOWN):
+        return _octave(state, 1 if key == layout.CHORD_OCT_UP else -1)
+    if chord_key(*key) is not None:
+        return _chord_press(state, event, view)
+    return state, []
+
+
+def _modifier(state, event, view):
+    key = (event.column, event.pad)
+    if key in layout.CHORD_QUALITIES:
+        if state.shift and event.pressed:
+            return _shift(state, key, view)
+        quality = layout.CHORD_QUALITIES[key]
+        qualities = tuple(q for q in state.chord_qualities if q != quality)
+        state = replace(state, chord_qualities=qualities + ((quality,) if event.pressed else ()))
+    else:
+        extension = layout.CHORD_EXTENSIONS[key]
+        extensions = state.chord_extensions - {extension}
+        if event.pressed:
+            extensions |= {extension}
+        state = replace(state, chord_extensions=extensions)
+    return _set_device(state, template(state, view))
+
+
+def _voicing(state, key, view):
+    if key == layout.CHORD_INV:
+        _, _, tones = harmony.shape(key_of(view), state.chord_qualities, state.chord_extensions)
+        # The 3rd inversion only for 4+ note chords.
+        state = replace(state, chord_inv=(state.chord_inv + 1) % (4 if len(tones) > 3 else 3))
+        message = f"Inversion: {harmony.INVERSIONS[state.chord_inv]}"
+    elif key == layout.CHORD_SPREAD:
+        state = replace(state, chord_spread=(state.chord_spread + 1) % len(harmony.SPREADS))
+        message = f"Spread: {harmony.SPREADS[state.chord_spread]}"
+    else:
+        state = replace(state, chord_bass=not state.chord_bass)
+        message = f"Bass {'ON' if state.chord_bass else 'OFF'}"
+    state, actions = _set_device(state, template(state, view))
+    return state, actions + [ShowMessage(message)]
+
+
+def _octave(state, step):
+    if state.chord_holds:
+        # A held pad keeps its translation: its chord must end where it started.
+        return state, []
+    octave = state.chord_octave + step
+    if octave not in values.CHORD_OCTAVES:
+        return state, []
+    return replace(state, chord_octave=octave), [ShowMessage(f"Octave {octave}")]
+
+
+def _shift(state, key, view):
+    # Shift + a piano key sets the key's root; Shift + Maj or Min the scale, Scale Mode on.
+    current = key_of(view)
+    if key in layout.CHORD_QUALITIES:
+        quality = layout.CHORD_QUALITIES[key]
+        if quality not in ("maj", "min"):
+            return state, []
+        name = "Major" if quality == "maj" else "Minor"
+        text = harmony.Key(current.root, current.intervals, name).text
+        return state, [SetScale(name=name, mode_on=True), ShowMessage(f"Key: {text}")]
+    found = chord_key(*key)
+    if found is None or found[0] != "piano":
+        return state, []
+    root = found[1][1] % 12
+    text = harmony.Key(root, current.intervals, current.name).text
+    return state, [SetScale(root=root), ShowMessage(f"Key: {text}")]
+
+
+def _chord_press(state, event, view):
+    key = key_of(view)
+    root = root_note(state, view, event.column, event.pad)
+    if view.track is None or not view.is_midi or not 0 <= root <= 127:
+        return state, []
+    played = harmony.chord(key, root, state.chord_qualities, state.chord_extensions)
+    if played is None:
+        return state, [ShowMessage(harmony.hint(key, (root - key.root) % 12))]
+    voicing = harmony.voice(played, state.chord_inv, state.chord_spread, state.chord_bass)
+    hold = (event.column, event.pad, harmony.pitches(key, played, voicing))
+    state = replace(state, chord_holds=state.chord_holds + (hold,))
+    return state, [ShowMessage(harmony.describe(key, played, voicing))]
+
+
+def _nav(state, event, snapshot):
+    # Column 16, as Sequencer Mode's, with Copy, Delete and Seq dark and inert.
+    key = (event.column, event.pad)
+    shift_layer = state.shift
+    if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
+        return controls.device_clip(state, event)
+    if state.device_clip and event.pressed:
+        return controls.device_clip_layer(state, key)
+    if not event.pressed:
+        return state, []
+    if shift_layer:
+        if key in layout.WINDOW_MOVES:
+            return controls.move_window(state, layout.WINDOW_MOVES[key], snapshot)
+        if key in layout.TEMPO_STEPS:
+            return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
+        if key == layout.FADER_SOURCE:
+            return controls.toggle_fader_source(state)
+        return state, []
+    if key in (layout.CHORD, layout.SESSION, layout.MIXER, layout.FX):
+        return leave(state, snapshot, layout.SESSION if key == layout.CHORD else key)
     return state, []
 
 

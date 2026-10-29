@@ -623,6 +623,14 @@ class SetChordDevice:
 
 
 @dataclass(frozen=True)
+class SetScale:
+    # Live's Set scale: the root (pitch class) and the scale name, each only when given.
+    root: int | None = None
+    name: str | None = None
+    mode_on: bool = False  # also turn Scale Mode on
+
+
+@dataclass(frozen=True)
 class ShowMessage:
     text: str
 

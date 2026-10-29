@@ -228,6 +228,7 @@ flowchart TD
   core_chord --> core_mixer
   core_chord --> core_model
   core_chord --> core_modes
+  core_chord --> core_values
   core_column_1 --> core_controls
   core_column_1 --> core_faders
   core_column_1 --> core_fx

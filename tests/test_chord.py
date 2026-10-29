@@ -13,6 +13,7 @@ from BleakLoop.core.model import (
     ScaleView,
     SetArms,
     SetChordDevice,
+    SetScale,
     SetMixer,
     ShowMessage,
     Snapshot,
@@ -197,3 +198,172 @@ def test_sync_follows_the_selection_in_linnstrument_mode():
     moved = snap(replace(TARGET, track=5), arms=SNAP_IN.arms)
     _, actions = engine.chord_sync(state, moved)
     assert actions[1:] == [RemoveChord(2), InsertChord(5), SetChordDevice(5, (0,) * 6, False)]
+
+
+# Presses
+
+MAJ, MIN, SUS4 = (3, 8), (3, 7), (3, 6)
+SEVEN, MAJ7 = (4, 8), (4, 7)
+
+
+def handle(state, key, snapshot=SNAP_IN, pressed=True):
+    return chord.handle(state, press(key, pressed), snapshot)
+
+
+def hold(state, *keys):
+    for key in keys:
+        state, _ = handle(state, key)
+    return state
+
+
+def message(state, key, snapshot=SNAP_IN):
+    _, actions = handle(state, key, snapshot)
+    return actions[-1].text
+
+
+def test_a_quality_press_switches_the_device_to_semitones():
+    state, actions = handle(ENTERED, MAJ)
+    assert state.chord_qualities == ("maj",)
+    assert actions == [SetChordDevice(2, (4, 7, 0, 0, 0, 0), False)]
+
+
+def test_a_quality_release_goes_back_to_the_key():
+    state = hold(ENTERED, MAJ)
+    state, actions = handle(state, MAJ, pressed=False)
+    assert state.chord_qualities == () and actions == [TRIADS]
+
+
+def test_the_last_pressed_quality_wins():
+    state = hold(ENTERED, MAJ, MIN)
+    assert state.chord_qualities == ("maj", "min")
+    assert state.chord_setting[1] == (3, 7, 0, 0, 0, 0)
+    state, _ = handle(state, MIN, pressed=False)
+    assert state.chord_setting[1] == (4, 7, 0, 0, 0, 0)
+
+
+def test_an_extension_with_no_quality_stays_in_scale_degrees():
+    _, actions = handle(ENTERED, SEVEN)
+    assert actions == [SetChordDevice(2, (2, 4, 6, 0, 0, 0), True)]
+
+
+def test_maj7_alone_plays_maj_and_maj7_in_semitones():
+    _, actions = handle(ENTERED, MAJ7)
+    assert actions == [SetChordDevice(2, (4, 7, 11, 0, 0, 0), False)]
+
+
+@pytest.mark.parametrize(
+    "key, field, value, text",
+    [
+        (layout.CHORD_INV, "chord_inv", 1, "Inversion: 1st"),
+        (layout.CHORD_SPREAD, "chord_spread", 1, "Spread: Open"),
+        (layout.CHORD_BASS, "chord_bass", True, "Bass ON"),
+    ],
+)
+def test_voicing_pads_latch(key, field, value, text):
+    state, actions = handle(ENTERED, key)
+    assert getattr(state, field) == value
+    assert actions[-1] == ShowMessage(text)
+    assert isinstance(actions[0], SetChordDevice)
+
+
+def test_inv_wraps_after_2nd_on_a_triad_and_after_3rd_on_a_seventh():
+    state = hold(ENTERED, layout.CHORD_INV, layout.CHORD_INV, layout.CHORD_INV)
+    assert state.chord_inv == 0
+    state = hold(replace(ENTERED, chord_extensions=frozenset({"7"})), *[layout.CHORD_INV] * 3)
+    assert state.chord_inv == 3
+
+
+def test_lead_is_inert():
+    assert handle(ENTERED, layout.CHORD_LEAD) == (ENTERED, [])
+
+
+def test_a_degree_press_plays_and_says_its_chord():
+    state, actions = handle(ENTERED, (10, 1))  # G, V
+    assert state.chord_holds == ((10, 1, (67, 71, 74)),)
+    assert actions == [ShowMessage("G · V in C major · G B D")]
+
+
+def test_a_piano_key_with_maj_and_7():
+    state = hold(ENTERED, MAJ, SEVEN)
+    # Pads 8 and 7 are the bottom pair: G is column 6 + 4 on pad 8, 48 + 7.
+    assert message(state, (10, 8)).startswith("G7 · V7 in C major · G B D F")
+
+
+def test_a_release_ends_the_hold():
+    state = hold(ENTERED, (10, 1))
+    state, actions = handle(state, (10, 1), pressed=False)
+    assert (state.chord_holds, actions) == ((), [])
+
+
+def test_an_out_of_key_degree_with_nothing_held_is_silent_with_a_hint():
+    state, actions = handle(ENTERED, (13, 1))  # semitone 10, B♭
+    assert state.chord_holds == ()
+    assert actions == [ShowMessage("Hold Maj for ♭VII")]
+
+
+def test_a_borrowed_degree_with_a_quality_held():
+    state = hold(ENTERED, MAJ)
+    assert message(state, (13, 1)).startswith("B♭ · ♭VII, borrowed from C minor · B♭ D F")
+
+
+def test_a_piano_gap_does_nothing():
+    assert handle(ENTERED, (8, 7)) == (ENTERED, [])
+
+
+def test_shift_and_a_piano_key_sets_the_root():
+    state = replace(ENTERED, shift=True)
+    assert handle(state, (7, 8))[1] == [SetScale(root=2), ShowMessage("Key: D major")]
+
+
+@pytest.mark.parametrize("key, name, text", [(MAJ, "Major", "C major"), (MIN, "Minor", "C minor")])
+def test_shift_and_maj_or_min_sets_the_scale(key, name, text):
+    state = replace(ENTERED, shift=True)
+    new, actions = handle(state, key)
+    assert new.chord_qualities == ()
+    assert actions == [SetScale(name=name, mode_on=True), ShowMessage(f"Key: {text}")]
+
+
+def test_shift_and_another_quality_does_nothing():
+    state = replace(ENTERED, shift=True)
+    assert handle(state, SUS4) == (state, [])
+
+
+def test_octave_steps_within_its_range():
+    state, actions = handle(ENTERED, layout.CHORD_OCT_UP)
+    assert (state.chord_octave, actions) == (1, [ShowMessage("Octave 1")])
+    assert handle(state, layout.CHORD_OCT_UP) == (state, [])
+    low = replace(ENTERED, chord_octave=-2)
+    assert handle(low, layout.CHORD_OCT_DOWN) == (low, [])
+
+
+def test_octave_is_refused_while_a_chord_pad_is_held():
+    assert handle(HELD, layout.CHORD_OCT_UP) == (HELD, [])
+
+
+def test_the_octave_moves_the_degree_row():
+    state = replace(ENTERED, chord_octave=-1)
+    assert handle(state, (3, 1))[0].chord_holds[0][2] == (48, 52, 55)
+
+
+@pytest.mark.parametrize("key", [layout.CHORD, layout.SESSION])
+def test_chord_or_session_returns_to_session(key):
+    state, actions = handle(ENTERED, key)
+    assert state.mode is Mode.SESSION and RemoveChord(2) in actions
+
+
+def test_mixer_leaves_for_mixer_mode():
+    state, _ = handle(ENTERED, layout.MIXER)
+    assert state.mode is Mode.SESSION and state.mixer
+
+
+@pytest.mark.parametrize("key", [layout.SEQ, layout.COPY, layout.DELETE])
+def test_seq_copy_and_delete_are_inert(key):
+    assert handle(ENTERED, key) == (ENTERED, [])
+
+
+def test_pad_note_translates_in_key_pads_only():
+    assert chord.pad_note(ENTERED, TARGET, 10, 1) == 67
+    assert chord.pad_note(ENTERED, TARGET, 13, 1) is None
+    assert chord.pad_note(hold(ENTERED, MAJ), TARGET, 13, 1) == 70
+    assert chord.pad_note(replace(ENTERED, shift=True), TARGET, 10, 1) is None
+    assert chord.pad_note(ENTERED, TARGET, 3, 8) is None
