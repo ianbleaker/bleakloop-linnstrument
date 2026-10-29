@@ -607,6 +607,7 @@ class SelectDrumPad:
 class InsertChord:
     # Live's Chord MIDI effect, first on the track, named values.CHORD_DEVICE_NAME.
     track: int
+    again: bool = False  # it went missing (Undo of the insert): logged
 
 
 @dataclass(frozen=True)

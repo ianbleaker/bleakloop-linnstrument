@@ -18,7 +18,7 @@ from .model import (
     SetChordDevice,
     ShowMessage,
 )
-from .modes import Mode, Origin
+from .modes import Mode
 
 NEEDS_MIDI = "Chord needs a MIDI track"
 REST = ((0,) * harmony.SHIFTS, False)  # every shift off: notes pass through unchanged
@@ -131,18 +131,30 @@ def release_hold(state, event):
 def sync(state, snapshot):
     # On every display tick in Chord Mode, in Linnstrument Mode entered from it, and while a
     # removal waits for the held pads.
-    actions = []
     if state.chord_remove_pending:
         if not state.chord_holds:
             return _remove(state)
         return state, []
     view = snapshot.chord or ChordView()
-    if state.mode is Mode.LINNSTRUMENT and state.came_from is Origin.CHORD:
+    actions = []
+    if not state.chord_holds:
+        # A held pad's chord ends on the device that started it: the move waits for it.
+        state, actions, moved = arm.follow(state, snapshot, view, NEEDS_MIDI)
+        if moved:
+            state, more = _remove(state)
+            actions += more + [InsertChord(state.arm_track)]
+            state = replace(state, chord_device_track=state.arm_track)
+        elif view.track is not None and view.track == state.chord_device_track:
+            if not view.device_present:
+                # Undo took the insert back.
+                actions.append(InsertChord(view.track, again=True))
+                state = replace(state, chord_setting=None)
+    if state.mode is Mode.LINNSTRUMENT:
         # The player plays the track: its notes pass through unchanged.
-        return _set_device(state, REST)
-    if state.mode is Mode.CHORD and view.track is not None:
-        state, actions = _set_device(state, template(state, view))
-    return state, actions
+        state, more = _set_device(state, REST)
+    else:
+        state, more = _set_device(state, template(state, view))
+    return state, actions + more
 
 
 # Input

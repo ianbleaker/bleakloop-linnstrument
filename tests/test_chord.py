@@ -144,3 +144,56 @@ def test_reentering_the_same_track_keeps_the_waiting_device():
 def test_chord_sync_does_nothing_outside_chord_mode(target):
     state = State(mode=target)
     assert engine.chord_sync(state, SNAP) == (state, [])
+
+
+# The display tick
+
+
+def test_sync_without_a_change_does_nothing():
+    assert chord.sync(ENTERED, SNAP_IN) == (ENTERED, [])
+
+
+def test_sync_moves_the_arm_and_the_device_to_a_track_clicked_in_live():
+    moved = snap(replace(TARGET, track=5, device_present=False), arms=SNAP_IN.arms)
+    state, actions = chord.sync(ENTERED, moved)
+    assert actions == [
+        SetArms(((2, False), (5, True))),
+        RemoveChord(2),
+        InsertChord(5),
+        SetChordDevice(5, (2, 4, 0, 0, 0, 0), True),
+    ]
+    assert (state.arm_track, state.chord_device_track) == (5, 5)
+
+
+def test_sync_waits_for_held_pads_before_moving():
+    moved = snap(replace(TARGET, track=5), arms=SNAP_IN.arms)
+    assert chord.sync(HELD, moved) == (HELD, [])
+
+
+def test_sync_on_an_audio_track_says_so_once_and_keeps_the_device():
+    audio = snap(replace(TARGET, track=1, is_midi=False), arms=SNAP_IN.arms)
+    state, actions = chord.sync(ENTERED, audio)
+    assert actions == [ShowMessage("Chord needs a MIDI track")]
+    assert state.chord_device_track == 2
+    assert chord.sync(state, audio) == (state, [])
+
+
+def test_sync_reinserts_a_device_undo_took_back():
+    undone = snap(replace(TARGET, device_present=False), arms=SNAP_IN.arms)
+    state, actions = chord.sync(ENTERED, undone)
+    assert actions == [InsertChord(2, again=True), TRIADS]
+
+
+def test_sync_in_linnstrument_mode_rests_the_device():
+    state, actions = engine.handle(ENTERED, press(layout.MODE_PAD), SNAP_IN)
+    state, actions = engine.chord_sync(state, SNAP_IN)
+    assert actions == [REST]
+    back, _ = engine.handle(state, press(layout.MODE_PAD), SNAP_IN)
+    assert engine.chord_sync(back, SNAP_IN)[1] == [TRIADS]
+
+
+def test_sync_follows_the_selection_in_linnstrument_mode():
+    state, _ = engine.handle(ENTERED, press(layout.MODE_PAD), SNAP_IN)
+    moved = snap(replace(TARGET, track=5), arms=SNAP_IN.arms)
+    _, actions = engine.chord_sync(state, moved)
+    assert actions[1:] == [RemoveChord(2), InsertChord(5), SetChordDevice(5, (0,) * 6, False)]
