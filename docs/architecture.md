@@ -199,6 +199,7 @@ flowchart TD
     core_engine["engine"]
     core_faders["faders"]
     core_fx["fx"]
+    core_harmony["harmony"]
     core_layout["layout"]
     core_leds["leds"]
     core_linnstrument_mode["linnstrument_mode"]
@@ -251,6 +252,7 @@ flowchart TD
   core_fx --> core_model
   core_fx --> core_modes
   core_fx --> core_values
+  core_harmony --> core_leds
   core_leds --> core_values
   core_linnstrument_mode --> core_column_1
   core_linnstrument_mode --> core_model
