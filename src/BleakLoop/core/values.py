@@ -47,3 +47,4 @@ SLIDE_START = 0.25  # of a column: a held step's X travel that starts a slide
 VELOCITY_PER_COLUMN = 16
 NUDGE_PER_COLUMN = 0.125  # of a step
 CHORD_OCTAVES = range(-2, 2)  # Chord Mode's Oct + and Oct - range, 0 the default
+CHORD_DEVICE_NAME = "BleakLoop Chord"  # BleakLoop's own Chord device, found again by name

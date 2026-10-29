@@ -15,10 +15,18 @@ from ableton.v3.control_surface import (
 )
 
 from . import device, live_actions, live_state
-from .core import controls, engine, faders, fx, layout, sequencer, values
+from .core import chord, controls, engine, faders, fx, layout, sequencer, values
 from .core.leds import Clock, phase_key
-from .core.model import PadPress, ScenesChanged, SequencerView, SlideMoved, YAxis
-from .core.modes import Mode, State
+from .core.model import (
+    ChordView,
+    PadPress,
+    RemoveChord,
+    ScenesChanged,
+    SequencerView,
+    SlideMoved,
+    YAxis,
+)
+from .core.modes import Mode, Origin, State
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +36,17 @@ CC_SLIDE_TRANSFER = 119  # value = the column a finger slid from
 NRPN_REPLY_CCS = (99, 98, 6, 38, 101, 100)
 # X for device row 0, column 6 is CC 6 / 38 on channel 1: the NRPN reply elements carry it.
 X_ON_NRPN = (0, 6)
+# (row, column) of every pad note translation can play: Sequencer Mode's note pads, and Chord
+# Mode's degree row and piano.
+TRANSLATED = frozenset(
+    {(row, column) for row in range(layout.ROWS) for column in layout.SEQ_NOTE_COLUMNS}
+    | {(layout.ROWS - 1, column) for column in layout.CHORD_DEGREE_COLUMNS}
+    | {
+        (layout.ROWS - pad, column)
+        for pad in layout.CHORD_PIANO_PADS
+        for column in layout.CHORD_PIANO_COLUMNS
+    }
+)
 
 
 class Elements(ElementsBase):
@@ -118,6 +137,7 @@ class BleakLoop(ControlSurface):
         self._pending_fresh = False
         self._selected_device = None  # the selected track's selected device, last tick
         self._seq_view = SequencerView()  # Sequencer Mode's last read target
+        self._chord_view = ChordView()  # Chord Mode's last read target
         self._seq_notes = None  # the note count last logged
         self._longest_seq_tick_ms = 0.0
         self._translated = {}  # (row, column) -> the audition note a note pad is translated to
@@ -152,6 +172,8 @@ class BleakLoop(ControlSurface):
                 self._poll_tick()
             if self._state.mode is Mode.SEQUENCER:
                 self._seq_sync()
+            if self._chord_active():
+                self._chord_sync()
             self._refresh()
         elif self._setup is None:
             logger.info("BleakLoop loaded")
@@ -173,6 +195,7 @@ class BleakLoop(ControlSurface):
         else:
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
+            self._remove_leftover_chords()
             self._load_fx()
             self._load_fx_scenes()
             self._scenes = list(self.song.scenes)
@@ -296,8 +319,14 @@ class BleakLoop(ControlSurface):
         super().disconnect()
 
     def _restore_arms(self):
-        # Unloaded in Sequencer Mode, or in Linnstrument Mode entered from it: the arms go
-        # back as leaving the mode would put them. After this fails, the hand-back still runs.
+        # Unloaded in Sequencer or Chord Mode, or in Linnstrument Mode entered from one: the
+        # Chord device goes and the arms go back as leaving the mode would put them. After this
+        # fails, the hand-back still runs.
+        try:
+            if self._state.chord_device_track is not None:
+                live_actions.apply(RemoveChord(self._state.chord_device_track), self.song, self)
+        except Exception:
+            logger.exception("CHORD: removing the device on unload failed")
         if self._state.saved_arms is None:
             return
         try:
@@ -435,6 +464,36 @@ class BleakLoop(ControlSurface):
             live_actions.apply(action, self.song, self)
         self._retranslate()
 
+    def _chord_active(self):
+        # Chord Mode, Linnstrument Mode entered from it, or a device removal still waiting.
+        state = self._state
+        return (
+            state.mode is Mode.CHORD
+            or (state.mode is Mode.LINNSTRUMENT and state.came_from is Origin.CHORD)
+            or state.chord_remove_pending
+        )
+
+    def _chord_sync(self):
+        # The arm and the Chord device follow Live's selected track, and Undo of the insert is
+        # put right: a click in Live sends no event.
+        state, actions = engine.chord_sync(self._state, self._snapshot())
+        self._state = state
+        for action in actions:
+            live_actions.apply(action, self.song, self)
+        self._retranslate()
+
+    def _remove_leftover_chords(self):
+        # A crash, or a Set saved in Chord Mode, leaves BleakLoop's device behind.
+        count = 0
+        for track in self.song.tracks:
+            device = live_state.chord_device(track)
+            while device is not None:
+                track.delete_device(list(track.devices).index(device))
+                count += 1
+                device = live_state.chord_device(track)
+        if count:
+            logger.info("CHORD: removed %d leftover devices", count)
+
     def _launch_tick(self, transport):
         state, actions, redraw = engine.launch_tick(self._state, transport)
         self._state = state
@@ -472,7 +531,7 @@ class BleakLoop(ControlSurface):
             self._send(device.user_firmware_mode(True))
             # The device turns X and slide mode off on entering User Firmware Mode.
             self._x_rows = None
-        elif mode is Mode.SEQUENCER:
+        elif mode in (Mode.SEQUENCER, Mode.CHORD):
             # Y and X off too: Mixer Mode's Y and the faders' X may be on, and nothing claims
             # them here. CC 64 is sustain on the armed track, CC 1-16 mod wheel, volume, pan.
             self._send(
@@ -491,39 +550,41 @@ class BleakLoop(ControlSurface):
         self._retranslate()
 
     def _retranslate(self):
-        # Sequencer Mode's note pads play the armed track through note translation, and still
-        # reach the script. A held pad keeps its translation until its release, which retranslates
+        # Sequencer Mode's note pads and Chord Mode's chord pads play the armed track through
+        # note translation, and still reach the script. A held pad keeps its translation until its release, which retranslates
         # it: its Note Off must leave as the note its Note On did. Linnstrument Mode doesn't listen
         # to the pads, so their releases never arrive, and a translation left there would move
         # the player's notes.
         if self._state.mode is Mode.LINNSTRUMENT:
             self._held_note_pads.clear()
         sequencing = self._state.mode is Mode.SEQUENCER
+        chording = self._state.mode is Mode.CHORD
         # A row holding a step isn't translated: a slide onto its note pads mustn't sound.
         held_rows = set(engine.x_rows(self._state)) if sequencing else set()
         changed = False
-        for row in range(layout.ROWS):
-            for column in layout.SEQ_NOTE_COLUMNS:
-                note = None
-                if sequencing and row not in held_rows:
-                    pad = layout.pad_of(row)
-                    note = sequencer.pad_note(self._state, self._seq_view, column, pad)
-                if (row, column) in self._held_note_pads:
-                    continue
-                if self._translated.get((row, column)) == note:
-                    continue
-                element = getattr(self.elements, f"pad_{row}_{column}")
-                if self._forwarding is None:
-                    self._forwarding = element.script_forwarding
-                if note is None:
-                    element.script_forwarding = self._forwarding
-                    element.use_default_message()
-                else:
-                    element.script_forwarding = ScriptForwarding.non_consuming
-                    element.set_channel(values.AUDITION_CHANNEL)
-                    element.set_identifier(note)
-                self._translated[(row, column)] = note
-                changed = True
+        for row, column in sorted(TRANSLATED):
+            note = None
+            pad = layout.pad_of(row)
+            if sequencing and column in layout.SEQ_NOTE_COLUMNS and row not in held_rows:
+                note = sequencer.pad_note(self._state, self._seq_view, column, pad)
+            elif chording:
+                note = chord.pad_note(self._state, self._chord_view, column, pad)
+            if (row, column) in self._held_note_pads:
+                continue
+            if self._translated.get((row, column)) == note:
+                continue
+            element = getattr(self.elements, f"pad_{row}_{column}")
+            if self._forwarding is None:
+                self._forwarding = element.script_forwarding
+            if note is None:
+                element.script_forwarding = self._forwarding
+                element.use_default_message()
+            else:
+                element.script_forwarding = ScriptForwarding.non_consuming
+                element.set_channel(values.AUDITION_CHANNEL)
+                element.set_identifier(note)
+            self._translated[(row, column)] = note
+            changed = True
         if changed:
             self.request_rebuild_midi_map()
 
@@ -556,7 +617,7 @@ class BleakLoop(ControlSurface):
     def _listen_for(self, mode):
         self._remove_listeners()
         self._x_listened = False
-        if mode in (Mode.SESSION, Mode.SEQUENCER):
+        if mode in (Mode.SESSION, Mode.SEQUENCER, Mode.CHORD):
             for row in range(layout.ROWS):
                 for column in range(layout.COLUMNS):
                     element = getattr(self.elements, f"pad_{row}_{column}")
@@ -623,7 +684,7 @@ class BleakLoop(ControlSurface):
             self._saved_split.setdefault(parameter, setting)
 
     def _on_pad(self, column, row, value):
-        if column in layout.SEQ_NOTE_COLUMNS:
+        if (row, column) in TRANSLATED:
             if value:
                 self._held_note_pads.add((row, column))
             else:
@@ -729,7 +790,7 @@ class BleakLoop(ControlSurface):
 
     def _snapshot(self):
         mode = self._state.mode
-        return live_state.read(
+        snapshot = live_state.read(
             self.song,
             Live.Application.get_application(),
             self._state.window,
@@ -739,7 +800,15 @@ class BleakLoop(ControlSurface):
             width=controls.window_tracks(self._state),
             sequencer=self._read_sequencer() if mode is Mode.SEQUENCER else None,
             seq_entry=self._state.seq_held,
+            chord=self._reads_chord(),
         )
+        if snapshot.chord is not None:
+            self._chord_view = snapshot.chord
+        return snapshot
+
+    def _reads_chord(self):
+        # Session Mode too: Chord's press there needs the selected track and the arms.
+        return self._state.mode in (Mode.SESSION, Mode.CHORD) or self._chord_active()
 
     def _read_sequencer(self):
         # Timed, and logged once per entry and whenever the note count changes.

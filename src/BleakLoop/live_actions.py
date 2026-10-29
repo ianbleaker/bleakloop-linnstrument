@@ -31,11 +31,13 @@ from .core.model import (
     FireScene,
     FireSlot,
     HighlightSlot,
+    InsertChord,
     ModifyNotes,
     QuantizeClip,
     RacksRead,
     RecallFxSnapshot,
     Redo,
+    RemoveChord,
     RemovePitch,
     SaveFaderBindings,
     SaveFxScenes,
@@ -46,12 +48,14 @@ from .core.model import (
     SetArm,
     SetArms,
     SetArrangementRecord,
+    SetChordDevice,
     SetDrumScroll,
     SetFaderParameter,
     SetLaunchQuantization,
     SetLoop,
     SetMacros,
     SetMixer,
+    SetScale,
     SetSessionRecord,
     SetTempo,
     SetVolume,
@@ -143,6 +147,32 @@ def _modify_notes(clip, changes):
     for note in notes:
         note.start_time, note.velocity = wanted[note.note_id]
     clip.apply_note_modifications(notes)
+
+
+def _insert_chord(song, action):
+    track = _set_track(song, action.track)
+    if track is None:
+        logger.info("CHORD: skipped InsertChord, no track %d", action.track)
+    elif live_state.chord_device(track) is not None:
+        logger.info("CHORD: skipped InsertChord, %s already has one", track.name)
+    else:
+        track.insert_device("Chord", 0)
+        track.devices[0].name = values.CHORD_DEVICE_NAME
+        if action.again:
+            logger.info("CHORD: re-inserted")
+
+
+def _set_chord_device(device, shifts, scale_aware):
+    # Only the parameters whose value differs. The other kind of shift goes to 0, so only one
+    # kind plays.
+    wanted = {"Use Current Scale": 1.0 if scale_aware else 0.0}
+    for n, shift in enumerate(shifts, 1):
+        wanted[f"Shift{n} Scale Degrees"] = shift if scale_aware else 0
+        wanted[f"Shift{n}"] = 0 if scale_aware else shift
+    for parameter in device.parameters:
+        value = wanted.get(parameter.name)
+        if value is not None and parameter.value != value:
+            parameter.value = value
 
 
 @contextmanager
@@ -464,6 +494,29 @@ def apply(action, song, surface):
         _toggle_detail_view(Live.Application.get_application().view)
     elif isinstance(action, SetMixer):
         surface.set_mixer(action.on)
+    elif isinstance(action, InsertChord):
+        _insert_chord(song, action)
+    elif isinstance(action, RemoveChord):
+        track = _set_track(song, action.track)
+        device = live_state.chord_device(track) if track is not None else None
+        if device is None:
+            logger.info("CHORD: skipped RemoveChord, no device on %d", action.track)
+        else:
+            track.delete_device(list(track.devices).index(device))
+    elif isinstance(action, SetChordDevice):
+        track = _set_track(song, action.track)
+        device = live_state.chord_device(track) if track is not None else None
+        if device is None:
+            logger.info("CHORD: skipped SetChordDevice, no device on %d", action.track)
+        else:
+            _set_chord_device(device, action.shifts, action.scale_aware)
+    elif isinstance(action, SetScale):
+        if action.root is not None:
+            song.root_note = action.root
+        if action.name is not None:
+            song.scale_name = action.name
+        if action.mode_on:
+            song.scale_mode = True
     elif isinstance(action, ShowMessage):
         surface.show_message(action.text)
     else:

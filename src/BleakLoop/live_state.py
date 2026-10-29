@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from .core import layout, values
 from .core.model import (
+    ChordView,
     ClipTarget,
     ClipView,
     DrumView,
@@ -42,6 +43,7 @@ def read(
     width=layout.WINDOW_TRACKS,
     sequencer=None,
     seq_entry=False,
+    chord=False,
 ):
     # faders: the core state whose faders show, or None while they're hidden.
     # sequencer: Sequencer Mode's SequencerView, read by read_sequencer, or None outside it.
@@ -51,7 +53,7 @@ def read(
     columns = range(window.track, min(window.track + width, len(tracks)))
     selected_track = song.view.selected_track
     mixable = list(song.tracks) + list(song.return_tracks)
-    set_tracks = list(song.tracks) if sequencer is not None or seq_entry else None
+    set_tracks = list(song.tracks) if sequencer is not None or seq_entry or chord else None
     return replace(
         read_transport(song, application),
         track_count=len(tracks),
@@ -88,6 +90,7 @@ def read(
         arms=_arms(set_tracks) if set_tracks is not None else (),
         sequencer=sequencer,
         seq_entry=read_seq_entry(song) if seq_entry else None,
+        chord=read_chord(song) if chord else None,
     )
 
 
@@ -107,6 +110,42 @@ def _index(items, item):
 
 def _is_midi(track):
     return track.has_midi_input and not track.is_foldable
+
+
+def chord_device(track):
+    # BleakLoop's Chord device on the track, found by its name, or None.
+    for device in track.devices:
+        if device.name == values.CHORD_DEVICE_NAME:
+            return device
+    return None
+
+
+def read_chord(song):
+    # Chord Mode's target: Live's selected track, the Set's scale, BleakLoop's device on the
+    # track, and whether its highlighted or playing slot is recording.
+    scale = ScaleView(
+        song.scale_mode, song.root_note, tuple(song.scale_intervals), song.scale_name
+    )
+    track = song.view.selected_track
+    index = _index(list(song.tracks), track)
+    if index is None:
+        return ChordView(scale=scale)
+    midi = _is_midi(track)
+    slots = list(track.clip_slots)
+    highlighted = song.view.highlighted_clip_slot
+    playing = track.playing_slot_index
+    recording = any(
+        slot.is_recording
+        for slot in slots
+        if slot == highlighted or (0 <= playing and slot == slots[playing])
+    )
+    return ChordView(
+        track=index,
+        is_midi=midi,
+        scale=scale,
+        device_present=midi and chord_device(track) is not None,
+        recording=recording,
+    )
 
 
 def read_sequencer(song):

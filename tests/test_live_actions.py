@@ -7,6 +7,7 @@ import pytest
 sys.modules.setdefault("Live", ModuleType("Live"))
 
 from BleakLoop import live_actions  # noqa: E402
+from BleakLoop.core import values  # noqa: E402
 from BleakLoop.core.modes import FaderBinding  # noqa: E402
 from BleakLoop.core.model import (  # noqa: E402
     BindFader,
@@ -17,18 +18,22 @@ from BleakLoop.core.model import (  # noqa: E402
     EditNotes,
     FaderBound,
     HighlightSlot,
+    InsertChord,
     RacksRead,
     RecallFxSnapshot,
     ModifyNotes,
+    RemoveChord,
     RemovePitch,
     SelectDrumPad,
     SaveFaderBindings,
     SaveFxScenes,
     SetArm,
     SetArms,
+    SetChordDevice,
     SetDrumScroll,
     SetFaderParameter,
     SetLoop,
+    SetScale,
     StepDevice,
     StepTrack,
     StoreFxSnapshot,
@@ -636,3 +641,113 @@ def test_drum_actions_skip_without_a_rack(action):
     apply(action, song)
     assert rack.view.drum_pads_scroll_position == 9
     assert rack.view.selected_drum_pad is rack.drum_pads[36]
+
+
+# Chord Mode
+
+
+class ChordParameter:
+    # Records each write, so a test sees which parameters were set.
+    def __init__(self, name, value, writes):
+        self.name, self._value, self._writes = name, value, writes
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        self._writes.append(self.name)
+        self._value = value
+
+
+def chord_device(writes, name=values.CHORD_DEVICE_NAME):
+    names = ["Device On", "Use Current Scale"]
+    for n in range(1, 7):
+        names += [f"Shift{n}", f"Shift{n} Scale Degrees", f"Velocity{n}"]
+    return SimpleNamespace(name=name, parameters=[ChordParameter(p, 0.0, writes) for p in names])
+
+
+def chord_track(devices=()):
+    track = fake_track()
+    track.name = "Keys"
+    track.devices = list(devices)
+
+    def insert_device(name, index):
+        assert name == "Chord"
+        track.devices.insert(index, SimpleNamespace(name="Chord"))
+
+    track.insert_device = insert_device
+    track.delete_device = lambda index: track.devices.pop(index)
+    return track
+
+
+def test_insert_chord_inserts_and_names_the_device():
+    other = SimpleNamespace(name="Operator")
+    track = chord_track([other])
+    apply(InsertChord(0), fake_song([track]))
+    assert [d.name for d in track.devices] == [values.CHORD_DEVICE_NAME, "Operator"]
+
+
+def test_insert_chord_skips_a_track_that_has_one(caplog):
+    track = chord_track([chord_device([])])
+    with caplog.at_level("INFO"):
+        apply(InsertChord(0), fake_song([track]))
+    assert len(track.devices) == 1 and "already has one" in caplog.text
+
+
+def test_a_reinsert_is_logged(caplog):
+    with caplog.at_level("INFO"):
+        apply(InsertChord(0, again=True), fake_song([chord_track()]))
+    assert "CHORD: re-inserted" in caplog.text
+
+
+def test_remove_chord_deletes_the_named_device():
+    other = SimpleNamespace(name="Operator")
+    track = chord_track([other, chord_device([])])
+    apply(RemoveChord(0), fake_song([track]))
+    assert track.devices == [other]
+
+
+def test_remove_chord_skips_a_track_without_one(caplog):
+    with caplog.at_level("INFO"):
+        apply(RemoveChord(0), fake_song([chord_track()]))
+    assert "skipped RemoveChord" in caplog.text
+
+
+def test_set_chord_device_in_scale_degrees_writes_only_changes():
+    writes = []
+    device = chord_device(writes)
+    song = fake_song([chord_track([device])])
+    apply(SetChordDevice(0, (2, 4, 0, 0, 0, 0), True), song)
+    assert writes == ["Use Current Scale", "Shift1 Scale Degrees", "Shift2 Scale Degrees"]
+    writes.clear()
+    apply(SetChordDevice(0, (2, 4, 0, 0, 0, 0), True), song)
+    assert writes == []
+
+
+def test_set_chord_device_in_semitones_clears_the_scale_degrees():
+    writes = []
+    device = chord_device(writes)
+    song = fake_song([chord_track([device])])
+    apply(SetChordDevice(0, (2, 4, 0, 0, 0, 0), True), song)
+    writes.clear()
+    apply(SetChordDevice(0, (4, 7, 0, 0, 0, 0), False), song)
+    values_by_name = {p.name: p.value for p in device.parameters}
+    assert values_by_name["Use Current Scale"] == 0.0
+    assert (values_by_name["Shift1"], values_by_name["Shift2"]) == (4, 7)
+    assert (values_by_name["Shift1 Scale Degrees"], values_by_name["Shift2 Scale Degrees"]) == (0, 0)
+
+
+def test_set_chord_device_skips_a_track_without_one(caplog):
+    with caplog.at_level("INFO"):
+        apply(SetChordDevice(0, (0,) * 6, False), fake_song([chord_track()]))
+    assert "skipped SetChordDevice" in caplog.text
+
+
+def test_set_scale_sets_only_what_is_given():
+    song = SimpleNamespace(root_note=0, scale_name="Major", scale_mode=False)
+    apply(SetScale(root=7), song)
+    assert (song.root_note, song.scale_name, song.scale_mode) == (7, "Major", False)
+    apply(SetScale(name="Minor", mode_on=True), song)
+    assert (song.root_note, song.scale_name, song.scale_mode) == (7, "Minor", True)

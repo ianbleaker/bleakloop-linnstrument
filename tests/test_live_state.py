@@ -1,7 +1,11 @@
 from types import SimpleNamespace
 
+import pytest
+
 from BleakLoop import live_state
+from BleakLoop.core import values
 from BleakLoop.core.layout import Window
+from BleakLoop.core.model import ScaleView
 from BleakLoop.core.modes import FaderBinding
 
 
@@ -572,3 +576,67 @@ def test_read_fx_scenes_store():
     song = SimpleNamespace(get_data=lambda key, default: stored.get(key, default))
     assert live_state.read_fx_scenes_store(song) == "text"
     assert live_state.read_fx_scenes_store(SimpleNamespace(get_data=lambda k, d: d)) == ""
+
+
+# Chord Mode
+
+
+def chord_song(tracks, selected, highlighted=None):
+    song = seq_song(tracks, selected=selected)
+    song.scale_name = "Minor"
+    song.view.highlighted_clip_slot = highlighted
+    return song
+
+
+def test_read_chord_reads_the_selected_track_scale_and_device():
+    audio = seq_track("Audio", midi=False)
+    keys = seq_track("Keys")
+    keys.devices = [SimpleNamespace(name=values.CHORD_DEVICE_NAME)]
+    view = live_state.read_chord(chord_song([audio, keys], selected=keys))
+    assert (view.track, view.is_midi, view.device_present, view.recording) == (
+        1,
+        True,
+        True,
+        False,
+    )
+    assert view.scale == ScaleView(True, 2, (0, 2, 3, 5, 7, 8, 10), "Minor")
+
+
+def test_read_chord_without_the_device():
+    keys = seq_track("Keys")
+    keys.devices = [SimpleNamespace(name="Chord")]
+    assert not live_state.read_chord(chord_song([keys], selected=keys)).device_present
+
+
+def test_read_chord_on_an_audio_track():
+    audio = seq_track("Audio", midi=False)
+    view = live_state.read_chord(chord_song([audio], selected=audio))
+    assert (view.track, view.is_midi) == (0, False)
+
+
+def test_read_chord_on_master():
+    master = seq_track("Master")
+    view = live_state.read_chord(chord_song([seq_track("Keys")], selected=master))
+    assert view.track is None and view.scale.name == "Minor"
+
+
+@pytest.mark.parametrize("highlighted, playing", [(1, -1), (None, 1)])
+def test_read_chord_reads_a_recording_slot(highlighted, playing):
+    keys = seq_track("Keys", playing=playing)
+    keys.clip_slots[1].is_recording = True
+    slot = keys.clip_slots[highlighted] if highlighted is not None else None
+    assert live_state.read_chord(chord_song([keys], selected=keys, highlighted=slot)).recording
+
+
+def test_read_reads_the_chord_view_and_arms_only_when_asked():
+    keys = seq_track("Keys", arm=True)
+    song = chord_song([keys], selected=keys)
+    assert live_state.read(song, APPLICATION, Window()).chord is None
+    snapshot = live_state.read(song, APPLICATION, Window(), chord=True)
+    assert snapshot.chord.track == 0 and snapshot.arms == (True,)
+
+
+def test_chord_device_finds_the_named_device():
+    named = SimpleNamespace(name=values.CHORD_DEVICE_NAME)
+    track = SimpleNamespace(devices=[SimpleNamespace(name="Chord"), named])
+    assert live_state.chord_device(track) is named

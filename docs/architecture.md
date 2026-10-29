@@ -314,6 +314,7 @@ flowchart TD
   live_state --> core_values
   surface --> Live
   surface --> ableton_v3
+  surface --> core_chord
   surface --> core_controls
   surface --> core_engine
   surface --> core_faders
