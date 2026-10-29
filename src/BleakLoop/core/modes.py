@@ -130,6 +130,14 @@ class Morph:
 
 
 @dataclass(frozen=True)
+class PendingLaunch:
+    # A scene launch held back until its bar line: decided at the press, fired by the timer.
+    scene: int
+    fire_beats: float  # song time to fire it at, so Live's launch quantization starts it on time
+    last_beats: float  # song time at the press, then at the last tick
+
+
+@dataclass(frozen=True)
 class StepHold:
     # One finger on a Sequencer Mode step.
     step: int  # the global step, from clip time 0
@@ -180,6 +188,9 @@ class State:
     device_clip: bool = False  # Device/Clip is held
     device_clip_used: bool = False  # a press during the hold: its release doesn't flip the view
     split: bool = False  # Session Mode's split view
+    mixer_split: bool = False  # Mixer Mode's split view
+    split_snapshots: bool = False  # the split views show the snapshots, not the faders
+    pending_launch: PendingLaunch | None = None  # fires in every mode, as a morph runs
     fader_bindings: tuple = (None,) * 8  # Mapped FX: FaderBinding or None per row
     seq_held: bool = False  # Seq is held in Session Mode
     seq_used: bool = False  # the Seq hold entered on a slot: its release does nothing
@@ -209,9 +220,10 @@ def enter(state, mode):
     # Mode, and the firmware sends its release as a User Firmware note, not on the control
     # channel, so BleakLoop never sees it.
     # A caller leaving Mixer Mode closes an open undo step first (mixer.reset), and one
-    # leaving the faders closes theirs (faders.reset). The split view, the fader source and
-    # the bindings survive.
-    # FX Mode turns off, but a running morph, its undo step and the snapshots carry on.
+    # leaving the faders closes theirs (faders.reset). The split views, their panel, the fader
+    # source and the bindings survive.
+    # FX Mode turns off, but a running morph, its undo step, a pending scene launch and the
+    # snapshots carry on.
     # Sequencer Mode's holds reset; its arm, rate, Triplet, note range and pitch survive. A
     # caller leaving it closes a slide's undo step first.
     if mode is Mode.LINNSTRUMENT and state.mode is Mode.SESSION:

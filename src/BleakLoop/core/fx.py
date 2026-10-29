@@ -9,6 +9,7 @@ from .leds import CYAN, LIME, OFF, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
     EndUndoStep,
+    FireScene,
     RecallFxSnapshot,
     SaveFxScenes,
     SaveFxSnapshots,
@@ -17,7 +18,7 @@ from .model import (
     ShowMessage,
     StoreFxSnapshot,
 )
-from .modes import FxRack, Morph, MorphMacro
+from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
 from .values import FX_TOUCH_TOLERANCE
 
 SLOTS = 16
@@ -120,8 +121,15 @@ def scenes_changed(state, event):
     landed = state.fx_landed_scene
     if landed is not None:
         landed = moved.get(landed)
+    # A pending launch follows its scene, and goes with it.
+    pending = state.pending_launch
+    if pending is not None:
+        scene = moved.get(pending.scene)
+        pending = None if scene is None else replace(pending, scene=scene)
     changed = scenes != _fit(state.fx_scenes, len(scenes))
-    state = replace(state, fx_scenes=scenes, morph=morph, fx_landed_scene=landed)
+    state = replace(
+        state, fx_scenes=scenes, morph=morph, fx_landed_scene=landed, pending_launch=pending
+    )
     return state, [SaveFxScenes(dump_scenes(scenes))] if changed else []
 
 
@@ -191,6 +199,10 @@ def _landed(state, slot, scene):
     return replace(state, fx_landed=slot, fx_landed_scene=None)
 
 
+def panel_visible(state):
+    # Session or Mixer Mode's split view shows the snapshots in columns 11-14.
+    return state.mode is Mode.SESSION and faders.split_view(state) and state.split_snapshots
+
 
 def toggle(state):
     if state.fx:
@@ -209,7 +221,7 @@ def toggle(state):
 
 
 def press(state, event, snapshot):
-    # Every grid pad in FX Mode, releases included.
+    # Every grid pad in FX Mode, and the split views' snapshot panel, releases included.
     key = (event.column, event.pad)
     if key in layout.FX_LENGTHS:
         bars = layout.FX_LENGTHS[key]
@@ -245,7 +257,8 @@ def _slot_press(state, slot, scene, snapshot):
 
 
 def render(state, snapshot):
-    # The grid columns right of the faders in FX Mode; dark under Shift, as Mixer's faders.
+    # The grid columns right of the faders in FX Mode, and the split views' snapshot panel;
+    # dark under Shift, as Mixer's faders.
     frame = {
         (column, pad): Light(OFF)
         for column in layout.GRID_COLUMNS
@@ -359,15 +372,19 @@ def end_beats(snapshot, bars):
     return math.floor(snapshot.song_beats / bar) * bar + bars * bar
 
 
+def launch_step(snapshot):
+    # Launch quantization's length in beats, None when launches are unquantized.
+    q = snapshot.launch_quantization
+    if q in LAUNCH_BARS:
+        return LAUNCH_BARS[q] * snapshot.signature_numerator * 4 / snapshot.signature_denominator
+    return LAUNCH_BEATS.get(q)
+
+
 def launch_end_beats(snapshot):
     # When a scene launched now starts: the next quantization boundary strictly after now.
     # None when launches are unquantized.
-    q = snapshot.launch_quantization
-    if q in LAUNCH_BARS:
-        step = LAUNCH_BARS[q] * snapshot.signature_numerator * 4 / snapshot.signature_denominator
-    elif q in LAUNCH_BEATS:
-        step = LAUNCH_BEATS[q]
-    else:
+    step = launch_step(snapshot)
+    if step is None:
         return None
     return (math.floor(snapshot.song_beats / step) + 1) * step
 
@@ -379,6 +396,46 @@ def scene_launch(state, scene, snapshot):
         return []
     end = launch_end_beats(snapshot) if snapshot.is_playing else None
     return [RecallFxSnapshot(scene, None, scene=True, end_beats=end)]
+
+
+def timed_launch(state, scene, snapshot):
+    # A scene pressed with a Bars pad held starts on the Nth bar line, or on the first launch
+    # quantization boundary at or after it, and its snapshot lands as it starts. Stopped, it
+    # launches at once.
+    if not snapshot.is_playing:
+        return state, [FireScene(scene, legato=False), *scene_launch(state, scene, snapshot)]
+    bars = state.fx_length
+    start = end_beats(snapshot, bars)
+    step = launch_step(snapshot)
+    if step is None:
+        fire = start
+    else:
+        # Any time in the last step before it starts it there: the earliest is clearest of
+        # a late tick.
+        start = math.ceil(start / step - 1e-9) * step
+        fire = start - step
+    actions = []
+    if scene_snapshot(state, scene) is not None:
+        actions.append(RecallFxSnapshot(scene, None, scene=True, end_beats=start))
+    if fire <= snapshot.song_beats:
+        # Live's launch quantization already starts it on time.
+        return state, [FireScene(scene, legato=False), *actions]
+    pending = PendingLaunch(scene, fire, snapshot.song_beats)
+    message = ShowMessage(f"Scene {scene + 1} in {_count(bars, 'bar')}")
+    return replace(state, pending_launch=pending), [message, *actions]
+
+
+def launch_tick(state, transport):
+    # On the 10 ms timer: fire the pending launch at its time. A stop or a backward jump
+    # cancels it, as either lands a morph at once. Returns whether to redraw.
+    pending = state.pending_launch
+    now = transport.song_beats
+    if not transport.is_playing or now < pending.last_beats:
+        message = ShowMessage(f"Scene {pending.scene + 1} launch cancelled")
+        return replace(state, pending_launch=None), [message], True
+    if now >= pending.fire_beats:
+        return replace(state, pending_launch=None), [FireScene(pending.scene, legato=False)], True
+    return replace(state, pending_launch=replace(pending, last_beats=now)), [], False
 
 
 def _match(stored, racks):

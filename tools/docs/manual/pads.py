@@ -113,7 +113,8 @@ WINDOW_MOVES = Item(
 FADER_SOURCE = _one(
     "Fader source",
     layout.FADER_SOURCE,
-    "Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode.",
+    "Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode. "
+    "In Session and Mixer Mode, the split view's snapshots come third.",
     label="Source",
 )
 
@@ -190,7 +191,7 @@ _NAVIGATION = (
     ),
     _one("Delete", layout.DELETE, "Hold, then press a clip or scene to delete it."),
     _one("Session", layout.SESSION, "Session Mode. In Session Mode, toggles the split view."),
-    _one("Mixer", layout.MIXER, "Mixer Mode. Press again for Session Mode."),
+    _one("Mixer", layout.MIXER, "Mixer Mode. In Mixer Mode, toggles the split view."),
     _one("FX", layout.FX, "FX Mode. Press again for Session Mode."),
     _one(
         "Seq",
@@ -252,7 +253,8 @@ _SPLIT = (
         "Faders",
         layout.SPLIT_FADER_COLUMNS,
         ALL_PADS,
-        "One fader per row, as in FX Mode, from the source Shift + FX picks.",
+        "One fader per row, as in FX Mode, from the source Shift + FX picks. Its third "
+        "choice shows the snapshots instead.",
     ),
 )
 
@@ -303,9 +305,27 @@ _FX = (
     Item(
         "Bars",
         {key: f"{bars} bar" if bars == 1 else f"{bars} bars" for key, bars in layout.FX_LENGTHS.items()},
-        "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.",
+        "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a "
+        "scene to launch it on that bar line.",
     ),
 )
+
+# The split views' snapshot panel: FX Mode's columns 11-14, column 10 dark.
+_SNAPSHOT_PANEL = _FX[1:]
+
+_SPLIT_SNAPSHOTS = (
+    *_SPLIT[:-1],
+    *_SNAPSHOT_PANEL,
+)
+
+_MIXER_SPLIT = (
+    replace(_MIXER[0], name="Volume faders", columns=SPLIT_TRACK_COLUMNS),
+    *(replace(block, columns=SPLIT_TRACK_COLUMNS) for block in _MIXER[1:]),
+    replace(_SPLIT[-1], name="Panel"),
+)
+
+# Not drawn: the Shift notes of Mixer's split view's list.
+_MIXER_SPLIT_SHIFT = tuple(replace(block, columns=SPLIT_TRACK_COLUMNS) for block in _MIXER_SHIFT)
 
 _DEVICE_CLIP = (
     Item(
@@ -490,8 +510,11 @@ SECTIONS = {
     "session-shift": _SESSION_SHIFT,
     "split": _SPLIT,
     "split-shift": _SPLIT_SHIFT,
+    "split-snapshots": _SPLIT_SNAPSHOTS,
     "mixer": _MIXER,
     "mixer-shift": _MIXER_SHIFT,
+    "mixer-split": _MIXER_SPLIT,
+    "mixer-split-shift": _MIXER_SPLIT_SHIFT,
     "fx": _FX,
     "fx-shift": (),  # the grid is dark under Shift
     "device-clip": _DEVICE_CLIP,
@@ -524,6 +547,7 @@ SECTIONS = {
 
 # When each of controls.SCENE_LIGHTS shows, for the manual's Reading the lights.
 SCENE_LIGHTS = {
+    "waiting": "while a held Bars pad holds their launch back to its bar line",
     "launching": "once launched, until they start at the next quantization boundary",
     "full": "while all their clips play",
     "playing": "while some of their clips play",
@@ -537,7 +561,9 @@ LISTS = {
     "navigation": "navigation-shift",
     "session": "session-shift",
     "split": "split-shift",
+    "split-snapshots": "split-shift",
     "mixer": "mixer-shift",
+    "mixer-split": "mixer-split-shift",
     "fx": None,
     "device-clip": None,
     "linnstrument": "linnstrument-shift",
@@ -551,7 +577,9 @@ LAYERS = {
     Layer.SESSION: ("global", "view", "navigation", "session"),
     Layer.SESSION_SHIFT: ("global-shift", "view-shift", "navigation-shift", "session-shift"),
     Layer.SPLIT: ("global", "view", "navigation", "split"),
+    Layer.SPLIT_SNAPSHOTS: ("global", "view", "navigation", "split-snapshots"),
     Layer.MIXER: ("global", "view", "navigation", "mixer"),
+    Layer.MIXER_SPLIT: ("global", "view", "navigation", "mixer-split"),
     Layer.MIXER_SHIFT: ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
     Layer.FX: ("global", "view", "navigation", "fx"),
     Layer.FX_SHIFT: ("global-shift", "view-shift", "navigation-shift", "fx-shift"),

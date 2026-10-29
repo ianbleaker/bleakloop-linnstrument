@@ -80,6 +80,13 @@ def fx_tick(state, transport, values):
     return fx.tick(state, transport, values)
 
 
+def launch_tick(state, transport):
+    # A pending scene launch on the 10 ms timer, in every mode, and a redraw flag.
+    if state.pending_launch is None:
+        return state, [], False
+    return fx.launch_tick(state, transport)
+
+
 def seq_sync(state, snapshot):
     # On every display tick in Sequencer Mode: the arm follows Live's selected track.
     if state.mode is not Mode.SEQUENCER:

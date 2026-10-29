@@ -17,8 +17,8 @@ While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 
 
 ### Overview
 
-- **Session Mode** launches clips and scenes, and mutes, solos and arms tracks. Its split view adds eight faders.
-- **Mixer Mode** gives each track a volume fader.
+- **Session Mode** launches clips and scenes, and mutes, solos and arms tracks. Its split view adds eight faders or the FX snapshots.
+- **Mixer Mode** gives each track a volume fader. Its split view adds eight faders or the FX snapshots, as Session Mode's does.
 - **FX Mode** has eight faders for a device or for parameters you bind, and snapshots of every rack's macros that recall at once or morph.
 - **Sequencer Mode** is a 64-step sequencer on a MIDI clip, with note pads.
 - **Linnstrument Mode** gives the LinnStrument back to you as an instrument, its panel buttons in column 0 included. Only the Global column stays.
@@ -89,7 +89,7 @@ Column 16, the outer edge, holds the mode pads, then Delete and Copy. Its last p
 
 <!-- callouts:navigation -->
 - **Session**: Session Mode. In Session Mode, toggles the split view.
-- **Mixer**: Mixer Mode. Press again for Session Mode.
+- **Mixer**: Mixer Mode. In Mixer Mode, toggles the split view.
 - **FX**: FX Mode. Press again for Session Mode.
 - **Seq**: Hold and press a clip, or tap, for Sequencer Mode.
 - **Delete**: Hold, then press a clip or scene to delete it.
@@ -99,7 +99,7 @@ Column 16, the outer edge, holds the mode pads, then Delete and Copy. Its last p
 With **Shift** held:
 
 - **Tempo**: Tempo +1 or -1 BPM.
-- **Fader source**: Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode.
+- **Fader source**: Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode. In Session and Mixer Mode, the split view's snapshots come third.
 - **Window directions**: Move the Ableton session ring in the selected direction.
 <!-- /callouts:navigation -->
 
@@ -138,7 +138,7 @@ With **Shift** held:
 
 #### Split view
 
-The split view shows 8 tracks and eight faders side by side. Press Session (column 16, pad 1) while in Session Mode to turn it on or off, with a message. Session is pink while the split view is on.
+The split view shows 8 tracks and a panel side by side. Press Session (column 16, pad 1) while in Session Mode to turn it on or off, with a message. Session is pink while the split view is on. The panel shows eight faders, Device FX or Mapped FX, or FX Mode's snapshots: Shift + FX steps through the three.
 
 ![Session Mode, split view](manual/session-split.svg)
 
@@ -146,7 +146,7 @@ The split view shows 8 tracks and eight faders side by side. Press Session (colu
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
-- **Faders**: One fader per row, as in FX Mode, from the source Shift + FX picks.
+- **Faders**: One fader per row, as in FX Mode, from the source Shift + FX picks. Its third choice shows the snapshots instead.
 
 With **Shift** held:
 
@@ -155,12 +155,32 @@ With **Shift** held:
 - **Arm**: Arm or disarm the track alone, keeping the selection.
 <!-- /callouts:split -->
 
+With the snapshots in the panel, columns 11–14 work as FX Mode's, and column 10 is dark.
+
+![Session Mode, split view with the snapshots](manual/session-split-snapshots.svg)
+
+<!-- callouts:split-snapshots -->
+- **Clip slots**: Launch a clip. On an armed track, an empty slot records.
+- **Mute**: Mute or unmute the track: pink while audible, orange while muted.
+- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall.
+- **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
+- **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
+
+With **Shift** held:
+
+- **Clip slots: legato**: Launch with legato.
+- **Solo**: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed.
+- **Arm**: Arm or disarm the track alone, keeping the selection.
+<!-- /callouts:split-snapshots -->
+
 ### Mixer Mode
 
 - Pads 1–6 of each track are its volume fader: pad 1 is 0 dB. Slide to fine-tune.
 - With Shift held the faders go dark, and pads 7 and 8 show their Shift layer: solo, and arm alone.
-- Copy and Delete do nothing here.
-- Press Mixer again, or Session, for Session Mode. FX and Mixer Mode replace each other.
+- Copy and Delete do nothing here, except on the split view's snapshots.
+- Press Session for Session Mode. FX and Mixer Mode replace each other.
+- Press Mixer again for the split view.
 
 ![Mixer Mode](manual/mixer.svg)
 
@@ -177,10 +197,28 @@ With **Shift** held:
 - **Arm**: Arm or disarm the track alone, keeping the selection.
 <!-- /callouts:mixer -->
 
+#### Mixer split view
+
+The split view shows 8 tracks' volume faders and the same panel as Session Mode's split view: eight faders or the snapshots, whichever Shift + FX last picked. Press Mixer (column 16, pad 2) while in Mixer Mode to turn it on or off, with a message. Mixer is pink while the split view is on.
+
+![Mixer Mode, split view](manual/mixer-split.svg)
+
+<!-- callouts:mixer-split -->
+- **Volume faders**: One volume fader per track.
+- **Mute**: Mute or unmute the track: pink while audible, orange while muted.
+- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+- **Panel**: One fader per row, as in FX Mode, from the source Shift + FX picks. Its third choice shows the snapshots instead.
+
+With **Shift** held:
+
+- **Solo**: Solo or unsolo the track, as Live's Exclusive Solo preference says: cyan, blue while soloed.
+- **Arm**: Arm or disarm the track alone, keeping the selection.
+<!-- /callouts:mixer-split -->
+
 ### FX Mode
 
-- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX (column 16, pad 3) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to.
-- Snapshots are saved in the Set. A held Bars pad turns a recall into a morph.
+- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX (column 16, pad 3) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to. In Session and Mixer Mode, the snapshots come third, for the split view's panel.
+- Snapshots are saved in the Set. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
 - With Shift held the grid, faders included, goes dark and ignores presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
@@ -192,7 +230,7 @@ With **Shift** held:
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
 - **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
-- **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars.
+- **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
 <!-- /callouts:fx -->
 
 ### Sequencer Mode
@@ -273,7 +311,7 @@ On the scene page:
 
 ### Moving around
 
-**Session, Mixer and FX** (column 16, pads 1–3) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it, or the current one's to go back to Session Mode. In Session Mode, Session toggles the split view, and is pink while it's on.
+**Session, Mixer and FX** (column 16, pads 1–3) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it. In FX Mode, FX goes back to Session Mode. In Session Mode, Session toggles the split view, and in Mixer Mode, Mixer toggles Mixer's; each is pink while its split view is on.
 
 Pad 4 of column 16 is dark and does nothing: it's kept for a Chord mode still to come. Pad 5 is **Seq**, which opens Sequencer Mode, pads 6 and 7 are **Delete** and **Copy**, and pad 8 is **Device/Clip**.
 
@@ -294,7 +332,7 @@ Recording on a MIDI track switches to Linnstrument Mode, so you can play straigh
 
 **Fixed Length** is one pad: its colour shows the length, dark while off, then cyan, blue, magenta and pink. The length stays when you change mode.
 
-**Scenes** (column 15, pads 1–6) launch the window's scenes. A scene with an FX snapshot morphs the macros to it, landing as the scene starts. Shift + a scene launches it legato and leaves the macros alone, and so does a launch from Live's mouse or another controller.
+**Scenes** (column 15, pads 1–6) launch the window's scenes. A scene with an FX snapshot morphs the macros to it, landing as the scene starts. Shift + a scene launches it legato and leaves the macros alone, and so does a launch from Live's mouse or another controller. With a Bars pad held, in FX Mode or the split view's snapshots, a scene launches on that bar line instead (see Snapshots and morphs).
 
 **Stop** (column 15, pad 8) is held like Copy and Delete. Hold it and press any pad in a track's column to stop that track's clips; a tap on its own does nothing. In FX Mode, holding Stop leaves the grid alone. Shift + Play stops all clips.
 
@@ -329,12 +367,15 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 ### Split view
 
-- Columns 2–9 work as in Session Mode for an 8-track window, and Live's ring shrinks to match. The window moves as usual; turning the split view off keeps it where it is, unless it then runs past the last track.
-- Columns 10–14 are the faders, five pads wide, in every row: they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads. With Shift held they go dark and ignore presses.
+- Session Mode and Mixer Mode each have their own split view, toggled by their own pad. Columns 2–9 work as in that mode for an 8-track window, and Live's ring shrinks to match. The window moves as usual; turning the split view off keeps it where it is, unless it then runs past the last track.
+- Columns 10–14 are the panel, in every row. Shift + FX steps it through Device FX, Mapped FX and the snapshots, and both split views show the same choice.
+- As faders, five pads wide, they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads.
+- As snapshots, columns 11–14 work as FX Mode's: snapshots, scene snapshots and Bars, with Copy and Delete as there. Column 10 is dark.
+- With Shift held the panel goes dark and ignores presses.
 - A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
 - The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
-- Mixer and FX Mode always show 13 tracks; near the last track, the window moves left to fill them. Pressing Session from them returns to whichever view you were in.
-- The split view is off each time Live starts or a Set opens.
+- FX Mode always shows 13 tracks, and so do Session and Mixer Mode without their split view; near the last track, the window moves left to fill them. Each mode keeps its own split view on or off when you leave it.
+- The split views are off, and the panel shows Device FX, each time Live starts or a Set opens.
 
 ### Mixer faders
 
@@ -385,11 +426,20 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Each scene can hold one snapshot. Pad N is the snapshot of the scene on column 15's pad N, so the column scrolls with the window. Pads past the last scene, and pads 7 and 8, are dark.
 - Store, recall, morph with a Bars pad, store over with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
 - A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not.
-- Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. A Bars pad held during the launch is ignored.
+- Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. With a Bars pad held, it lands as the timed launch below starts the scene.
 - Shift + a scene (legato) doesn't fire the snapshot, and neither do launches from Live's mouse or another controller. A scene without a snapshot leaves the macros, and any running morph, alone.
 - The snapshots follow Live's scenes. Move a scene and its snapshot moves with it; delete a scene and its snapshot goes; a new scene starts empty.
 - Live's Duplicate copies the scene's snapshot to the copy. So does any new scene inserted straight below a scene with a snapshot, when it has the same clips on the same tracks and at least one clip, such as Capture and Insert Scene. Copy + scene copies the snapshot too; if the source has none, the target keeps its own.
 - Undoing a scene delete in Live brings the scene back without its snapshot.
+
+**Timed scene launches:**
+
+- Hold a Bars pad, in FX Mode or the split view's snapshots, and press a scene in column 15: the scene starts on that bar line, as a morph lands: pressed at bar 1 beat 2 with 4 bars held, it starts at bar 5. If launch quantization doesn't fall on that bar line, such as 4 Bars with 1 bar held, it starts on the first quantization boundary after it.
+- Its scene snapshot, if it has one, morphs from the press and lands as the scene starts.
+- The scene pad blinks yellow with the beat until BleakLoop fires the scene, then blinks lime as usual until it starts.
+- With the transport stopped, the scene launches at once.
+- Stopping the transport, or jumping back in the song, cancels a waiting launch, with a message.
+- A new scene press replaces a waiting launch; the replaced launch's morph still lands at its bar line. Shift + a scene launches it legato at once, whatever Bars pad is held.
 
 **During a morph:**
 
@@ -480,7 +530,7 @@ The LinnStrument is your instrument again. Column 1 keeps the controls it has in
 - **Track colours** use the closest LinnStrument colour.
 - **Clip slots:** track colour, blinking while playing; track colour, has a clip; yellow, about to launch; red, recording; white, empty and ready to record.
 <!-- lights:scenes -->
-- **Scenes:** lime and blinking fast once launched, until they start at the next quantization boundary; lime while all their clips play; magenta while some of their clips play; white if they hold clips.
+- **Scenes:** yellow and blinking with the beat while a held Bars pad holds their launch back to its bar line; lime and blinking fast once launched, until they start at the next quantization boundary; lime while all their clips play; magenta while some of their clips play; white if they hold clips.
 <!-- /lights:scenes -->
 - **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, and the playhead is white. A note pad lights yellow while its note plays, and the selected note blinks green.
 - On the LinnStrument, lime looks yellow and green looks lime.

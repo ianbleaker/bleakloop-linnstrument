@@ -110,7 +110,7 @@ def test_toggle_on_drops_copy_source():
 
 
 def test_toggle_off():
-    state, actions = handle(MIXER, press(*layout.MIXER))
+    state, actions = handle(MIXER, press(*layout.SESSION))
     assert not state.mixer
     assert actions == [SetMixer(False), ShowMessage("Mixer Mode OFF")]
 
@@ -124,7 +124,7 @@ def test_toggle_off_resets_fader_state_and_closes_undo():
         glide_ms=5.0,
         undo_open=True,
     )
-    state, actions = handle(state, press(*layout.MIXER))
+    state, actions = handle(state, press(*layout.SESSION))
     assert (state.touches, state.lifts, state.glides) == ((), (), ())
     assert (state.glide_ms, state.undo_open) == (None, False)
     assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("Mixer Mode OFF")]

@@ -260,6 +260,12 @@ def test_leaving_for_mixer_widens_the_split_window():
     assert left.window == layout.Window(7, 0)
 
 
+def test_leaving_for_mixers_split_view_keeps_its_8_track_window():
+    state = replace(ENTERED, mixer_split=True, window=layout.Window(12, 0))
+    left, _ = handle(state, layout.MIXER, replace(SNAP_IN, track_count=20, scene_count=4))
+    assert left.mixer and left.window == layout.Window(12, 0)
+
+
 def test_every_seq_release_does_nothing():
     assert handle(ENTERED, layout.SEQ, pressed=False) == (ENTERED, [])
 
