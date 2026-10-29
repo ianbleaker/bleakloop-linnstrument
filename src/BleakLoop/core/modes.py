@@ -223,6 +223,7 @@ class State:
     chord_holds: tuple = ()  # (column, pad, pitches) per sounding chord pad
     chord_device_track: int | None = None  # the song.tracks index of BleakLoop's Chord device
     chord_remove_pending: bool = False  # the device goes once no chord pad is held
+    chord_setting: tuple | None = None  # the last SetChordDevice's (track, shifts, scale_aware)
 
 
 def enter(state, mode):

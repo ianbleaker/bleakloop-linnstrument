@@ -24,6 +24,16 @@ def handle(state, event, snapshot):
     ):
         # Any other press during a Device/Clip hold makes it a hold, not a tap.
         state = replace(state, device_clip_used=True)
+    if (
+        state.chord_holds
+        and state.mode is not Mode.CHORD
+        and isinstance(event, PadPress)
+        and not event.pressed
+    ):
+        # A chord pad pressed in Chord Mode and released after leaving it.
+        state, released = chord.release_hold(state, event)
+        if released:
+            return state, []
     if state.mode is Mode.SESSION:
         return session.handle(state, event, snapshot)
     if state.mode is Mode.SEQUENCER:
@@ -99,10 +109,12 @@ def seq_sync(state, snapshot):
 
 
 def chord_sync(state, snapshot):
-    # On every display tick in Chord Mode, and in Linnstrument Mode entered from it: the arm
-    # and the Chord device follow Live's selected track.
-    if state.mode is Mode.CHORD or (
-        state.mode is Mode.LINNSTRUMENT and state.came_from is Origin.CHORD
+    # On every display tick in Chord Mode, in Linnstrument Mode entered from it, and while the
+    # Chord device's removal waits: the arm and the device follow Live's selected track.
+    if (
+        state.mode is Mode.CHORD
+        or (state.mode is Mode.LINNSTRUMENT and state.came_from is Origin.CHORD)
+        or state.chord_remove_pending
     ):
         return chord.sync(state, snapshot)
     return state, []

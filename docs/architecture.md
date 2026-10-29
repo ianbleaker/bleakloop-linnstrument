@@ -217,10 +217,17 @@ flowchart TD
   end
   __init__ -.->|lazy| surface
   core_arm --> core_model
+  core_chord --> core_arm
   core_chord --> core_column_1
+  core_chord --> core_controls
+  core_chord --> core_faders
+  core_chord --> core_fx
+  core_chord --> core_harmony
   core_chord --> core_layout
   core_chord --> core_leds
+  core_chord --> core_mixer
   core_chord --> core_model
+  core_chord --> core_modes
   core_column_1 --> core_controls
   core_column_1 --> core_faders
   core_column_1 --> core_fx
@@ -281,6 +288,7 @@ flowchart TD
   core_sequencer --> core_model
   core_sequencer --> core_modes
   core_sequencer --> core_values
+  core_session --> core_chord
   core_session --> core_column_1
   core_session --> core_controls
   core_session --> core_faders

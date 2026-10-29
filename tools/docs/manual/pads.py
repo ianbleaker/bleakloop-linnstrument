@@ -193,6 +193,7 @@ _NAVIGATION = (
     _one("Session", layout.SESSION, "Session Mode. In Session Mode, toggles the split view."),
     _one("Mixer", layout.MIXER, "Mixer Mode. In Mixer Mode, toggles the split view."),
     _one("FX", layout.FX, "FX Mode. Press again for Session Mode."),
+    _one("Chord", layout.CHORD, "Chord Mode, on the selected MIDI track."),
     _one(
         "Seq",
         layout.SEQ,

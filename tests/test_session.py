@@ -555,13 +555,13 @@ def test_mode_pad_lights(state, current):
     frame = session.render(state, SNAP)
     for key in (layout.SESSION, layout.MIXER, layout.FX):
         assert frame[key] == Light(BLUE if key == current else CYAN)
-    assert frame[layout.CHORD] == Light(OFF)
+    assert frame[layout.CHORD] == Light(CYAN)
 
 
 def test_normal_layer_column_16():
     frame = session.render(SESSION, SNAP)
     assert [frame[(layout.NAV_COLUMN, p)] for p in range(1, 9)] == [
-        Light(BLUE), Light(CYAN), Light(CYAN), Light(OFF),
+        Light(BLUE), Light(CYAN), Light(CYAN), Light(CYAN),
         Light(CYAN), Light(RED), Light(MAGENTA), Light(ORANGE),
     ]
 
@@ -1772,12 +1772,9 @@ def test_source_outside_window_not_drawn(source):
     )
 
 
-@pytest.mark.parametrize(
-    "state, key", [(state, key) for state in (SESSION, SHIFT) for key in (layout.CHORD,)]
-)
-def test_reserved_pads(state, key):
-    assert handle(state, key) == (state, [])
-    assert session.render(state, SNAP)[key] == Light(OFF)
+def test_shift_chord_does_nothing():
+    assert handle(SHIFT, layout.CHORD) == (SHIFT, [])
+    assert session.render(SHIFT, SNAP)[layout.CHORD] == Light(OFF)
 
 
 def test_shift_midi_recording_enters_linnstrument_without_shift():

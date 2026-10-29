@@ -69,6 +69,7 @@ class ScaleView:
     on: bool = False
     root: int = 0
     intervals: tuple = ()
+    name: str = ""  # Live's scale_name, e.g. "Major"
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,16 @@ class SequencerView:
     notes: tuple = ()  # NoteView per note in the clip
     drum: DrumView | None = None
     scale: ScaleView = ScaleView()
+
+
+@dataclass(frozen=True)
+class ChordView:
+    # Chord Mode's target: Live's selected track. Track indexes are song.tracks indexes.
+    track: int | None = None
+    is_midi: bool = False
+    scale: ScaleView = ScaleView()
+    device_present: bool = False  # BleakLoop's Chord device is on the track
+    recording: bool = False  # the track's highlighted or playing slot is recording
 
 
 @dataclass(frozen=True)
@@ -155,6 +166,7 @@ class Snapshot:
     arms: tuple = ()
     sequencer: SequencerView | None = None  # read only in Sequencer Mode
     seq_entry: SeqEntry | None = None  # read only while Seq is held
+    chord: ChordView | None = None  # read only in Session and Chord Mode
 
 
 @dataclass(frozen=True)
@@ -589,6 +601,24 @@ class SetDrumScroll:
 class SelectDrumPad:
     track: int
     note: int
+
+
+@dataclass(frozen=True)
+class InsertChord:
+    # Live's Chord MIDI effect, first on the track, named values.CHORD_DEVICE_NAME.
+    track: int
+
+
+@dataclass(frozen=True)
+class RemoveChord:
+    track: int
+
+
+@dataclass(frozen=True)
+class SetChordDevice:
+    track: int
+    shifts: tuple  # six shifts, unused ones 0
+    scale_aware: bool  # scale-degree shifts, with Use Current Scale on
 
 
 @dataclass(frozen=True)

@@ -91,6 +91,7 @@ Column 16, the outer edge, holds the mode pads, then Delete and Copy. Its last p
 - **Session**: Session Mode. In Session Mode, toggles the split view.
 - **Mixer**: Mixer Mode. In Mixer Mode, toggles the split view.
 - **FX**: FX Mode. Press again for Session Mode.
+- **Chord**: Chord Mode, on the selected MIDI track.
 - **Seq**: Hold and press a clip, or tap, for Sequencer Mode.
 - **Delete**: Hold, then press a clip or scene to delete it.
 - **Copy**: Hold, press a clip, then an empty slot.

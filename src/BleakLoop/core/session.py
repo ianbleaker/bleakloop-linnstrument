@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import column_1, controls, faders, fx, layout, mixer, modes, sequencer
+from . import chord, column_1, controls, faders, fx, layout, mixer, modes, sequencer
 from .leds import (
     BLUE,
     CYAN,
@@ -378,7 +378,9 @@ def _nav_column(state, key, snapshot):
         if key == layout.FADER_SOURCE:
             return controls.toggle_fader_source(state)
         return state, []
-    # Chord and Seq have no match here. The current mode's pad goes back to Session.
+    # Seq has no match here. The current mode's pad goes back to Session.
+    if key == layout.CHORD:
+        return chord.enter(state, snapshot)
     if key == layout.SESSION:
         if state.mixer:
             return _widen(state, mixer.toggle, snapshot)
@@ -548,7 +550,7 @@ def _render_normal_layer(frame, state):
     frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
     # Modes are cyan, the current one blue.
     current = layout.MIXER if state.mixer else layout.FX if state.fx else layout.SESSION
-    for key in (layout.SESSION, layout.MIXER, layout.FX, layout.SEQ):
+    for key in (layout.SESSION, layout.MIXER, layout.FX, layout.CHORD, layout.SEQ):
         frame[key] = Light(BLUE if key == current else CYAN)
     if faders.split_view(state):
         frame[current] = Light(PINK)
