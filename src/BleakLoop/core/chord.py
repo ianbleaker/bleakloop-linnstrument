@@ -8,7 +8,7 @@ indexes are song.tracks indexes.
 from dataclasses import replace
 
 from . import arm, column_1, controls, faders, fx, harmony, layout, mixer, modes, values
-from .leds import OFF, Light
+from .leds import BLUE, CYAN, GREEN, OFF, ORANGE, WHITE, YELLOW, Blink, Light
 from .model import (
     ChordView,
     EnterMode,
@@ -22,6 +22,7 @@ from .model import (
 from .modes import Mode
 
 NEEDS_MIDI = "Chord needs a MIDI track"
+MAJ, MIN = (next(k for k, q in layout.CHORD_QUALITIES.items() if q == name) for name in ("maj", "min"))
 REST = ((0,) * harmony.SHIFTS, False)  # every shift off: notes pass through unchanged
 
 
@@ -329,10 +330,96 @@ def _nav(state, event, snapshot):
 
 
 def render(state, snapshot):
+    view = snapshot.chord or ChordView()
+    key = key_of(view)
     frame = {
         (column, pad): Light(OFF)
         for column in range(1, layout.COLUMNS)
         for pad in range(1, layout.ROWS + 1)
     }
     frame.update(column_1.render(state, snapshot))
+    sounding = set()  # MIDI notes of every held chord
+    roots = set()
+    for column, pad, pitches in state.chord_holds:
+        sounding |= set(pitches)
+        roots.add(root_note(state, view, column, pad))
+    _render_modifiers(frame, state, view)
+    _render_degrees(frame, key, roots)
+    _render_piano(frame, state, view, key, sounding, roots)
+    for pad_key, step in ((layout.CHORD_OCT_UP, 1), (layout.CHORD_OCT_DOWN, -1)):
+        movable = state.chord_octave + step in values.CHORD_OCTAVES
+        frame[pad_key] = Light(WHITE if movable else OFF)
+    _render_nav(frame, state)
     return frame
+
+
+def _render_modifiers(frame, state, view):
+    if state.shift:
+        # Shift + Maj or Min sets the scale: the current one cyan.
+        name = view.scale.name
+        frame[MAJ] = Light(CYAN if name == "Major" else WHITE)
+        frame[MIN] = Light(CYAN if name == "Minor" else WHITE)
+    else:
+        for pad_key, quality in layout.CHORD_QUALITIES.items():
+            held = Blink.FAST if quality in state.chord_qualities else Blink.STEADY
+            frame[pad_key] = Light(harmony.QUALITIES[quality][3], held)
+        for pad_key, extension in layout.CHORD_EXTENSIONS.items():
+            held = Blink.FAST if extension in state.chord_extensions else Blink.STEADY
+            frame[pad_key] = Light(WHITE, held)
+    frame[layout.CHORD_INV] = Light(CYAN)
+    frame[layout.CHORD_SPREAD] = Light(CYAN)
+    frame[layout.CHORD_BASS] = Light(CYAN if state.chord_bass else OFF)
+
+
+def _render_degrees(frame, key, roots):
+    # Each degree in its quality's colour, green while its chord sounds.
+    playing = {(root - key.root) % 12 for root in roots}
+    for column in layout.CHORD_DEGREE_COLUMNS:
+        semitone = column - layout.CHORD_DEGREE_COLUMNS[0]
+        d = key.degree_of(key.root + semitone)
+        if semitone in playing:
+            colour = GREEN
+        elif not key.is_heptatonic:
+            colour = ORANGE if d is not None else OFF
+        elif d is not None:
+            colour = harmony.QUALITIES[key.diatonic_quality(d)][3]
+        else:
+            colour = harmony.QUALITIES[key.borrowed_quality(semitone)][3]
+        frame[(column, 1)] = Light(colour)
+
+
+def _render_piano(frame, state, view, key, sounding, roots):
+    for column in layout.CHORD_PIANO_COLUMNS:
+        for pad in layout.CHORD_PIANO_PADS:
+            note = root_note(state, view, column, pad)
+            if note is None:
+                continue
+            pc = note % 12
+            if state.shift:
+                colour = CYAN if pc == key.root else WHITE
+            elif note in roots:
+                colour = GREEN
+            elif note in sounding:
+                colour = YELLOW
+            elif pc == key.root:
+                colour = CYAN
+            else:
+                colour = WHITE if key.degree_of(pc) is not None else OFF
+            frame[(column, pad)] = Light(colour)
+
+
+def _render_nav(frame, state):
+    # As Sequencer Mode's, with Copy, Delete and Seq dark.
+    if state.shift:
+        for pad_key in layout.WINDOW_MOVES:
+            frame[pad_key] = Light(YELLOW)
+        for pad_key in layout.TEMPO_STEPS:
+            frame[pad_key] = Light(GREEN)
+        frame[layout.FADER_SOURCE] = Light(ORANGE)
+    else:
+        for pad_key in (layout.SESSION, layout.MIXER, layout.FX):
+            frame[pad_key] = Light(CYAN)
+        frame[layout.CHORD] = Light(BLUE)
+        frame[layout.DEVICE_CLIP] = Light(ORANGE)
+    if state.device_clip:
+        controls.render_device_clip_layer(frame)

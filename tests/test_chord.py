@@ -18,6 +18,7 @@ from BleakLoop.core.model import (
     ShowMessage,
     Snapshot,
 )
+from BleakLoop.core.leds import BLUE, CYAN, GREEN, OFF, ORANGE, RED, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.modes import Mode, State
 
 C_MAJOR = ScaleView(True, 0, (0, 2, 4, 5, 7, 9, 11), "Major")
@@ -367,3 +368,49 @@ def test_pad_note_translates_in_key_pads_only():
     assert chord.pad_note(hold(ENTERED, MAJ), TARGET, 13, 1) == 70
     assert chord.pad_note(replace(ENTERED, shift=True), TARGET, 10, 1) is None
     assert chord.pad_note(ENTERED, TARGET, 3, 8) is None
+
+
+# Lights
+
+
+def test_c_major_at_rest():
+    frame = chord.render(ENTERED, SNAP_IN)
+    row = [frame[(column, 1)].colour for column in range(3, 15)]
+    # C C♯ D E♭ E F F♯ G A♭ A B♭ B: in-key degrees by quality, borrowed ones by theirs.
+    assert row == [
+        ORANGE, ORANGE, BLUE, ORANGE, BLUE, ORANGE, RED, ORANGE, ORANGE, BLUE, ORANGE, RED
+    ]
+    # The piano's bottom pair: C cyan, naturals white, sharps off.
+    assert [frame[(column, 8)].colour for column in range(6, 15)] == [CYAN] + [WHITE] * 6 + [
+        CYAN,
+        WHITE,
+    ]
+    assert frame[(6, 7)].colour == OFF and frame[(8, 7)] == Light(OFF)
+    assert frame[MAJ] == Light(ORANGE) and frame[SEVEN] == Light(WHITE)
+    assert frame[layout.CHORD] == Light(BLUE) and frame[layout.SEQ] == Light(OFF)
+
+
+def test_g7_sounding_from_the_piano():
+    state = hold(ENTERED, MAJ, SEVEN, (10, 8))
+    frame = chord.render(state, SNAP_IN)
+    # G3 B3 D4 F4 on the piano: G is column 10 pad 8, B column 12, D column 7 pad 6, F 9/6.
+    assert frame[(10, 8)].colour == GREEN
+    assert [frame[key].colour for key in ((12, 8), (7, 6), (9, 6))] == [YELLOW] * 3
+    assert frame[(10, 1)].colour == GREEN
+    assert frame[MAJ] == Light(ORANGE, Blink.FAST) and frame[SEVEN] == Light(WHITE, Blink.FAST)
+
+
+def test_shift_layer_lights():
+    frame = chord.render(replace(ENTERED, shift=True), SNAP_IN)
+    assert (frame[MAJ], frame[MIN], frame[SUS4], frame[SEVEN]) == (
+        Light(CYAN),
+        Light(WHITE),
+        Light(OFF),
+        Light(OFF),
+    )
+    assert frame[(6, 8)].colour == CYAN and frame[(6, 7)].colour == WHITE
+
+
+def test_octave_pads_go_dark_at_their_limit():
+    frame = chord.render(replace(ENTERED, chord_octave=1), SNAP_IN)
+    assert frame[layout.CHORD_OCT_UP] == Light(OFF) and frame[layout.CHORD_OCT_DOWN] == Light(WHITE)
