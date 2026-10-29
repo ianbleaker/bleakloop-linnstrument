@@ -414,3 +414,14 @@ def test_shift_layer_lights():
 def test_octave_pads_go_dark_at_their_limit():
     frame = chord.render(replace(ENTERED, chord_octave=1), SNAP_IN)
     assert frame[layout.CHORD_OCT_UP] == Light(OFF) and frame[layout.CHORD_OCT_DOWN] == Light(WHITE)
+
+
+def test_leaving_closes_a_morph_step_before_removing_the_device():
+    _, actions = chord.leave(replace(ENTERED, fx_undo_open=True), SNAP_IN)
+    assert actions.index(EndUndoStep()) < actions.index(RemoveChord(2))
+
+
+def test_a_move_closes_a_morph_step_before_the_device_changes():
+    moved = snap(replace(TARGET, track=5), arms=SNAP_IN.arms)
+    _, actions = chord.sync(replace(ENTERED, fx_undo_open=True), moved)
+    assert actions.index(EndUndoStep()) < actions.index(RemoveChord(2))

@@ -63,21 +63,15 @@ def enter(state, snapshot):
     actions += more
     state, more = arm.take(state, snapshot, view.track)
     actions += more
-    old, pending = state.chord_device_track, state.chord_remove_pending
     state = modes.enter(state, Mode.CHORD)
-    if pending and old == view.track:
+    if state.chord_remove_pending and state.chord_device_track == view.track:
         # Left with a pad held and back on the same track: the device is still there.
         state = replace(state, chord_remove_pending=False)
     else:
-        if pending:
-            actions.append(RemoveChord(old))
-        actions.append(InsertChord(view.track))
-        state = replace(
-            state,
-            chord_device_track=view.track,
-            chord_remove_pending=False,
-            chord_setting=None,
-        )
+        state, more = _remove(state)
+        actions += more
+        state, more = _insert(state, view.track)
+        actions += more
     state, more = _set_device(state, template(state, view))
     message = ShowMessage(f"Chord: {key_of(view).text}")
     return state, actions + more + [EnterMode(Mode.CHORD), message]
@@ -118,7 +112,17 @@ def _remove(state):
     state = replace(
         state, chord_device_track=None, chord_remove_pending=False, chord_setting=None
     )
-    return state, [] if track is None else [RemoveChord(track)]
+    if track is None:
+        return state, []
+    state, actions = fx.close_morph_step(state)
+    return state, actions + [RemoveChord(track)]
+
+
+def _insert(state, track, again=False):
+    # A running morph's undo step closes first, so undoing the morph leaves the device alone.
+    state, actions = fx.close_morph_step(state)
+    state = replace(state, chord_device_track=track, chord_setting=None)
+    return state, actions + [InsertChord(track, again)]
 
 
 def release_hold(state, event):
@@ -144,13 +148,14 @@ def sync(state, snapshot):
         state, actions, moved = arm.follow(state, snapshot, view, NEEDS_MIDI)
         if moved:
             state, more = _remove(state)
-            actions += more + [InsertChord(state.arm_track)]
-            state = replace(state, chord_device_track=state.arm_track)
+            actions += more
+            state, more = _insert(state, state.arm_track)
+            actions += more
         elif view.track is not None and view.track == state.chord_device_track:
             if not view.device_present:
                 # Undo took the insert back.
-                actions.append(InsertChord(view.track, again=True))
-                state = replace(state, chord_setting=None)
+                state, more = _insert(state, view.track, again=True)
+                actions += more
     if state.mode is Mode.LINNSTRUMENT:
         # The player plays the track: its notes pass through unchanged.
         state, more = _set_device(state, REST)
