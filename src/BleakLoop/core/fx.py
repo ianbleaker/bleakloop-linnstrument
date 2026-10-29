@@ -80,6 +80,13 @@ def parse_scenes(text):
         return ()
 
 
+def close_morph_step(state):
+    # Before any write to the Set: a morph's undo step closes first; the morph carries on.
+    if not state.fx_undo_open:
+        return state, []
+    return replace(state, fx_undo_open=False), [EndUndoStep()]
+
+
 def scene_snapshot(state, scene):
     return state.fx_scenes[scene] if scene < len(state.fx_scenes) else None
 

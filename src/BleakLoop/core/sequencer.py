@@ -194,18 +194,11 @@ def _close_slide(state):
     return replace(state, seq_undo_open=False), [EndUndoStep()]
 
 
-def _close_morph_step(state):
-    # Before any write to the Set: a morph's undo step closes first; the morph carries on.
-    if not state.fx_undo_open:
-        return state, []
-    return replace(state, fx_undo_open=False), [EndUndoStep()]
-
-
 def _write(state, writes):
     # Edits and loop changes: dropped while a slide's undo step is open.
     if state.seq_undo_open or not writes:
         return state, []
-    state, actions = _close_morph_step(state)
+    state, actions = fx.close_morph_step(state)
     return state, actions + list(writes)
 
 
@@ -339,7 +332,7 @@ def x_axis(state, event):
         if hold.used or not hold.notes or abs(columns) < values.SLIDE_START:
             return state, [], False
         if not state.seq_undo_open:
-            state, actions = _close_morph_step(state)
+            state, actions = fx.close_morph_step(state)
             actions.append(BeginUndoStep())
             state = replace(state, seq_undo_open=True)
         sliding = replace(hold, used=True, sliding=True)
