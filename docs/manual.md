@@ -595,5 +595,5 @@ The LinnStrument is your instrument again. Column 1 keeps the controls it has in
 - **Scenes:** yellow and blinking with the beat while a held Bars pad holds their launch back to its bar line; lime and blinking fast once launched, until they start at the next quantization boundary; lime while all their clips play; magenta while some of their clips play; white if they hold clips.
 <!-- /lights:scenes -->
 - **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, and the playhead is white. A note pad lights yellow while its note plays, and the selected note blinks green.
-- **Chord Mode** colours each degree by its chord: orange major, blue minor, pink suspended, red diminished, magenta augmented. While a chord sounds, its degree and root are green, and its other notes on the piano yellow.
+- **Chord Mode** colours each degree by its chord: orange major, blue minor, red diminished, magenta augmented. While a chord sounds, its degree and root are green, and its other notes on the piano yellow.
 - On the LinnStrument, lime looks yellow and green looks lime.

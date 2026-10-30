@@ -214,7 +214,14 @@ def write_chord(song, action, used, final):
                 for pitch in pitches
             )
         )
-    return (root.note_id, *(added or ()))
+    added = tuple(added or ())
+    logger.info(
+        "CHORD: wrote %d notes, root %.3f beats from the press, quantization %d",
+        len(added),
+        distance(root.start_time, action.press_position),
+        quantization,
+    )
+    return (root.note_id, *added)
 
 
 def _set_chord_device(device, shifts, scale_aware):
