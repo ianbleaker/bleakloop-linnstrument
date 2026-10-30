@@ -138,6 +138,8 @@ class BleakLoop(ControlSurface):
         self._selected_device = None  # the selected track's selected device, last tick
         self._seq_view = SequencerView()  # Sequencer Mode's last read target
         self._chord_view = ChordView()  # Chord Mode's last read target
+        self._chord_writes = []  # [WriteChord, deadline in ms] waiting for the recorded root
+        self._chord_notes = set()  # (track, scene, note id) a chord write matched or wrote
         self._seq_notes = None  # the note count last logged
         self._longest_seq_tick_ms = 0.0
         self._translated = {}  # (row, column) -> the audition note a note pad is translated to
@@ -163,6 +165,7 @@ class BleakLoop(ControlSurface):
         super().update_display()
         if self._started:
             self._check_pending_clip()
+            self._write_chords()
             self._load_fx()
             self._load_fx_scenes()
             self._follow_scenes()
@@ -767,6 +770,30 @@ class BleakLoop(ControlSurface):
         # Polled on the display tick: Live refuses changes made inside a listener callback.
         self._pending_clip = slot
         self._pending_fresh = True
+
+    def write_chord_when_ready(self, action):
+        # Polled on the display tick: Live adds the recorded root a moment after the release,
+        # and refuses changes made inside a listener callback.
+        deadline = time.monotonic() * 1000 + values.CHORD_WRITE_RETRY_MS
+        self._chord_writes.append([action, deadline])
+
+    def _write_chords(self):
+        now_ms = time.monotonic() * 1000
+        waiting = []
+        for action, deadline in self._chord_writes:
+            try:
+                done = live_actions.write_chord(
+                    self.song, action, self._chord_notes, now_ms >= deadline
+                )
+            except Exception:
+                # The clip's track or scene was deleted.
+                logger.exception("CHORD: writing the chord failed")
+                done = ()
+            if done is None:
+                waiting.append([action, deadline])
+            else:
+                self._chord_notes.update((action.track, action.scene, i) for i in done)
+        self._chord_writes = waiting
 
     def _check_pending_clip(self):
         slot = self._pending_clip

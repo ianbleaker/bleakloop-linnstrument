@@ -48,3 +48,8 @@ VELOCITY_PER_COLUMN = 16
 NUDGE_PER_COLUMN = 0.125  # of a step
 CHORD_OCTAVES = range(-2, 2)  # Chord Mode's Oct + and Oct - range, 0 the default
 CHORD_DEVICE_NAME = "BleakLoop Chord"  # BleakLoop's own Chord device, found again by name
+CHORD_WRITE_RETRY_MS = 1000  # how long a chord's write-back waits for Live's recorded root
+# How far, in beats, the recorded root's start may be from the press: one step of Live's
+# MIDI record quantization, by int(song.midi_recording_quantization) (off, 1/4, 1/8, 1/8T,
+# 1/8 + 1/8T, 1/16, 1/16T, 1/16 + 1/16T, 1/32), and 0.1 beats when off.
+CHORD_ROOT_WINDOWS = (0.1, 1.0, 0.5, 1 / 3, 0.5, 0.25, 1 / 6, 0.25, 0.125)

@@ -17,6 +17,7 @@ from BleakLoop.core.model import (
     SetMixer,
     ShowMessage,
     Snapshot,
+    WriteChord,
 )
 from BleakLoop.core.leds import BLUE, CYAN, GREEN, OFF, ORANGE, RED, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.modes import Mode, State
@@ -116,7 +117,7 @@ def test_leaving_for_fx():
     assert actions[-1] == ShowMessage("FX Mode ON")
 
 
-HELD = replace(ENTERED, chord_holds=((6, 8, (60, 64, 67)),))
+HELD = replace(ENTERED, chord_holds=((6, 8, (60, 64, 67), None),))
 
 
 def test_leaving_with_a_pad_held_defers_the_removal():
@@ -280,7 +281,7 @@ def test_lead_is_inert():
 
 def test_a_degree_press_plays_and_says_its_chord():
     state, actions = handle(ENTERED, (10, 1))  # G, V
-    assert state.chord_holds == ((10, 1, (67, 71, 74)),)
+    assert state.chord_holds == ((10, 1, (67, 71, 74), None),)
     assert actions == [ShowMessage("G · V in C major · G B D")]
 
 
@@ -368,6 +369,52 @@ def test_pad_note_translates_in_key_pads_only():
     assert chord.pad_note(hold(ENTERED, MAJ), TARGET, 13, 1) == 70
     assert chord.pad_note(replace(ENTERED, shift=True), TARGET, 10, 1) is None
     assert chord.pad_note(ENTERED, TARGET, 3, 8) is None
+
+
+# Recording
+
+# Session-recording into scene 1, the playhead at beat 3.5.
+RECORDING = snap(
+    replace(TARGET, recording=True, scene=1, position=3.5), arms=SNAP_IN.arms
+)
+
+
+def test_a_recorded_press_writes_its_chord_at_the_release():
+    state, _ = handle(ENTERED, (10, 1), RECORDING)  # G, V
+    assert state.chord_holds == ((10, 1, (67, 71, 74), (2, 1, 67, 3.5)),)
+    state, actions = handle(state, (10, 1), RECORDING, pressed=False)
+    assert state.chord_holds == ()
+    assert actions == [WriteChord(2, 1, 67, 3.5, (67, 71, 74))]
+
+
+def test_a_press_while_not_recording_writes_nothing():
+    state = hold(ENTERED, (10, 1))
+    assert handle(state, (10, 1), pressed=False)[1] == []
+
+
+def test_a_recorded_press_released_after_leaving_still_writes():
+    state, _ = handle(ENTERED, (10, 1), RECORDING)
+    state, _ = chord.leave(state, SNAP_IN)
+    _, actions = engine.handle(state, press((10, 1), False), SNAP_IN)
+    assert actions == [WriteChord(2, 1, 67, 3.5, (67, 71, 74))]
+
+
+def test_a_write_closes_a_morph_step_first():
+    state, _ = handle(replace(ENTERED, fx_undo_open=True), (10, 1), RECORDING)
+    _, actions = handle(state, (10, 1), RECORDING, pressed=False)
+    assert actions == [EndUndoStep(), WriteChord(2, 1, 67, 3.5, (67, 71, 74))]
+
+
+def test_arrangement_recording_says_once_per_take_that_it_writes_only_the_root():
+    arranging = snap(replace(TARGET, arrangement=True), arms=SNAP_IN.arms)
+    state, actions = handle(ENTERED, (10, 1), arranging)
+    assert actions[-1] == ShowMessage(chord.SESSION_ONLY)
+    state, _ = handle(state, (10, 1), arranging, pressed=False)
+    state, actions = handle(state, (10, 1), arranging)
+    assert ShowMessage(chord.SESSION_ONLY) not in actions
+    state, _ = handle(state, (10, 1), arranging, pressed=False)
+    state, _ = chord.sync(state, SNAP_IN)  # the take ended
+    assert handle(state, (10, 1), arranging)[1][-1] == ShowMessage(chord.SESSION_ONLY)
 
 
 # Lights

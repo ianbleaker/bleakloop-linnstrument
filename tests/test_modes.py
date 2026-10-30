@@ -133,7 +133,7 @@ def test_entry_resets_chord_holds_and_keeps_its_settings(target):
         arm_track=1,
         chord_qualities=("min",),
         chord_extensions=frozenset({"7"}),
-        chord_holds=((6, 8, (60, 64, 67)),),
+        chord_holds=((6, 8, (60, 64, 67), None),),
         chord_inv=1,
         chord_spread=2,
         chord_bass=True,

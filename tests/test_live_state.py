@@ -620,12 +620,39 @@ def test_read_chord_on_master():
     assert view.track is None and view.scale.name == "Minor"
 
 
+def take_clip(recording=True, overdubbing=False):
+    return SimpleNamespace(
+        is_recording=recording, is_overdubbing=overdubbing, playing_position=2.5
+    )
+
+
 @pytest.mark.parametrize("highlighted, playing", [(1, -1), (None, 1)])
 def test_read_chord_reads_a_recording_slot(highlighted, playing):
-    keys = seq_track("Keys", playing=playing)
+    keys = seq_track("Keys", playing=playing, clips={1: take_clip()})
     keys.clip_slots[1].is_recording = True
     slot = keys.clip_slots[highlighted] if highlighted is not None else None
-    assert live_state.read_chord(chord_song([keys], selected=keys, highlighted=slot)).recording
+    view = live_state.read_chord(chord_song([keys], selected=keys, highlighted=slot))
+    assert (view.recording, view.scene, view.position, view.arrangement) == (True, 1, 2.5, False)
+
+
+def test_read_chord_reads_an_overdub():
+    clip = take_clip(recording=False, overdubbing=True)
+    keys = seq_track("Keys", playing=2, clips={2: clip})
+    view = live_state.read_chord(chord_song([keys], selected=keys))
+    assert (view.recording, view.scene) == (True, 2)
+
+
+def test_read_chord_ignores_a_clip_playing_without_recording():
+    keys = seq_track("Keys", playing=2, clips={2: take_clip(recording=False)})
+    view = live_state.read_chord(chord_song([keys], selected=keys))
+    assert (view.recording, view.scene) == (False, None)
+
+
+def test_read_chord_reads_arrangement_recording():
+    keys = seq_track("Keys")
+    song = chord_song([keys], selected=keys)
+    song.record_mode = True
+    assert live_state.read_chord(song).arrangement
 
 
 def test_read_reads_the_chord_view_and_arms_only_when_asked():

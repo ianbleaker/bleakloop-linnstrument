@@ -120,9 +120,16 @@ def chord_device(track):
     return None
 
 
+def _recording(slot):
+    # A new take, or an overdub on a playing clip.
+    if slot.is_recording:
+        return True
+    return slot.has_clip and (slot.clip.is_recording or slot.clip.is_overdubbing)
+
+
 def read_chord(song):
     # Chord Mode's target: Live's selected track, the Set's scale, BleakLoop's device on the
-    # track, and whether its highlighted or playing slot is recording.
+    # track, and its highlighted or playing slot when that's recording.
     scale = ScaleView(
         song.scale_mode, song.root_note, tuple(song.scale_intervals), song.scale_name
     )
@@ -134,17 +141,23 @@ def read_chord(song):
     slots = list(track.clip_slots)
     highlighted = song.view.highlighted_clip_slot
     playing = track.playing_slot_index
-    recording = any(
-        slot.is_recording
-        for slot in slots
-        if slot == highlighted or (0 <= playing and slot == slots[playing])
-    )
+    candidates = [highlighted] if highlighted in slots else []
+    if 0 <= playing < len(slots):
+        candidates.append(slots[playing])
+    recording = next((slot for slot in candidates if _recording(slot)), None)
+    scene, position = None, 0.0
+    if recording is not None:
+        scene = slots.index(recording)
+        position = recording.clip.playing_position if recording.has_clip else 0.0
     return ChordView(
         track=index,
         is_midi=midi,
         scale=scale,
         device_present=midi and chord_device(track) is not None,
-        recording=recording,
+        recording=recording is not None,
+        scene=scene,
+        position=position,
+        arrangement=song.record_mode and recording is None,
     )
 
 

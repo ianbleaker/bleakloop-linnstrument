@@ -104,6 +104,9 @@ class ChordView:
     scale: ScaleView = ScaleView()
     device_present: bool = False  # BleakLoop's Chord device is on the track
     recording: bool = False  # the track's highlighted or playing slot is recording
+    scene: int | None = None  # the recording slot's scene
+    position: float = 0.0  # the recording clip's playing position, in beats
+    arrangement: bool = False  # Arrangement Record is on and no Session slot is recording
 
 
 @dataclass(frozen=True)
@@ -620,6 +623,17 @@ class SetChordDevice:
     track: int
     shifts: tuple  # six shifts, unused ones 0
     scale_aware: bool  # scale-degree shifts, with Use Current Scale on
+
+
+@dataclass(frozen=True)
+class WriteChord:
+    # The chord's other notes, written into the recording Session clip next to the root Live
+    # recorded from the press: Live records a MIDI effect's input, not its output.
+    track: int
+    scene: int
+    root: int
+    press_position: float  # the clip's playing position at the press, in beats
+    pitches: tuple  # the whole chord, root included
 
 
 @dataclass(frozen=True)

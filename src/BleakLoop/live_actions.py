@@ -75,6 +75,7 @@ from .core.model import (
     UnmuteAll,
     UnarmAll,
     UnsoloAll,
+    WriteChord,
 )
 
 logger = logging.getLogger(__name__)
@@ -160,6 +161,60 @@ def _insert_chord(song, action):
         track.devices[0].name = values.CHORD_DEVICE_NAME
         if action.again:
             logger.info("CHORD: re-inserted")
+
+
+def write_chord(song, action, used, final):
+    # Polled on the display tick until it returns the note ids it matched and wrote, which a
+    # later write mustn't match again; None while it waits. It waits for Live's recorded root,
+    # and for the playhead to pass the root's end: notes added before then play for a moment.
+    # The final try writes what it can, or logs.
+    slot = _set_slot(song, action.track, action.scene)
+    if slot is None or not slot.has_clip:
+        logger.info("CHORD: skipped WriteChord, no clip at %d/%d", action.track, action.scene)
+        return ()
+    clip = slot.clip
+    length = clip.loop_end - clip.loop_start
+
+    def distance(a, b):
+        # Around the loop: a root snapped to the loop end lands at its start.
+        d = abs(a - b) % length if length > 0 else abs(a - b)
+        return min(d, length - d) if length > 0 else d
+
+    windows = values.CHORD_ROOT_WINDOWS
+    quantization = int(song.midi_recording_quantization)
+    window = windows[quantization] if 0 <= quantization < len(windows) else windows[0]
+    notes = clip.get_notes_extended(action.root, 1, 0.0, max(clip.loop_end, clip.end_marker))
+    found = [
+        note
+        for note in notes
+        if (action.track, action.scene, note.note_id) not in used
+        and distance(note.start_time, action.press_position) <= window
+    ]
+    if not found:
+        if final:
+            logger.info("CHORD: recorded root not found")
+            return ()
+        return None
+    root = min(found, key=lambda note: distance(note.start_time, action.press_position))
+    elapsed = clip.playing_position - root.start_time
+    if length > 0 and elapsed < -length / 2:
+        elapsed += length  # the playhead wrapped round the loop
+    if not final and elapsed < root.duration:
+        return None
+    pitches = sorted({p for p in action.pitches if p != action.root and 0 <= p <= 127})
+    with _undo_step(song):
+        added = clip.add_new_notes(
+            tuple(
+                Live.Clip.MidiNoteSpecification(
+                    pitch=pitch,
+                    start_time=root.start_time,
+                    duration=root.duration,
+                    velocity=root.velocity,
+                )
+                for pitch in pitches
+            )
+        )
+    return (root.note_id, *(added or ()))
 
 
 def _set_chord_device(device, shifts, scale_aware):
@@ -510,6 +565,8 @@ def apply(action, song, surface):
             logger.info("CHORD: skipped SetChordDevice, no device on %d", action.track)
         else:
             _set_chord_device(device, action.shifts, action.scale_aware)
+    elif isinstance(action, WriteChord):
+        surface.write_chord_when_ready(action)
     elif isinstance(action, SetScale):
         if action.root is not None:
             song.root_note = action.root

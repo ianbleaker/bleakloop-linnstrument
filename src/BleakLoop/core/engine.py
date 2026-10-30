@@ -31,9 +31,9 @@ def handle(state, event, snapshot):
         and not event.pressed
     ):
         # A chord pad pressed in Chord Mode and released after leaving it.
-        state, released = chord.release_hold(state, event)
-        if released:
-            return state, []
+        state, actions = chord.release_hold(state, event)
+        if actions is not None:
+            return state, actions
     if state.mode is Mode.SESSION:
         return session.handle(state, event, snapshot)
     if state.mode is Mode.SEQUENCER:

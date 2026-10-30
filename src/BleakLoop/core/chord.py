@@ -18,10 +18,12 @@ from .model import (
     SetChordDevice,
     SetScale,
     ShowMessage,
+    WriteChord,
 )
 from .modes import Mode
 
 NEEDS_MIDI = "Chord needs a MIDI track"
+SESSION_ONLY = "Chord notes are written in Session clips only"
 MAJ, MIN = (next(k for k, q in layout.CHORD_QUALITIES.items() if q == name) for name in ("maj", "min"))
 REST = ((0,) * harmony.SHIFTS, False)  # every shift off: notes pass through unchanged
 
@@ -127,11 +129,20 @@ def _insert(state, track, again=False):
 
 def release_hold(state, event):
     # A held chord pad's release, in any mode: the press it ends may be from Chord Mode.
+    # Returns (state, actions), with actions None when the pad wasn't a held chord pad. A
+    # recorded press writes the chord's other notes next to the root Live recorded.
     key = (event.column, event.pad)
-    holds = tuple(h for h in state.chord_holds if h[:2] != key)
-    if holds == state.chord_holds:
-        return state, False
-    return replace(state, chord_holds=holds), True
+    ended = [h for h in state.chord_holds if h[:2] == key]
+    if not ended:
+        return state, None
+    state = replace(state, chord_holds=tuple(h for h in state.chord_holds if h[:2] != key))
+    actions = []
+    for _, _, pitches, take in ended:
+        if take is not None:
+            # A running morph's undo step closes first, as before any other clip edit.
+            state, more = fx.close_morph_step(state)
+            actions += more + [WriteChord(*take, pitches)]
+    return state, actions
 
 
 def sync(state, snapshot):
@@ -142,6 +153,9 @@ def sync(state, snapshot):
             return _remove(state)
         return state, []
     view = snapshot.chord or ChordView()
+    if state.chord_told_arrangement and not view.arrangement:
+        # The Arrangement take ended: the next one is told again.
+        state = replace(state, chord_told_arrangement=False)
     actions = []
     if not state.chord_holds:
         # A held pad's chord ends on the device that started it: the move waits for it.
@@ -212,9 +226,10 @@ def handle(state, event, snapshot):
         return state, []
     view = snapshot.chord or ChordView()
     key = (event.column, event.pad)
-    if not event.pressed and any(h[:2] == key for h in state.chord_holds):
-        state, _ = release_hold(state, event)
-        return state, []
+    if not event.pressed:
+        state, actions = release_hold(state, event)
+        if actions is not None:
+            return state, actions
     if key == layout.SHIFT:
         return column_1.handle(state, event, snapshot)
     if event.column == layout.NAV_COLUMN:
@@ -306,9 +321,17 @@ def _chord_press(state, event, view):
     if played is None:
         return state, [ShowMessage(harmony.hint(key, (root - key.root) % 12))]
     voicing = harmony.voice(played, state.chord_inv, state.chord_spread, state.chord_bass)
-    hold = (event.column, event.pad, harmony.pitches(key, played, voicing))
+    take = None
+    if view.recording and view.scene is not None:
+        take = (view.track, view.scene, root, view.position)
+    hold = (event.column, event.pad, harmony.pitches(key, played, voicing), take)
     state = replace(state, chord_holds=state.chord_holds + (hold,))
-    return state, [ShowMessage(harmony.describe(key, played, voicing))]
+    actions = [ShowMessage(harmony.describe(key, played, voicing))]
+    if view.arrangement and not state.chord_told_arrangement:
+        # Once per take: Live records only the root there.
+        state = replace(state, chord_told_arrangement=True)
+        actions.append(ShowMessage(SESSION_ONLY))
+    return state, actions
 
 
 def _nav(state, event, snapshot):
@@ -345,7 +368,7 @@ def render(state, snapshot):
     frame.update(column_1.render(state, snapshot))
     sounding = set()  # MIDI notes of every held chord
     roots = set()
-    for column, pad, pitches in state.chord_holds:
+    for column, pad, pitches, _ in state.chord_holds:
         sounding |= set(pitches)
         roots.add(root_note(state, view, column, pad))
     _render_modifiers(frame, state, view)

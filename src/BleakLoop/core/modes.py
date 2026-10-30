@@ -220,10 +220,13 @@ class State:
     chord_spread: int = 0  # Spread's, an index into harmony.SPREADS
     chord_bass: bool = False
     chord_octave: int = 0  # in values.CHORD_OCTAVES, kept across entries
-    chord_holds: tuple = ()  # (column, pad, pitches) per sounding chord pad
+    # (column, pad, pitches, take) per sounding chord pad. take: (track, scene, root, clip
+    # position) when its press was recorded into a Session clip, else None.
+    chord_holds: tuple = ()
     chord_device_track: int | None = None  # the song.tracks index of BleakLoop's Chord device
     chord_remove_pending: bool = False  # the device goes once no chord pad is held
     chord_setting: tuple | None = None  # the last SetChordDevice's (track, shifts, scale_aware)
+    chord_told_arrangement: bool = False  # this Arrangement take's message is shown
 
 
 def enter(state, mode):

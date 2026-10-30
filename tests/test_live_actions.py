@@ -1,4 +1,5 @@
 import sys
+from dataclasses import replace
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -42,6 +43,7 @@ from BleakLoop.core.model import (  # noqa: E402
     UnarmAll,
     UnmuteAll,
     UnsoloAll,
+    WriteChord,
 )
 
 
@@ -751,3 +753,107 @@ def test_set_scale_sets_only_what_is_given():
     assert (song.root_note, song.scale_name, song.scale_mode) == (7, "Major", False)
     apply(SetScale(name="Minor", mode_on=True), song)
     assert (song.root_note, song.scale_name, song.scale_mode) == (7, "Minor", True)
+
+
+class ChordClip(FakeClip):
+    # A recording clip: notes from get_notes_extended, and ids from add_new_notes.
+    def __init__(self, notes, position, loop_end=4.0):
+        super().__init__(loop_end=loop_end, end_marker=loop_end, notes=notes)
+        self.playing_position = position
+
+    def get_notes_extended(self, pitch, span, start, length):
+        return [n for n in self.notes if pitch <= n.pitch < pitch + span]
+
+    def add_new_notes(self, specs):
+        super().add_new_notes(specs)
+        return [100 + i for i in range(len(specs))]
+
+
+def recorded(note_id, start, duration=0.5, pitch=67, velocity=90):
+    return SimpleNamespace(
+        note_id=note_id, pitch=pitch, start_time=start, duration=duration, velocity=velocity
+    )
+
+
+def write_song(clip, quantization=0):
+    song = seq_song(clip)
+    song.midi_recording_quantization = quantization
+    return song
+
+
+G_TAKE = WriteChord(1, 1, 67, 1.0, (67, 71, 74))
+
+
+def write(song, used=(), final=False, action=G_TAKE):
+    return live_actions.write_chord(song, action, set(used), final)
+
+
+def test_write_chord_adds_the_other_notes_on_the_recorded_root(note_specs):
+    clip = ChordClip([recorded(7, 1.01)], position=1.6)
+    song = write_song(clip)
+    assert write(song) == (7, 100, 101)
+    spec = {"start_time": 1.01, "duration": 0.5, "velocity": 90}
+    assert clip.calls == [("add", ({"pitch": 71, **spec}, {"pitch": 74, **spec}))]
+    assert song.undo == ["begin", "end"]
+
+
+def test_write_chord_waits_for_the_playhead_to_pass_the_root(note_specs):
+    clip = ChordClip([recorded(7, 1.0)], position=1.3)
+    song = write_song(clip)
+    assert write(song) is None and clip.calls == []
+    assert write(song, final=True) == (7, 100, 101)
+
+
+def test_write_chord_waits_for_a_late_root(note_specs):
+    clip = ChordClip([], position=1.6)
+    song = write_song(clip)
+    assert write(song) is None
+    clip.notes.append(recorded(7, 1.0))
+    assert write(song) == (7, 100, 101)
+
+
+def test_write_chord_gives_up_on_a_root_never_found(note_specs, caplog):
+    # Off the grid: 0.25 beats away with record quantization off.
+    song = write_song(ChordClip([recorded(7, 1.25)], position=2.0))
+    assert write(song) is None
+    with caplog.at_level("INFO"):
+        assert write(song, final=True) == ()
+    assert "CHORD: recorded root not found" in caplog.text
+
+
+def test_write_chord_matches_within_one_record_quantization_step(note_specs):
+    # At 1/16 the root snaps to 1.25, after the press.
+    song = write_song(ChordClip([recorded(7, 1.25)], position=2.0), quantization=5)
+    assert write(song) == (7, 100, 101)
+
+
+def test_write_chord_skips_a_root_an_earlier_write_used(note_specs):
+    song = write_song(ChordClip([recorded(7, 1.0), recorded(8, 1.05)], position=2.0))
+    assert write(song, used={(1, 1, 7)}) == (8, 100, 101)
+
+
+def test_write_chord_over_a_loop_wrap(note_specs):
+    # Pressed at 3.5 in a 4-beat loop and released after the wrap, at 0.1.
+    clip = ChordClip([recorded(7, 3.5, duration=0.4)], position=0.1)
+    action = replace(G_TAKE, press_position=3.5)
+    assert write(write_song(clip), action=action) == (7, 100, 101)
+
+
+def test_write_chord_matches_a_root_snapped_round_the_loop(note_specs):
+    # Pressed just before the loop end at 1/16: Live snaps the root to the loop start.
+    clip = ChordClip([recorded(7, 0.0, duration=0.2)], position=0.5)
+    action = replace(G_TAKE, press_position=3.95)
+    assert write(write_song(clip, quantization=5), action=action) == (7, 100, 101)
+
+
+def test_write_chord_skips_a_missing_clip(caplog):
+    with caplog.at_level("INFO"):
+        assert write(write_song(None)) == ()
+    assert "skipped WriteChord" in caplog.text
+
+
+def test_write_chord_action_waits_on_the_surface():
+    queued = []
+    surface = SimpleNamespace(write_chord_when_ready=queued.append)
+    live_actions.apply(G_TAKE, SimpleNamespace(), surface)
+    assert queued == [G_TAKE]
