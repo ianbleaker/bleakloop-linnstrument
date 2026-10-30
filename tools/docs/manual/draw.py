@@ -43,6 +43,8 @@ TITLES = {
     Layer.SEQUENCER_SETTINGS: "Sequencer Mode, settings",
     Layer.SEQUENCER_SHIFT: "Sequencer Mode with Shift held",
     Layer.SEQUENCER_DRUMS: "Sequencer Mode on a Drum Rack",
+    Layer.CHORD: "Chord Mode",
+    Layer.CHORD_SHIFT: "Chord Mode with Shift held",
 }
 
 CAPTION = 20

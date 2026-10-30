@@ -4,9 +4,11 @@ import enum
 from dataclasses import replace
 
 from BleakLoop.core.model import (
+    ChordView,
     DrumView,
     FaderView,
     NoteView,
+    ScaleView,
     SelectedTrack,
     SequencerView,
     SlotView,
@@ -30,6 +32,8 @@ class Layer(enum.Enum):
     SEQUENCER_SETTINGS = "sequencer-settings"
     SEQUENCER_SHIFT = "sequencer-shift"
     SEQUENCER_DRUMS = "sequencer-drums"
+    CHORD = "chord"
+    CHORD_SHIFT = "chord-shift"
 
     @property
     def slug(self):
@@ -166,6 +170,26 @@ SEQ_DRUM_SNAPSHOT = replace(
     ),
 )
 
+# Chord Mode on Lead in C major, with Maj and 7 held and G7 sounding from the piano's G
+# (column 10, pad 8): G green, and B, D and F yellow.
+CHORD_SNAPSHOT = replace(
+    SNAPSHOT,
+    chord=ChordView(
+        track=3,
+        is_midi=True,
+        scale=ScaleView(True, 0, (0, 2, 4, 5, 7, 9, 11), "Major"),
+        device_present=True,
+    ),
+)
+CHORD_STATE = State(
+    mode=Mode.CHORD,
+    arm_track=3,
+    chord_device_track=3,
+    chord_qualities=("maj",),
+    chord_extensions=frozenset({"7"}),
+    chord_holds=((10, 8, (55, 59, 62, 65), None),),
+)
+
 # Linnstrument Mode's column 1, for its own column figure: the rest is the instrument.
 LINNSTRUMENT = (State(mode=Mode.LINNSTRUMENT), SNAPSHOT)
 LINNSTRUMENT_SHIFT = (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT)
@@ -203,4 +227,9 @@ SCENES = {
     Layer.SEQUENCER_SETTINGS: (replace(SEQUENCER, seq_settings=True), SEQ_SNAPSHOT),
     Layer.SEQUENCER_SHIFT: (replace(SEQUENCER, shift=True), SEQ_SNAPSHOT),
     Layer.SEQUENCER_DRUMS: (SEQUENCER, SEQ_DRUM_SNAPSHOT),
+    Layer.CHORD: (CHORD_STATE, CHORD_SNAPSHOT),
+    Layer.CHORD_SHIFT: (
+        replace(CHORD_STATE, shift=True, chord_qualities=(), chord_extensions=frozenset(), chord_holds=()),
+        CHORD_SNAPSHOT,
+    ),
 }

@@ -21,6 +21,7 @@ While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1 
 - **Mixer Mode** gives each track a volume fader. Its split view adds eight faders or the FX snapshots, as Session Mode's does.
 - **FX Mode** has eight faders for a device or for parameters you bind, and snapshots of every rack's macros that recall at once or morph.
 - **Sequencer Mode** is a 64-step sequencer on a MIDI clip, with note pads.
+- **Chord Mode** plays chords on a MIDI track: hold a quality and extensions with one hand, and press a degree or a piano key with the other. Each chord's name and role in the key show in the status bar.
 - **Linnstrument Mode** gives the LinnStrument back to you as an instrument, its panel buttons in column 0 included. Only the Global column stays.
 
 How to read the surface:
@@ -39,7 +40,7 @@ How to read the surface:
 
 <img src="manual/columns-global.svg" alt="Global column" align="right">
 
-Column 1 holds the transport, recording, Undo and Shift, the same in every mode. In Linnstrument and Sequencer Mode, Record, Capture and Shift + Play act on the selected track.
+Column 1 holds the transport, recording, Undo and Shift, the same in every mode. In Linnstrument, Sequencer and Chord Mode, Record, Capture and Shift + Play act on the selected track.
 
 <!-- callouts:global -->
 - **Play**: Start/stop. Blinks on the beat while playing.
@@ -65,7 +66,7 @@ With **Shift** held:
 
 <img src="manual/columns-view.svg" alt="View column" align="right">
 
-Column 15, next to the grid, holds the window's scenes, Unmute all and Stop, in Session, Mixer and FX Mode. Sequencer Mode has its own.
+Column 15, next to the grid, holds the window's scenes, Unmute all and Stop, in Session, Mixer and FX Mode. Sequencer and Chord Mode have their own.
 
 <!-- callouts:view -->
 - **Scenes**: Launch a scene. Its FX snapshot, if it has one, lands as it starts.
@@ -268,10 +269,37 @@ With **Shift** held:
 - **Pages**: Pages 1–16 of 64 steps: 1–8 in column 12, 9–16 in column 13. Press one to show it, or hold one and press another to loop both.
 <!-- /callouts:sequencer-settings -->
 
+### Chord Mode
+
+- Press Chord (column 16, pad 4) in Session, Mixer or FX Mode to play chords on the selected MIDI track. Chord or Session goes back to Session Mode, and Mixer or FX to that mode.
+- Hold a quality and any extensions first, then press a degree pad or a piano key. A chord takes what's held when you press its key.
+- The key is Live's own scale. With Shift held, the piano sets its root, and Maj or Min its scale.
+- The Global column works as in Sequencer Mode, and pad 7 switches to Linnstrument Mode keeping the track, with Back returning here.
+
+![Chord Mode](manual/chord.svg)
+
+![Chord Mode with Shift held](manual/chord-shift.svg)
+
+<!-- callouts:chord -->
+- **Degrees**: Play the chord on each semitone of the key, from its root on the left, in the colour of its quality: orange major, blue minor, red diminished. With nothing held, an in-key degree plays its chord in the key, and the others need a quality held.
+- **Qualities**: Hold for major, minor, sus4, sus2, diminished or augmented chords, on any degree or piano key. With two held, the last pressed counts.
+- **Extensions**: Hold to add a 7th, major 7th, 9th, 6th, 11th or 13th. They stack.
+- **Inv**: Step the inversion: root, 1st, 2nd, then 3rd on 4-note chords.
+- **Spread**: Step the spread: close, open, wide.
+- **Bass**: Bass on/off: the root an octave below the chord. Cyan while on.
+- **Piano**: Three octaves of keys, lowest at the near pair of rows. Play a key for the chord built on it: the key's root is cyan, other in-key notes white. While a chord sounds, its root is green and its other notes yellow.
+- **Oct +/−**: Move the degree row and the piano an octave up or down.
+
+With **Shift** held:
+
+- **Scale**: Set Live's scale to Major or Minor, and turn Scale Mode on. The current one is cyan.
+- **Key**: Set the key's root to the key you press.
+<!-- /callouts:chord -->
+
 ### Linnstrument Mode
 
 - Columns 2–16 and the panel buttons are your instrument again. Column 1 keeps its controls, always opening on the controls page.
-- Back (pad 7) returns to the mode you came from: Session, Mixer, FX or Sequencer.
+- Back (pad 7) returns to the mode you came from: Session, Mixer, FX, Sequencer or Chord.
 - Shift + Record is Session Record, and Shift + Back opens the scene page.
 - Changing a setting on the panel can save BleakLoop's control split as your own: read the warning under Using BleakLoop first.
 
@@ -286,7 +314,7 @@ Only the Global column stays: on its controls page, with Shift held, and on the 
 - **Metronome**: Metronome on/off. Blinks while on.
 - **Fixed Length**: Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, then off.
 - **Undo**: Undo.
-- **Back**: Back to the mode you came from: Session, Mixer, FX or Sequencer.
+- **Back**: Back to the mode you came from: Session, Mixer, FX, Sequencer or Chord.
 - **Shift**: Hold for the Shift layer.
 
 With **Shift** held:
@@ -314,13 +342,13 @@ On the scene page:
 
 **Session, Mixer and FX** (column 16, pads 1–3) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it. In FX Mode, FX goes back to Session Mode. In Session Mode, Session toggles the split view, and in Mixer Mode, Mixer toggles Mixer's; each is pink while its split view is on.
 
-Pad 4 of column 16 is dark and does nothing: it's kept for a Chord mode still to come. Pad 5 is **Seq**, which opens Sequencer Mode, pads 6 and 7 are **Delete** and **Copy**, and pad 8 is **Device/Clip**.
+Pad 4 of column 16 is **Chord**, which opens Chord Mode. Pad 5 is **Seq**, which opens Sequencer Mode, pads 6 and 7 are **Delete** and **Copy**, and pad 8 is **Device/Clip**.
 
 **Device/Clip** (column 16, pad 8, orange):
 
 - A tap flips Live's Detail view: to Clip view if it shows anything else or is hidden, and to Device view if it shows Clip view. It follows what you last clicked in Live. A press counts as a tap only if you press nothing else while holding it.
 - Held, like Shift, its pad blinks fast and column 16 shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual.
-- It works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
+- It works in Session, Mixer, FX, Sequencer and Chord Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
 - Tracks steps through every track, then the returns and master. Devices are the ones directly on the track; with a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
 - The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.
 - With Shift's layer showing, its pad is Left, a window move, and never flips the view.
@@ -512,9 +540,42 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 - Press a dark page past the loop end to extend the loop to the end of that page. Hold one page and press another to loop from the start of the first to the end of the last.
 - **Double** doubles the loop, copying its notes into the new half. **Halve** halves it, as long as it stays at least a step long.
 
+### Playing chords
+
+Chord Mode plays chords on the selected MIDI track through Live's own Chord MIDI effect. Your left hand holds the chord's shape and your right picks where it's built.
+
+**The Chord device.** Opening Chord Mode puts a Chord device named "BleakLoop Chord" first on the track, and leaving takes it away again once your fingers are off the chord pads. Each chord pad plays only the chord's root, and the device adds the other notes. It moves with the track when you select another one, and comes back if Undo takes it away. If Live closes in Chord Mode, or a Set is saved in it, BleakLoop removes the leftover device the next time it starts.
+
+**The arm** works as in Sequencer Mode: the track is armed alone, the arm follows the selected MIDI track, and leaving puts every arm back. On an audio or group track, Chord says "Chord needs a MIDI track". Pad 7 switches to Linnstrument Mode on the same track, with the device kept but doing nothing, so your notes play as you play them. Back returns to Chord Mode. The selection doesn't move while a chord pad is held: the arm and the device wait for you to let go.
+
+**Hold first, then press.** The device is set when a quality, extension or voicing pad changes, before your chord key sounds. So hold the shape first, then press the key. Changing what's held while a chord sounds affects the next chord, not the one you're holding.
+
+**The key** is Live's Set scale, saved with the Set, so every scale-aware part of Live follows it. Shift + a piano key sets its root, and Shift + Maj or Min sets Major or Minor and turns Live's Scale Mode on. A change made in Live with the mouse shows at once. Selecting a clip with its own scale sets the Set's scale to it, so the degree row follows the clip you select.
+
+**Degrees** (pad 1, columns 3–14): one pad per semitone of the key, from its root on the left. Each is in the colour of its chord's quality, and green while it sounds.
+
+- With nothing held, "the key decides": an in-key degree plays its chord in the key, I major, ii minor and so on in a major key, with any held extensions in the key too. A bare piano key in the key plays its chord the same way.
+- A held quality plays that quality on any degree or key instead, so D with Maj held is D major, V of V in C.
+- The other degrees are borrowed chords: ♭II, ♭III, ♯iv°, ♭VI and ♭VII in a major key, and ♭II, iii, ♯iv°, vi and vii° in a minor one. They play only with a quality held, and say which one to hold when pressed without it. Out-of-key piano keys work the same way.
+- In a scale that isn't 7 notes long, in-scale degrees are orange and play major chords, and the rest stay dark until a quality is held.
+
+**Qualities and extensions** (columns 3 and 4): Maj, Min, Sus4, Sus2, Dim and Aug, and 7, maj7, 9, 6, 11 and 13. A held pad blinks fast. Extensions stack, and maj7 beats 7. With two qualities held, the last pressed counts. maj7 with no quality held plays a major 7th chord.
+
+**Voicing** (column 5): Inv steps the inversion, Spread the spread (close, open, wide), and Bass adds the root an octave below. They stay set until you change them, and the status bar names each new setting. An inversion sounds below the key you press: the 1st inversion of C on C4 is E3, G3 and C4.
+
+**At most 7 notes.** The device adds up to 6 notes to the root, each within 3 octaves of it. A bigger chord drops its highest notes, and the status bar says so.
+
+**The status bar** names every chord as you play it: its name, its Roman numeral and what it does in the key (in key, borrowed, V of another degree, from harmonic minor, suspended or altered), its notes, its voicing and any notes outside the key.
+
+**The piano** (columns 6–14, pads 3–8) is three octaves, each a pair of rows: naturals on the nearer row, sharps and flats on the farther. Oct + and Oct − (column 15) move the piano and the degree row an octave, but not while a chord pad is held. The octave stays while Live runs.
+
+**Recording.** Live records only the root each chord pad plays, since it records a MIDI effect's input. So when you let go of a chord recorded into a Session clip, BleakLoop finds that root in the clip and adds the chord's other notes beside it, with the root's timing, length and velocity. It follows Live's record quantization, and each chord's notes are one undo. Arrangement recording keeps only the roots, and the status bar says so once per take.
+
+> **Careful:** the Chord device also plays the clips on its track, so in Chord Mode a clip you recorded sounds its chords again, stacked. Record your chords in Chord Mode, then switch to Linnstrument Mode (pad 7) or leave Chord Mode to play over them or overdub: there the clip plays as written.
+
 ### Linnstrument Mode
 
-The LinnStrument is your instrument again. Column 1 keeps the controls it has in Session Mode, so the pads are where you know them. You're playing the selected track, so Record records a new clip on it, Capture captures MIDI to it, and Shift + Play stops its clips. Column 1 always opens on the controls page. Pad 7 is **Back**: it returns to the mode you came from, Session, Mixer, FX or Sequencer.
+The LinnStrument is your instrument again. Column 1 keeps the controls it has in Session Mode, so the pads are where you know them. You're playing the selected track, so Record records a new clip on it, Capture captures MIDI to it, and Shift + Play stops its clips. Column 1 always opens on the controls page. Pad 7 is **Back**: it returns to the mode you came from, Session, Mixer, FX, Sequencer or Chord.
 
 > **Careful:** in Linnstrument Mode the LinnStrument's own panel buttons work again. Changing a setting there (Octave, Volume, Per-Split, Split and the like) saves BleakLoop's control split as your own, along with any MPE channel it borrowed. To undo that, close Live and set your split up again on the device. If you change the left split's Octave or Transpose, BleakLoop puts them back, so select the right split first. BleakLoop follows a Row Offset change within about a second, or two for a custom offset or a guitar tuning, while column 1 ignores presses. A Row Offset that repeats notes in column 1 (zero offset, or a guitar tuning with repeated strings) turns column 1's controls off, with a message. If you move the right split onto column 1's channel, BleakLoop moves column 1 to a free channel, with a message. If the right split uses every channel, column 1's controls go off until one is free again.
 
@@ -534,4 +595,5 @@ The LinnStrument is your instrument again. Column 1 keeps the controls it has in
 - **Scenes:** yellow and blinking with the beat while a held Bars pad holds their launch back to its bar line; lime and blinking fast once launched, until they start at the next quantization boundary; lime while all their clips play; magenta while some of their clips play; white if they hold clips.
 <!-- /lights:scenes -->
 - **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, and the playhead is white. A note pad lights yellow while its note plays, and the selected note blinks green.
+- **Chord Mode** colours each degree by its chord: orange major, blue minor, pink suspended, red diminished, magenta augmented. While a chord sounds, its degree and root are green, and its other notes on the piano yellow.
 - On the LinnStrument, lime looks yellow and green looks lime.

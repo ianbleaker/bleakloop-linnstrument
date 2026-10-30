@@ -363,7 +363,7 @@ _LINNSTRUMENT = (
     METRONOME,
     FIXED_LENGTH,
     UNDO,
-    _one("Back", layout.MODE_PAD, "Back to the mode you came from: Session, Mixer, FX or Sequencer."),
+    _one("Back", layout.MODE_PAD, "Back to the mode you came from: Session, Mixer, FX, Sequencer or Chord."),
     SHIFT,
 )
 
@@ -499,6 +499,77 @@ _SEQUENCER_SETTINGS = (
     ),
 )
 
+# Chord Mode: column 1 as in Sequencer Mode, column 16 without Copy, Delete and Seq.
+_CHORD_NAV = (
+    *_SEQUENCER_NAV[2:5],
+    _one("Chord", layout.CHORD, "Back to Session Mode."),
+    DEVICE_CLIP,
+)
+
+_DEGREE_NAMES = ("I", "♭II", "ii", "♭III", "iii", "IV", "♯iv°", "V", "♭VI", "vi", "♭VII", "vii°")
+CHORD_DEGREES = Item(
+    "Degrees",
+    {(column, 1): name for column, name in zip(layout.CHORD_DEGREE_COLUMNS, _DEGREE_NAMES)},
+    "Play the chord on each semitone of the key, from its root on the left, in the colour "
+    "of its quality: orange major, blue minor, red diminished. With nothing held, an "
+    "in-key degree plays its chord in the key, and the others need a quality held.",
+)
+CHORD_QUALITIES = Item(
+    "Qualities",
+    {key: name.capitalize() for key, name in layout.CHORD_QUALITIES.items()},
+    "Hold for major, minor, sus4, sus2, diminished or augmented chords, on any degree or "
+    "piano key. With two held, the last pressed counts.",
+)
+CHORD_EXTENSIONS = Item(
+    "Extensions",
+    dict(layout.CHORD_EXTENSIONS),
+    "Hold to add a 7th, major 7th, 9th, 6th, 11th or 13th. They stack.",
+)
+CHORD_INV = _one(
+    "Inv", layout.CHORD_INV, "Step the inversion: root, 1st, 2nd, then 3rd on 4-note chords."
+)
+CHORD_SPREAD = _one("Spread", layout.CHORD_SPREAD, "Step the spread: close, open, wide.")
+CHORD_BASS = _one(
+    "Bass", layout.CHORD_BASS, "Bass on/off: the root an octave below the chord. Cyan while on."
+)
+CHORD_OCTAVES = Item(
+    "Oct +/−",
+    {layout.CHORD_OCT_UP: "Oct +", layout.CHORD_OCT_DOWN: "Oct −"},
+    "Move the degree row and the piano an octave up or down.",
+)
+CHORD_PIANO = Block(
+    "Piano",
+    layout.CHORD_PIANO_COLUMNS,
+    layout.CHORD_PIANO_PADS,
+    "Three octaves of keys, lowest at the near pair of rows. Play a key for the chord built "
+    "on it: the key's root is cyan, other in-key notes white. While a chord sounds, its "
+    "root is green and its other notes yellow.",
+)
+
+_CHORD = (
+    CHORD_QUALITIES,
+    CHORD_EXTENSIONS,
+    CHORD_INV,
+    CHORD_SPREAD,
+    CHORD_BASS,
+    CHORD_DEGREES,
+    CHORD_PIANO,
+    CHORD_OCTAVES,
+)
+
+# Under Shift the piano and Maj and Min set the key; the other lit pads wait for Shift's
+# release, so they're labelled but not listed.
+_CHORD_SHIFT = (
+    Item(
+        "Scale",
+        {key: label for key, label in CHORD_QUALITIES.labels.items() if label in ("Maj", "Min")},
+        "Set Live's scale to Major or Minor, and turn Scale Mode on. The current one is "
+        "cyan.",
+    ),
+    replace(CHORD_PIANO, name="Key", callout="Set the key's root to the key you press."),
+    *(replace(item, variant=False) for item in (CHORD_INV, CHORD_SPREAD, CHORD_DEGREES, CHORD_OCTAVES)),
+)
+
 # The manual's sections, by marker slug.
 SECTIONS = {
     "global": _GLOBAL,
@@ -529,6 +600,9 @@ SECTIONS = {
     "sequencer-grid": _SEQUENCER_GRID,
     "sequencer": _SEQUENCER,
     "sequencer-settings": _SEQUENCER_SETTINGS,
+    "chord-nav": _CHORD_NAV,
+    "chord": _CHORD,
+    "chord-shift": _CHORD_SHIFT,
     # Listed, not drawn: Sequencer Mode's own pads, after its first map. Column 16's mode
     # pads are in the Navigation column's list.
     "sequencer-functions": (
@@ -571,6 +645,7 @@ LISTS = {
     "linnstrument-scenes": None,
     "sequencer-functions": None,
     "sequencer-settings": None,
+    "chord": "chord-shift",
 }
 
 # The sections each map is drawn from.
@@ -593,6 +668,8 @@ LAYERS = {
     ),
     Layer.SEQUENCER_SHIFT: ("sequencer-global-shift", "sequencer-nav-shift", "sequencer"),
     Layer.SEQUENCER_DRUMS: ("sequencer-global", "sequencer-nav", "sequencer"),
+    Layer.CHORD: ("sequencer-global", "chord-nav", "chord"),
+    Layer.CHORD_SHIFT: ("sequencer-global-shift", "sequencer-nav-shift", "chord-shift"),
 }
 
 # Columns a map shows dimmed and unlabelled, per layer: none at present.
