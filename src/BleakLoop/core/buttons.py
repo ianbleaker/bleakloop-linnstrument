@@ -69,6 +69,14 @@ LAYERS = {
     "SEQUENCER_DRUMS": ("sequencer-global", "sequencer-nav", "sequencer"),
     "SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "split-shift"),
     "MIXER_SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "mixer-split-shift"),
+    # Sequencer Mode's column 15 is live on both layers, beside its own columns.
+    "SEQUENCER_BUTTONS": ("sequencer-global", "sequencer-nav", "sequencer-grid", "sequencer"),
+    "SEQUENCER_SHIFT_BUTTONS": (
+        "sequencer-global-shift",
+        "sequencer-nav-shift",
+        "sequencer-grid",
+        "sequencer",
+    ),
     "LINNSTRUMENT": ("linnstrument",),
     "LINNSTRUMENT_SHIFT": ("linnstrument-shift",),
     "LINNSTRUMENT_SCENES": ("linnstrument-scenes",),

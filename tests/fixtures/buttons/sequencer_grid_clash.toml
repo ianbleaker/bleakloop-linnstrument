@@ -1,0 +1,5 @@
+[global.play_stop]
+pad = [1, 1]
+
+[sequencer_grid.double]
+pad = [1, 1]
