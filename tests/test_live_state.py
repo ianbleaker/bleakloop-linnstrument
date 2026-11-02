@@ -1,8 +1,10 @@
 from types import SimpleNamespace
 
+import pytest
+
 from BleakLoop import live_state
 from BleakLoop.core.layout import Window
-from BleakLoop.core.modes import FaderBinding
+from BleakLoop.core.modes import FaderBinding, Morph
 
 
 def fake_track(name, mute=False, solo=False):
@@ -33,6 +35,9 @@ def fake_song(tracks, returns=(), selected=None, scenes=()):
         current_song_time=0.0,
         tempo=120.0,
         metronome=False,
+        loop=False,
+        loop_start=0.0,
+        loop_length=16.0,
         visible_tracks=list(tracks),
         tracks=list(tracks),
         return_tracks=list(returns),
@@ -572,3 +577,27 @@ def test_read_fx_scenes_store():
     song = SimpleNamespace(get_data=lambda key, default: stored.get(key, default))
     assert live_state.read_fx_scenes_store(song) == "text"
     assert live_state.read_fx_scenes_store(SimpleNamespace(get_data=lambda k, d: d)) == ""
+
+
+def _launch_song(*triggered):
+    return SimpleNamespace(scenes=[SimpleNamespace(is_triggered=t) for t in triggered])
+
+
+@pytest.mark.parametrize(
+    "triggered, slot, expected",
+    [
+        ((False, True), 1, True),  # waiting
+        ((False, False), 1, False),  # started
+        ((True, False), 1, None),  # another scene took the wait over
+        ((False,), 1, None),  # the scene has gone
+        ((False, False), None, None),  # its scene was deleted
+    ],
+)
+def test_read_launch_triggered(triggered, slot, expected):
+    morph = Morph(slot, 0.0, 8.0, 0.0, scene=True, launch=True)
+    assert live_state.read_launch_triggered(_launch_song(*triggered), morph) is expected
+
+
+def test_read_launch_triggered_ignores_other_morphs():
+    morph = Morph(0, 0.0, 8.0, 0.0, scene=True)
+    assert live_state.read_launch_triggered(_launch_song(True), morph) is None

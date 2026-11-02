@@ -445,8 +445,10 @@ class BleakLoop(ControlSurface):
 
     def _morph_tick(self, transport):
         start = time.monotonic()
-        macro_values = live_state.read_macro_values(self.song, self._state.morph)
-        state, actions, redraw = engine.fx_tick(self._state, transport, macro_values)
+        morph = self._state.morph
+        macro_values = live_state.read_macro_values(self.song, morph)
+        triggered = live_state.read_launch_triggered(self.song, morph)
+        state, actions, redraw = engine.fx_tick(self._state, transport, macro_values, triggered)
         self._state = state
         for action in actions:
             live_actions.apply(action, self.song, self)
@@ -454,6 +456,10 @@ class BleakLoop(ControlSurface):
             self._refresh()
         self._longest_tick_ms = max(self._longest_tick_ms, (time.monotonic() - start) * 1000)
         if state.morph is None:
+            if morph.wrapped:
+                started = morph.launch and morph.triggered and triggered is False
+                how = "as the scene started" if started else "on its end"
+                logger.info("FX: morph landed after a loop wrap, %s", how)
             logger.info("FX: morph landed, longest tick %.1f ms", self._longest_tick_ms)
             self._longest_tick_ms = 0.0
 

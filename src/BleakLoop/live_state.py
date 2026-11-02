@@ -29,6 +29,9 @@ def read_transport(song, application):
         tempo=song.tempo,
         metronome=song.metronome,
         session_view=application.view.is_view_visible("Session"),
+        loop=song.loop,
+        loop_start=song.loop_start,
+        loop_length=song.loop_length,
     )
 
 
@@ -434,6 +437,18 @@ def read_macro_values(song, morph):
     # The live value per morphing macro, or None when its rack has moved or gone.
     targets = macro_parameters(song, ((m.path, m.rack_name, m.index) for m in morph.macros))
     return tuple(None if parameter is None else parameter.value for parameter in targets)
+
+
+def read_launch_triggered(song, morph):
+    # Whether a launch morph's scene waits to launch: True, or False once it has stopped
+    # waiting with no other scene waiting, which is Live starting it. None for any other
+    # morph, a scene that's gone, or a wait another scene's launch has taken over.
+    scenes = song.scenes
+    if not morph.launch or morph.slot is None or morph.slot >= len(scenes):
+        return None
+    if scenes[morph.slot].is_triggered:
+        return True
+    return None if any(scene.is_triggered for scene in scenes) else False
 
 
 def macro_parameters(song, macros_wanted):

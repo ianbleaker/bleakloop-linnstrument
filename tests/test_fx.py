@@ -539,6 +539,119 @@ def test_a_backward_jump_lands():
     assert (state.morph, redraw) == (None, True)
 
 
+# The Arrangement loop over beats 0-16: song time wraps from 16 back to 0.
+def looped(beats, is_playing=True):
+    return replace(SNAP, is_playing=is_playing, song_beats=beats, loop=True, loop_length=16.0)
+
+
+def loop_tick(state, beats, values=(0.0, 0.0, 50.0), triggered=None):
+    return engine.fx_tick(state, looped(beats), values, triggered)
+
+
+def written(state):
+    return tuple(m.written for m in state.morph.macros)
+
+
+def test_a_loop_wrap_carries_the_morph_on():
+    state = replace(MORPHING, morph=replace(MORPH, start_beats=8.0, end_beats=24.0, last_beats=15.9))
+    state, actions, redraw = loop_tick(state, 0.0)
+    assert actions == [SetMacros(((P0, "R", 0, 50.0), (P1, "R", 0, 30.0)))]
+    assert not redraw
+    morph = state.morph
+    assert (morph.start_beats, morph.end_beats, morph.last_beats) == (-8.0, 8.0, 0.0)
+
+
+def test_a_late_tick_after_a_loop_wrap_counts_the_beats_both_sides():
+    state = replace(MORPHING, morph=replace(MORPH, start_beats=8.0, end_beats=24.0, last_beats=15.5))
+    state, _, _ = loop_tick(state, 0.5)
+    assert (state.morph.start_beats, state.morph.end_beats) == (-8.0, 8.0)
+
+
+def test_a_morph_longer_than_the_loop_lands_after_its_length():
+    state = replace(MORPHING, morph=replace(MORPH, end_beats=32.0))
+    for beats in (8.0, 15.9, 0.0, 8.0, 15.9):
+        state, _, redraw = loop_tick(state, beats, written(state))
+        assert not redraw
+    state, actions, redraw = loop_tick(state, 0.0, written(state))
+    assert actions[-1] == EndUndoStep()
+    assert (state.morph, state.fx_landed, redraw) == (None, 3, True)
+
+
+@pytest.mark.parametrize("last, now", [(12.0, 4.0), (15.9, 3.0)])
+def test_a_backward_jump_inside_the_loop_lands(last, now):
+    state = replace(MORPHING, morph=replace(MORPH, last_beats=last))
+    state, actions, redraw = loop_tick(state, now)
+    assert actions[-1] == EndUndoStep()
+    assert (state.morph, redraw) == (None, True)
+
+
+LAUNCH = replace(MORPH, end_beats=8.0, scene=True, launch=True)
+LAUNCH_MORPH = replace(MORPHING, morph=replace(LAUNCH, wrapped=True))
+
+
+def test_a_loop_wrap_marks_the_morph_wrapped():
+    state = replace(MORPHING, morph=replace(LAUNCH, end_beats=24.0, last_beats=15.9))
+    state, _, _ = loop_tick(state, 0.0, triggered=True)
+    assert state.morph.wrapped and state.morph.triggered
+
+
+def test_without_a_wrap_a_launch_morph_lands_on_its_end_whatever_the_trigger():
+    # Another scene's launch cancels this one's wait: the morph carries on to its end.
+    state = replace(MORPHING, morph=LAUNCH)
+    state, _, _ = loop_tick(state, 4.0, triggered=True)
+    state, _, redraw = loop_tick(state, 6.0, written(state), triggered=False)
+    assert not redraw
+    state, _, redraw = loop_tick(state, 8.0, written(state), triggered=True)
+    assert (state.morph, redraw) == (None, True)
+
+
+def test_after_a_wrap_a_launch_morph_lands_as_the_scene_starts():
+    state, _, redraw = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
+    assert state.morph.triggered and not redraw
+    state, _, redraw = loop_tick(state, 7.99, written(state), triggered=True)
+    assert not redraw
+    state, actions, redraw = loop_tick(state, 8.01, written(state), triggered=False)
+    assert actions[0] == SetMacros(((P0, "R", 0, 100.0), (P0, "R", 1, 1.0), (P1, "R", 0, 10.0)))
+    assert (state.morph, state.fx_landed_scene, redraw) == (None, 3, True)
+
+
+def test_after_a_wrap_a_launch_morph_holds_at_its_targets_while_the_scene_starts_late():
+    state, _, _ = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
+    state, actions, redraw = loop_tick(state, 9.0, (50.0, 0.0, 30.0), triggered=True)
+    assert actions == [SetMacros(((P0, "R", 0, 100.0), (P1, "R", 0, 10.0)))]
+    assert not redraw
+    assert state.morph is not None
+
+
+def test_after_a_wrap_another_scene_taking_the_wait_over_leaves_the_morph_alone():
+    state, _, _ = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
+    state, _, redraw = loop_tick(state, 6.0, written(state), triggered=None)
+    assert not redraw
+    assert not state.morph.triggered
+    state, _, redraw = loop_tick(state, 8.0, written(state), triggered=None)
+    assert (state.morph, redraw) == (None, True)
+
+
+def test_after_a_wrap_a_launch_morph_lands_early_if_the_scene_starts_early():
+    state, _, _ = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
+    state, _, redraw = loop_tick(state, 6.0, triggered=False)
+    assert (state.morph, redraw) == (None, True)
+
+
+@pytest.mark.parametrize("triggered", [False, None])
+def test_a_launch_morph_never_seen_waiting_lands_on_its_end(triggered):
+    state, _, redraw = loop_tick(LAUNCH_MORPH, 7.99, triggered=triggered)
+    assert not redraw
+    state, _, redraw = loop_tick(state, 8.0, triggered=triggered)
+    assert (state.morph, redraw) == (None, True)
+
+
+def test_a_launch_morph_still_lands_on_a_stop():
+    state, _, _ = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
+    state, _, redraw = engine.fx_tick(state, looped(5.0, is_playing=False), (0.0, 0.0, 50.0), True)
+    assert (state.morph, redraw) == (None, True)
+
+
 def test_landing_after_the_step_closed_keeps_the_mixer_step():
     state = replace(MORPHING, fx_undo_open=False, undo_open=True)
     state, actions, _ = tick(state, 16.0, (0.0, 0.0, 50.0))
@@ -857,6 +970,7 @@ def test_a_launch_recall_morphs_to_the_end_set_at_the_press():
     assert actions == [BeginUndoStep(), ShowMessage("Scene 3 snapshot on launch")]
     assert (state.morph.start_beats, state.morph.end_beats) == (5.6, 8.0)
     assert state.morph.scene
+    assert state.morph.launch
 
 
 def test_a_launch_recall_past_its_end_recalls_at_once():
@@ -1124,6 +1238,22 @@ def test_launch_tick_cancels_on_a_stop_or_a_jump_back(beats, is_playing):
     assert state.pending_launch is None
     assert actions == [ShowMessage("Scene 3 launch cancelled")]
     assert redraw
+
+
+def test_launch_tick_counts_across_a_loop_wrap():
+    # Fires on beat 20 counted from the press, which the wrap moves to beat 4.
+    state = replace(FX, pending_launch=PendingLaunch(2, 20.0, 15.9))
+    state, actions, redraw = engine.launch_tick(state, looped(0.0))
+    assert (state.pending_launch, actions, redraw) == (PendingLaunch(2, 4.0, 0.0), [], False)
+    state, actions, redraw = engine.launch_tick(state, looped(4.0))
+    assert (state.pending_launch, actions, redraw) == (None, [FireScene(2, legato=False)], True)
+
+
+def test_launch_tick_cancels_on_a_jump_back_inside_the_loop():
+    state = replace(FX, pending_launch=PendingLaunch(2, 20.0, 12.0))
+    state, actions, _ = engine.launch_tick(state, looped(4.0))
+    assert state.pending_launch is None
+    assert actions == [ShowMessage("Scene 3 launch cancelled")]
 
 
 def test_a_pending_scene_blinks_yellow():

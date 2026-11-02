@@ -127,6 +127,11 @@ class Morph:
     last_beats: float  # song time at the last tick
     macros: tuple = ()  # MorphMacro per macro still morphing
     scene: bool = False  # slot is a scene index, not a global slot
+    launch: bool = False  # a scene launch's snapshot, landing as the scene starts
+    # After a wrap of the loop, end_beats may no longer fall on Live's launch grid: a launch
+    # morph then lands as Live starts the scene, seen waiting to launch (triggered) and then not.
+    wrapped: bool = False
+    triggered: bool = False
 
 
 @dataclass(frozen=True)
