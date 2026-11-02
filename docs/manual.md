@@ -438,7 +438,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Its scene snapshot, if it has one, morphs from the press and lands as the scene starts.
 - The scene pad blinks yellow with the beat until BleakLoop fires the scene, then blinks lime as usual until it starts.
 - With the transport stopped, the scene launches at once.
-- Stopping the transport, or jumping back in the song, cancels a waiting launch, with a message.
+- Stopping the transport, or jumping back in the song, cancels a waiting launch, with a message. Live's Arrangement loop coming round isn't a jump: the launch keeps counting its bars.
 - A new scene press replaces a waiting launch; the replaced launch's morph still lands at its bar line. Shift + a scene launches it legato at once, whatever Bars pad is held.
 
 **During a morph:**
@@ -447,6 +447,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - A new recall takes over from where the macros are.
 - A macro you turn yourself drops out of the morph and keeps your value.
 - Stopping the transport, or jumping back in the song, lands the morph at once.
+- Live's Arrangement loop coming round isn't a jump: the morph keeps going until it has played its bars, even when it's longer than the loop. Once the loop has come round, a scene's snapshot lands as Live actually starts the scene.
 - The morph carries on when you leave FX Mode.
 
 A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot yet (#63).
