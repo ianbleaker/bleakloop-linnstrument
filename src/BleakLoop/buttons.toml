@@ -1,0 +1,9 @@
+# Every button: where it sits, its manual label and text, and the status messages it shows.
+# Table path = button ID. pad = [column, pad]. See docs/buttons.md.
+
+manual_format = "{label}."
+
+[global.play_stop]
+section = "global"
+pad = [1, 1]
+label = "Play"

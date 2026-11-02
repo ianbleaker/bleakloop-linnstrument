@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from . import buttons
+
 ROWS = 8
 COLUMNS = 17  # column 0 is the device's hardware buttons
 
@@ -21,7 +23,7 @@ MUTE_ROW = 7
 SELECT_ROW = 8
 
 # (column, pad)
-PLAY_STOP = (GLOBAL_COLUMN, 1)
+PLAY_STOP = buttons.pos("global.play_stop")
 RECORD = (GLOBAL_COLUMN, 2)
 CAPTURE = (GLOBAL_COLUMN, 3)
 QUANTIZE = CAPTURE  # pad 3's Shift function

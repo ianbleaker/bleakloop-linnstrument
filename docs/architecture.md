@@ -193,6 +193,7 @@ flowchart TD
     live_state["live_state"]
   end
   subgraph Core
+    core_buttons["buttons"]
     core_controls["controls"]
     core_engine["engine"]
     core_faders["faders"]
@@ -248,6 +249,7 @@ flowchart TD
   core_global_column --> core_mixer
   core_global_column --> core_model
   core_global_column --> core_modes
+  core_layout --> core_buttons
   core_leds --> core_values
   core_linnstrument_mode --> core_global_column
   core_linnstrument_mode --> core_layout
