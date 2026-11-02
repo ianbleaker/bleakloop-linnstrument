@@ -529,7 +529,8 @@ def test_any_song_level_function_works_in_column_1(monkeypatch):
 
 
 def test_every_moved_function_runs_in_all_its_modes():
-    from BleakLoop.core import catalogue, functions
+    # engine imports every module that registers functions, as Live does.
+    from BleakLoop.core import catalogue, engine, functions  # noqa: F401
 
     moved = {
         "play_stop", "record", "capture", "record_clip", "capture_midi", "metronome",
