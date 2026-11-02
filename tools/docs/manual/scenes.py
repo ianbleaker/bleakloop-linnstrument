@@ -166,7 +166,7 @@ SEQ_DRUM_SNAPSHOT = replace(
     ),
 )
 
-# Linnstrument Mode's column 1, for its own column figure: the rest is the instrument.
+# Linnstrument Mode's Global column, for its own column figure: the rest is the instrument.
 LINNSTRUMENT = (State(mode=Mode.LINNSTRUMENT), SNAPSHOT)
 LINNSTRUMENT_SHIFT = (State(mode=Mode.LINNSTRUMENT, shift=True), SNAPSHOT)
 LINNSTRUMENT_SCENES = (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT)

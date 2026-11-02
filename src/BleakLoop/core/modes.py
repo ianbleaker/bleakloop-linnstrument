@@ -177,7 +177,7 @@ class State:
     glides: tuple = ()  # Glide per track
     glide_ms: float | None = None  # time of the last glide step, None when none is moving
     undo_open: bool = False  # a fader gesture's undo step is open in Live
-    scene_page: bool = False  # Linnstrument Mode column 1 shows the scene page
+    scene_page: bool = False  # Linnstrument Mode's Global column shows the scene page
     came_from: Origin = Origin.SESSION  # where Linnstrument Mode's Back returns to
     fx: bool = False
     fx_length: int | None = None  # bars of the held FX length pad

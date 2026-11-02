@@ -21,7 +21,7 @@ SHIFT = SCENES[Layer.SESSION_SHIFT]
 FIGURES = {
     "columns-global": (
         "Global column",
-        1,
+        layout.GLOBAL_COLUMN,
         (("normal", NORMAL, "global"), (None, SHIFT, "global-shift")),
     ),
     "columns-view": (

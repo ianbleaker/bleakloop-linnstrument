@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, engine, layout, modes, sequencer
+from BleakLoop.core import engine, global_column, layout, modes, sequencer
 from BleakLoop.core.leds import (
     BLUE,
     CYAN,
@@ -456,7 +456,7 @@ def test_linnstrument_and_back_keep_the_arm():
     assert state.mode is Mode.LINNSTRUMENT
     assert state.came_from is Origin.SEQUENCER
     assert actions == [EnterMode(Mode.LINNSTRUMENT)]
-    back, actions = column_1.handle(state, press(layout.MODE_PAD), SNAP_IN)
+    back, actions = global_column.handle(state, press(layout.MODE_PAD), SNAP_IN)
     assert back.mode is Mode.SEQUENCER
     assert actions == [EnterMode(Mode.SEQUENCER)]
     assert back.seq_saved_arms == ENTERED.seq_saved_arms
@@ -937,7 +937,7 @@ def test_column_16_shift_layer():
     ]
 
 
-def test_column_1_and_2():
+def test_global_column_and_column_2():
     frame = render()
     assert frame[layout.MODE_PAD] == Light(MAGENTA)
     assert frame[layout.RECORD] == Light(RED)

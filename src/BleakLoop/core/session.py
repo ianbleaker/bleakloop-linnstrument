@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import column_1, controls, faders, fx, layout, mixer, modes, sequencer
+from . import controls, faders, fx, global_column, layout, mixer, modes, sequencer
 from .leds import (
     BLUE,
     CYAN,
@@ -65,7 +65,7 @@ def handle(state, event, snapshot):
     if state.seq_held and event.pressed and key != layout.SEQ:
         return _seq_press(state, event, snapshot)
     if key == layout.SHIFT:
-        return column_1.handle(state, event, snapshot)
+        return global_column.handle(state, event, snapshot)
     # Under Shift, Copy and Delete's pads are window moves.
     shift_layer = state.shift and not state.copy and not state.delete
     if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
@@ -126,8 +126,8 @@ def handle(state, event, snapshot):
         return _copy(state, event, snapshot)
     if state.delete:
         return _delete(state, event, snapshot)
-    if event.column == 1:
-        return column_1.handle(state, event, snapshot)
+    if event.column == layout.GLOBAL_COLUMN:
+        return global_column.handle(state, event, snapshot)
     if event.column in layout.GRID_COLUMNS:
         if event.pad == layout.MUTE_ROW:
             return state, _mute_row(state, _track(event.column, snapshot))
@@ -466,7 +466,7 @@ def render(state, snapshot):
         frame[layout.STOP] = Light(RED if snapshot.any_armed else OFF)
     else:
         frame[layout.STOP] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
-    frame.update(column_1.render(state, snapshot))
+    frame.update(global_column.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame
 

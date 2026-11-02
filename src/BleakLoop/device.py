@@ -15,7 +15,6 @@ from .core.leds import (
     resolve,
 )
 from .core.model import PadPress, SlideMoved, XAxis
-from .core.values import SPLIT_POINT
 
 CC_STATUS = 0xB0
 
@@ -41,16 +40,18 @@ NRPN_RIGHT_PER_NOTE = tuple(range(102, 118))  # right split per-note channel c o
 NRPN_RIGHT_PER_ROW_LOWEST = 118  # right split per-row lowest channel
 OCTAVE_ZERO = 5  # Octave value for no shift
 TRANSPOSE_ZERO = 7  # Transpose value for no shift
+# The right split's first column: the left split is the Global column alone.
+SPLIT_POINT = layout.GLOBAL_COLUMN + 1
 
 # The left split, in setup order. Each is queried first, for the restore.
 FIXED_SETTINGS = [
     (200, 1),  # split on
-    (202, SPLIT_POINT),  # left split is column 1
+    (202, SPLIT_POINT),  # left split is the Global column
     (0, 0),  # left split MIDI mode: one channel
     (20, 0),  # left split Send X off
     (24, 0),  # left split Send Y off
     (27, 0),  # left split Send Z off
-    (32, 0),  # left split Played colour off: column 1 keeps BleakLoop's lights
+    (32, 0),  # left split Played colour off: the Global column keeps BleakLoop's lights
     (34, 0),  # left split LowRow off: pad 8 stays a pad
     (35, 0),  # left split special mode off: a note split
     (NRPN_TRANSPOSE_PITCH, TRANSPOSE_ZERO),
@@ -68,12 +69,12 @@ READ_NUMBERS = [
     NRPN_RIGHT_PER_ROW_LOWEST,
 ]
 
-REFUSE_DUPLICATES = "Row Offset repeats notes in column 1: controls off"
+REFUSE_DUPLICATES = "Row Offset repeats notes in the Global column: controls off"
 REFUSE_ROW_OFFSET = "Couldn't read Row Offset: controls off"
 REFUSE_RIGHT_SPLIT = "Couldn't read the right split: controls off"
 REFUSE_CHANNELS = "The right split uses every channel: controls off"
-CONTROLS_ON = "Column 1 controls on"
-CONTROLS_MOVED = "The right split took column 1's channel: controls moved to channel {}"
+CONTROLS_ON = "Global column controls on"
+CONTROLS_MOVED = "The right split took the Global column's channel: controls moved to channel {}"
 OCTAVE_RESET = "Left split Octave/Transpose reset: select the right split to change yours"
 
 
@@ -138,7 +139,7 @@ def x_rows(rows):
     ]
 
 
-# Column 1's notes (architecture section 5, "Note numbers in a playing split").
+# The Global column's notes (architecture section 5, "Note numbers in a playing split").
 
 
 def row_notes(reads):
@@ -390,5 +391,9 @@ class LedDriver:
     def reset(self):
         self._sent = {}
 
-    def release_column_1(self):
-        return [m for pad in range(1, layout.ROWS + 1) for m in light(1, pad, DEVICE_DEFAULT)]
+    def release_global_column(self):
+        return [
+            m
+            for pad in range(1, layout.ROWS + 1)
+            for m in light(layout.GLOBAL_COLUMN, pad, DEVICE_DEFAULT)
+        ]

@@ -59,7 +59,7 @@ def _scenes(column, callout):
     return Item("Scenes", labels, callout)
 
 
-# Column 1: the same pads in every mode.
+# The Global column: the same pads in every mode.
 PLAY = _one("Play", layout.PLAY_STOP, "Start/stop. Blinks on the beat while playing.")
 METRONOME = _one(
     "Metronome", layout.METRONOME, "Metronome on/off. Blinks while on.", label="Metro"
@@ -388,11 +388,11 @@ _LINNSTRUMENT_SHIFT = (
 )
 
 _LINNSTRUMENT_SCENES = (
-    _scenes(1, "Launch a scene and its FX snapshot, and go back to the controls."),
+    _scenes(layout.GLOBAL_COLUMN, "Launch a scene and its FX snapshot, and go back to the controls."),
     _one("Back", layout.SHIFT, "Back to the controls without launching."),
 )
 
-# Sequencer Mode: column 1 as in Linnstrument Mode, and its own columns 15 and 16.
+# Sequencer Mode: the Global column as in Linnstrument Mode, and its own columns 15 and 16.
 _SEQUENCER_GLOBAL = (
     PLAY,
     RECORD_CLIP,
