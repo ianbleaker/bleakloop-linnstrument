@@ -510,34 +510,29 @@ does = "pages"
 value = 16
 
 
-# Functions.
+# Functions: each one's label, at most 7 characters, its message, and its outcomes and
+# refusals. Refusals always show; show = false hides the rest.
 
 [functions.play_stop]
 label = "Play"
 
-[functions.record]
-label = "Record"
-
-[functions.capture]
-label = "Capture"
-
 [functions.metronome]
 label = "Metro"
-
-[functions.fixed_length]
-label = "Length"
+[functions.metronome.outcomes]
+on = "Metronome ON"
+off = "Metronome OFF"
 
 [functions.undo]
 label = "Undo"
+message = "Undo"
+[functions.undo.refusals]
+nothing = "Nothing to undo"
 
-[functions.linnstrument_mode]
-label = "Linn"
-
-[functions.shift]
-label = "Shift"
-
-[functions.stop_all]
-label = "StopAll"
+[functions.redo]
+label = "Redo"
+message = "Redo"
+[functions.redo.refusals]
+nothing = "Nothing to redo"
 
 [functions.quantize]
 label = "Quant"
@@ -545,26 +540,54 @@ label = "Quant"
 [functions.launch_quantization]
 label = "LaunchQ"
 
-[functions.redo]
-label = "Redo"
+[functions.tempo]
+message = "Tempo {bpm:.1f} BPM"
 
-[functions.record_clip]
-label = "RecClip"
+[functions.fixed_length]
+label = "Length"
+
+[functions.stop_all]
+label = "StopAll"
+
+[functions.record]
+label = "Record"
+
+[functions.capture]
+label = "Capture"
 
 [functions.capture_midi]
 label = "CapMIDI"
 
-[functions.back]
-label = "Back"
+[functions.record_clip]
+label = "RecClip"
 
 [functions.stop_track]
 label = "StopTrk"
 
-[functions.scene_page]
-label = "Scenes"
+[functions.unmute_all]
+label = "Unmute"
+message = "Unmute all"
 
-[functions.close_scenes]
-label = "Back"
+[functions.unsolo_all]
+label = "Unsolo"
+message = "Unsolo all"
+
+[functions.unarm_all]
+label = "Unarm"
+message = "Unarm all"
+
+[functions.shift]
+label = "Shift"
+
+[functions.window]
+message = "Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene}"
+
+[functions.fader_source]
+label = "Source"
+[functions.fader_source.outcomes]
+device = "Device FX"
+mapped = "Mapped FX"
+snapshots = "FX snapshots"
 
 [functions.session]
 label = "Session"
@@ -578,29 +601,29 @@ label = "FX"
 [functions.seq]
 label = "Seq"
 
-[functions.delete]
-label = "Delete"
-
 [functions.copy]
 label = "Copy"
 
-[functions.device_clip]
-label = "DevClip"
-
-[functions.fader_source]
-label = "Source"
-
-[functions.unmute_all]
-label = "Unmute"
+[functions.delete]
+label = "Delete"
 
 [functions.stop]
 label = "Stop"
 
-[functions.unsolo_all]
-label = "Unsolo"
+[functions.linnstrument_mode]
+label = "Linn"
 
-[functions.unarm_all]
-label = "Unarm"
+[functions.back]
+label = "Back"
+
+[functions.scene_page]
+label = "Scenes"
+
+[functions.close_scenes]
+label = "Back"
+
+[functions.device_clip]
+label = "DevClip"
 
 [functions.double]
 label = "Double"

@@ -4,7 +4,7 @@ each function's label, manual text and messages."""
 import tomllib
 from pathlib import Path
 
-from .catalogue import LINNSTRUMENT, MODES, SEQUENCER, SESSION
+from .catalogue import LINNSTRUMENT, MESSAGE_ONLY, MODES, SEQUENCER, SESSION
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
@@ -323,7 +323,7 @@ def _validate(data, items):
     if not _is_messages(data.get("system", {})):
         raise ValueError("system: every message must be a string")
     for name, function in data.get("functions", {}).items():
-        if name not in MODES:
+        if name not in MODES and name not in MESSAGE_ONLY:
             raise ValueError(f"functions.{name}: no such function")
         if not isinstance(function, dict):
             raise ValueError(f"functions.{name}: not a table")

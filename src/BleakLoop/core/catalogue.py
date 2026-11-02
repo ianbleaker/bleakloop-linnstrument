@@ -66,3 +66,7 @@ MODES = {
     # Unlit and unused until Chord is built.
     "reserved": frozenset({SESSION}),
 }
+
+# Messages with no button behind them: [functions.<name>] holds their wording, but no button
+# can name them with does.
+MESSAGE_ONLY = frozenset({"faders", "scenes"})

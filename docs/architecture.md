@@ -219,6 +219,7 @@ flowchart TD
   core_buttons --> core_catalogue
   core_buttons -.->|lazy| core_layout
   core_buttons --> core_model
+  core_controls --> core_buttons
   core_controls --> core_faders
   core_controls --> core_functions
   core_controls --> core_layout

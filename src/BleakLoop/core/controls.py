@@ -4,7 +4,7 @@ Device/Clip layer."""
 
 from dataclasses import replace
 
-from . import faders, functions, layout
+from . import buttons, faders, functions, layout
 from .modes import Mode
 from .leds import BLUE, GREEN, LIME, MAGENTA, OFF, ORANGE, RED, WHITE, YELLOW, Blink, Light
 from .model import (
@@ -13,7 +13,6 @@ from .model import (
     SetArrangementRecord,
     SetSessionRecord,
     SetTempo,
-    ShowMessage,
     StepDevice,
     StepTrack,
     ToggleDetailView,
@@ -37,20 +36,20 @@ def play_light(snapshot):
 def metronome(snapshot):
     return [
         ToggleMetronome(),
-        ShowMessage("Metronome OFF" if snapshot.metronome else "Metronome ON"),
+        *buttons.say("metronome", "off" if snapshot.metronome else "on"),
     ]
 
 
 def undo(snapshot):
     if snapshot.can_undo:
-        return [Undo(), ShowMessage("Undo")]
-    return [ShowMessage("Nothing to undo")]
+        return [Undo(), *buttons.say("undo")]
+    return buttons.refuse("undo", "nothing")
 
 
 def redo(snapshot):
     if snapshot.can_redo:
-        return [Redo(), ShowMessage("Redo")]
-    return [ShowMessage("Nothing to redo")]
+        return [Redo(), *buttons.say("redo")]
+    return buttons.refuse("redo", "nothing")
 
 
 def window_tracks(state):
@@ -69,17 +68,20 @@ def move_window(state, steps, snapshot):
         return state, []
     last_track = min(window.track + width, snapshot.track_count)
     last_scene = min(window.scene + layout.WINDOW_SCENES, snapshot.scene_count)
-    message = (
-        f"Tracks {window.track + 1}–{last_track}, "
-        f"Scenes {window.scene + 1}–{last_scene}"
+    message = buttons.say(
+        "window",
+        first_track=window.track + 1,
+        last_track=last_track,
+        first_scene=window.scene + 1,
+        last_scene=last_scene,
     )
-    return replace(state, window=window), [ShowMessage(message)]
+    return replace(state, window=window), message
 
 
 def tempo_step(snapshot, step):
     # Shift + column 16 pads 7 and 8.
     bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + step))
-    return [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
+    return [SetTempo(bpm), *buttons.say("tempo", bpm=bpm)]
 
 
 @functions.register("tempo", light=lambda state, snapshot, value: Light(GREEN))
@@ -91,21 +93,21 @@ def _tempo(state, snapshot, step):
     "unmute_all", light=lambda state, snapshot, value: Light(ORANGE if snapshot.any_muted else OFF)
 )
 def unmute_all(state, snapshot, value=None):
-    return state, [UnmuteAll(), ShowMessage("Unmute all")]
+    return state, [UnmuteAll(), *buttons.say("unmute_all")]
 
 
 @functions.register(
     "unsolo_all", light=lambda state, snapshot, value: Light(BLUE if snapshot.any_soloed else OFF)
 )
 def unsolo_all(state, snapshot, value=None):
-    return state, [UnsoloAll(), ShowMessage("Unsolo all")]
+    return state, [UnsoloAll(), *buttons.say("unsolo_all")]
 
 
 @functions.register(
     "unarm_all", light=lambda state, snapshot, value: Light(RED if snapshot.any_armed else OFF)
 )
 def unarm_all(state, snapshot, value=None):
-    return state, [UnarmAll(), ShowMessage("Unarm all")]
+    return state, [UnarmAll(), *buttons.say("unarm_all")]
 
 
 @functions.register("window", light=lambda state, snapshot, value: Light(YELLOW))
@@ -194,14 +196,14 @@ def toggle_fader_source(state):
     panel = state.mode is Mode.SESSION and not state.fx
     if state.split_snapshots and panel:
         state = replace(state, split_snapshots=False, fader_source="device", fx_length=None)
-        return state, [ShowMessage("Device FX")]
+        return state, buttons.say("fader_source", "device")
     if state.fader_source == "mapped" and panel:
         # The faders stop showing.
         state, actions = faders.reset(state)
-        return replace(state, split_snapshots=True), actions + [ShowMessage("FX snapshots")]
+        return replace(state, split_snapshots=True), actions + buttons.say("fader_source", "snapshots")
     mapped = state.fader_source == "device"
     state = replace(state, fader_source="mapped" if mapped else "device")
-    return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
+    return state, buttons.say("fader_source", "mapped" if mapped else "device")
 
 
 def render_device_clip_layer(frame, state, snapshot=None):
