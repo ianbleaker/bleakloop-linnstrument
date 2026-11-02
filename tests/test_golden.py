@@ -42,6 +42,12 @@ HOLDS = {
 }
 
 
+# Linnstrument Mode hears only column 1 (the device's left split), and Device/Clip, Copy,
+# Delete, Stop and Seq can't be held there.
+LEFT_SPLIT = {"linnstrument", "scene-page"}
+LEFT_SPLIT_HOLDS = {"none", "shift"}
+
+
 def _diff(before, after):
     changed = [
         f"{f.name}={getattr(after, f.name)!r}"
@@ -55,11 +61,13 @@ def lines():
     out = []
     for base, (state, snapshot) in BASES.items():
         for hold, flags in HOLDS.items():
+            if base in LEFT_SPLIT and hold not in LEFT_SPLIT_HOLDS:
+                continue
             held = replace(state, **flags)
             name = f"{base}/{hold}"
             frame = engine.render(held, snapshot)
             out.append(f"{name} frame " + " ".join(f"{k}:{v!r}" for k, v in sorted(frame.items())))
-            for column in range(1, 17):
+            for column in (1,) if base in LEFT_SPLIT else range(1, 17):
                 for pad in range(1, 9):
                     for pressed in (True, False):
                         after, actions = engine.handle(held, PadPress(column, pad, pressed), snapshot)
