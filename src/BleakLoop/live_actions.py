@@ -229,7 +229,24 @@ def _step_track(song, step):
     if track is None:
         return "No more tracks"
     song.view.selected_track = track
+    _focus_rack(song, track)
     return track.name
+
+
+# The racks a track change hands the blue hand to. A MIDI Effect Rack sits in front of the
+# instrument, so it would win "first" without being the rack the player means.
+_FOCUS_RACKS = ("InstrumentGroupDevice", "DrumGroupDevice", "AudioEffectGroupDevice")
+
+
+def _focus_rack(song, track):
+    # The first top-level rack with a mapped macro, else the first rack; with none, Live's
+    # own selection stays. Selected too, or the device follow would move the hand back.
+    racks = [device for device in track.devices if device.class_name in _FOCUS_RACKS]
+    rack = next((rack for rack in racks if rack.has_macro_mappings), racks[0] if racks else None)
+    if rack is None:
+        return
+    song.view.select_device(rack)
+    song.appointed_device = rack
 
 
 def _step_device(song, step):
@@ -294,7 +311,9 @@ def apply(action, song, surface):
                     track.solo = False
         target.solo = not target.solo
     elif isinstance(action, SelectTrack):
-        song.view.selected_track = song.visible_tracks[action.track]
+        track = song.visible_tracks[action.track]
+        song.view.selected_track = track
+        _focus_rack(song, track)
     elif isinstance(action, ArmExclusive):
         target = song.visible_tracks[action.track]
         for track in song.tracks:

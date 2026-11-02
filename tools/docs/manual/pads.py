@@ -217,7 +217,7 @@ SELECT = Block(
     "Select and arm",
     layout.GRID_COLUMNS,
     SELECT_PADS,
-    "Select the track and arm it alone.",
+    "Select the track, arm it alone and give its first rack the blue hand.",
 )
 SOLO = Block(
     "Solo",
@@ -331,7 +331,8 @@ _DEVICE_CLIP = (
     Item(
         "Tracks",
         {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEVICE_CLIP_TRACK_STEPS.items()},
-        "Select the previous or next track, through the returns and master.",
+        "Select the previous or next track, through the returns and master, and give its "
+        "first rack the blue hand.",
     ),
     Item(
         "Devices",
