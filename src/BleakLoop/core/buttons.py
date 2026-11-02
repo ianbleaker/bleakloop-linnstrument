@@ -243,7 +243,7 @@ class Registry:
         column, pad = self.entry(id)["pad"]
         return (column, pad)
 
-    def say(self, name, outcome=None, **values):
+    def say(self, name, outcome=None, /, **values):
         # The function's message, or one of its outcomes; nothing when its show flag is off.
         item = self.function(name)
         if not item.get("show", True):
@@ -251,11 +251,11 @@ class Registry:
         template = item["outcomes"][outcome] if outcome else item["message"]
         return [_message(name, template, values)]
 
-    def refuse(self, name, key, **values):
+    def refuse(self, name, key, /, **values):
         # Always shown, whatever the show flag says: a silent press that does nothing confuses.
         return [_message(name, self.function(name)["refusals"][key], values)]
 
-    def system(self, key, **values):
+    def system(self, key, /, **values):
         return _format(self.data["system"][key], values)[0]
 
     def section(self, name, base=None):
@@ -473,13 +473,13 @@ def section(name, base=None):
     return _get().section(name, base)
 
 
-def say(name, outcome=None, **values):
+def say(name, outcome=None, /, **values):
     return _get().say(name, outcome, **values)
 
 
-def refuse(name, key, **values):
+def refuse(name, key, /, **values):
     return _get().refuse(name, key, **values)
 
 
-def system(key, **values):
+def system(key, /, **values):
     return _get().system(key, **values)

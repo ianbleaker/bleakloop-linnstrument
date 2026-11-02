@@ -6,7 +6,7 @@ and Shift + Play/Stop act on it.
 
 from dataclasses import replace
 
-from . import catalogue, controls, faders, functions, fx, layout, mixer, modes
+from . import buttons, catalogue, controls, faders, functions, fx, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -32,7 +32,6 @@ from .model import (
     QuantizeClip,
     SetLaunchQuantization,
     ShowClip,
-    ShowMessage,
     StopAllClips,
     StopTrackClips,
     TogglePlay,
@@ -109,7 +108,7 @@ def _record(state, snapshot, value):
 
 @functions.register("capture", light=_lit(LIME))
 def _capture(state, snapshot, value):
-    return state, [CaptureAndInsertScene(), ShowMessage("Capture and Insert Scene")]
+    return state, [CaptureAndInsertScene(), *buttons.say("capture")]
 
 
 @functions.register("record_clip", light=_lit(RED))
@@ -168,7 +167,7 @@ def _linnstrument_from_session(state, snapshot, value):
 
 @functions.register("stop_all", light=_lit(RED))
 def _stop_all(state, snapshot, value):
-    return state, [StopAllClips(), ShowMessage("Stop all clips")]
+    return state, [StopAllClips(), *buttons.say("stop_all")]
 
 
 @functions.register("stop_track", light=_lit(RED))
@@ -240,26 +239,26 @@ def _fixed_length(state):
     cycle = (None, *layout.FIXED_LENGTHS)
     bars = cycle[(cycle.index(state.fixed_length) + 1) % len(cycle)]
     if bars is None:
-        return replace(state, fixed_length=None), [ShowMessage("Fixed Length OFF")]
-    message = ShowMessage(f"Fixed Length {bars} bar" + ("s" if bars > 1 else ""))
-    return replace(state, fixed_length=bars), [message]
+        return replace(state, fixed_length=None), buttons.say("fixed_length", "off")
+    unit = "bars" if bars > 1 else "bar"
+    return replace(state, fixed_length=bars), buttons.say("fixed_length", bars=bars, unit=unit)
 
 
 def _stop_track(snapshot):
     track = snapshot.selected_track
     if track is None:
-        return [ShowMessage("No selected track")]
-    return [StopTrackClips(track.index), ShowMessage(f"Stop clips: {track.name}")]
+        return buttons.refuse("stop_track", "no_track")
+    return [StopTrackClips(track.index), *buttons.say("stop_track", track=track.name)]
 
 
 def _record_clip(state, snapshot):
     track = snapshot.selected_track
     if track is None:
-        return [ShowMessage("No selected track")]
+        return buttons.refuse("record_clip", "no_track")
     if track.is_foldable:
-        return [ShowMessage("Cannot record on a group track")]
+        return buttons.refuse("record_clip", "group_track")
     if not track.armed:
-        return [ShowMessage("Track not armed")]
+        return buttons.refuse("record_clip", "not_armed")
     length = controls.record_length(state.fixed_length, snapshot)
     # From the highlighted scene down, then wrapping to the top.
     count = snapshot.scene_count
@@ -269,21 +268,21 @@ def _record_clip(state, snapshot):
             return [
                 FireSlot(track.index, scene, legato=False, record_length=length),
                 ShowClip(track.index, scene),
-                ShowMessage("Record Clip"),
+                *buttons.say("record_clip"),
             ]
     # No empty slot: the new scene is added at the end, so it takes the next index.
     return [
         AddScene(),
         FireSlot(track.index, count, legato=False, record_length=length),
         ShowClip(track.index, count),
-        ShowMessage("Record Clip: new scene"),
+        *buttons.say("record_clip", "new_scene"),
     ]
 
 
 def _capture_midi(snapshot):
     if not snapshot.can_capture_midi:
-        return [ShowMessage("Nothing to capture")]
-    return [CaptureMidi(), ShowMessage("Capture MIDI")]
+        return buttons.refuse("capture_midi", "nothing")
+    return [CaptureMidi(), *buttons.say("capture_midi")]
 
 
 def _quantize(snapshot):
@@ -294,23 +293,23 @@ def _quantize(snapshot):
     ]
     found = [(target, clip) for target, clip in candidates if clip is not None]
     if not found:
-        return [ShowMessage("No clip to quantize")]
+        return buttons.refuse("quantize", "no_clip")
     target, clip = found[0]
     if not clip.is_midi:
-        return [ShowMessage("Cannot quantize an audio clip")]
-    return [QuantizeClip(target), ShowMessage("Quantize 1/16")]
+        return buttons.refuse("quantize", "audio")
+    return [QuantizeClip(target), *buttons.say("quantize")]
 
 
 def _launch_quantization(state, snapshot):
     if snapshot.launch_quantization != 0:
         state = replace(state, quantization_memory=snapshot.launch_quantization)
-        return state, [SetLaunchQuantization(0), ShowMessage("Launch Quantization: None")]
+        return state, [SetLaunchQuantization(0), *buttons.say("launch_quantization", name="None")]
     value = state.quantization_memory
     if value is None:
         value = DEFAULT_QUANTIZATION
     return state, [
         SetLaunchQuantization(value),
-        ShowMessage(f"Launch Quantization: {QUANTIZATION_NAMES[value]}"),
+        *buttons.say("launch_quantization", name=QUANTIZATION_NAMES[value]),
     ]
 
 

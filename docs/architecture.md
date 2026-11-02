@@ -252,6 +252,7 @@ flowchart TD
   core_fx --> core_model
   core_fx --> core_modes
   core_fx --> core_values
+  core_global_column --> core_buttons
   core_global_column --> core_catalogue
   core_global_column --> core_controls
   core_global_column --> core_faders
