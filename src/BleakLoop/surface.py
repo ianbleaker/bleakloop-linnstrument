@@ -15,10 +15,11 @@ from ableton.v3.control_surface import (
 )
 
 from . import device, live_actions, live_state
-from .core import buttons, controls, engine, faders, fx, layout, sequencer, values
+from .core import buttons, controls, engine, faders, fx, layout, sequencer, userfile, values
 from .core.leds import Clock, phase_key
 from .core.model import PadPress, ScenesChanged, SequencerView, SlideMoved, YAxis
 from .core.modes import Mode, State
+from .editor import server
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,7 @@ class BleakLoop(ControlSurface):
         self._ticks = 0
         self._button_stamps = None  # buttons.stamps() as last read
         self._reload_pending = False
+        self._editor = None  # the editor's server, while it runs
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
         logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
@@ -145,6 +147,8 @@ class BleakLoop(ControlSurface):
 
     def update_display(self):
         super().update_display()
+        if self._editor is not None:
+            self._editor.poll()
         if self._started:
             self._watch_buttons()
             self._check_pending_clip()
@@ -164,6 +168,7 @@ class BleakLoop(ControlSurface):
             self._button_stamps = buttons.stamps()
             if buttons.user_error:
                 logger.warning("BleakLoop: user buttons not loaded: %s", buttons.user_error)
+            self._start_editor()
             self._listen_for_nrpn_replies()
             self.request_rebuild_midi_map()
             # Reads first, then the fixed sets: every read reply is in before the computed sets.
@@ -196,6 +201,15 @@ class BleakLoop(ControlSurface):
                 callback=self._on_blink_timer, interval=values.BLINK_TIMER_MS, repeat=True
             )
             self._timer.start()
+
+    def _start_editor(self):
+        port = userfile.EDITOR["port"]
+        try:
+            self._editor = server.Server(port, server.placeholder)
+        except OSError as error:
+            logger.warning("BleakLoop editor: port %d unavailable (%s), editor off", port, error)
+            return
+        logger.info("BleakLoop editor: http://%s:%d", server.HOST, port)
 
     def _watch_buttons(self):
         # About once a second: a save to either buttons file applies, once no pad is held, so
@@ -305,6 +319,9 @@ class BleakLoop(ControlSurface):
         self._state = replace(self._state, fader_bindings=bindings)
 
     def disconnect(self):
+        if self._editor is not None:
+            self._editor.close()
+            self._editor = None
         if self._timer is not None:
             self._timer.stop()
             self._timer = None

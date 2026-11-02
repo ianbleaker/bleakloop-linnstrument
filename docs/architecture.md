@@ -186,6 +186,7 @@ flowchart TD
   subgraph Plumbing
     __init__["__init__"]
     device["device"]
+    editor_server["server"]
     surface["surface"]
   end
   subgraph Adapters
@@ -332,8 +333,10 @@ flowchart TD
   surface --> core_model
   surface --> core_modes
   surface --> core_sequencer
+  surface --> core_userfile
   surface --> core_values
   surface --> device
+  surface --> editor_server
   surface --> live_actions
   surface --> live_state
 ```

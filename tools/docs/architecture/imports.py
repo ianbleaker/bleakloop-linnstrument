@@ -11,6 +11,8 @@ LAYERS = {
     "__init__": "Plumbing",
     "surface": "Plumbing",
     "device": "Plumbing",
+    "editor": "Plumbing",
+    "editor.server": "Plumbing",
     "live_state": "Adapters",
     "live_actions": "Adapters",
     "Live": "External",
