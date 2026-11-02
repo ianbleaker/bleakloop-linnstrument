@@ -20,7 +20,7 @@ class Function:
 
 # Holds: pressed and released, in an order each mode's handle() keeps itself. A mode may run
 # one as a tap instead (Sequencer Mode's Seq leaves it), registering its press.
-HOLDS = frozenset({"shift", "device_clip", "seq", "copy", "delete", "stop"})
+HOLDS = frozenset({"shift", "device_clip", "seq", "copy", "delete", "stop", "bars"})
 
 
 _FUNCTIONS = {}  # (name, mode) -> Function

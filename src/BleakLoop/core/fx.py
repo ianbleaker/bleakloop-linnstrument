@@ -4,7 +4,7 @@ import json
 import math
 from dataclasses import replace
 
-from . import faders, layout, mixer
+from . import faders, functions, layout, mixer
 from .leds import CYAN, LIME, OFF, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
@@ -222,9 +222,12 @@ def toggle(state):
 
 def press(state, event, snapshot):
     # Every grid pad in FX Mode, and the split views' snapshot panel, releases included.
-    key = (event.column, event.pad)
-    if key in layout.FX.bars:
-        bars = layout.FX.bars[key]
+    button = layout.FX.at((event.column, event.pad))
+    if button is None:
+        return state, []
+    if button[1] == "bars":
+        # A hold: a timed recall or launch waits on it.
+        bars = button[3]
         if event.pressed:
             return replace(state, fx_length=bars), []
         if state.fx_length == bars:
@@ -233,14 +236,50 @@ def press(state, event, snapshot):
     # Under Shift the grid is dark and does nothing, as Mixer's faders.
     if not event.pressed or state.shift:
         return state, []
-    if key in layout.FX.slots:
-        return _slot_press(state, layout.FX.slots.index(key), False, snapshot)
-    if key in layout.FX.scene_slots:
-        # Column 13 follows the scene pads.
-        scene = state.window.scene + layout.FX.scene_slots.index(key)
-        if scene < snapshot.scene_count:
-            return _slot_press(state, scene, True, snapshot)
+    return functions.press(button, state, snapshot)
+
+
+@functions.register("slots", light=lambda state, snapshot, slot: _slot_light(state, slot - 1))
+def _slot(state, snapshot, slot):
+    return _slot_press(state, slot - 1, False, snapshot)
+
+
+@functions.register(
+    "scene_slots", light=lambda state, snapshot, row: _scene_slot_light(state, snapshot, row - 1)
+)
+def _scene_slot(state, snapshot, row):
+    # Column 13 follows the scene pads.
+    scene = state.window.scene + row - 1
+    if scene < snapshot.scene_count:
+        return _slot_press(state, scene, True, snapshot)
     return state, []
+
+
+functions.register_hold(
+    "bars",
+    light=lambda state, snapshot, bars: Light(WHITE, Blink.FAST if bars == state.fx_length else Blink.STEADY),
+)
+
+
+def _slot_light(state, slot):
+    morph = state.morph
+    if morph is not None and not morph.scene and morph.slot == slot:
+        return Light(CYAN, Blink.FAST)
+    if state.fx_slots[slot] is not None:
+        return Light(CYAN, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
+    return Light(OFF)
+
+
+def _scene_slot_light(state, snapshot, row):
+    scene = state.window.scene + row
+    if scene >= snapshot.scene_count:
+        return Light(OFF)
+    morph = state.morph
+    if morph is not None and morph.scene and morph.slot == scene:
+        return Light(LIME, Blink.FAST)
+    if scene_snapshot(state, scene) is not None:
+        return Light(LIME, Blink.TEMPO if scene == state.fx_landed_scene else Blink.STEADY)
+    return Light(OFF)
 
 
 def _slot_press(state, slot, scene, snapshot):
@@ -267,25 +306,8 @@ def render(state, snapshot):
     }
     if state.shift and not state.copy and not state.delete:
         return frame
-    morph = state.morph
-    target = morph.slot if morph is not None and not morph.scene else None
-    for slot, key in enumerate(layout.FX.slots):
-        if slot == target:
-            frame[key] = Light(CYAN, Blink.FAST)
-        elif state.fx_slots[slot] is not None:
-            frame[key] = Light(CYAN, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
-    target = morph.slot if morph is not None and morph.scene else None
-    for row, key in enumerate(layout.FX.scene_slots):
-        scene = state.window.scene + row
-        if scene >= snapshot.scene_count:
-            continue
-        if scene == target:
-            frame[key] = Light(LIME, Blink.FAST)
-        elif scene_snapshot(state, scene) is not None:
-            landed = scene == state.fx_landed_scene
-            frame[key] = Light(LIME, Blink.TEMPO if landed else Blink.STEADY)
-    for key, bars in layout.FX.bars.items():
-        frame[key] = Light(WHITE, Blink.FAST if bars == state.fx_length else Blink.STEADY)
+    for button in layout.FX.buttons():
+        frame[button[2]] = functions.light(button, state, snapshot)
     return frame
 
 

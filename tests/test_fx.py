@@ -1324,3 +1324,14 @@ def test_leaving_a_split_view_lets_go_of_a_held_length():
     assert not state.split and state.fx_length is None
     state, _ = handle(replace(MIXER_PANEL, fx_length=4), layout.NAVIGATION.mixer)
     assert not state.mixer_split and state.fx_length is None
+
+
+def test_snapshot_buttons_move_to_free_pads(monkeypatch):
+    # Slot 1 to column 13's unused pad 7, and the 1-bar pad to column 14's pad 6.
+    slots = list(layout.FX.slots)
+    slots[0] = (13, 7)
+    monkeypatch.setattr(layout.FX, "slots", tuple(slots))
+    monkeypatch.setattr(layout.FX, "bars", {(14, 6) if bars == 1 else key: bars for key, bars in layout.FX.bars.items()})
+    assert handle(FX, (13, 7)) == (FX, [StoreFxSnapshot(0)])
+    assert handle(FX, (11, 1)) == (FX, [])
+    assert handle(FX, (14, 6))[0].fx_length == 1
