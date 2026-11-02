@@ -15,7 +15,7 @@ from ableton.v3.control_surface import (
 )
 
 from . import device, live_actions, live_state
-from .core import buttons, controls, engine, faders, fx, layout, sequencer, userfile, values
+from .core import buttons, controls, engine, faders, fx, layout, sequencer, values
 from .core.leds import Clock, phase_key
 from .core.model import PadPress, ScenesChanged, SequencerView, SlideMoved, YAxis
 from .core.modes import Mode, State
@@ -129,6 +129,7 @@ class BleakLoop(ControlSurface):
         self._button_stamps = None  # buttons.stamps() as last read
         self._reload_pending = False
         self._editor = None  # the editor's server, while it runs
+        self._editor_problem = None  # why the editor didn't start, shown once started
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
         logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
@@ -196,6 +197,8 @@ class BleakLoop(ControlSurface):
                 self.show_message(self._refusal)
             if buttons.user_error:
                 self.show_message(f"BleakLoop: user buttons not loaded: {buttons.user_error}")
+            elif self._editor_problem:
+                self.show_message(self._editor_problem)
             # The display tick alone would land tempo blinks up to 100 ms late.
             self._timer = Live.Base.Timer(
                 callback=self._on_blink_timer, interval=values.BLINK_TIMER_MS, repeat=True
@@ -203,13 +206,27 @@ class BleakLoop(ControlSurface):
             self._timer.start()
 
     def _start_editor(self):
-        port = userfile.EDITOR["port"]
+        settings = buttons.editor_settings()
+        if not settings["enabled"]:
+            logger.info("BleakLoop editor: off")
+            return
+        port = settings["port"]
+        editor = server.Editor(port, self._editor_saved)
         try:
-            self._editor = server.Server(port, server.placeholder)
+            self._editor = server.Server(port, editor.handle)
         except OSError as error:
-            logger.warning("BleakLoop editor: port %d unavailable (%s), editor off", port, error)
+            message = f"BleakLoop editor: port {port} unavailable ({error.strerror}), editor off"
+            logger.warning(message)
+            self._editor_problem = message
             return
         logger.info("BleakLoop editor: http://%s:%d", server.HOST, port)
+
+    def _editor_saved(self):
+        # The editor wrote or deleted the user file: reload now, without waiting for the poll
+        # (and without the poll reloading it again). A problem goes back to the page.
+        self._button_stamps = buttons.stamps()
+        self._reload_pending = False
+        return self.reload_buttons()
 
     def _watch_buttons(self):
         # About once a second: a save to either buttons file applies, once no pad is held, so
@@ -232,11 +249,11 @@ class BleakLoop(ControlSurface):
             message = f"BleakLoop: buttons not reloaded: {error}"
             logger.warning(message)
             self.show_message(message)
-            return False
+            return str(error)
         logger.info("BleakLoop: buttons reloaded")
         self.show_message("BleakLoop: buttons reloaded")
         self._refresh()
-        return True
+        return None
 
     def _follow_selected_device(self):
         # Device FX follows the blue hand, which other control surfaces may move. A click on

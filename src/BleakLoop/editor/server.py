@@ -2,8 +2,17 @@
 http.server blocks. Each connection reads into a buffer until its request is complete, and its
 response goes out over the following ticks. Every response closes the connection."""
 
+import json
+import logging
+import os
 import socket
 import time
+import tomllib
+from pathlib import Path
+
+from ..core import buttons, userfile
+
+logger = logging.getLogger(__name__)
 
 HOST = "127.0.0.1"
 MAX_REQUEST = 256 * 1024
@@ -19,6 +28,7 @@ REASONS = {
     405: "Method Not Allowed",
     413: "Payload Too Large",
     415: "Unsupported Media Type",
+    500: "Internal Server Error",
 }
 
 
@@ -127,7 +137,12 @@ class Server:
             if isinstance(request, int):
                 connection.outgoing = response(request, "text/plain; charset=utf-8", REASONS[request])
             else:
-                connection.outgoing = self.handle(request)
+                # A bug here must never reach Live's display tick.
+                try:
+                    connection.outgoing = self.handle(request)
+                except Exception:
+                    logger.exception("BleakLoop editor: %s %s failed", request.method, request.path)
+                    connection.outgoing = response(500, "text/plain; charset=utf-8", REASONS[500])
         if connection.outgoing:
             try:
                 sent = connection.sock.send(connection.outgoing)
@@ -151,8 +166,106 @@ class Server:
         self.sock.close()
 
 
-def placeholder(request):
-    # Item 4's go/no-go answer, until the editor's routes replace it.
-    if request.method == "GET" and request.path == "/":
-        return response(200, "text/plain; charset=utf-8", "BleakLoop editor OK")
-    return response(404, "text/plain; charset=utf-8", "Not Found")
+PAGE = Path(__file__).parent / "index.html"
+TEXT = "text/plain; charset=utf-8"
+
+
+def _json(status, data):
+    return response(status, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False))
+
+
+def _error(status, message):
+    return _json(status, {"error": message})
+
+
+def write_atomic(path, text):
+    # A temporary file in the same folder, then a rename: a reader sees the old file or the
+    # new one, never half of one.
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with open(temporary, "w", encoding="utf-8") as file:
+            file.write(text)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+class Editor:
+    """The editor's routes. Writes only to the user file it was given, never to a path from a
+    request. on_change reloads the layout after a save or reset."""
+
+    def __init__(self, port, on_change, shipped_path=None, user_path=None):
+        self.port = port
+        self.on_change = on_change
+        self.shipped_path = shipped_path or buttons.PATH
+        self.user_path = user_path or buttons.USER_PATH
+        self.hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+
+    def handle(self, request):
+        # Another web page in the browser can reach 127.0.0.1 too: a foreign Host (DNS
+        # rebinding) or Origin is refused, and a POST must be JSON, which a page on another
+        # origin can't send without a preflight this server never grants.
+        host = request.headers.get("host", "")
+        if host not in self.hosts:
+            return response(403, TEXT, "Forbidden")
+        origin = request.headers.get("origin")
+        if origin is not None and origin != f"http://{host}":
+            return response(403, TEXT, "Forbidden")
+        path = request.path.split("?", 1)[0]
+        if request.method == "GET":
+            if path == "/":
+                return response(200, "text/html; charset=utf-8", PAGE.read_bytes())
+            if path == "/api/layout":
+                return _json(200, buttons.describe())
+            return response(404, TEXT, "Not Found")
+        if request.method != "POST":
+            return response(405, TEXT, "Method Not Allowed")
+        kind = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if kind != "application/json":
+            return response(415, TEXT, "Unsupported Media Type")
+        if path == "/api/save":
+            return self._save(request.body)
+        if path == "/api/reset":
+            return self._reset()
+        return response(404, TEXT, "Not Found")
+
+    def _save(self, body):
+        if self.user_path is None:
+            return _error(400, "BleakLoop isn't installed in a Remote Scripts folder: no user file")
+        try:
+            overlay = json.loads(body.decode("utf-8"))["overlay"]
+            if not isinstance(overlay, dict):
+                raise ValueError("overlay: not an object")
+            overlay = userfile.prune(overlay)
+            text = userfile.to_toml(overlay)
+            if tomllib.loads(text) != overlay:
+                raise ValueError("the overlay doesn't survive being written as TOML")
+            with open(self.shipped_path, "rb") as file:
+                shipped = tomllib.load(file)
+            merged, _ = userfile.merge(shipped, overlay, str(self.user_path))
+            buttons.Registry(merged)
+        except (ValueError, KeyError, TypeError, UnicodeDecodeError) as error:
+            message = str(error) if not isinstance(error, KeyError) else f"missing {error}"
+            return _error(400, message)
+        try:
+            write_atomic(self.user_path, text)
+        except OSError as error:
+            return _error(400, f"couldn't write {self.user_path}: {error.strerror}")
+        return self._changed()
+
+    def _reset(self):
+        if self.user_path is not None:
+            try:
+                Path(self.user_path).unlink(missing_ok=True)
+            except OSError as error:
+                return _error(400, f"couldn't delete {self.user_path}: {error.strerror}")
+        return self._changed()
+
+    def _changed(self):
+        problem = self.on_change()
+        if problem:
+            return _error(400, problem)
+        return _json(200, buttons.describe())

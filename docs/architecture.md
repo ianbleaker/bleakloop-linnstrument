@@ -312,6 +312,8 @@ flowchart TD
   device --> core_layout
   device --> core_leds
   device --> core_model
+  editor_server --> core_buttons
+  editor_server --> core_userfile
   live_actions --> Live
   live_actions --> core_buttons
   live_actions --> core_model
@@ -333,7 +335,6 @@ flowchart TD
   surface --> core_model
   surface --> core_modes
   surface --> core_sequencer
-  surface --> core_userfile
   surface --> core_values
   surface --> device
   surface --> editor_server

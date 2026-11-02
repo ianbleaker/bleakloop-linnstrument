@@ -551,6 +551,127 @@ def reload(path=None, user_path=None):
     layout.refresh()
 
 
+def _neighbours(section):
+    # The other sections live in a layer with this one.
+    return sorted({other for names in LAYERS.values() if section in names for other in names} - {section})
+
+
+def _pads(regions):
+    return [[column, pad] for columns, pads in regions for column in columns for pad in pads]
+
+
+def describe(registry=None):
+    """The layout as plain data, for the editor: each live section's buttons, where each comes
+    from and its fixed regions, every function's messages, the system messages and the user's
+    changes."""
+    from . import layout
+
+    registry = registry or _get()
+    overlay = getattr(registry, "overlay", {})
+    regions = _regions()
+    sections = []
+    for live in layout.SECTIONS:
+        name = live._name
+        key = name.replace("-", "_")
+        modes = section_modes(name)
+        own = []
+        for id, item in registry.items.items():
+            if item["section"] != name:
+                continue
+            short = id[len(key) + 1 :]
+            entry = {
+                "id": id,
+                "name": short,
+                "function": _does(id, item),
+                "pad": list(item["pad"]),
+                "label": registry.label(_does(id, item), name, _freeze(item.get("value"))),
+                "source": "user" if short in overlay.get(key, {}) else "shipped",
+            }
+            if "label" in item:
+                entry["own_label"] = item["label"]
+            if "value" in item:
+                entry["value"] = item["value"]
+            own.append(entry)
+        taken = {tuple(entry["pad"]) for entry in own}
+        inherited = []
+        if name in FALLBACK:
+            for id, pad in _live(registry.items, FALLBACK[name]):
+                item = registry.items[id]
+                if pad not in taken and MODES[_does(id, item)] & modes:
+                    entry = {
+                        "id": id,
+                        "function": _does(id, item),
+                        "pad": list(pad),
+                        "label": registry.label(_does(id, item), item["section"], _freeze(item.get("value"))),
+                        "source": "inherited",
+                        "from": item["section"],
+                    }
+                    if "value" in item:
+                        entry["value"] = item["value"]
+                    inherited.append(entry)
+        sections.append(
+            {
+                "name": name,
+                "key": key,
+                "modes": sorted(modes),
+                "fallback": FALLBACK.get(name),
+                "left_split": name in LEFT_SPLIT_SECTIONS,
+                "entries": own + inherited,
+                "regions": _pads(regions.get(name, ())),
+                # Fixed or taken in a layer this section shares: a button can't go there.
+                "locked": sorted(
+                    {
+                        tuple(pad)
+                        for other in _neighbours(name)
+                        for pad in _pads(regions.get(other, ()))
+                    }
+                    | {tuple(pad) for pad in _pads(regions.get(name, ()))}
+                ),
+                "others": [
+                    {"id": id, "section": other, "pad": list(pad)}
+                    for other in _neighbours(name)
+                    for id, pad in _live(registry.items, other)
+                    if registry.items[id]["section"] == other
+                ],
+                "functions": sorted(function for function, runs in MODES.items() if runs & modes),
+            }
+        )
+    functions = {}
+    for name in sorted(set(MODES) | set(registry.functions)):
+        item = registry.function(name)
+        described = {key: item[key] for key in ("label", "message", "show") if key in item}
+        described.setdefault("label", name)
+        described["placeholders"] = {}
+        if "message" in item:
+            described["placeholders"]["message"] = sorted(userfile.placeholders(item["message"]))
+        for table in ("outcomes", "refusals"):
+            if table in item:
+                described[table] = dict(item[table])
+                described["placeholders"][table] = {
+                    key: sorted(userfile.placeholders(text)) for key, text in item[table].items()
+                }
+        functions[name] = described
+    system = dict(registry.data.get("system", {}))
+    return {
+        "sections": sections,
+        "layers": {layer: list(names) for layer, names in LAYERS.items()},
+        "functions": functions,
+        "system": system,
+        "system_placeholders": {key: sorted(userfile.placeholders(text)) for key, text in system.items()},
+        "fixed_groups": sorted(userfile.FIXED_GROUPS),
+        "open_groups": sorted(userfile.OPEN_GROUPS),
+        "max_label": MAX_LABEL,
+        "overlay": overlay,
+        "editor": getattr(registry, "editor", dict(userfile.EDITOR)),
+        "shipped_path": str(PATH),
+        "user_path": None if USER_PATH is None else str(USER_PATH),
+    }
+
+
+def editor_settings():
+    return dict(_get().editor)
+
+
 def entry(id):
     return _get().entry(id)
 

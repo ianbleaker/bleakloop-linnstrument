@@ -186,3 +186,97 @@ def merge(shipped, user, name="user buttons file"):
     except ValueError as error:
         raise ValueError(f"{name}: {error}") from None
     return merged, editor
+
+
+HEADER = """\
+# BleakLoop's user buttons: your changes over the shipped buttons.toml. Anything not listed
+# here comes from the shipped file; delete this file to go back to it. BleakLoop applies a
+# save within about a second. The editor at http://127.0.0.1:<port> rewrites this whole file
+# on every save, so comments added here by hand are lost.
+"""
+
+_BARE = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
+
+
+def _key(name):
+    if name and set(name) <= _BARE:
+        return name
+    return _string(name)
+
+
+def _string(text):
+    out = []
+    for char in text:
+        if char == '"':
+            out.append('\\"')
+        elif char == "\\":
+            out.append("\\\\")
+        elif char == "\n":
+            out.append("\\n")
+        elif char == "\t":
+            out.append("\\t")
+        elif char == "\r":
+            out.append("\\r")
+        elif ord(char) < 0x20 or ord(char) == 0x7F:
+            out.append(f"\\u{ord(char):04x}")
+        else:
+            out.append(char)
+    return '"' + "".join(out) + '"'
+
+
+def _value(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            raise ValueError("numbers must be finite")
+        return repr(value)
+    if isinstance(value, str):
+        return _string(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_value(part) for part in value) + "]"
+    raise ValueError(f"can't write {type(value).__name__} values")
+
+
+def _table(lines, name, table):
+    # A table's plain values, then its nested tables as [name.key].
+    lines.append(f"[{name}]")
+    nested = []
+    for key, value in table.items():
+        if isinstance(value, dict):
+            nested.append((key, value))
+        else:
+            lines.append(f"{_key(key)} = {_value(value)}")
+    for key, value in nested:
+        _table(lines, f"{name}.{_key(key)}", value)
+
+
+def prune(value):
+    # Drops empty tables, which TOML can't keep apart from missing ones.
+    if not isinstance(value, dict):
+        return value
+    pruned = {key: prune(part) for key, part in value.items()}
+    return {key: part for key, part in pruned.items() if part != {}}
+
+
+def to_toml(overlay):
+    """The user file's text for an overlay: editor, system, functions, then the buttons."""
+    lines = [HEADER.rstrip("\n")]
+    order = [key for key in ("editor", "system", "functions") if key in overlay]
+    order += [key for key in overlay if key not in ("editor", "system", "functions")]
+    for key in order:
+        value = overlay[key]
+        if not isinstance(value, dict):
+            raise ValueError(f"{key}: not allowed in the user file")
+        if key in ("editor", "system"):
+            lines.append("")
+            _table(lines, _key(key), value)
+            continue
+        for name, item in value.items():
+            if not isinstance(item, dict):
+                raise ValueError(f"{key}.{name}: not a table")
+            lines.append("")
+            _table(lines, f"{_key(key)}.{_key(name)}", item)
+    return "\n".join(lines) + "\n"

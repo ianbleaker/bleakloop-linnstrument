@@ -104,3 +104,32 @@ def test_stamps_change_when_a_file_is_saved_created_or_deleted(tmp_path):
     assert buttons.stamps(shipped, user) != created
     user.unlink()
     assert buttons.stamps(shipped, user) == before
+
+
+def test_the_writer_round_trips_through_tomllib():
+    import tomllib
+
+    overlay = {
+        "editor": {"enabled": False, "port": 50000},
+        "system": {"track": 'Quote " back \\ slash\nnew {track} — é ✓'},
+        "functions": {
+            "metronome": {
+                "label": "Métro",
+                "show": True,
+                "outcomes": {"on": "On\t{x}", "off": "Off"},
+            },
+            "odd key": {"refusals": {"a.b": "x"}},
+        },
+        "navigation_shift": {"tempo_5": {"pad": [16, 4], "does": "tempo", "value": 5}},
+        "sequencer_settings": {"rate_4": {"value": 1.0, "pad": [11, 1]}},
+        "fx": {"window": {"value": [[1, 2], [3, -4]]}},
+    }
+    text = userfile.to_toml(overlay)
+    assert text.startswith("# BleakLoop's user buttons")
+    assert tomllib.loads(text) == overlay
+
+
+def test_prune_drops_empty_tables():
+    assert userfile.prune({"global": {}, "functions": {"x": {"outcomes": {}}}, "system": {"a": "b"}}) == {
+        "system": {"a": "b"}
+    }
