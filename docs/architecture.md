@@ -288,6 +288,7 @@ flowchart TD
   core_sequencer --> core_model
   core_sequencer --> core_modes
   core_sequencer --> core_values
+  core_session --> core_buttons
   core_session --> core_catalogue
   core_session --> core_controls
   core_session --> core_faders

@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, sequencer
+from . import buttons, catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, sequencer
 from .leds import (
     BLUE,
     CYAN,
@@ -34,7 +34,6 @@ from .model import (
     SelectTrack,
     SetArm,
     ShowClip,
-    ShowMessage,
     StopTrackClips,
     ToggleMute,
     ToggleSolo,
@@ -81,14 +80,14 @@ def handle(state, event, snapshot):
         if state.mixer and not fx.panel_visible(state):
             return state, []
         if state.fx or state.mixer:
-            return replace(state, copy=True), [ShowMessage("Copy: press a slot to overwrite")]
-        return replace(state, copy=True), [ShowMessage("Copy: pick a clip or scene")]
+            return replace(state, copy=True), buttons.say("copy", "held_slots")
+        return replace(state, copy=True), buttons.say("copy", "held")
     if held == "delete" and not shifted:
         if not event.pressed:
             return replace(state, delete=False), []
         if state.mixer and not fx.panel_visible(state):
             return state, []
-        return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
+        return replace(state, delete=True), buttons.say("delete")
     if held == "stop" and not shifted:
         return _stop(state, event)
     if normal is not None or controls.at(controls.sections(state, shift=True), key) is not None:
@@ -280,38 +279,38 @@ def _copy_slot(state, event, snapshot):
     if source is None:
         if slot.has_clip:
             source = ClipSource(track.index, scene, track.has_midi_input)
-            return replace(state, copy_source=source), [ShowMessage("Copy: pick an empty slot")]
+            return replace(state, copy_source=source), buttons.say("copy", "picked_clip")
         if track.is_foldable and any(slot.member_clips):
             source = GroupSource(track.index, scene)
-            return replace(state, copy_source=source), [ShowMessage("Copy: pick an empty slot")]
-        return state, [ShowMessage("Copy: pick a clip or scene")]
+            return replace(state, copy_source=source), buttons.say("copy", "picked_clip")
+        return state, buttons.refuse("copy", "empty_slot")
     if isinstance(source, SceneSource):
-        return state, [ShowMessage("Pick a scene target")]
+        return state, buttons.refuse("copy", "scene_source")
     dropped = replace(state, copy_source=None)
     if isinstance(source, GroupSource):
         return dropped, _copy_group(state, source, track, scene, slot)
     if slot.has_clip:
-        return dropped, [ShowMessage("Target not empty")]
+        return dropped, buttons.refuse("copy", "target_full")
     if track.is_foldable:
-        return dropped, [ShowMessage("Cannot copy into a group track")]
+        return dropped, buttons.refuse("copy", "group_target")
     if track.has_midi_input != source.midi:
-        return dropped, [ShowMessage("Cannot copy between MIDI and audio tracks")]
+        return dropped, buttons.refuse("copy", "kinds")
     copy = CopyClip(source.track, source.scene, track.index, scene)
-    return dropped, [copy, ShowMessage("Clip copied")]
+    return dropped, [copy, *buttons.say("copy", "clip_copied")]
 
 
 def _copy_group(state, source, track, scene, slot):
     # Each member copies to its own slot: every member with a clip in the source row needs an
     # empty slot in the target row, or nothing copies.
     if track.index != source.track:
-        return [ShowMessage("Pick a slot in the same group")]
+        return buttons.refuse("copy", "other_group")
     row = source.scene - state.window.scene
     if not 0 <= row < len(track.slots):
         return []
     sources = track.slots[row].member_clips
     if any(a and b for a, b in zip(sources, slot.member_clips)):
-        return [ShowMessage("Target not empty")]
-    return [CopyGroupClips(source.track, source.scene, scene), ShowMessage("Clips copied")]
+        return buttons.refuse("copy", "target_full")
+    return [CopyGroupClips(source.track, source.scene, scene), *buttons.say("copy", "clips_copied")]
 
 
 def _copy_scene(state, event, snapshot):
@@ -324,15 +323,15 @@ def _copy_scene(state, event, snapshot):
     if source is None:
         if has:
             state = replace(state, copy_source=SceneSource(scene))
-            return state, [ShowMessage("Copy: pick an empty scene")]
-        return state, [ShowMessage("Scene is empty")]
+            return state, buttons.say("copy", "picked_scene")
+        return state, buttons.refuse("copy", "empty_scene")
     if isinstance(source, (ClipSource, GroupSource)):
-        return state, [ShowMessage("Pick a clip target")]
+        return state, buttons.refuse("copy", "clip_source")
     dropped = replace(state, copy_source=None)
     if has:
-        return dropped, [ShowMessage("Target scene not empty")]
+        return dropped, buttons.refuse("copy", "scene_full")
     dropped, save = fx.copy_scene(dropped, source.scene, scene, snapshot.scene_count)
-    return dropped, [CopyScene(source.scene, scene), *save, ShowMessage("Scene copied")]
+    return dropped, [CopyScene(source.scene, scene), *save, *buttons.say("copy", "scene_copied")]
 
 
 def _delete(state, event, snapshot):
@@ -352,7 +351,7 @@ def _delete(state, event, snapshot):
         if scene >= snapshot.scene_count:
             return state, []
         if snapshot.scene_count == 1:
-            return state, [ShowMessage("Cannot delete last scene")]
+            return state, buttons.refuse("delete", "last_scene")
         window = layout.move_window(
             state.window,
             0,
@@ -403,7 +402,7 @@ def _stop(state, event):
 def _stop_track(state, track):
     if track is None:
         return state, []
-    return state, [StopTrackClips(track.index), ShowMessage(f"Stop clips: {track.name}")]
+    return state, [StopTrackClips(track.index), *buttons.say("stop", track=track.name)]
 
 
 def _mute_row(state, track):
@@ -439,6 +438,11 @@ def _widen(state, toggle, snapshot):
     return state, actions
 
 
+def _split_owner(state):
+    # Session and Mixer Mode each toggle their own split view from their own pad.
+    return "mixer" if state.mixer else "session"
+
+
 def _toggle_split(state, snapshot):
     # Session or Mixer Mode's own split view.
     on = not faders.split_view(state)
@@ -450,13 +454,13 @@ def _toggle_split(state, snapshot):
         actions = []
         state = replace(state, split=on)
     if on:
-        return state, actions + [ShowMessage("Split view ON")]
+        return state, actions + buttons.say(_split_owner(state), "split_on")
     # The wider window keeps the last tracks filling it; the faders and snapshots stop showing.
     state, more = faders.reset(state)
     state = replace(state, fx_length=None)
     actions += more
     window = layout.move_window(state.window, 0, 0, snapshot.track_count, snapshot.scene_count)
-    return replace(state, window=window), actions + [ShowMessage("Split view OFF")]
+    return replace(state, window=window), actions + buttons.say(_split_owner(state), "split_off")
 
 
 def render(state, snapshot):

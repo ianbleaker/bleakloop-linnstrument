@@ -614,9 +614,15 @@ snapshots = "FX snapshots"
 
 [functions.session]
 label = "Session"
+[functions.session.outcomes]
+split_on = "Split view ON"
+split_off = "Split view OFF"
 
 [functions.mixer]
 label = "Mixer"
+[functions.mixer.outcomes]
+split_on = "Split view ON"
+split_off = "Split view OFF"
 
 [functions.fx]
 label = "FX"
@@ -626,12 +632,34 @@ label = "Seq"
 
 [functions.copy]
 label = "Copy"
+[functions.copy.outcomes]
+held = "Copy: pick a clip or scene"
+held_slots = "Copy: press a slot to overwrite"
+picked_clip = "Copy: pick an empty slot"
+clip_copied = "Clip copied"
+clips_copied = "Clips copied"
+picked_scene = "Copy: pick an empty scene"
+scene_copied = "Scene copied"
+[functions.copy.refusals]
+empty_slot = "Copy: pick a clip or scene"
+scene_source = "Pick a scene target"
+target_full = "Target not empty"
+group_target = "Cannot copy into a group track"
+kinds = "Cannot copy between MIDI and audio tracks"
+other_group = "Pick a slot in the same group"
+empty_scene = "Scene is empty"
+clip_source = "Pick a clip target"
+scene_full = "Target scene not empty"
 
 [functions.delete]
 label = "Delete"
+message = "Delete Mode ON"
+[functions.delete.refusals]
+last_scene = "Cannot delete last scene"
 
 [functions.stop]
 label = "Stop"
+message = "Stop clips: {track}"
 
 [functions.linnstrument_mode]
 label = "Linn"
