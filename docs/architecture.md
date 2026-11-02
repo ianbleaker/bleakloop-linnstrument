@@ -270,6 +270,7 @@ flowchart TD
   core_linnstrument_mode --> core_global_column
   core_linnstrument_mode --> core_layout
   core_linnstrument_mode --> core_model
+  core_mixer --> core_buttons
   core_mixer --> core_faders
   core_mixer --> core_layout
   core_mixer --> core_model

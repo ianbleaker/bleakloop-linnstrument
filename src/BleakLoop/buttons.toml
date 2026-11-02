@@ -623,6 +623,8 @@ label = "Mixer"
 [functions.mixer.outcomes]
 split_on = "Split view ON"
 split_off = "Split view OFF"
+on = "Mixer Mode ON"
+off = "Mixer Mode OFF"
 
 [functions.fx]
 label = "FX"
