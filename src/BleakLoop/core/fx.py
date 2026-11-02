@@ -23,7 +23,7 @@ from .values import FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
 
 SLOTS = 16
 
-# Launch quantization values (column_1.QUANTIZATION_NAMES) to their length: bars, then beats.
+# Launch quantization values (global_column.QUANTIZATION_NAMES) to their length: bars, then beats.
 LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
 LAUNCH_BEATS = {5: 2, 6: 4 / 3, 7: 1, 8: 2 / 3, 9: 1 / 2, 10: 1 / 3, 11: 1 / 4, 12: 1 / 6, 13: 1 / 8}
 

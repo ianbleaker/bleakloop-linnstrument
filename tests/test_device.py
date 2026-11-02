@@ -1,6 +1,7 @@
 import pytest
 
 from BleakLoop import device
+from BleakLoop.core import layout
 from BleakLoop.core.leds import BLUE, DEVICE_DEFAULT, OFF, WHITE, Clock, Light
 
 CLOCK = Clock(beats=0.0, now_ms=0)
@@ -56,7 +57,7 @@ def test_query():
     assert device.query(35) == device.nrpn(299, 35)
 
 
-# Column 1's notes
+# The Global column's notes
 
 
 def steps(start, offset):
@@ -386,7 +387,9 @@ def test_driver_repaints_after_reset():
     assert len(driver.update(frame(), CLOCK)) == 9
 
 
-def test_release_column_1():
+def test_release_global_column():
     driver = device.LedDriver()
-    expected = [m for pad in range(1, 9) for m in device.light(1, pad, DEVICE_DEFAULT)]
-    assert driver.release_column_1() == expected
+    expected = [
+        m for pad in range(1, 9) for m in device.light(layout.GLOBAL_COLUMN, pad, DEVICE_DEFAULT)
+    ]
+    assert driver.release_global_column() == expected

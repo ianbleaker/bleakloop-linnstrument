@@ -63,7 +63,7 @@ def test_entry_clears_copy_and_delete(start, target, source):
 
 @pytest.mark.parametrize("shift", [True, False])
 def test_entering_session_keeps_shift(shift):
-    # Shift is column 1 pad 8 in both modes, and its control-split release still arrives.
+    # Shift is the Global column's pad 8 in both modes, and its control-split release still arrives.
     assert modes.enter(State(mode=Mode.LINNSTRUMENT, shift=shift), Mode.SESSION).shift is shift
 
 

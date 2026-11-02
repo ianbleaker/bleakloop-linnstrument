@@ -1,6 +1,5 @@
 """Tuned values, by name. Each names its row in docs/architecture.md section 8."""
 
-SPLIT_POINT = 2  # left split is column 1
 RESTORE_GAP_MS = 20  # before each unload restore NRPN: the device drops the end of a burst
 POLL_MS = 1000  # Linnstrument Mode re-check of Row Offset, left split Octave/Transpose, right split
 

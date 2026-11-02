@@ -69,7 +69,7 @@ def test_scroll_to_scene_below_window_near_end_is_clamped():
     assert layout.scroll_to_scene(layout.Window(0, 0), 9, 20, 10) == layout.Window(0, 4)
 
 
-def test_column_1_has_one_pad_per_role():
+def test_global_column_has_one_pad_per_role():
     roles = [
         layout.PLAY_STOP,
         layout.RECORD,

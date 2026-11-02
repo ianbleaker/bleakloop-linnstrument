@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, engine, faders, fx, layout, mixer, session
+from BleakLoop.core import engine, faders, fx, global_column, layout, mixer, session
 from BleakLoop.core.leds import BLUE, MAGENTA, OFF, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
@@ -241,7 +241,7 @@ def test_a_slide_onto_shift_ends_on_its_release_and_leaves_shift_alone():
     state, _, _ = x(state, 2, 8, centre(2) + 10)
     state, _ = engine.slide(state, SlideMoved(8, 2, 1), SNAP)
     shifted = replace(state, shift=True)
-    state, actions = session.handle(shifted, PadPress(1, 8, False), SNAP)
+    state, actions = session.handle(shifted, PadPress(*layout.SHIFT, False), SNAP)
     assert state.shift and state.fader_touches == ()
     assert actions == [EndUndoStep()]
 
@@ -317,7 +317,7 @@ def test_mixer_on_resets_the_faders():
 
 def test_entering_linnstrument_mode_resets_the_faders():
     state, _, _ = x(touched(), 5, 3, centre(8))
-    state, actions = column_1.handle(state, PadPress(*layout.MODE_PAD, True), SNAP)
+    state, actions = global_column.handle(state, PadPress(*layout.MODE_PAD, True), SNAP)
     assert state.fader_touches == () and not state.fader_undo_open
     assert actions[0] == EndUndoStep()
 

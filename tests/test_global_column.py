@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, controls, layout, modes
+from BleakLoop.core import controls, global_column, layout, modes
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -72,7 +72,7 @@ def press(key, pressed=True):
 
 
 def handle(state, key, snapshot=BASE, pressed=True):
-    return column_1.handle(state, press(key, pressed), snapshot)
+    return global_column.handle(state, press(key, pressed), snapshot)
 
 
 def with_track(snapshot=BASE, **k):
@@ -91,7 +91,7 @@ def test_shift_press_and_release(state):
 @pytest.mark.parametrize("state", MODES + [shifted(SESSION), shifted(LINNSTRUMENT)])
 @pytest.mark.parametrize("pad", range(1, 8))
 def test_releases_do_nothing(state, pad):
-    assert handle(state, (1, pad), with_track(), pressed=False) == (state, [])
+    assert handle(state, (layout.GLOBAL_COLUMN, pad), with_track(), pressed=False) == (state, [])
 
 
 # Pad 1: Play/Stop
@@ -354,7 +354,7 @@ def test_empty_shift_slots_do_nothing(state, key):
 
 @pytest.mark.parametrize("state, key", EMPTY_SHIFT)
 def test_empty_shift_slots_are_unlit(state, key):
-    assert column_1.render(shifted(state), BASE)[key] == Light(OFF)
+    assert global_column.render(shifted(state), BASE)[key] == Light(OFF)
 
 
 def test_shift_mode_in_session_keeps_the_mode():
@@ -377,7 +377,7 @@ def test_scene_page_survives_the_shift_release():
 
 @pytest.mark.parametrize("pad", range(1, 8))
 def test_scene_page_ignores_other_releases(pad):
-    assert handle(SCENES, (1, pad), pressed=False) == (SCENES, [])
+    assert handle(SCENES, (layout.GLOBAL_COLUMN, pad), pressed=False) == (SCENES, [])
 
 
 def test_scene_page_closes_on_a_shift_press():
@@ -387,13 +387,13 @@ def test_scene_page_closes_on_a_shift_press():
 @pytest.mark.parametrize("pad", range(1, 7))
 def test_scene_page_launches_and_closes(pad):
     snap = replace(BASE, scene_count=10)
-    assert handle(SCENES, (1, pad), snap) == (LINNSTRUMENT, [FireScene(pad - 1, legato=False)])
+    assert handle(SCENES, (layout.GLOBAL_COLUMN, pad), snap) == (LINNSTRUMENT, [FireScene(pad - 1, legato=False)])
 
 
 def test_scene_page_pad_7_is_dark_and_does_nothing():
     snap = replace(BASE, scene_count=10)
     assert handle(SCENES, layout.MODE_PAD, snap) == (SCENES, [])
-    assert column_1.render(SCENES, snap)[layout.MODE_PAD] == Light(OFF)
+    assert global_column.render(SCENES, snap)[layout.MODE_PAD] == Light(OFF)
 
 
 def test_scene_page_launches_from_the_window():
@@ -423,8 +423,8 @@ def test_scene_page_lights():
     tracks = (TrackView(index=0, slots=(clip, playing, SlotView())),)
     snap = replace(BASE, tracks=tracks, scene_count=5)
     state = replace(SCENES, window=Window(scene=2))
-    frame = column_1.render(state, snap)
-    assert set(frame) == {(1, p) for p in range(1, 9)}
+    frame = global_column.render(state, snap)
+    assert set(frame) == {(layout.GLOBAL_COLUMN, p) for p in range(1, 9)}
     assert frame[(1, 1)] == Light(WHITE)
     assert frame[(1, 2)] == Light(LIME)
     assert frame[(1, 3)] == Light(OFF)  # no clip
@@ -437,7 +437,7 @@ def test_scene_page_lights():
 
 @pytest.mark.parametrize("state", MODES)
 def test_normal_lights(state):
-    frame = column_1.render(state, BASE)
+    frame = global_column.render(state, BASE)
     assert frame == {
         layout.PLAY_STOP: controls.play_light(BASE),
         layout.RECORD: (
@@ -461,7 +461,7 @@ def test_normal_lights(state):
     ],
 )
 def test_normal_lights_follow_live(state, snapshot):
-    frame = column_1.render(state, snapshot)
+    frame = global_column.render(state, snapshot)
     assert frame[layout.PLAY_STOP] == controls.play_light(snapshot)
     assert frame[layout.METRONOME] == controls.metronome_light(snapshot)
     if state.mode is Mode.SESSION:
@@ -475,7 +475,7 @@ def test_normal_lights_follow_live(state, snapshot):
     "bars, colour", [(None, OFF), (1, CYAN), (2, BLUE), (4, MAGENTA), (8, PINK)]
 )
 def test_fixed_length_colour(state, bars, colour):
-    frame = column_1.render(replace(state, fixed_length=bars), BASE)
+    frame = global_column.render(replace(state, fixed_length=bars), BASE)
     assert frame[layout.FIXED_LENGTH] == Light(colour)
 
 
@@ -483,7 +483,7 @@ def test_fixed_length_colour(state, bars, colour):
 @pytest.mark.parametrize("state", MODES)
 def test_shift_lights(state, quantization, light):
     snap = replace(BASE, launch_quantization=quantization, session_record=True)
-    frame = column_1.render(shifted(state), snap)
+    frame = global_column.render(shifted(state), snap)
     linnstrument = state.mode is Mode.LINNSTRUMENT
     assert frame == {
         layout.PLAY_STOP: Light(RED),
@@ -499,6 +499,6 @@ def test_shift_lights(state, quantization, light):
 
 @pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
 def test_copy_or_delete_hides_the_shift_layer(held):
-    frame = column_1.render(State(shift=True, **held), BASE)
+    frame = global_column.render(State(shift=True, **held), BASE)
     assert frame[layout.CAPTURE] == Light(LIME)
     assert frame[layout.SHIFT] == Light(WHITE, Blink.FAST)

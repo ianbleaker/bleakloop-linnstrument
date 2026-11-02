@@ -1,4 +1,4 @@
-"""Column 1: the control column, the same in every mode, and Linnstrument Mode's scene page.
+"""The Global column: the control column, the same in every mode, and Linnstrument Mode's scene page.
 
 In Linnstrument and Sequencer Mode the player is on the selected track, so Record, Capture
 and Shift + Play/Stop act on it.
@@ -63,7 +63,7 @@ FIXED_LENGTH_COLOURS = {None: OFF, 1: CYAN, 2: BLUE, 4: MAGENTA, 8: PINK}
 
 
 def handle(state, event, snapshot):
-    # A column-1 PadPress, pressed or released.
+    # A Global column PadPress, pressed or released.
     key = (event.column, event.pad)
     if state.scene_page:
         return _scene_page(state, key, event.pressed, snapshot)
@@ -246,11 +246,11 @@ def _launch_quantization(state, snapshot):
 
 
 def render(state, snapshot):
-    # Column 1 only. Copy and Delete hide the Shift layer.
+    # The Global column only. Copy and Delete hide the Shift layer.
     shift_held = Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
     if state.scene_page:
         frame = {
-            (1, pad): controls.scene_light(snapshot, state.window.scene, pad - 1, controls.waiting_scene(state))
+            (layout.GLOBAL_COLUMN, pad): controls.scene_light(snapshot, state.window.scene, pad - 1, controls.waiting_scene(state))
             for pad in range(1, layout.WINDOW_SCENES + 1)
         }
         frame[layout.MODE_PAD] = Light(OFF)

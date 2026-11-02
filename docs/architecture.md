@@ -45,11 +45,11 @@ flowchart LR
 | Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers | `core/modes.py` |
 | Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights | `core/controls.py` |
 | Clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table | `core/session.py` |
-| Column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/column_1.py` |
+| The Global column in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/global_column.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
 | FX Mode: snapshot storage format, rack identity, store, recall, morph timing and tick, scene snapshots and their launch and reordering, FX lights | `core/fx.py` |
 | Horizontal faders: X maths, touches and slides, undo, fader lights | `core/faders.py` |
-| Linnstrument Mode: column 1 only, handed to `column_1` | `core/linnstrument_mode.py` |
+| Linnstrument Mode: the Global column only, handed to `global_column` | `core/linnstrument_mode.py` |
 | Sequencer Mode: entry, the arm, step maths, editing, pages and loop, note pads, its lights | `core/sequencer.py` |
 | Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
 | Tuned numbers: every value in section 8, by name | `core/values.py` |
@@ -93,9 +93,9 @@ The core is a state machine plus a renderer, with no side effects of its own.
   - `event` is a pad press or release, or a tick. A Y-axis value takes its own entry, `y_axis(state, event) -> state`, and so does an X value, `x_axis(state, event) -> (state, actions, redraw)`. A slide transfer goes to `slide(state, event, snapshot) -> (state, actions)`.
   - `snapshot` is a plain, read-only view of the Live state the decision needs.
   - `actions` are plain values such as `FireSlot(track, scene, legato, record_length)`, `Undo()`, `SetVolume(track, value)` or `ShowMessage(text)`. The adapters carry them out.
-- **Output:** `render(state, snapshot) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, column 1 in Linnstrument Mode. A pad may blink; the LED driver resolves blinking pads with a `clock` that gives the tempo-blink and fast-blink phase.
+- **Output:** `render(state, snapshot) -> Frame`. A frame is the colour of every pad the current mode owns: the 8 × 16 surface in Session and Mixer Mode, the Global column in Linnstrument Mode. A pad may blink; the LED driver resolves blinking pads with a `clock` that gives the tempo-blink and fast-blink phase.
 - **Sending:** the LED driver compares each frame with the last frame sent and sends only the pads that differ, all in one pass, so blinking pads switch together. Clearing the remembered frame on a mode switch makes every pad correct after the switch.
-- **Shift layer:** while Shift is held, `handle` looks up the Shift table and `render` draws the Shift layer. There's no per-element modifier wiring. Shift is column 1's pad 8 in every mode. Entering Session Mode keeps it held. Entering Linnstrument Mode clears it, because the firmware sends the release of a pad pressed in User Firmware Mode as a User Firmware note, which never reaches the control channel.
+- **Shift layer:** while Shift is held, `handle` looks up the Shift table and `render` draws the Shift layer. There's no per-element modifier wiring. Shift is the Global column's pad 8 in every mode. Entering Session Mode keeps it held. Entering Linnstrument Mode clears it, because the firmware sends the release of a pad pressed in User Firmware Mode as a User Firmware note, which never reaches the control channel.
 
 ```mermaid
 sequenceDiagram
@@ -146,11 +146,11 @@ src/BleakLoop/
     modes.py           Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers
     controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights
     session.py         clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table
-    column_1.py        column 1 in every mode: its controls, Shift, and Linnstrument Mode's scene page
+    global_column.py   the Global column in every mode: its controls, Shift, and Linnstrument Mode's scene page
     mixer.py           Mixer toggle, coarse steps, bands, smoothing
     fx.py              FX Mode: snapshot storage, rack identity, store, recall, morph timing and tick, scene snapshots, FX lights
     faders.py          horizontal faders: X maths, touches and slides, undo, fader lights
-    linnstrument_mode.py  Linnstrument Mode: column 1 only, handed to column_1
+    linnstrument_mode.py  Linnstrument Mode: the Global column only, handed to global_column
     sequencer.py       Sequencer Mode: entry, the arm, step maths, editing, pages and loop, note pads, its lights
     leds.py            device colours, track colour matching, tempo and fast blink
     values.py          every value in section 8, by name
@@ -193,11 +193,11 @@ flowchart TD
     live_state["live_state"]
   end
   subgraph Core
-    core_column_1["column_1"]
     core_controls["controls"]
     core_engine["engine"]
     core_faders["faders"]
     core_fx["fx"]
+    core_global_column["global_column"]
     core_layout["layout"]
     core_leds["leds"]
     core_linnstrument_mode["linnstrument_mode"]
@@ -213,14 +213,6 @@ flowchart TD
     ableton_v3["ableton.v3"]
   end
   __init__ -.->|lazy| surface
-  core_column_1 --> core_controls
-  core_column_1 --> core_faders
-  core_column_1 --> core_fx
-  core_column_1 --> core_layout
-  core_column_1 --> core_leds
-  core_column_1 --> core_mixer
-  core_column_1 --> core_model
-  core_column_1 --> core_modes
   core_controls --> core_faders
   core_controls --> core_layout
   core_controls --> core_leds
@@ -248,8 +240,17 @@ flowchart TD
   core_fx --> core_model
   core_fx --> core_modes
   core_fx --> core_values
+  core_global_column --> core_controls
+  core_global_column --> core_faders
+  core_global_column --> core_fx
+  core_global_column --> core_layout
+  core_global_column --> core_leds
+  core_global_column --> core_mixer
+  core_global_column --> core_model
+  core_global_column --> core_modes
   core_leds --> core_values
-  core_linnstrument_mode --> core_column_1
+  core_linnstrument_mode --> core_global_column
+  core_linnstrument_mode --> core_layout
   core_linnstrument_mode --> core_model
   core_mixer --> core_faders
   core_mixer --> core_layout
@@ -259,20 +260,20 @@ flowchart TD
   core_model --> core_leds
   core_modes --> core_layout
   core_modes --> core_values
-  core_sequencer --> core_column_1
   core_sequencer --> core_controls
   core_sequencer --> core_faders
   core_sequencer --> core_fx
+  core_sequencer --> core_global_column
   core_sequencer --> core_layout
   core_sequencer --> core_leds
   core_sequencer --> core_mixer
   core_sequencer --> core_model
   core_sequencer --> core_modes
   core_sequencer --> core_values
-  core_session --> core_column_1
   core_session --> core_controls
   core_session --> core_faders
   core_session --> core_fx
+  core_session --> core_global_column
   core_session --> core_layout
   core_session --> core_leds
   core_session --> core_mixer
@@ -282,7 +283,6 @@ flowchart TD
   device --> core_layout
   device --> core_leds
   device --> core_model
-  device --> core_values
   live_actions --> Live
   live_actions --> core_model
   live_actions --> core_modes
@@ -326,14 +326,14 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 - **X-axis:** CC 10 = 1 on a row's channel turns X on for that row. X is 14-bit, sent LSB first on CC 32 + column, then MSB on CC column, on the row's channel. The value is global across the surface, about 0–2730: column c's reference X is `X_COLUMN_WIDTH × (c − 1)` (`FXD_CALX_FULL_UNIT` = 4095 / 24 in `ls_calibration.ino`), so its centre is `X_COLUMN_WIDTH × (c − 0.5)`. Row 0's column 6 uses CC 6 and 38 on channel 1, the NRPN reply CCs: those elements carry its X while X is listened, with no duplicate elements.
 - **Slide mode:** CC 9 = 1 on a row's channel turns on slide transfers. A finger crossing into the next cell sends CC 119 (value = source column) on the row's channel, then a Note On for the target cell with the first cell's velocity, then a Note Off for the source cell with velocity = the target column. With slide mode off, a crossing is a release and a fresh press with a gap between (below).
 - **Clean slate:** each time User Firmware Mode turns on, the device turns X, Y, Z and slide mode off, so they're re-sent after every NRPN 245 = 1. Source: `ls_handleTouches.ino` and [User Firmware Mode](https://github.com/rogerlinndesign/linnstrument-firmware/blob/master/user_firmware_mode.md).
-- **Control split** (Linnstrument Mode): set up on load as a one-column note split, column 1 only, in one-channel mode on the control channel (NRPNs in section 8). The setup runs in three phases:
+- **Control split** (Linnstrument Mode): set up on load as a one-column note split holding the Global column (`layout.GLOBAL_COLUMN`, column 1) only, in one-channel mode on the control channel (NRPNs in section 8). The setup runs in three phases:
   - **Reads:** Row Offset (227, 253, 263–270) and the right split's channels (100, 101, 102–117, 118), two NRPN 299 queries per step.
-  - **Fixed sets:** split on at column 1, one channel, Send X/Y/Z off, no Played colour (a pressed pad would light red over BleakLoop's colour), LowRow off, no special mode, Transpose at 0.
+  - **Fixed sets:** split on at the Global column, one channel, Send X/Y/Z off, no Played colour (a pressed pad would light red over BleakLoop's colour), LowRow off, no special mode, Transpose at 0.
   - **Computed sets:** the control channel and the Octave, worked out from the reads.
 
-  Each set is preceded by a query in the same step, and on unload the player's value is written back for every number BleakLoop set. The control channel is the highest one the right split doesn't use (its main channel, plus its per-note channels or its eight per-row channels). The right split is left untouched, unless it uses all 16: then its highest per-note channel other than the main one is turned off, borrowed and restored on unload. If the right split can't be read, channel 16 is used and the controls stay off. The Octave is the one closest to 0 that keeps all eight column-1 notes in 0–127. In Linnstrument Mode, BleakLoop polls Row Offset and the left split's Octave/Transpose every `POLL_MS`, rebuilds the note map and puts its own Octave/Transpose back if the player changed them. A Row Offset change to custom or Guitar needs values the poll didn't read: column-1 presses are dropped (releases still go through) and the poll repeats at once. A Row Offset that repeats a note in column 1 turns the controls off, with a message, until it changes. The same poll reads the right split's MIDI mode, main channel, per-row lowest channel and the control channel's own per-note switch. If the right split now plays on the control channel, the next poll reads all 16 per-note switches and moves the control channel to the highest free one (NRPN 1), with a message. With none free the controls go off, with a message, and the control channel's notes are no longer listened, so they reach Live's tracks; the full poll goes on until a channel frees up. The right split is never changed mid-session. BleakLoop listens for all 128 notes on the control channel; everything else passes through to Live's tracks.
+  Each set is preceded by a query in the same step, and on unload the player's value is written back for every number BleakLoop set. The control channel is the highest one the right split doesn't use (its main channel, plus its per-note channels or its eight per-row channels). The right split is left untouched, unless it uses all 16: then its highest per-note channel other than the main one is turned off, borrowed and restored on unload. If the right split can't be read, channel 16 is used and the controls stay off. The Octave is the one closest to 0 that keeps all eight Global column notes in 0–127. In Linnstrument Mode, BleakLoop polls Row Offset and the left split's Octave/Transpose every `POLL_MS`, rebuilds the note map and puts its own Octave/Transpose back if the player changed them. A Row Offset change to custom or Guitar needs values the poll didn't read: Global column presses are dropped (releases still go through) and the poll repeats at once. A Row Offset that repeats a note in the Global column turns the controls off, with a message, until it changes. The same poll reads the right split's MIDI mode, main channel, per-row lowest channel and the control channel's own per-note switch. If the right split now plays on the control channel, the next poll reads all 16 per-note switches and moves the control channel to the highest free one (NRPN 1), with a message. With none free the controls go off, with a message, and the control channel's notes are no longer listened, so they reach Live's tracks; the full poll goes on until a channel frees up. The right split is never changed mid-session. BleakLoop listens for all 128 notes on the control channel; everything else passes through to Live's tracks.
 
-**Colour values** (CC 22): red 1, yellow 2, green 3, cyan 4, blue 5, magenta 6, off 7, white 8, orange 9, lime 10, pink 11. Value 0 ("as set in Note Lights") also shows dark, but means device default and is used only to hand column 1's lights back on unload. On the device, lime looks yellow and green looks lime.
+**Colour values** (CC 22): red 1, yellow 2, green 3, cyan 4, blue 5, magenta 6, off 7, white 8, orange 9, lime 10, pink 11. Value 0 ("as set in Note Lights") also shows dark, but means device default and is used only to hand the Global column's lights back on unload. On the device, lime looks yellow and green looks lime.
 
 ![Colour values](architecture/colours.svg)
 
@@ -346,7 +346,7 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 > [!NOTE]
 > **Bursts lose messages.** In a single burst of the split setup the device dropped a block of about 16–19 messages from the middle, so the split setup is paced one step per display tick: two queries, or one query and one NRPN (about 2.8 s at startup). Each step carries one column of the loading rainbow (24 light CCs). On unload, the restore appended to the 38-message hand-back burst lost its last 18 messages, so each restore NRPN is sent after a `RESTORE_GAP_MS` sleep.
 
-- **Control split pads are notes.** Column 1 sends Note On for a press and Note Off for a release on the control channel. The note number follows "Note numbers in a playing split" below, with Transpose at 0 and BleakLoop's Octave.
+- **Control split pads are notes.** The Global column sends Note On for a press and Note Off for a release on the control channel. The note number follows "Note numbers in a playing split" below, with Transpose at 0 and BleakLoop's Octave.
 - **Y is relative and dense.** Every press reports 64 first, after the note-on. Y swings to 127 or 0 over about half a pad and then stays saturated until the release. Reports arrive every 10–20 ms, 1–3 units apart.
 - **A slide never overlaps pads.** With slide mode off, the old pad's release comes first, then 160–460 ms of silence, then the next pad's press.
 - **X matches the firmware.** Measured 2026-10-27: column centres 2, 11 and 14 read 230–257, 1782–1812 and 2309–2348; in a slow slide each column's first X was within 6 of `X_COLUMN_WIDTH × (c − 1)`, up to 2747 at column 16's far edge. After a transfer, X arrives on the target column's CC from the first report, and the source's Note Off comes 1–3 ms after the target's Note On, as value 0.
@@ -355,7 +355,7 @@ Sources (Roger Linn Design): [User Firmware Mode](https://github.com/rogerlinnde
 
 **Note numbers in a playing split.** Outside User Firmware Mode, a pad sends its row note + (column − 1) + 12 × (Octave NRPN 36 − 5) + (Transpose Pitch NRPN 37 − 7) − (Transpose Lights NRPN 38 − 7). Rows count from the nearest, row 0. Notes above 127 aren't sent. The row note comes from the global Row Offset (NRPN 227). Source: `determineRowOffsetNote` in the [firmware](https://github.com/rogerlinndesign/linnstrument-firmware/blob/master/ls_handleTouches.ino). Note names below are Live's (C3 = 60).
 
-| Row Offset (227) | Row note, row r | Measured, column 1, nearest pad first |
+| Row Offset (227) | Row note, row r | Measured, Global column, nearest pad first |
 | --- | --- | --- |
 | +3 to +7 (3–7) | 30 + r × offset | +3: F#0 A0 C1 D#1 F#1 A1 C2 D#2; +4: F#0 A#0 D1 F#1 A#1 D2 F#2 A#2; +5: F#0 B0 E1 A1 D2 G2 C3 F3; +6: F#0 C1 F#1 C2 F#2 C3 F#3 C4; +7: F#0 C#1 G#1 D#2 A#2 F3 C4 G4 |
 | Zero (127) | 30 for every row | F#0 on every pad |
@@ -378,7 +378,7 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
   - **Sequencer Mode's slides** use #46's X layer (section 5). `engine.x_rows` is the device rows holding a step (`sequencer.x_rows`), so X (CC 10) and slide mode (CC 9) are on only there, sent on each change. Sequencer Mode listens to every X element (MSB and LSB, columns 1–16, including `nrpn_6` / `nrpn_38` for row 0, column 6) and CC 119 on channels 1–8 for as long as it lasts, and drops the reports no hold uses, so none reach the armed track. Y stays off. A transfer (CC 119) moves the hold to its new cell (`sequencer.slide`), and the hold ends on that cell's release, whatever the column, as a fader touch does; one no hold owns releases the pad it left, as in Session Mode. The decoder isn't reset when the held rows change, since another row's slide may be mid-transfer.
 
 > [!IMPORTANT]
-> **Elements in Linnstrument Mode:** notes 0–127 on every channel, 16 × 128 = 2048 note buttons. The control channel is chosen from the right split after load, and elements must be declared before it is known. Only the chosen channel's 128 are listened. All 128, not only the eight that column 1 sends, so column 1 never plays Live's tracks, even between a Row Offset change and the next poll. The build time is logged at load (`BleakLoop elements built in`).
+> **Elements in Linnstrument Mode:** notes 0–127 on every channel, 16 × 128 = 2048 note buttons. The control channel is chosen from the right split after load, and elements must be declared before it is known. Only the chosen channel's 128 are listened. All 128, not only the eight that the Global column sends, so it never plays Live's tracks, even between a Row Offset change and the next poll. The build time is logged at load (`BleakLoop elements built in`).
 
 - **NRPN replies:** CC 99, 98, 6, 38, 101 and 100 on channel 1, listened during the setup and in Linnstrument Mode, so the setup's queries and the Linnstrument Mode poll can be read. Their listeners are removed when Session Mode is entered. The cost: in Linnstrument Mode, any channel-1 RPN or NRPN the LinnStrument sends (for example, MPE configuration on a settings change) doesn't reach Live.
 - **Routing per mode.** An element only intercepts MIDI while it has a listener, and v3's background layer listens to every element by default. So BleakLoop excludes every element from the background (`_should_include_element_in_background` returns False) and attaches listeners per mode. Sequencer Mode listens to the pads as Session Mode does. In Linnstrument Mode, only the control channel's 128 notes and the NRPN replies are listened; everything else reaches Live's tracks.
@@ -389,7 +389,7 @@ Custom Row Offset 33 is inverted guitar in the firmware: 65 − 5 × r, one lowe
 
 ### Device lifecycle
 
-- **Device setup and mode.** On load, BleakLoop enters User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Linnstrument Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. The setup runs in User Firmware Mode so the device shows a loading rainbow instead of its note lights: NRPNs are answered in either mode, and the device doesn't redraw its note lights over the User Firmware lights. Each step also paints one column (`device.loading_column`), sweeping columns 1–16 with the diagonal hues shifted by one per sweep, so the rainbow rolls. Entering Session Mode redraws every pad over it, and leaving User Firmware Mode clears it. On unload, it turns Y-axis, X and slide reporting off, leaves User Firmware Mode and returns column 1's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
+- **Device setup and mode.** On load, BleakLoop enters User Firmware Mode, configures the control split in its three phases (paced, section 5), then enters Session Mode, showing a message if the controls are off. NRPN 245 is sent on entering Session and Linnstrument Mode. Each set step queries a setting and then sets it; the device answers in order, so the first reply is the player's own value. The computed sets are worked out only after the fixed sets have gone out, so every read reply has arrived. The setup runs in User Firmware Mode so the device shows a loading rainbow instead of its note lights: NRPNs are answered in either mode, and the device doesn't redraw its note lights over the User Firmware lights. Each step also paints one column (`device.loading_column`), sweeping columns 1–16 with the diagonal hues shifted by one per sweep, so the rainbow rolls. Entering Session Mode redraws every pad over it, and leaving User Firmware Mode clears it. On unload, it turns Y-axis, X and slide reporting off, leaves User Firmware Mode and returns the Global column's lights to value 0 in one burst. It then writes back each number BleakLoop set, in setup order, including a borrowed per-note channel. One NRPN goes out per `RESTORE_GAP_MS` sleep, so the device is playable with the player's own split. Row Offset and the rest of the right split are only read, never written. A setting that never replied keeps BleakLoop's value.
 
 ```mermaid
 sequenceDiagram
@@ -416,7 +416,7 @@ sequenceDiagram
   BleakLoop->>LinnStrument: y_axis(False), CC 11 = 0 on channels 1–8
   BleakLoop->>LinnStrument: x_rows(()), CC 10 and 9 = 0 on channels 1–8
   BleakLoop->>LinnStrument: user_firmware_mode(False), NRPN 245 = 0
-  BleakLoop->>LinnStrument: release_column_1(), column 1 lights to value 0
+  BleakLoop->>LinnStrument: release_global_column(), Global column lights to value 0
   loop split_restore(saved, set numbers), RESTORE_GAP_MS sleep before each
     BleakLoop->>LinnStrument: NRPN N = player's value
   end
@@ -467,7 +467,7 @@ stateDiagram-v2
 
 - **X and slide rows.** `engine.x_rows(state)` names the device rows that want X and slide mode: all 8 while the horizontal faders show, else none. After each handled event, on mode entry and on a Mixer toggle, the surface sends `device.x_rows(rows)` only when the set changed, and re-listens when it switches between empty and not. Entering User Firmware Mode forgets the last set sent, so the next sync re-sends it.
 - **Decoding.** `device.SlideDecoder` keeps each cell's X LSB and turns the MSB into `XAxis(column, pad, value)`. A CC 119 arms a transfer for its row: the row's next Note On becomes `SlideMoved(pad, from_column, to_column)` instead of a press, and the next message for the source cell (its Note Off) is swallowed, whatever its value. `engine.slide` gives a slide to the fader whose touch is on the source cell; otherwise it becomes a release of the source pad, so a held pad (Stop, a Bars pad) never sticks. The target's own release later is a release of a pad never pressed, which every handler ignores.
-- **X input path.** X arrives at the firmware's scan rate, so `engine.x_axis(state, event)` needs no snapshot: the touch holds the parameter's name, range and quantization from its press, as Mixer's Y does. It returns `redraw` only when the lit pad count changes. A touch follows its finger through slides into any column, and ends on the release of the cell it's on: `session.handle` checks that before any column dispatch, so a release off the end of a fader never reaches the slot, scene or column 1 handler. The surface logs each gesture's report count and its longest `_on_x` (`FADERS: n reports, longest x ms`). Measured 2026-10-27 on racks and plugins: up to 769 reports in one long gesture, the longest `_on_x` 3.8 ms, most under 2 ms.
+- **X input path.** X arrives at the firmware's scan rate, so `engine.x_axis(state, event)` needs no snapshot: the touch holds the parameter's name, range and quantization from its press, as Mixer's Y does. It returns `redraw` only when the lit pad count changes. A touch follows its finger through slides into any column, and ends on the release of the cell it's on: `session.handle` checks that before any column dispatch, so a release off the end of a fader never reaches the slot, scene or Global column handler. The surface logs each gesture's report count and its longest `_on_x` (`FADERS: n reports, longest x ms`). Measured 2026-10-27 on racks and plugins: up to 769 reports in one long gesture, the longest `_on_x` 3.8 ms, most under 2 ms.
 
 ### Follow-up events
 
@@ -553,9 +553,9 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Value | Used by | Source | Status |
 | --- | --- | --- | --- |
 | Control channel: the highest channel the right split doesn't use; with none free, its highest per-note channel other than the main one, turned off (101 + c = 0); channel 16 if the right split can't be read | `device.control_channel` | Chosen at load from reads 100, 101, 102–117 and 118. Main always counts as used: no NRPN reads the firmware's main-channel-off switch, so a free channel can be skipped, which is harmless | Confirmed on device for Per Note, Per Row and One Channel, including the borrow; the channel 16 fallback can't be reached on a working device |
-| Fixed setup NRPNs: 200 = 1 (split on), 202 = `SPLIT_POINT` = 2 (left split is column 1), 0 = 0 (one channel), 20, 24, 27 = 0 (Send X/Y/Z off), 32 = 0 (Played colour off), 34 = 0 (LowRow off), 35 = 0 (no special mode), 37 = 38 = 7 (Transpose 0) | `device.fixed_steps`, each preceded by its query | Device protocol | Confirmed on device: one reply per query, in setup order, all restored on unload |
+| Fixed setup NRPNs: 200 = 1 (split on), 202 = `device.SPLIT_POINT` = `layout.GLOBAL_COLUMN` + 1 = 2 (the left split is the Global column), 0 = 0 (one channel), 20, 24, 27 = 0 (Send X/Y/Z off), 32 = 0 (Played colour off), 34 = 0 (LowRow off), 35 = 0 (no special mode), 37 = 38 = 7 (Transpose 0) | `device.fixed_steps`, each preceded by its query | Device protocol | Confirmed on device: one reply per query, in setup order, all restored on unload |
 | Computed setup NRPNs: 1 = control channel, 36 = the Octave fit, plus the borrowed per-note channel if any | `device.computed_steps`, each preceded by its query | Device protocol | Confirmed on device: borrowed channel restored on unload |
-| Octave fit: the NRPN 36 value in 0–10 closest to 5, ties lower, that keeps column 1's eight notes in 0–127 | `device.fit_octave` | Device protocol; every Row Offset spans at most 112, so one always fits | Confirmed on device: 5 for Row Offsets 4, 5, 7, No Overlap, +12, −5 and inverted guitar, 4 for +16 and −16 |
+| Octave fit: the NRPN 36 value in 0–10 closest to 5, ties lower, that keeps the Global column's eight notes in 0–127 | `device.fit_octave` | Device protocol; every Row Offset spans at most 112, so one always fits | Confirmed on device: 5 for Row Offsets 4, 5, 7, No Overlap, +12, −5 and inverted guitar, 4 for +16 and −16 |
 | NRPN 299 = N: query setting N, answered as NRPN N | `device.query` | Device protocol | Confirmed on device |
 | `RESTORE_GAP_MS = 20`: sleep before each unload restore NRPN | `surface.disconnect` | Tuned: 0 lost the last 18 messages, 20 restored all 13 | Confirmed on device |
 | `POLL_MS = 1000`: Linnstrument Mode re-check of Row Offset and the left split's Octave/Transpose | `surface` | Chosen: shorter than a trip through Global Settings and back | Confirmed on device: NRPN 36 refits and a left-split Octave change is reset within about 1 s, with no flicker |

@@ -5,6 +5,10 @@ from dataclasses import dataclass
 ROWS = 8
 COLUMNS = 17  # column 0 is the device's hardware buttons
 
+# The control column, the same in every mode. Linnstrument Mode reads it through the device's
+# left split, which always starts at the leftmost pad column, so it must stay leftmost.
+GLOBAL_COLUMN = 1
+
 GRID_COLUMNS = range(2, 15)
 SCENE_COLUMN = 15
 NAV_COLUMN = 16
@@ -17,17 +21,17 @@ MUTE_ROW = 7
 SELECT_ROW = 8
 
 # (column, pad)
-PLAY_STOP = (1, 1)
-RECORD = (1, 2)
-CAPTURE = (1, 3)
+PLAY_STOP = (GLOBAL_COLUMN, 1)
+RECORD = (GLOBAL_COLUMN, 2)
+CAPTURE = (GLOBAL_COLUMN, 3)
 QUANTIZE = CAPTURE  # pad 3's Shift function
-METRONOME = (1, 4)
+METRONOME = (GLOBAL_COLUMN, 4)
 LAUNCH_QUANTIZATION = METRONOME  # pad 4's Shift function
-FIXED_LENGTH = (1, 5)
-UNDO = (1, 6)
-MODE_PAD = (1, 7)
+FIXED_LENGTH = (GLOBAL_COLUMN, 5)
+UNDO = (GLOBAL_COLUMN, 6)
+MODE_PAD = (GLOBAL_COLUMN, 7)
 SCENE_PAGE = MODE_PAD  # pad 7's Shift function in Linnstrument Mode
-SHIFT = (1, 8)
+SHIFT = (GLOBAL_COLUMN, 8)
 SESSION = (NAV_COLUMN, 1)
 MIXER = (NAV_COLUMN, 2)
 FX = (NAV_COLUMN, 3)

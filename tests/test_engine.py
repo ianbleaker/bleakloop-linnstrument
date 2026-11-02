@@ -71,7 +71,7 @@ def test_linnstrument_input_goes_to_linnstrument_module():
 
 
 @pytest.mark.parametrize("key", [(2, 8), (5, 5), (16, 8)])
-def test_linnstrument_ignores_pads_outside_column_1(key):
+def test_linnstrument_ignores_pads_outside_global_column(key):
     assert engine.handle(LINNSTRUMENT, press(key), STOPPED) == (LINNSTRUMENT, [])
 
 
@@ -85,7 +85,7 @@ def test_session_render_goes_to_session_module():
 
 
 def test_linnstrument_render_goes_to_linnstrument_module():
-    assert set(engine.render(LINNSTRUMENT, PLAYING)) == {(1, p) for p in range(1, 9)}
+    assert set(engine.render(LINNSTRUMENT, PLAYING)) == {(layout.GLOBAL_COLUMN, p) for p in range(1, 9)}
 
 
 # Blink clock

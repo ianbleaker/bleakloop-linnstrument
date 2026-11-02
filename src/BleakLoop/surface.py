@@ -56,7 +56,7 @@ class Elements(ElementsBase):
                     X_LSB_CC_BASE + column, f"Xl {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
             self.add_button(CC_SLIDE_TRANSFER, f"Slide {row}", channel=row, msg_type=MIDI_CC_TYPE)
-        # Linnstrument Mode column 1: every note on every channel. The control channel is chosen
+        # Linnstrument Mode's Global column: every note on every channel. The control channel is chosen
         # from the right split after load, and elements must exist before it.
         for channel in range(16):
             for note in range(128):
@@ -95,7 +95,7 @@ class BleakLoop(ControlSurface):
         self._control_channel = None  # 0-based, chosen at load, moved off a right split clash
         self._rescan = False  # the next poll reads every right split channel
         self._clash = False  # the right split uses every channel: controls off
-        self._note_map = None  # column 1 note -> pad, None while refused
+        self._note_map = None  # Global column note -> pad, None while refused
         self._refusal = None
         self._right_split_unread = False
         self._sent = {}  # BleakLoop's last left split Octave/Transpose
@@ -284,7 +284,7 @@ class BleakLoop(ControlSurface):
             device.y_axis(False)
             + device.x_rows(())
             + device.user_firmware_mode(False)
-            + self._driver.release_column_1()
+            + self._driver.release_global_column()
         )
         # Paced: in one burst with the hand-back the device dropped the last 18 messages.
         for step in device.split_restore(self._saved_split, self._set_numbers):
@@ -579,7 +579,7 @@ class BleakLoop(ControlSurface):
             if self._wants_x(mode):
                 self._listen_for_x()
         else:
-            # All 128 notes, so column 1 never plays Live's tracks whatever Row Offset sends.
+            # All 128 notes, so the Global column never plays Live's tracks whatever Row Offset sends.
             # None while the right split uses the control channel: its notes are the player's.
             channel = self._control_channel
             if not self._clash:
@@ -685,7 +685,7 @@ class BleakLoop(ControlSurface):
             # Row Offset changed since the last re-check: drop the press and re-check now.
             self._poll_due = 0
             return
-        self._handle(PadPress(1, pad, value > 0))
+        self._handle(PadPress(layout.GLOBAL_COLUMN, pad, value > 0))
 
     def _handle(self, event, entry=engine.handle):
         state, actions = entry(self._state, event, self._snapshot())

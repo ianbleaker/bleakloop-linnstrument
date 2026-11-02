@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from BleakLoop.core import column_1, controls, engine, fx, layout, mixer, modes, session
+from BleakLoop.core import controls, engine, fx, global_column, layout, mixer, modes, session
 from BleakLoop.core.layout import Window
 from BleakLoop.core.leds import (
     BLUE,
@@ -141,7 +141,7 @@ def test_shift_press_and_release():
     assert handle(state, layout.SHIFT, pressed=False) == (SESSION, [])
 
 
-# Column 1
+# Global column
 
 
 def test_undo():
@@ -1059,7 +1059,7 @@ def test_empty_unarmed_slot_plain_fire():
 
 def test_back_after_auto_linnstrument_mode_returns_to_session():
     state, _ = handle(SESSION, (2, 1), ARMED_MIDI)
-    state, actions = column_1.handle(state, press(layout.MODE_PAD), ARMED_MIDI)
+    state, actions = global_column.handle(state, press(layout.MODE_PAD), ARMED_MIDI)
     assert (state.mode, state.mixer, state.fx) == (Mode.SESSION, False, False)
     assert actions == [EnterMode(Mode.SESSION)]
 
@@ -1144,7 +1144,7 @@ INERT_WHILE_HELD = (
     [(c, p) for c in layout.GRID_COLUMNS for p in (layout.MUTE_ROW, layout.SELECT_ROW)]
     + [layout.SESSION, layout.MIXER, layout.FX, *layout.RESERVED, layout.SEQ]
     + [layout.UNMUTE_ALL, layout.STOP]
-    + [(1, p) for p in range(1, 8)]
+    + [(layout.GLOBAL_COLUMN, p) for p in range(1, 8)]
 )
 
 
@@ -1635,7 +1635,7 @@ def test_stop_held_keeps_its_light_under_shift():
     assert session.render(state, SNAP)[layout.STOP] == Light(RED, Blink.FAST)
 
 
-def test_normal_layer_column_1():
+def test_normal_layer_global_column():
     frame = session.render(SESSION, SNAP)
     assert frame[layout.UNDO] == Light(WHITE)
     assert frame[layout.METRONOME] == Light(ORANGE)
@@ -1647,7 +1647,7 @@ def test_normal_layer_column_1():
     assert frame[layout.RECORD] == Light(RED)
 
 
-def test_normal_layer_column_1_playing_with_metronome():
+def test_normal_layer_global_column_playing_with_metronome():
     frame = session.render(SESSION, replace(SNAP, is_playing=True, metronome=True))
     assert frame[layout.METRONOME] == Light(ORANGE, Blink.FAST)
     assert frame[layout.PLAY_STOP] == Light(GREEN, Blink.TEMPO)
@@ -1670,7 +1670,7 @@ def test_scene_lights_follow_window_offset():
 
 
 @pytest.mark.parametrize("quantization, light", [(4, Light(GREEN)), (0, Light(RED))])
-def test_shift_layer_column_1(quantization, light):
+def test_shift_layer_global_column(quantization, light):
     frame = session.render(SHIFT, replace(SNAP, launch_quantization=quantization))
     assert frame[layout.PLAY_STOP] == Light(RED)
     assert frame[layout.UNDO] == Light(WHITE)

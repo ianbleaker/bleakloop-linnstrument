@@ -7,7 +7,7 @@ Steps are counted from clip time 0. Step s of the page in view is at column 3 + 
 import math
 from dataclasses import replace
 
-from . import column_1, controls, faders, fx, layout, mixer, modes, values
+from . import controls, faders, fx, global_column, layout, mixer, modes, values
 from .leds import (
     BLUE,
     CYAN,
@@ -280,7 +280,7 @@ def handle(state, event, snapshot):
         # A held step ends on its cell's release, wherever the finger slid to.
         return _release_step(state, event, view, snapshot)
     if key == layout.SHIFT:
-        return column_1.handle(state, event, snapshot)
+        return global_column.handle(state, event, snapshot)
     if event.column == layout.NAV_COLUMN:
         return _nav(state, event, snapshot)
     if event.column in layout.SEQ_STEP_COLUMNS:
@@ -294,8 +294,8 @@ def handle(state, event, snapshot):
     # Copy over Delete over Shift.
     if state.copy or state.delete:
         return state, []
-    if event.column == 1:
-        return column_1.handle(state, event, snapshot)
+    if event.column == layout.GLOBAL_COLUMN:
+        return global_column.handle(state, event, snapshot)
     if event.column == layout.SCENE_COLUMN:
         return _side(state, key, view)
     return state, []
@@ -653,7 +653,7 @@ def render(state, snapshot):
         for column in range(1, layout.COLUMNS)
         for pad in range(1, layout.ROWS + 1)
     }
-    frame.update(column_1.render(state, snapshot))
+    frame.update(global_column.render(state, snapshot))
     if view.track is not None and view.is_midi:
         _render_steps(frame, state, view, snapshot)
         _render_meters(frame, state, view)
