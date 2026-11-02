@@ -1963,3 +1963,13 @@ def test_a_view_button_works_in_column_1(monkeypatch):
         CaptureAndInsertScene(),
         ShowMessage("Capture and Insert Scene"),
     ]
+
+
+def test_device_clip_layer_follows_its_buttons(monkeypatch):
+    monkeypatch.setattr(layout.DEVICE_CLIP, "tracks", {(16, 1): -1, (16, 2): 1})
+    held = replace(SESSION, device_clip=True)
+    assert handle(held, (16, 1))[1] == [StepTrack(-1)]
+    assert handle(held, (16, 7))[1] == []
+    frame = session.render(held, SNAP)
+    assert frame[(16, 1)] == Light(LIME)
+    assert frame[(16, 7)] == Light(OFF)

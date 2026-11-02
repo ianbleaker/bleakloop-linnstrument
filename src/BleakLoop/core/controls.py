@@ -161,13 +161,31 @@ def device_clip(state, event):
     return state, [ToggleDetailView()] if tapped else []
 
 
+def navigation_pads(state):
+    # The pads Device/Clip's layer takes over: the Navigation column's, both layers, and its own.
+    if state.mode is Mode.SEQUENCER:
+        sections = (layout.SEQUENCER_NAV, layout.SEQUENCER_NAV_SHIFT, layout.DEVICE_CLIP)
+    else:
+        sections = (layout.NAVIGATION, layout.NAVIGATION_SHIFT, layout.DEVICE_CLIP)
+    return {button[2] for section in sections for button in section.buttons()}
+
+
 def device_clip_layer(state, key):
-    # Device/Clip held + a column 16 pad.
-    if key in layout.DEVICE_CLIP.tracks:
-        return state, [StepTrack(layout.DEVICE_CLIP.tracks[key])]
-    if key in layout.DEVICE_CLIP.devices:
-        return state, [StepDevice(layout.DEVICE_CLIP.devices[key])]
-    return state, []
+    # Device/Clip held + a press on a pad its layer takes.
+    button = layout.DEVICE_CLIP.at(key)
+    if button is None:
+        return state, []
+    return functions.press(button, state, snapshot=None)
+
+
+@functions.register("tracks", light=lambda state, snapshot, step: Light(LIME))
+def _track_step(state, snapshot, step):
+    return state, [StepTrack(step)]
+
+
+@functions.register("devices", light=lambda state, snapshot, step: Light(MAGENTA))
+def _device_step(state, snapshot, step):
+    return state, [StepDevice(step)]
 
 
 def toggle_fader_source(state):
@@ -186,14 +204,11 @@ def toggle_fader_source(state):
     return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
 
 
-def render_device_clip_layer(frame, state):
-    # Over either layer: the whole of column 16.
-    for pad in range(1, layout.ROWS + 1):
-        frame[(layout.NAV_COLUMN, pad)] = Light(OFF)
-    for key in layout.DEVICE_CLIP.tracks:
-        frame[key] = Light(LIME)
-    for key in layout.DEVICE_CLIP.devices:
-        frame[key] = Light(MAGENTA)
+def render_device_clip_layer(frame, state, snapshot=None):
+    # Over either layer: the Navigation pads go dark, then the layer's own light.
+    frame.update(dict.fromkeys(navigation_pads(state), Light(OFF)))
+    for button in layout.DEVICE_CLIP.buttons():
+        frame[button[2]] = functions.light(button, state, snapshot)
     frame.update(dict.fromkeys(pads(state, "device_clip"), Light(ORANGE, Blink.FAST)))
 
 

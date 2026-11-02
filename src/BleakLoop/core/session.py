@@ -69,7 +69,7 @@ def handle(state, event, snapshot):
     shifted = shift_layer and event.pressed and controls.at(controls.sections(state, shift=True), key) is not None
     if held == "device_clip" and not shifted:
         return controls.device_clip(state, event)
-    if state.device_clip and event.pressed and key in _navigation_pads():
+    if state.device_clip and event.pressed and key in controls.navigation_pads(state):
         # Device/Clip's layer replaces the Navigation column's normal and Shift layers.
         return controls.device_clip_layer(state, key)
     if held == "seq" and not shifted:
@@ -143,11 +143,6 @@ def handle(state, event, snapshot):
                 return fx.timed_launch(state, scene, snapshot)
             return state, [FireScene(scene, legato=False), *fx.scene_launch(state, scene, snapshot)]
     return state, []
-
-
-def _navigation_pads():
-    sections = (layout.NAVIGATION, layout.NAVIGATION_SHIFT, layout.DEVICE_CLIP)
-    return {button[2] for section in sections for button in section.buttons()}
 
 
 def _button(state, event, key, snapshot):
@@ -498,7 +493,7 @@ def render(state, snapshot):
         for button in section.buttons():
             frame[button[2]] = functions.light(button, state, snapshot)
     if state.device_clip:
-        controls.render_device_clip_layer(frame, state)
+        controls.render_device_clip_layer(frame, state, snapshot)
     if shift_layer and state.stop:
         # A held Stop stays lit over the Shift layer.
         for section in controls.sections(state)[1:]:

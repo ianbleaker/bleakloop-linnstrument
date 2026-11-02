@@ -541,4 +541,5 @@ def test_every_moved_function_runs_in_all_its_modes():
     both = {"session", "mixer", "fx", "seq", "copy", "delete"}
     assert {(name, mode) for name in both for mode in catalogue.MODES[name]} <= functions.registered()
     own = {"reserved", "double", "halve", "follow", "up", "down", "view", "rates", "triplet", "pages", "slots", "scene_slots", "bars"}
+    own |= {"tracks", "devices"}
     assert {(name, mode) for name in own for mode in catalogue.MODES[name]} <= functions.registered()

@@ -288,7 +288,7 @@ def handle(state, event, snapshot):
     shifted = shift_layer and event.pressed and layout.SEQUENCER_NAV_SHIFT.at(key) is not None
     if held == "device_clip" and not shifted:
         return controls.device_clip(state, event)
-    if state.device_clip and event.pressed and key in _navigation_pads():
+    if state.device_clip and event.pressed and key in controls.navigation_pads(state):
         # Device/Clip's layer replaces the Navigation column's normal and Shift layers.
         return controls.device_clip_layer(state, key)
     if held == "copy" and not shifted:
@@ -311,7 +311,7 @@ def handle(state, event, snapshot):
         return functions.press(setting, state, snapshot)
     if not event.pressed:
         return state, []
-    if key in _navigation_pads():
+    if key in controls.navigation_pads(state):
         # Navigation's buttons work under Copy and Delete too.
         button = (layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV).at(key)
         return functions.press(button, state, snapshot) if button else (state, [])
@@ -324,11 +324,6 @@ def handle(state, event, snapshot):
     if button is None:
         return state, []
     return functions.press(button, state, snapshot)
-
-
-def _navigation_pads():
-    sections = (layout.SEQUENCER_NAV, layout.SEQUENCER_NAV_SHIFT, layout.DEVICE_CLIP)
-    return {button[2] for section in sections for button in section.buttons()}
 
 
 def _page_release(state, button):
@@ -834,4 +829,4 @@ def _render_buttons(frame, state, snapshot):
         for button in section.buttons():
             frame[button[2]] = functions.light(button, state, snapshot)
     if state.device_clip:
-        controls.render_device_clip_layer(frame, state)
+        controls.render_device_clip_layer(frame, state, snapshot)
