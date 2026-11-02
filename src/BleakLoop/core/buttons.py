@@ -639,17 +639,8 @@ def describe(registry=None):
     functions = {}
     for name in sorted(set(MODES) | set(registry.functions)):
         item = registry.function(name)
-        described = {key: item[key] for key in ("label", "message", "show") if key in item}
+        described = {key: item[key] for key in userfile.FUNCTION_FIELDS if key in item}
         described.setdefault("label", name)
-        described["placeholders"] = {}
-        if "message" in item:
-            described["placeholders"]["message"] = sorted(userfile.placeholders(item["message"]))
-        for table in ("outcomes", "refusals"):
-            if table in item:
-                described[table] = dict(item[table])
-                described["placeholders"][table] = {
-                    key: sorted(userfile.placeholders(text)) for key, text in item[table].items()
-                }
         functions[name] = described
     system = dict(registry.data.get("system", {}))
     return {
@@ -657,14 +648,43 @@ def describe(registry=None):
         "layers": {layer: list(names) for layer, names in LAYERS.items()},
         "functions": functions,
         "system": system,
-        "system_placeholders": {key: sorted(userfile.placeholders(text)) for key, text in system.items()},
         "fixed_groups": sorted(userfile.FIXED_GROUPS),
         "open_groups": sorted(userfile.OPEN_GROUPS),
         "max_label": MAX_LABEL,
         "overlay": overlay,
+        "shipped": _shipped(),
         "editor": getattr(registry, "editor", dict(userfile.EDITOR)),
         "shipped_path": str(PATH),
         "user_path": None if USER_PATH is None else str(USER_PATH),
+    }
+
+
+def _shipped():
+    # The shipped file alone, by section key, for the editor to lay the user's changes over,
+    # with the placeholders each of its messages may use.
+    data = _read(PATH)
+    sections = {
+        key: [{"name": name, **item} for name, item in table.items()]
+        for key, table in data.items()
+        if key not in TOP_LEVEL
+    }
+    functions, placeholders = {}, {}
+    for name, item in data.get("functions", {}).items():
+        functions[name] = {key: value for key, value in item.items() if key in userfile.FUNCTION_FIELDS}
+        allowed = {}
+        if "message" in item:
+            allowed["message"] = sorted(userfile.placeholders(item["message"]))
+        for table in ("outcomes", "refusals"):
+            if table in item:
+                allowed[table] = {key: sorted(userfile.placeholders(text)) for key, text in item[table].items()}
+        placeholders[name] = allowed
+    system = data.get("system", {})
+    return {
+        "sections": sections,
+        "functions": functions,
+        "placeholders": placeholders,
+        "system": system,
+        "system_placeholders": {key: sorted(userfile.placeholders(text)) for key, text in system.items()},
     }
 
 
