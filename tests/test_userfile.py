@@ -147,3 +147,11 @@ def test_an_added_tempo_button_steps_by_its_value_and_lights(shipped):
     _, actions = session.handle(shift, PadPress(1, 2, True), SNAP)
     assert actions[0] == SetTempo(SNAP.tempo + 5)
     assert session.render(shift, SNAP)[(1, 2)] == Light(GREEN)
+
+
+def test_check_buttons_takes_a_user_file():
+    from tools import check_buttons
+
+    assert check_buttons.main(["--user", str(FIXTURES / "moved_pad.toml")]) == 0
+    assert check_buttons.main(["--user", str(FIXTURES / "clash.toml")]) == 1
+    assert check_buttons.main(["--user", str(FIXTURES / "missing.toml")]) == 1
