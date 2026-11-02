@@ -1,9 +1,547 @@
 # Every button: where it sits, its manual label and text, and the status messages it shows.
-# Table path = button ID. pad = [column, pad]. See docs/buttons.md.
+#
+# The table path is the button's ID. Fields:
+#   section  the manual section the button belongs to (tools/docs/manual/pads.py SECTIONS)
+#   pad      [column, pad]; column 1 is the Global column, pad 1 the far row
+#   label    the manual pad map's label, at most 7 characters
+#   group    a set of pads read together, such as the tempo steps; value is each pad's value
+#
+# Fixed regions (clip grid, scene pads, faders, Mute/Select rows) aren't movable.
 
 manual_format = "{label}."
+
+# The Global column: the same pads in every mode.
 
 [global.play_stop]
 section = "global"
 pad = [1, 1]
 label = "Play"
+
+[global.record]
+section = "global"
+pad = [1, 2]
+label = "Record"
+
+[global.capture]
+section = "global"
+pad = [1, 3]
+label = "Capture"
+
+[global.quantize]
+section = "global-shift"
+pad = [1, 3]
+label = "Quant"
+
+[global.metronome]
+section = "global"
+pad = [1, 4]
+label = "Metro"
+
+[global.launch_quantization]
+section = "global-shift"
+pad = [1, 4]
+label = "LaunchQ"
+
+[global.fixed_length]
+section = "global"
+pad = [1, 5]
+label = "Length"
+
+[global.undo]
+section = "global"
+pad = [1, 6]
+label = "Undo"
+
+[global.mode]
+section = "global"
+pad = [1, 7]
+label = "Linn"
+
+[global.scene_page]
+section = "linnstrument-shift"
+pad = [1, 7]
+label = "Scenes"
+
+[global.shift]
+section = "global"
+pad = [1, 8]
+label = "Shift"
+
+# The Navigation column.
+
+[nav.session]
+section = "navigation"
+pad = [16, 1]
+label = "Session"
+
+[nav.mixer]
+section = "navigation"
+pad = [16, 2]
+label = "Mixer"
+
+[nav.fx]
+section = "navigation"
+pad = [16, 3]
+label = "FX"
+
+[nav.fader_source]
+section = "navigation-shift"
+pad = [16, 3]
+label = "Source"
+
+# Unlit and unused until Chord is built.
+[nav.reserved]
+section = "navigation"
+pad = [16, 4]
+
+[nav.seq]
+section = "navigation"
+pad = [16, 5]
+label = "Seq"
+
+[nav.delete]
+section = "navigation"
+pad = [16, 6]
+label = "Delete"
+
+[nav.copy]
+section = "navigation"
+pad = [16, 7]
+label = "Copy"
+
+[nav.device_clip]
+section = "navigation"
+pad = [16, 8]
+label = "DevClip"
+
+# Shift + column 16: value is the window's (track step, scene step).
+
+[nav.window_up]
+section = "navigation-shift"
+pad = [16, 5]
+group = "nav.window"
+value = [0, -1]
+label = "Up"
+
+[nav.window_down]
+section = "navigation-shift"
+pad = [16, 6]
+group = "nav.window"
+value = [0, 1]
+label = "Down"
+
+[nav.window_right]
+section = "navigation-shift"
+pad = [16, 7]
+group = "nav.window"
+value = [1, 0]
+label = "Right"
+
+[nav.window_left]
+section = "navigation-shift"
+pad = [16, 8]
+group = "nav.window"
+value = [-1, 0]
+label = "Left"
+
+# Shift + column 16: value is the BPM step.
+
+[nav.tempo_up]
+section = "navigation-shift"
+pad = [16, 1]
+group = "nav.tempo"
+value = 1
+label = "Tempo+"
+
+[nav.tempo_down]
+section = "navigation-shift"
+pad = [16, 2]
+group = "nav.tempo"
+value = -1
+label = "Tempo-"
+
+# Column 15 in Session, Mixer and FX Mode.
+
+[view.unmute_all]
+section = "view"
+pad = [15, 7]
+label = "Unmute"
+
+[view.stop]
+section = "view"
+pad = [15, 8]
+label = "Stop"
+
+# FX Mode: value is the snapshot slot.
+
+[fx.slot_1]
+section = "fx"
+pad = [11, 1]
+group = "fx.slots"
+value = 1
+
+[fx.slot_2]
+section = "fx"
+pad = [11, 2]
+group = "fx.slots"
+value = 2
+
+[fx.slot_3]
+section = "fx"
+pad = [11, 3]
+group = "fx.slots"
+value = 3
+
+[fx.slot_4]
+section = "fx"
+pad = [11, 4]
+group = "fx.slots"
+value = 4
+
+[fx.slot_5]
+section = "fx"
+pad = [11, 5]
+group = "fx.slots"
+value = 5
+
+[fx.slot_6]
+section = "fx"
+pad = [11, 6]
+group = "fx.slots"
+value = 6
+
+[fx.slot_7]
+section = "fx"
+pad = [11, 7]
+group = "fx.slots"
+value = 7
+
+[fx.slot_8]
+section = "fx"
+pad = [11, 8]
+group = "fx.slots"
+value = 8
+
+[fx.slot_9]
+section = "fx"
+pad = [12, 1]
+group = "fx.slots"
+value = 9
+
+[fx.slot_10]
+section = "fx"
+pad = [12, 2]
+group = "fx.slots"
+value = 10
+
+[fx.slot_11]
+section = "fx"
+pad = [12, 3]
+group = "fx.slots"
+value = 11
+
+[fx.slot_12]
+section = "fx"
+pad = [12, 4]
+group = "fx.slots"
+value = 12
+
+[fx.slot_13]
+section = "fx"
+pad = [12, 5]
+group = "fx.slots"
+value = 13
+
+[fx.slot_14]
+section = "fx"
+pad = [12, 6]
+group = "fx.slots"
+value = 14
+
+[fx.slot_15]
+section = "fx"
+pad = [12, 7]
+group = "fx.slots"
+value = 15
+
+[fx.slot_16]
+section = "fx"
+pad = [12, 8]
+group = "fx.slots"
+value = 16
+
+# FX Mode column 13: value is the scene in the window. Pads 7-8 are unused.
+
+[fx.scene_slot_1]
+section = "fx"
+pad = [13, 1]
+group = "fx.scene_slots"
+value = 1
+label = "Scene 1"
+
+[fx.scene_slot_2]
+section = "fx"
+pad = [13, 2]
+group = "fx.scene_slots"
+value = 2
+label = "Scene 2"
+
+[fx.scene_slot_3]
+section = "fx"
+pad = [13, 3]
+group = "fx.scene_slots"
+value = 3
+label = "Scene 3"
+
+[fx.scene_slot_4]
+section = "fx"
+pad = [13, 4]
+group = "fx.scene_slots"
+value = 4
+label = "Scene 4"
+
+[fx.scene_slot_5]
+section = "fx"
+pad = [13, 5]
+group = "fx.scene_slots"
+value = 5
+label = "Scene 5"
+
+[fx.scene_slot_6]
+section = "fx"
+pad = [13, 6]
+group = "fx.scene_slots"
+value = 6
+label = "Scene 6"
+
+# FX Mode column 14: value is the morph length in bars.
+
+[fx.bars_1]
+section = "fx"
+pad = [14, 1]
+group = "fx.bars"
+value = 1
+label = "1 bar"
+
+[fx.bars_2]
+section = "fx"
+pad = [14, 2]
+group = "fx.bars"
+value = 2
+label = "2 bars"
+
+[fx.bars_4]
+section = "fx"
+pad = [14, 3]
+group = "fx.bars"
+value = 4
+label = "4 bars"
+
+[fx.bars_8]
+section = "fx"
+pad = [14, 4]
+group = "fx.bars"
+value = 8
+label = "8 bars"
+
+[fx.bars_16]
+section = "fx"
+pad = [14, 5]
+group = "fx.bars"
+value = 16
+label = "16 bars"
+
+# Sequencer Mode settings view: value is the step length in beats.
+
+[seq.rate_4]
+section = "sequencer-settings"
+pad = [11, 1]
+group = "seq.rates"
+value = 1.0
+label = "1/4"
+
+[seq.rate_8]
+section = "sequencer-settings"
+pad = [11, 2]
+group = "seq.rates"
+value = 0.5
+label = "1/8"
+
+[seq.rate_16]
+section = "sequencer-settings"
+pad = [11, 3]
+group = "seq.rates"
+value = 0.25
+label = "1/16"
+
+[seq.rate_32]
+section = "sequencer-settings"
+pad = [11, 4]
+group = "seq.rates"
+value = 0.125
+label = "1/32"
+
+[seq.triplet]
+section = "sequencer-settings"
+pad = [11, 5]
+label = "Triplet"
+
+# Settings view: value is the page, column 12 then column 13.
+
+[seq.page_1]
+section = "sequencer-settings"
+pad = [12, 1]
+group = "seq.pages"
+value = 1
+
+[seq.page_2]
+section = "sequencer-settings"
+pad = [12, 2]
+group = "seq.pages"
+value = 2
+
+[seq.page_3]
+section = "sequencer-settings"
+pad = [12, 3]
+group = "seq.pages"
+value = 3
+
+[seq.page_4]
+section = "sequencer-settings"
+pad = [12, 4]
+group = "seq.pages"
+value = 4
+
+[seq.page_5]
+section = "sequencer-settings"
+pad = [12, 5]
+group = "seq.pages"
+value = 5
+
+[seq.page_6]
+section = "sequencer-settings"
+pad = [12, 6]
+group = "seq.pages"
+value = 6
+
+[seq.page_7]
+section = "sequencer-settings"
+pad = [12, 7]
+group = "seq.pages"
+value = 7
+
+[seq.page_8]
+section = "sequencer-settings"
+pad = [12, 8]
+group = "seq.pages"
+value = 8
+
+[seq.page_9]
+section = "sequencer-settings"
+pad = [13, 1]
+group = "seq.pages"
+value = 9
+
+[seq.page_10]
+section = "sequencer-settings"
+pad = [13, 2]
+group = "seq.pages"
+value = 10
+
+[seq.page_11]
+section = "sequencer-settings"
+pad = [13, 3]
+group = "seq.pages"
+value = 11
+
+[seq.page_12]
+section = "sequencer-settings"
+pad = [13, 4]
+group = "seq.pages"
+value = 12
+
+[seq.page_13]
+section = "sequencer-settings"
+pad = [13, 5]
+group = "seq.pages"
+value = 13
+
+[seq.page_14]
+section = "sequencer-settings"
+pad = [13, 6]
+group = "seq.pages"
+value = 14
+
+[seq.page_15]
+section = "sequencer-settings"
+pad = [13, 7]
+group = "seq.pages"
+value = 15
+
+[seq.page_16]
+section = "sequencer-settings"
+pad = [13, 8]
+group = "seq.pages"
+value = 16
+
+# Sequencer Mode column 15, the same in both views. Up and Down sit above the view switch.
+
+[seq.double]
+section = "sequencer-grid"
+pad = [15, 1]
+label = "Double"
+
+[seq.halve]
+section = "sequencer-grid"
+pad = [15, 2]
+label = "Halve"
+
+[seq.follow]
+section = "sequencer-grid"
+pad = [15, 4]
+label = "Follow"
+
+[seq.up]
+section = "sequencer-grid"
+pad = [15, 6]
+label = "Up"
+
+[seq.down]
+section = "sequencer-grid"
+pad = [15, 7]
+label = "Down"
+
+[seq.view]
+section = "sequencer-grid"
+pad = [15, 8]
+label = "View"
+
+# Device/Clip + column 16: value is the track or device step.
+
+[device_clip.track_previous]
+section = "device-clip"
+pad = [16, 7]
+group = "device_clip.tracks"
+value = -1
+label = "Track-"
+
+[device_clip.track_next]
+section = "device-clip"
+pad = [16, 6]
+group = "device_clip.tracks"
+value = 1
+label = "Track+"
+
+[device_clip.device_previous]
+section = "device-clip"
+pad = [16, 5]
+group = "device_clip.devices"
+value = -1
+label = "Device-"
+
+[device_clip.device_next]
+section = "device-clip"
+pad = [16, 4]
+group = "device_clip.devices"
+value = 1
+label = "Device+"

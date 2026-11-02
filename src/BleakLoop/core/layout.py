@@ -22,38 +22,6 @@ WINDOW_SCENES = 6
 MUTE_ROW = 7
 SELECT_ROW = 8
 
-# (column, pad)
-PLAY_STOP = buttons.pos("global.play_stop")
-RECORD = (GLOBAL_COLUMN, 2)
-CAPTURE = (GLOBAL_COLUMN, 3)
-QUANTIZE = CAPTURE  # pad 3's Shift function
-METRONOME = (GLOBAL_COLUMN, 4)
-LAUNCH_QUANTIZATION = METRONOME  # pad 4's Shift function
-FIXED_LENGTH = (GLOBAL_COLUMN, 5)
-UNDO = (GLOBAL_COLUMN, 6)
-MODE_PAD = (GLOBAL_COLUMN, 7)
-SCENE_PAGE = MODE_PAD  # pad 7's Shift function in Linnstrument Mode
-SHIFT = (GLOBAL_COLUMN, 8)
-SESSION = (NAV_COLUMN, 1)
-MIXER = (NAV_COLUMN, 2)
-FX = (NAV_COLUMN, 3)
-FADER_SOURCE = FX  # FX's Shift function
-# Unlit and unused until Chord (16/4) is built.
-RESERVED = ((NAV_COLUMN, 4),)
-SEQ = (NAV_COLUMN, 5)
-DELETE = (NAV_COLUMN, 6)
-COPY = (NAV_COLUMN, 7)
-DEVICE_CLIP = (NAV_COLUMN, 8)
-UNMUTE_ALL = (SCENE_COLUMN, 7)
-STOP = (SCENE_COLUMN, 8)
-
-# FX Mode: slot N is FX_SLOTS[N - 1].
-FX_SLOTS = tuple((11, pad) for pad in range(1, 9)) + tuple((12, pad) for pad in range(1, 9))
-# FX Mode column 13: scene N in the window's snapshot is FX_SCENE_SLOTS[N - 1]. Pads 7-8 are
-# unused.
-FX_SCENE_SLOTS = tuple((13, pad) for pad in range(1, WINDOW_SCENES + 1))
-# Column 14: morph length in bars.
-FX_LENGTHS = {(14, 1): 1, (14, 2): 2, (14, 3): 4, (14, 4): 8, (14, 5): 16}
 # FX Mode: one horizontal fader per pad row.
 FX_FADER_COLUMNS = range(2, 11)
 
@@ -61,40 +29,66 @@ FX_FADER_COLUMNS = range(2, 11)
 SPLIT_TRACKS = 8
 SPLIT_FADER_COLUMNS = range(10, 15)
 
-# bars, in Fixed Length's cycle order
-FIXED_LENGTHS = (1, 2, 4, 8)
-
-# Shift + column 16 pads 5-8, in every mode but Linnstrument Mode: (track step, scene step).
-WINDOW_MOVES = {
-    (NAV_COLUMN, 5): (0, -1),
-    (NAV_COLUMN, 6): (0, 1),
-    (NAV_COLUMN, 7): (1, 0),
-    (NAV_COLUMN, 8): (-1, 0),
-}
-
-# Shift + column 16 pads 1 and 2: BPM step.
-TEMPO_STEPS = {(NAV_COLUMN, 1): 1, (NAV_COLUMN, 2): -1}
-
 # Sequencer Mode: steps in columns 3-10, note pads or settings in 11-14.
 SEQ_STEP_COLUMNS = range(3, 11)
 SEQ_NOTE_COLUMNS = range(11, 15)
+
+# bars, in Fixed Length's cycle order
+FIXED_LENGTHS = (1, 2, 4, 8)
+
+# Buttons: (column, pad), from buttons.toml. The fixed regions above come first, because the
+# registry checks no button sits on them.
+PLAY_STOP = buttons.pos("global.play_stop")
+RECORD = buttons.pos("global.record")
+CAPTURE = buttons.pos("global.capture")
+QUANTIZE = buttons.pos("global.quantize")
+METRONOME = buttons.pos("global.metronome")
+LAUNCH_QUANTIZATION = buttons.pos("global.launch_quantization")
+FIXED_LENGTH = buttons.pos("global.fixed_length")
+UNDO = buttons.pos("global.undo")
+MODE_PAD = buttons.pos("global.mode")
+SCENE_PAGE = buttons.pos("global.scene_page")  # Linnstrument Mode
+SHIFT = buttons.pos("global.shift")
+SESSION = buttons.pos("nav.session")
+MIXER = buttons.pos("nav.mixer")
+FX = buttons.pos("nav.fx")
+FADER_SOURCE = buttons.pos("nav.fader_source")
+# Unlit and unused until Chord is built.
+RESERVED = (buttons.pos("nav.reserved"),)
+SEQ = buttons.pos("nav.seq")
+DELETE = buttons.pos("nav.delete")
+COPY = buttons.pos("nav.copy")
+DEVICE_CLIP = buttons.pos("nav.device_clip")
+UNMUTE_ALL = buttons.pos("view.unmute_all")
+STOP = buttons.pos("view.stop")
+
+# FX Mode: slot N is FX_SLOTS[N - 1].
+FX_SLOTS = tuple(buttons.group("fx.slots"))
+# FX Mode: scene N in the window's snapshot is FX_SCENE_SLOTS[N - 1].
+FX_SCENE_SLOTS = tuple(buttons.group("fx.scene_slots"))
+# Morph length in bars.
+FX_LENGTHS = buttons.group("fx.bars")
+
+# Shift + column 16, in every mode but Linnstrument Mode: (track step, scene step).
+WINDOW_MOVES = buttons.group("nav.window")
+# Shift + column 16: BPM step.
+TEMPO_STEPS = buttons.group("nav.tempo")
+
 # Settings view: step length in beats per rate pad.
-SEQ_RATES = {(11, 1): 1.0, (11, 2): 0.5, (11, 3): 0.25, (11, 4): 0.125}
-SEQ_TRIPLET = (11, 5)
-# Settings view: page N is SEQ_PAGES[N], column 12 then column 13.
-SEQ_PAGES = tuple((12, pad) for pad in range(1, 9)) + tuple((13, pad) for pad in range(1, 9))
-SEQ_DOUBLE = (SCENE_COLUMN, 1)
-SEQ_HALVE = (SCENE_COLUMN, 2)
-SEQ_FOLLOW = (SCENE_COLUMN, 4)
-# Up and Down sit above the view switch, in reach in both views.
-SEQ_UP = (SCENE_COLUMN, 6)
-SEQ_DOWN = (SCENE_COLUMN, 7)
-SEQ_VIEW = (SCENE_COLUMN, 8)
+SEQ_RATES = buttons.group("seq.rates")
+SEQ_TRIPLET = buttons.pos("seq.triplet")
+# Settings view: page N is SEQ_PAGES[N].
+SEQ_PAGES = tuple(buttons.group("seq.pages"))
+SEQ_DOUBLE = buttons.pos("seq.double")
+SEQ_HALVE = buttons.pos("seq.halve")
+SEQ_FOLLOW = buttons.pos("seq.follow")
+SEQ_UP = buttons.pos("seq.up")
+SEQ_DOWN = buttons.pos("seq.down")
+SEQ_VIEW = buttons.pos("seq.view")
 
-# Device/Clip + column 16 pads 7-4: track step, device step.
-DEVICE_CLIP_TRACK_STEPS = {(NAV_COLUMN, 7): -1, (NAV_COLUMN, 6): 1}
-DEVICE_CLIP_DEVICE_STEPS = {(NAV_COLUMN, 5): -1, (NAV_COLUMN, 4): 1}
-
+# Device/Clip + column 16: track step, device step.
+DEVICE_CLIP_TRACK_STEPS = buttons.group("device_clip.tracks")
+DEVICE_CLIP_DEVICE_STEPS = buttons.group("device_clip.devices")
 
 def device_row(pad):
     if not 1 <= pad <= ROWS:

@@ -8,9 +8,7 @@ A moved pad takes its Shift aliases (FX's FADER_SOURCE) along unless they're ove
 """
 
 import argparse
-import ast
 import importlib
-import inspect
 import json
 import sys
 from contextlib import contextmanager
@@ -42,11 +40,12 @@ BLINKS = {"steady": Blink.STEADY, "tempo": Blink.TEMPO, "fast": Blink.FAST}
 SPEC_KEYS = {"title", "panels", "layout"}
 PANEL_KEYS = {"layer", "columns", "caption", "state", "lights", "labels", "blocks"}
 BLOCK_KEYS = {"name", "columns", "pads"}
-# Constants that are another's pad, as QUANTIZE = CAPTURE.
+# Shift functions on another button's pad: each follows that button when only it moves.
 ALIASES = {
-    node.targets[0].id: node.value.id
-    for node in ast.parse(inspect.getsource(layout)).body
-    if isinstance(node, ast.Assign) and isinstance(node.value, ast.Name)
+    "QUANTIZE": "CAPTURE",
+    "LAUNCH_QUANTIZATION": "METRONOME",
+    "SCENE_PAGE": "MODE_PAD",
+    "FADER_SOURCE": "FX",
 }
 
 

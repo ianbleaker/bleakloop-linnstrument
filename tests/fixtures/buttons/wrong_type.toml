@@ -1,0 +1,4 @@
+[global.undo]
+section = "global"
+pad = [1, 6]
+show = "yes"

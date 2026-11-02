@@ -1,0 +1,4 @@
+[nav.tempo_up]
+section = "navigation-shift"
+pad = [16, 1]
+group = "nav.tempo"

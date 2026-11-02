@@ -214,6 +214,7 @@ flowchart TD
     ableton_v3["ableton.v3"]
   end
   __init__ -.->|lazy| surface
+  core_buttons -.->|lazy| core_layout
   core_controls --> core_faders
   core_controls --> core_layout
   core_controls --> core_leds
