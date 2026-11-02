@@ -305,10 +305,12 @@ flowchart TD
   core_session --> core_model
   core_session --> core_modes
   core_session --> core_sequencer
+  device --> core_buttons
   device --> core_layout
   device --> core_leds
   device --> core_model
   live_actions --> Live
+  live_actions --> core_buttons
   live_actions --> core_model
   live_actions --> core_modes
   live_actions --> core_values
@@ -318,6 +320,7 @@ flowchart TD
   live_state --> core_values
   surface --> Live
   surface --> ableton_v3
+  surface --> core_buttons
   surface --> core_controls
   surface --> core_engine
   surface --> core_faders

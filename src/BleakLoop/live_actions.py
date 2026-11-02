@@ -7,7 +7,7 @@ from contextlib import contextmanager
 import Live
 
 from . import live_state
-from .core import values
+from .core import buttons, values
 from .core.modes import FaderBinding
 from .core.model import (
     AddScene,
@@ -164,31 +164,31 @@ def _binding(song, row):
     # (FaderBinding, message) for Live's selected parameter, or (None, the refusal).
     parameter = song.view.selected_parameter
     if parameter is None:
-        return None, "Click a parameter in Live first"
+        return None, buttons.system("bind_select")
     owner = getattr(parameter, "canonical_parent", None)
     track = getattr(owner, "canonical_parent", None)
     tracks = [entry[2] for entry in live_state.fx_tracks(song)]
     if not any(track == other for other in tracks):
         # Inside a rack chain, or not on a track at all.
         if _on_a_track(track, tracks):
-            return None, "Map it to a macro instead"
-        return None, "Can't bind this parameter"
+            return None, buttons.system("bind_macro")
+        return None, buttons.system("bind_refused")
     tn = _earlier_named(tracks, track)
     if hasattr(owner, "sends"):
         # The track's mixer: volume, pan and sends only.
         index = _index(live_state.mixer_parameters(track), parameter)
         if index is None:
-            return None, "Can't bind this parameter"
+            return None, buttons.system("bind_refused")
         binding = FaderBinding(track.name, tn, None, 0, index, parameter.name)
-        return binding, f"Fader {row + 1}: {track.name} {parameter.name}"
+        return binding, buttons.system("bound", fader=row + 1, owner=track.name, parameter=parameter.name)
     index = _index(list(owner.parameters), parameter)
     if index is None:
-        return None, "Can't bind this parameter"
+        return None, buttons.system("bind_refused")
     devices = list(track.devices)
     binding = FaderBinding(
         track.name, tn, owner.name, _earlier_named(devices, owner), index, parameter.name
     )
-    return binding, f"Fader {row + 1}: {owner.name} {parameter.name}"
+    return binding, buttons.system("bound", fader=row + 1, owner=owner.name, parameter=parameter.name)
 
 
 def _on_a_track(item, tracks):
@@ -227,10 +227,10 @@ def _step_track(song, step):
     tracks = list(song.visible_tracks) + list(song.return_tracks) + [song.master_track]
     track = _step(tracks, song.view.selected_track, step)
     if track is None:
-        return "No more tracks"
+        return buttons.system("no_more_tracks")
     song.view.selected_track = track
     _focus_rack(song, track)
-    return track.name
+    return buttons.system("track", track=track.name)
 
 
 # The racks a track change hands the blue hand to. A MIDI Effect Rack sits in front of the
@@ -262,11 +262,11 @@ def _step_device(song, step):
     devices = list(track.devices)
     device = _step(devices, _top_level(track.view.selected_device, track, devices), step)
     if device is None:
-        return "No more devices"
+        return buttons.system("no_more_devices")
     song.view.select_device(device)
     # The blue hand too: Device FX follows it, and a selection doesn't always move it.
     song.appointed_device = device
-    return device.name
+    return buttons.system("device", device=device.name)
 
 
 def _top_level(device, track, devices):

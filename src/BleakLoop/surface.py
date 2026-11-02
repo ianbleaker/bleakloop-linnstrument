@@ -15,7 +15,7 @@ from ableton.v3.control_surface import (
 )
 
 from . import device, live_actions, live_state
-from .core import controls, engine, faders, fx, layout, sequencer, values
+from .core import buttons, controls, engine, faders, fx, layout, sequencer, values
 from .core.leds import Clock, phase_key
 from .core.model import PadPress, ScenesChanged, SequencerView, SlideMoved, YAxis
 from .core.modes import Mode, State
@@ -389,7 +389,7 @@ class BleakLoop(ControlSurface):
             if channel is not None:
                 self._pending_sets.append((device.NRPN_LEFT_MAIN_CHANNEL, channel + 1))
                 self._control_channel, clash, moved = channel, False, True
-                self.show_message(device.CONTROLS_MOVED.format(channel + 1))
+                self.show_message(buttons.system("controls_moved", channel=channel + 1))
         self._rescan = clash
         if moved or clash != self._clash:
             self._clash = clash

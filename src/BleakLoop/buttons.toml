@@ -509,6 +509,24 @@ pad = [13, 8]
 does = "pages"
 value = 16
 
+# Messages not tied to a button: the device setup, the track and device names Device/Clip's
+# steps show, and Mapped FX's binding.
+[system]
+refuse_duplicates = "Row Offset repeats notes in the Global column: controls off"
+refuse_row_offset = "Couldn't read Row Offset: controls off"
+refuse_right_split = "Couldn't read the right split: controls off"
+refuse_channels = "The right split uses every channel: controls off"
+controls_on = "Global column controls on"
+controls_moved = "The right split took the Global column's channel: controls moved to channel {channel}"
+octave_reset = "Left split Octave/Transpose reset: select the right split to change yours"
+track = "{track}"
+no_more_tracks = "No more tracks"
+device = "{device}"
+no_more_devices = "No more devices"
+bound = "Fader {fader}: {owner} {parameter}"
+bind_select = "Click a parameter in Live first"
+bind_macro = "Map it to a macro instead"
+bind_refused = "Can't bind this parameter"
 
 # Functions: each one's label, at most 7 characters, its message, and its outcomes and
 # refusals. Refusals always show; show = false hides the rest.
