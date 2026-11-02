@@ -217,7 +217,7 @@ SELECT = Block(
     "Select and arm",
     layout.GRID_COLUMNS,
     SELECT_PADS,
-    "Select the track and arm it alone. Press the selected, armed track to disarm it.",
+    "Select the track and arm it alone.",
 )
 SOLO = Block(
     "Solo",

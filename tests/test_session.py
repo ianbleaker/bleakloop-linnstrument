@@ -266,9 +266,12 @@ def test_select_row_selects_and_arms_exclusively():
     assert handle(SESSION, (3, 8)) == (SESSION, [SelectTrack(1), ArmExclusive(1, True)])
 
 
-def test_select_row_on_selected_armed_track_disarms_it():
+def test_select_row_on_selected_armed_track_keeps_it_armed():
     snapshot = with_track(SNAP, 3, arm=True, selected=True)
-    assert handle(SESSION, (3, 8), snapshot) == (SESSION, [SetArm(1, False)])
+    assert handle(SESSION, (3, 8), snapshot) == (
+        SESSION,
+        [SelectTrack(1), ArmExclusive(1, True)],
+    )
 
 
 def test_select_row_on_armed_track_not_selected_selects_and_arms_exclusively():
