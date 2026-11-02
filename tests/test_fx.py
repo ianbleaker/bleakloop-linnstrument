@@ -1231,6 +1231,22 @@ def test_launch_tick_cancels_on_a_stop_or_a_jump_back(beats, is_playing):
     assert redraw
 
 
+def test_launch_tick_counts_across_a_loop_wrap():
+    # Fires on beat 20 counted from the press, which the wrap moves to beat 4.
+    state = replace(FX, pending_launch=PendingLaunch(2, 20.0, 15.9))
+    state, actions, redraw = engine.launch_tick(state, looped(0.0))
+    assert (state.pending_launch, actions, redraw) == (PendingLaunch(2, 4.0, 0.0), [], False)
+    state, actions, redraw = engine.launch_tick(state, looped(4.0))
+    assert (state.pending_launch, actions, redraw) == (None, [FireScene(2, legato=False)], True)
+
+
+def test_launch_tick_cancels_on_a_jump_back_inside_the_loop():
+    state = replace(FX, pending_launch=PendingLaunch(2, 20.0, 12.0))
+    state, actions, _ = engine.launch_tick(state, looped(4.0))
+    assert state.pending_launch is None
+    assert actions == [ShowMessage("Scene 3 launch cancelled")]
+
+
 def test_a_pending_scene_blinks_yellow():
     frame = session.render(PENDING, launching(2.0))
     assert frame[SCENE_3] == Light(YELLOW, Blink.TEMPO)

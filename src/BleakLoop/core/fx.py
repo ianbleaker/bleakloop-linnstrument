@@ -464,16 +464,20 @@ def timed_launch(state, scene, snapshot):
 
 
 def launch_tick(state, transport):
-    # On the 10 ms timer: fire the pending launch at its time. A stop or a backward jump
-    # cancels it, as either lands a morph at once. Returns whether to redraw.
+    # On the 10 ms timer: fire the pending launch at its time, counted across a wrap of the
+    # loop. A stop or a backward jump cancels it, as either lands a morph at once. Returns
+    # whether to redraw.
     pending = state.pending_launch
     now = transport.song_beats
-    if not transport.is_playing or now < pending.last_beats:
+    played = advance(transport, pending.last_beats)
+    if played is None:
         message = ShowMessage(f"Scene {pending.scene + 1} launch cancelled")
         return replace(state, pending_launch=None), [message], True
-    if now >= pending.fire_beats:
+    # After a wrap of the loop, the fire time moves back with the song time.
+    fire = pending.fire_beats - (played - now)
+    if now >= fire:
         return replace(state, pending_launch=None), [FireScene(pending.scene, legato=False)], True
-    return replace(state, pending_launch=replace(pending, last_beats=now)), [], False
+    return replace(state, pending_launch=replace(pending, fire_beats=fire, last_beats=now)), [], False
 
 
 def _match(stored, racks):
