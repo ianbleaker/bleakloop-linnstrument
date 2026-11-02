@@ -241,6 +241,14 @@ _FOCUS_RACKS = ("InstrumentGroupDevice", "DrumGroupDevice", "AudioEffectGroupDev
 def _focus_rack(song, track):
     # The first top-level rack with a mapped macro, else the first rack; with none, Live's
     # own selection stays. Selected too, or the device follow would move the hand back.
+    # Guarded: the arm that follows a track selection mustn't depend on it.
+    try:
+        _hand_to_rack(song, track)
+    except Exception:
+        logger.exception("FADERS: handing the blue hand to a rack failed")
+
+
+def _hand_to_rack(song, track):
     racks = [device for device in track.devices if device.class_name in _FOCUS_RACKS]
     rack = next((rack for rack in racks if rack.has_macro_mappings), racks[0] if racks else None)
     if rack is None:
