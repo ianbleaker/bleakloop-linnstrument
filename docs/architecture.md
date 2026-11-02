@@ -244,6 +244,7 @@ flowchart TD
   core_functions --> core_catalogue
   core_functions --> core_leds
   core_functions --> core_modes
+  core_fx --> core_buttons
   core_fx --> core_faders
   core_fx --> core_functions
   core_fx --> core_layout

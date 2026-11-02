@@ -626,6 +626,9 @@ split_off = "Split view OFF"
 
 [functions.fx]
 label = "FX"
+[functions.fx.outcomes]
+on = "FX Mode ON"
+off = "FX Mode OFF"
 
 [functions.seq]
 label = "Seq"
@@ -727,3 +730,28 @@ label = "Triplet"
 message = "Rate {rate}"
 [functions.triplet.outcomes]
 triplet = "Rate {rate} triplet"
+
+[functions.slots]
+[functions.slots.outcomes]
+cleared = "{name} cleared"
+stored = "{name} stored ({racks})"
+recalled = "{name} recalled{note}"
+morphing = "{name} {timing}{note}"
+[functions.slots.refusals]
+no_racks = "No racks to store"
+nothing = "{name}: nothing to recall{note}"
+
+[functions.scene_slots]
+[functions.scene_slots.outcomes]
+cleared = "{name} cleared"
+stored = "{name} stored ({racks})"
+recalled = "{name} recalled{note}"
+morphing = "{name} {timing}{note}"
+[functions.scene_slots.refusals]
+no_racks = "No racks to store"
+nothing = "{name}: nothing to recall{note}"
+
+[functions.scenes]
+[functions.scenes.outcomes]
+timed = "Scene {scene} in {bars}"
+cancelled = "Scene {scene} launch cancelled"

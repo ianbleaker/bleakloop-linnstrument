@@ -4,7 +4,7 @@ import json
 import math
 from dataclasses import replace
 
-from . import faders, functions, layout, mixer
+from . import buttons, faders, functions, layout, mixer
 from .leds import CYAN, LIME, OFF, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
@@ -15,7 +15,6 @@ from .model import (
     SaveFxSnapshots,
     SetMacros,
     SetMixer,
-    ShowMessage,
     StoreFxSnapshot,
 )
 from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
@@ -188,6 +187,11 @@ def _set(state, slot, scene, value, scene_count):
     return replace(state, fx_slots=slots), SaveFxSnapshots(dump(slots))
 
 
+def _owner(scene):
+    # The function whose wording a snapshot message uses.
+    return "scene_slots" if scene else "slots"
+
+
 def _name(slot, scene):
     return f"Scene {slot + 1} snapshot" if scene else f"Snapshot {slot + 1}"
 
@@ -208,7 +212,7 @@ def toggle(state):
     if state.fx:
         state, actions = faders.reset(state)
         state = replace(state, fx=False, fx_length=None)
-        return state, actions + [ShowMessage("FX Mode OFF")]
+        return state, actions + buttons.say("fx", "off")
     # FX and Mixer Mode replace each other. Split view faders give way to FX Mode's.
     state, actions = faders.reset(state)
     if state.mixer:
@@ -217,7 +221,7 @@ def toggle(state):
         state = replace(state, mixer=False)
         actions.append(SetMixer(False))
     state = replace(state, fx=True, copy_source=None)
-    return state, actions + [ShowMessage("FX Mode ON")]
+    return state, actions + buttons.say("fx", "on")
 
 
 def press(state, event, snapshot):
@@ -291,7 +295,7 @@ def _slot_press(state, slot, scene, snapshot):
         if not stored:
             return state, []
         state, save = _set(state, slot, scene, None, snapshot.scene_count)
-        return state, [save, ShowMessage(f"{_name(slot, scene)} cleared")]
+        return state, [save, *buttons.say(_owner(scene), "cleared", name=_name(slot, scene))]
     return state, [RecallFxSnapshot(slot, state.fx_length, scene=scene)]
 
 
@@ -313,20 +317,21 @@ def render(state, snapshot):
 
 def racks_read(state, event, snapshot):
     # The adapter's rack read after a store or a recall, in any mode.
-    name = _name(event.slot, event.scene)
+    name, owner = _name(event.slot, event.scene), _owner(event.scene)
     if not event.recall:
         if not event.racks:
-            return state, [ShowMessage("No racks to store")]
+            return state, buttons.refuse(owner, "no_racks")
         value = capture(event.racks)
         state, save = _set(state, event.slot, event.scene, value, snapshot.scene_count)
-        return state, [save, ShowMessage(f"{name} stored ({_count(len(event.racks), 'rack')})")]
+        racks = _count(len(event.racks), "rack")
+        return state, [save, *buttons.say(owner, "stored", name=name, racks=racks)]
     stored = _stored(state, event.slot, event.scene)
     if stored is None:
         return state, []
     macros, missing = _match(stored, event.racks)
     note = f", {_count(missing, 'rack')} not found" if missing else ""
     if not macros:
-        return state, [ShowMessage(f"{name}: nothing to recall{note}")]
+        return state, buttons.refuse(owner, "nothing", name=name, note=note)
     # A recall closes a fader gesture's undo step; the finger carries on in a new one.
     actions = []
     if state.fader_undo_open:
@@ -346,14 +351,14 @@ def racks_read(state, event, snapshot):
         actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
         state = replace(state, morph=None, fx_undo_open=False)
         state = _landed(state, event.slot, event.scene)
-        return state, actions + [ShowMessage(f"{name} recalled{note}")]
+        return state, actions + buttons.say(owner, "recalled", name=name, note=note)
     start = snapshot.song_beats
     end = event.end_beats if launch else end_beats(snapshot, event.bars)
     morph = Morph(event.slot, start, end, start, macros, scene=event.scene, launch=launch)
     state = replace(state, morph=morph, fx_undo_open=True)
     timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
-    message = ShowMessage(f"{name} {timing}{note}")
-    return state, actions + [BeginUndoStep(), message]
+    message = buttons.say(owner, "morphing", name=name, timing=timing, note=note)
+    return state, actions + [BeginUndoStep(), *message]
 
 
 def tick(state, transport, values, triggered=None):
@@ -484,8 +489,8 @@ def timed_launch(state, scene, snapshot):
         # Live's launch quantization already starts it on time.
         return state, [FireScene(scene, legato=False), *actions]
     pending = PendingLaunch(scene, fire, snapshot.song_beats)
-    message = ShowMessage(f"Scene {scene + 1} in {_count(bars, 'bar')}")
-    return replace(state, pending_launch=pending), [message, *actions]
+    message = buttons.say("scenes", "timed", scene=scene + 1, bars=_count(bars, "bar"))
+    return replace(state, pending_launch=pending), [*message, *actions]
 
 
 def launch_tick(state, transport):
@@ -496,8 +501,8 @@ def launch_tick(state, transport):
     now = transport.song_beats
     played = advance(transport, pending.last_beats)
     if played is None:
-        message = ShowMessage(f"Scene {pending.scene + 1} launch cancelled")
-        return replace(state, pending_launch=None), [message], True
+        message = buttons.say("scenes", "cancelled", scene=pending.scene + 1)
+        return replace(state, pending_launch=None), message, True
     # After a wrap of the loop, the fire time moves back with the song time.
     fire = pending.fire_beats - (played - now)
     if now >= fire:
