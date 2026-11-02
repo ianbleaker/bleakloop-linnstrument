@@ -155,6 +155,10 @@ class Snapshot:
     arms: tuple = ()
     sequencer: SequencerView | None = None  # read only in Sequencer Mode
     seq_entry: SeqEntry | None = None  # read only while Seq is held
+    # The Arrangement loop: song time wraps from its end to its start while it's on.
+    loop: bool = False
+    loop_start: float = 0.0
+    loop_length: float = 0.0
 
 
 @dataclass(frozen=True)

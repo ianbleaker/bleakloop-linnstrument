@@ -445,8 +445,10 @@ class BleakLoop(ControlSurface):
 
     def _morph_tick(self, transport):
         start = time.monotonic()
-        macro_values = live_state.read_macro_values(self.song, self._state.morph)
-        state, actions, redraw = engine.fx_tick(self._state, transport, macro_values)
+        morph = self._state.morph
+        macro_values = live_state.read_macro_values(self.song, morph)
+        triggered = live_state.read_launch_triggered(self.song, morph)
+        state, actions, redraw = engine.fx_tick(self._state, transport, macro_values, triggered)
         self._state = state
         for action in actions:
             live_actions.apply(action, self.song, self)

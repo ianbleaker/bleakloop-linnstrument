@@ -19,7 +19,7 @@ from .model import (
     StoreFxSnapshot,
 )
 from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
-from .values import FX_TOUCH_TOLERANCE
+from .values import FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
 
 SLOTS = 16
 
@@ -327,15 +327,16 @@ def racks_read(state, event, snapshot):
         return state, actions + [ShowMessage(f"{name} recalled{note}")]
     start = snapshot.song_beats
     end = event.end_beats if launch else end_beats(snapshot, event.bars)
-    morph = Morph(event.slot, start, end, start, macros, scene=event.scene)
+    morph = Morph(event.slot, start, end, start, macros, scene=event.scene, launch=launch)
     state = replace(state, morph=morph, fx_undo_open=True)
     timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
     message = ShowMessage(f"{name} {timing}{note}")
     return state, actions + [BeginUndoStep(), message]
 
 
-def tick(state, transport, values):
-    # On the 10 ms timer: values holds each morphing macro's live value, None if unreadable.
+def tick(state, transport, values, triggered=None):
+    # On the 10 ms timer: values holds each morphing macro's live value, None if unreadable;
+    # triggered is whether a launch morph's scene waits to launch, None if it's gone.
     morph = state.morph
     # A macro turned by hand, or gone, drops out and keeps its value.
     macros = [
@@ -344,16 +345,25 @@ def tick(state, transport, values):
         if value is not None and abs(value - macro.written) <= FX_TOUCH_TOLERANCE * macro.span
     ]
     now = transport.song_beats
+    played = advance(transport, morph.last_beats)
+    if played is not None and played != now:
+        # The loop wrapped: the morph's times move back with the song time.
+        shift = played - now
+        start, end = morph.start_beats - shift, morph.end_beats - shift
+        morph = replace(morph, start_beats=start, end_beats=end, wrapped=True)
+    if morph.launch and triggered:
+        morph = replace(morph, triggered=True)
     # A stop or a backward jump lands at once: there's nothing to interpolate to.
-    if not transport.is_playing or now >= morph.end_beats or now < morph.last_beats:
+    if played is None or _lands(morph, now, triggered):
         writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
         actions = [SetMacros(writes)] if writes else []
         if state.fx_undo_open:
             actions.append(EndUndoStep())
         state = _landed(replace(state, morph=None, fx_undo_open=False), morph.slot, morph.scene)
         return state, actions, True
-    # Linear in song beats; quantized macros switch only when the morph lands.
-    fraction = (now - morph.start_beats) / (morph.end_beats - morph.start_beats)
+    # Linear in song beats; quantized macros switch only when the morph lands. A launch
+    # morph whose scene starts late holds at its targets until it does.
+    fraction = min((now - morph.start_beats) / (morph.end_beats - morph.start_beats), 1.0)
     moved, writes = [], []
     for macro in macros:
         if not macro.quantized:
@@ -364,6 +374,34 @@ def tick(state, transport, values):
         moved.append(macro)
     state = replace(state, morph=replace(morph, macros=tuple(moved), last_beats=now))
     return state, [SetMacros(tuple(writes))] if writes else [], False
+
+
+def _lands(morph, now, triggered):
+    # After a wrap, a launch morph lands as its scene stops waiting, which is Live starting
+    # it. Unseen waiting (an unquantized launch, or a deleted scene) keeps the predicted time,
+    # as does every morph without a wrap: then the prediction is Live's own boundary, and
+    # another scene's launch, which cancels this one's wait, leaves the morph alone.
+    if morph.launch and morph.wrapped and morph.triggered:
+        return not triggered
+    return now >= morph.end_beats
+
+
+def advance(transport, last):
+    # Song time now as if it ran on from last: past the loop's end after a wrap of the
+    # Arrangement loop. None for a stop or a backward jump.
+    now = transport.song_beats
+    if not transport.is_playing:
+        return None
+    if now >= last:
+        return now
+    if not transport.loop:
+        return None
+    start = transport.loop_start
+    end = start + transport.loop_length
+    gap = max(end - last, 0.0) + (now - start)
+    if last < start or now < start or gap > LOOP_WRAP_TOLERANCE:
+        return None
+    return last + gap
 
 
 def end_beats(snapshot, bars):

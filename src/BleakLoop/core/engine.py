@@ -73,11 +73,12 @@ def tick(state, now_ms):
     return mixer.tick(state, now_ms)
 
 
-def fx_tick(state, transport, values):
-    # The morph on the 10 ms timer, in every mode: values per morphing macro, and a redraw flag.
+def fx_tick(state, transport, values, triggered=None):
+    # The morph on the 10 ms timer, in every mode: values per morphing macro, whether a launch
+    # morph's scene waits to launch, and a redraw flag.
     if state.morph is None:
         return state, [], False
-    return fx.tick(state, transport, values)
+    return fx.tick(state, transport, values, triggered)
 
 
 def launch_tick(state, transport):
