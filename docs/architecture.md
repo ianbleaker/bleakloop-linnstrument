@@ -209,6 +209,7 @@ flowchart TD
     core_modes["modes"]
     core_sequencer["sequencer"]
     core_session["session"]
+    core_userfile["userfile"]
     core_values["values"]
   end
   subgraph External
@@ -219,6 +220,7 @@ flowchart TD
   core_buttons --> core_catalogue
   core_buttons -.->|lazy| core_layout
   core_buttons --> core_model
+  core_buttons --> core_userfile
   core_controls --> core_buttons
   core_controls --> core_faders
   core_controls --> core_functions

@@ -4,10 +4,23 @@ each function's label, manual text and messages."""
 import tomllib
 from pathlib import Path
 
+from . import userfile
 from .catalogue import LINNSTRUMENT, MESSAGE_ONLY, MODES, SEQUENCER, SESSION
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
+
+
+def user_path(script):
+    # The user's buttons file, in the User Library beside Remote Scripts, so an upgrade keeps
+    # it. None unless the script sits in a Remote Scripts folder: a repo checkout never reads
+    # a user's own file. Not resolved, as the developer install is a symlink.
+    if script.parent.name != "Remote Scripts":
+        return None
+    return script.parent.parent / "BleakLoop" / "buttons.toml"
+
+
+USER_PATH = user_path(Path(__file__).parent.parent)
 
 # The manual's section keys (tools/docs/manual/pads.py SECTIONS), plus the held-modifier
 # sections that have combos but no manual section of their own.
@@ -470,28 +483,55 @@ def _regions():
     }
 
 
-def load(path):
+def _read(path):
     with open(path, "rb") as file:
-        return Registry(tomllib.load(file))
+        return tomllib.load(file)
+
+
+def load(path, user_path=None):
+    # The shipped file, with the user's file over it when there is one.
+    data = _read(path)
+    overlay, editor = {}, dict(userfile.EDITOR)
+    if user_path is not None and Path(user_path).exists():
+        try:
+            try:
+                overlay = _read(user_path)
+            except OSError as error:
+                raise ValueError(f"couldn't read it: {error.strerror}") from None
+            data, editor = userfile.merge(data, overlay, str(user_path))
+            registry = Registry(data)
+        except ValueError as error:
+            text = str(error)
+            raise ValueError(text if text.startswith(str(user_path)) else f"{user_path}: {text}") from None
+    else:
+        registry = Registry(data)
+    registry.overlay, registry.editor = overlay, editor
+    return registry
 
 
 # Loaded on first use: layout's fixed regions must exist before the registry validates.
 _registry = None
+# Why the user's file was left out at startup, for the surface to show; None when it loaded.
+user_error = None
 
 
 def _get():
-    global _registry
+    global _registry, user_error
     if _registry is None:
-        _registry = load(PATH)
+        try:
+            _registry = load(PATH, USER_PATH)
+        except ValueError as error:
+            user_error = str(error)
+            _registry = load(PATH)
     return _registry
 
 
-def reload(path=None):
-    # Loads the file again and refills layout's sections in place. A file that fails its
+def reload(path=None, user_path=None):
+    # Loads the files again and refills layout's sections in place. A file that fails its
     # checks raises and leaves the current layout as it was.
-    global _registry
-    registry = load(path or PATH)
-    _registry = registry
+    global _registry, user_error
+    registry = load(path or PATH, user_path or USER_PATH)
+    _registry, user_error = registry, None
     from . import layout
 
     layout.refresh()
