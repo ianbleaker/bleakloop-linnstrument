@@ -69,15 +69,6 @@ READ_NUMBERS = [
     NRPN_RIGHT_PER_ROW_LOWEST,
 ]
 
-# Wording from buttons.toml's [system] table. A refusal is compared by value, so each is read
-# once at load.
-REFUSE_DUPLICATES = buttons.system("refuse_duplicates")
-REFUSE_ROW_OFFSET = buttons.system("refuse_row_offset")
-REFUSE_RIGHT_SPLIT = buttons.system("refuse_right_split")
-REFUSE_CHANNELS = buttons.system("refuse_channels")
-CONTROLS_ON = buttons.system("controls_on")
-OCTAVE_RESET = buttons.system("octave_reset")
-
 
 def cc(channel, number, value):
     return [(CC_STATUS + channel, number, value)]
@@ -189,9 +180,9 @@ def control_map(reads):
     # (note -> pad, Octave, refusal message).
     notes = row_notes(reads)
     if notes is None:
-        return None, OCTAVE_ZERO, REFUSE_ROW_OFFSET
+        return None, OCTAVE_ZERO, buttons.system("refuse_row_offset")
     if len(set(notes)) < len(notes):
-        return None, OCTAVE_ZERO, REFUSE_DUPLICATES
+        return None, OCTAVE_ZERO, buttons.system("refuse_duplicates")
     octave = fit_octave(notes)
     shift = 12 * (octave - OCTAVE_ZERO)
     return {note + shift: layout.pad_of(row) for row, note in enumerate(notes)}, octave, None
@@ -271,7 +262,7 @@ def computed_settings(reads):
     channel, changes = control_channel(reads)
     note_to_pad, octave, refusal = control_map(reads)
     if right_split_channels(reads) is None:
-        note_to_pad, refusal = None, REFUSE_RIGHT_SPLIT
+        note_to_pad, refusal = None, buttons.system("refuse_right_split")
     settings = [(NRPN_LEFT_MAIN_CHANNEL, channel + 1), (NRPN_OCTAVE, octave)] + changes
     return settings, channel, note_to_pad, refusal
 

@@ -170,6 +170,15 @@ class Section:
         self.__dict__["_modes"] = section_modes(name)
         self.__dict__["_built"] = frozenset(buttons)
 
+    def _refill(self, buttons, does):
+        # A reload: new buttons in the same object, so whatever holds it (a fallback, a module
+        # attribute) sees them. Name, fallback and modes stay.
+        for key in [key for key in self.__dict__ if not key.startswith("_")]:
+            del self.__dict__[key]
+        self.__dict__.update(buttons)
+        self.__dict__["_does"] = dict(does)
+        self.__dict__["_built"] = frozenset(buttons)
+
     def __getattr__(self, attr):
         base = self.__dict__.get("_base")
         if attr.startswith("_") or base is None:
@@ -475,6 +484,17 @@ def _get():
     if _registry is None:
         _registry = load(PATH)
     return _registry
+
+
+def reload(path=None):
+    # Loads the file again and refills layout's sections in place. A file that fails its
+    # checks raises and leaves the current layout as it was.
+    global _registry
+    registry = load(path or PATH)
+    _registry = registry
+    from . import layout
+
+    layout.refresh()
 
 
 def entry(id):

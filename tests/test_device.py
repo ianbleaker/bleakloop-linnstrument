@@ -1,7 +1,7 @@
 import pytest
 
 from BleakLoop import device
-from BleakLoop.core import layout
+from BleakLoop.core import buttons, layout
 from BleakLoop.core.leds import BLUE, DEVICE_DEFAULT, OFF, WHITE, Clock, Light
 
 CLOCK = Clock(beats=0.0, now_ms=0)
@@ -114,11 +114,11 @@ def test_fit_octave(notes, octave):
 
 
 def test_control_map_refuses_repeats():
-    assert device.control_map({227: 127}) == (None, 5, device.REFUSE_DUPLICATES)
+    assert device.control_map({227: 127}) == (None, 5, buttons.system("refuse_duplicates"))
 
 
 def test_control_map_refuses_unknown_offset():
-    assert device.control_map({227: 8}) == (None, 5, device.REFUSE_ROW_OFFSET)
+    assert device.control_map({227: 8}) == (None, 5, buttons.system("refuse_row_offset"))
 
 
 def test_control_map_fourths():
@@ -240,12 +240,12 @@ def test_computed_settings_borrow():
 def test_computed_settings_refuses_unread_right_split():
     settings, channel, note_to_pad, refusal = device.computed_settings({227: 5})
     assert settings == [(1, 16), (36, 5)]
-    assert (channel, note_to_pad, refusal) == (15, None, device.REFUSE_RIGHT_SPLIT)
+    assert (channel, note_to_pad, refusal) == (15, None, buttons.system("refuse_right_split"))
 
 
 def test_computed_settings_row_offset_refusal():
     _, _, note_to_pad, refusal = device.computed_settings({227: 127, **FACTORY})
-    assert (note_to_pad, refusal) == (None, device.REFUSE_DUPLICATES)
+    assert (note_to_pad, refusal) == (None, buttons.system("refuse_duplicates"))
 
 
 def test_computed_steps():
@@ -315,7 +315,7 @@ def test_realign_new_octave_is_not_a_player_change():
 
 def test_realign_refused():
     note_to_pad, refusal, settings, _ = device.realign({227: 127, **SENT}, SENT)
-    assert (note_to_pad, refusal, settings) == (None, device.REFUSE_DUPLICATES, [])
+    assert (note_to_pad, refusal, settings) == (None, buttons.system("refuse_duplicates"), [])
 
 
 def test_split_restore_follows_numbers_order():

@@ -310,7 +310,7 @@ class BleakLoop(ControlSurface):
     def _compute_settings(self):
         settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
         self._control_channel = channel
-        self._right_split_unread = self._refusal == device.REFUSE_RIGHT_SPLIT
+        self._right_split_unread = self._refusal == buttons.system("refuse_right_split")
         self._sent = {
             device.NRPN_OCTAVE: dict(settings)[device.NRPN_OCTAVE],
             device.NRPN_TRANSPOSE_PITCH: device.TRANSPOSE_ZERO,
@@ -364,14 +364,14 @@ class BleakLoop(ControlSurface):
             return
         self._recheck_channel()
         if self._clash:
-            note_map, refusal = None, device.REFUSE_CHANNELS
+            note_map, refusal = None, buttons.system("refuse_channels")
         self._note_map = note_map
         if player_changed:
-            self.show_message(device.OCTAVE_RESET)
+            self.show_message(buttons.system("octave_reset"))
         if refusal is not None and refusal != self._refusal:
             self.show_message(refusal)
         elif refusal is None and was_refused:
-            self.show_message(device.CONTROLS_ON)
+            self.show_message(buttons.system("controls_on"))
         self._refusal = refusal
 
     def _recheck_channel(self):

@@ -40,28 +40,59 @@ FIXED_LENGTHS = (1, 2, 4, 8)
 # and each group as {(column, pad): value} by its function. A mode's section falls back to
 # its Session one (buttons.FALLBACK). The fixed regions above come first, because the
 # registry checks no button sits on them.
-GLOBAL = buttons.section("global")
-GLOBAL_SHIFT = buttons.section("global-shift")
-LINNSTRUMENT = buttons.section("linnstrument", GLOBAL)
-LINNSTRUMENT_SHIFT = buttons.section("linnstrument-shift", GLOBAL_SHIFT)
-LINNSTRUMENT_SCENES = buttons.section("linnstrument-scenes")
-SEQUENCER_GLOBAL = buttons.section("sequencer-global", GLOBAL)
-SEQUENCER_GLOBAL_SHIFT = buttons.section("sequencer-global-shift", GLOBAL_SHIFT)
-NAVIGATION = buttons.section("navigation")
-NAVIGATION_SHIFT = buttons.section("navigation-shift")
-SEQUENCER_NAV = buttons.section("sequencer-nav", NAVIGATION)
-SEQUENCER_NAV_SHIFT = buttons.section("sequencer-nav-shift", NAVIGATION_SHIFT)
-VIEW = buttons.section("view")
-VIEW_SHIFT = buttons.section("view-shift")
-DEVICE_CLIP = buttons.section("device-clip")
-SEQUENCER_GRID = buttons.section("sequencer-grid")
-SEQUENCER_SETTINGS = buttons.section("sequencer-settings")
-FX = buttons.section("fx")
-# Read by index: slot N is FX.slots[N - 1], window scene N is FX.scene_slots[N - 1] and page
-# N is SEQUENCER_SETTINGS.pages[N].
-FX.slots = tuple(FX.slots)
-FX.scene_slots = tuple(FX.scene_slots)
-SEQUENCER_SETTINGS.pages = tuple(SEQUENCER_SETTINGS.pages)
+GLOBAL = buttons.Section("global", {}, {})
+GLOBAL_SHIFT = buttons.Section("global-shift", {}, {})
+LINNSTRUMENT = buttons.Section("linnstrument", {}, {}, GLOBAL)
+LINNSTRUMENT_SHIFT = buttons.Section("linnstrument-shift", {}, {}, GLOBAL_SHIFT)
+LINNSTRUMENT_SCENES = buttons.Section("linnstrument-scenes", {}, {})
+SEQUENCER_GLOBAL = buttons.Section("sequencer-global", {}, {}, GLOBAL)
+SEQUENCER_GLOBAL_SHIFT = buttons.Section("sequencer-global-shift", {}, {}, GLOBAL_SHIFT)
+NAVIGATION = buttons.Section("navigation", {}, {})
+NAVIGATION_SHIFT = buttons.Section("navigation-shift", {}, {})
+SEQUENCER_NAV = buttons.Section("sequencer-nav", {}, {}, NAVIGATION)
+SEQUENCER_NAV_SHIFT = buttons.Section("sequencer-nav-shift", {}, {}, NAVIGATION_SHIFT)
+VIEW = buttons.Section("view", {}, {})
+VIEW_SHIFT = buttons.Section("view-shift", {}, {})
+DEVICE_CLIP = buttons.Section("device-clip", {}, {})
+SEQUENCER_GRID = buttons.Section("sequencer-grid", {}, {})
+SEQUENCER_SETTINGS = buttons.Section("sequencer-settings", {}, {})
+FX = buttons.Section("fx", {}, {})
+
+SECTIONS = (
+    GLOBAL,
+    GLOBAL_SHIFT,
+    LINNSTRUMENT,
+    LINNSTRUMENT_SHIFT,
+    LINNSTRUMENT_SCENES,
+    SEQUENCER_GLOBAL,
+    SEQUENCER_GLOBAL_SHIFT,
+    NAVIGATION,
+    NAVIGATION_SHIFT,
+    SEQUENCER_NAV,
+    SEQUENCER_NAV_SHIFT,
+    VIEW,
+    VIEW_SHIFT,
+    DEVICE_CLIP,
+    SEQUENCER_GRID,
+    SEQUENCER_SETTINGS,
+    FX,
+)
+
+
+def refresh():
+    # Fills every section from the current registry, in place: a reload reaches whatever holds
+    # them. buttons.reload calls this again after a change.
+    for section in SECTIONS:
+        fresh = buttons.section(section._name)
+        section._refill(fresh._own(), fresh._does)
+    # Read by index: slot N is FX.slots[N - 1], window scene N is FX.scene_slots[N - 1] and
+    # page N is SEQUENCER_SETTINGS.pages[N].
+    FX.slots = tuple(FX.slots)
+    FX.scene_slots = tuple(FX.scene_slots)
+    SEQUENCER_SETTINGS.pages = tuple(SEQUENCER_SETTINGS.pages)
+
+
+refresh()
 
 def device_row(pad):
     if not 1 <= pad <= ROWS:
