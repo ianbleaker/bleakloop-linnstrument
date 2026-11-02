@@ -2,9 +2,9 @@
 
 PYTHONPATH=src python3 -m tools.docs.mockup SPEC.json [-o OUT.svg]
 
-A top-level "layout" object moves pads for the figure, by core/layout.py constant name:
-{"SESSION": "16,1", "RESERVED": [], "DEVICE_CLIP_TRACK_STEPS": {"16,7": -1, "16,6": 1}}.
-Every button moves alone: moving FX leaves its Shift function, FADER_SOURCE, where it was.
+A top-level "layout" object moves pads for the figure, by core/layout.py section and button:
+{"NAVIGATION.session": "16,1", "DEVICE_CLIP.tracks": {"16,7": -1, "16,6": 1}}.
+Every button moves alone: moving NAVIGATION.fx leaves NAVIGATION_SHIFT.fader_source where it was.
 """
 
 import argparse
@@ -64,18 +64,24 @@ def _layout(overrides):
     if not isinstance(overrides, dict):
         raise SpecError("layout: must be an object")
     patched = {name: _position(name, value) for name, value in overrides.items()}
-    saved = {name: getattr(layout, name) for name in patched}
+    saved = {name: getattr(*_target(name)) for name in patched}
     try:
         for name, value in patched.items():
-            setattr(layout, name, value)
+            setattr(*_target(name), value)
         if patched:
             importlib.reload(pads)
         yield
     finally:
         for name, value in saved.items():
-            setattr(layout, name, value)
+            setattr(*_target(name), value)
         if patched:
             importlib.reload(pads)
+
+
+def _target(name):
+    # "NAVIGATION.fx" -> (layout.NAVIGATION, "fx"); a flat constant stays on layout.
+    section, _, button = name.rpartition(".")
+    return (getattr(layout, section, None) if section else layout), button
 
 
 def _panel(spec, layer):
@@ -106,7 +112,8 @@ def _panel(spec, layer):
 
 def _position(name, value):
     # A pad ("16,1"), pads (["16,6"]) or pads with values ({"16,7": -1}), as the constant has.
-    current = getattr(layout, name, None)
+    owner, button = _target(name)
+    current = getattr(owner, button, None)
     if _is_key(current):
         if not isinstance(value, str):
             raise SpecError(f"layout {name}: a pad, 'column,pad'")
@@ -118,7 +125,7 @@ def _position(name, value):
     if isinstance(current, dict) and current and all(_is_key(k) for k in current):
         if not isinstance(value, dict):
             raise SpecError(f"layout {name}: an object of pads")
-        # A list value is a tuple, as WINDOW_MOVES' (track step, scene step).
+        # A list value is a tuple, as a window move's (track step, scene step).
         for v in value.values():
             if not all(isinstance(n, (int, float, str)) for n in (v if isinstance(v, list) else [v])):
                 raise SpecError(f"layout {name}: values are JSON scalars or lists of them")

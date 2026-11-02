@@ -220,9 +220,9 @@ def test_fx_modes_fader_columns_go_to_the_faders():
 
 
 def test_fx_modes_slots_and_bars_are_unchanged():
-    state, actions = session.handle(FX_ON, PadPress(*layout.FX_SLOTS[0], True), SNAP)
+    state, actions = session.handle(FX_ON, PadPress(*layout.FX.slots[0], True), SNAP)
     assert actions == [StoreFxSnapshot(0)] and state.fader_touches == ()
-    state, _ = session.handle(FX_ON, PadPress(*min(layout.FX_LENGTHS), True), SNAP)
+    state, _ = session.handle(FX_ON, PadPress(*min(layout.FX.bars), True), SNAP)
     assert state.fx_length == 1
 
 
@@ -241,7 +241,7 @@ def test_a_slide_onto_shift_ends_on_its_release_and_leaves_shift_alone():
     state, _, _ = x(state, 2, 8, centre(2) + 10)
     state, _ = engine.slide(state, SlideMoved(8, 2, 1), SNAP)
     shifted = replace(state, shift=True)
-    state, actions = session.handle(shifted, PadPress(*layout.SHIFT, False), SNAP)
+    state, actions = session.handle(shifted, PadPress(*layout.GLOBAL.shift, False), SNAP)
     assert state.shift and state.fader_touches == ()
     assert actions == [EndUndoStep()]
 
@@ -282,7 +282,7 @@ def test_a_slide_onto_the_tracks_ends_on_its_release_and_fires_nothing(pad):
 def test_split_off_resets_the_faders():
     state, _ = session.handle(SPLIT, PadPress(12, 4, True), SNAP)
     state, _, _ = x(state, 12, 4, centre(13))
-    state, actions = session.handle(state, PadPress(*layout.SESSION, True), SNAP)
+    state, actions = session.handle(state, PadPress(*layout.NAVIGATION.session, True), SNAP)
     assert not state.split and state.fader_touches == () and not state.fader_undo_open
     assert actions == [EndUndoStep(), ShowMessage("Split view OFF")]
 
@@ -317,7 +317,7 @@ def test_mixer_on_resets_the_faders():
 
 def test_entering_linnstrument_mode_resets_the_faders():
     state, _, _ = x(touched(), 5, 3, centre(8))
-    state, actions = global_column.handle(state, PadPress(*layout.MODE_PAD, True), SNAP)
+    state, actions = global_column.handle(state, PadPress(*layout.GLOBAL.linnstrument_mode, True), SNAP)
     assert state.fader_touches == () and not state.fader_undo_open
     assert actions[0] == EndUndoStep()
 

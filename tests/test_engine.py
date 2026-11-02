@@ -36,7 +36,7 @@ def test_default_state_is_session():
 
 
 def test_session_input_goes_to_session_module():
-    state, actions = engine.handle(SESSION, press(layout.MODE_PAD), STOPPED)
+    state, actions = engine.handle(SESSION, press(layout.GLOBAL.linnstrument_mode), STOPPED)
     assert state.mode is Mode.LINNSTRUMENT
     assert actions == [EnterMode(Mode.LINNSTRUMENT)]
 
@@ -44,9 +44,9 @@ def test_session_input_goes_to_session_module():
 def test_unowned_slide_releases_the_pad_it_left():
     # Sliding off Stop ends the hold, as releasing it does.
     stopping = State(Mode.SESSION, stop=True)
-    slide = SlideMoved(pad=layout.STOP[1], from_column=layout.STOP[0], to_column=16)
+    slide = SlideMoved(pad=layout.VIEW.stop[1], from_column=layout.VIEW.stop[0], to_column=16)
     assert engine.slide(stopping, slide, STOPPED) == engine.handle(
-        stopping, press(layout.STOP, False), STOPPED
+        stopping, press(layout.VIEW.stop, False), STOPPED
     )
     assert not engine.slide(stopping, slide, STOPPED)[0].stop
 
@@ -55,17 +55,17 @@ def test_unowned_slide_releases_the_pad_it_left():
 
 
 def test_mode_pad_press_enters_session():
-    state, actions = engine.handle(LINNSTRUMENT, press(layout.MODE_PAD), STOPPED)
+    state, actions = engine.handle(LINNSTRUMENT, press(layout.GLOBAL.linnstrument_mode), STOPPED)
     assert state == State(mode=Mode.SESSION)
     assert actions == [EnterMode(Mode.SESSION)]
 
 
 def test_mode_pad_release_is_ignored():
-    assert engine.handle(LINNSTRUMENT, press(layout.MODE_PAD, False), STOPPED) == (LINNSTRUMENT, [])
+    assert engine.handle(LINNSTRUMENT, press(layout.GLOBAL.linnstrument_mode, False), STOPPED) == (LINNSTRUMENT, [])
 
 
 def test_linnstrument_input_goes_to_linnstrument_module():
-    state, actions = engine.handle(LINNSTRUMENT, press(layout.SHIFT), STOPPED)
+    state, actions = engine.handle(LINNSTRUMENT, press(layout.GLOBAL.shift), STOPPED)
     assert state.shift
     assert actions == []
 
@@ -106,15 +106,15 @@ SEQUENCER = State(Mode.SEQUENCER, seq_track=0)
 
 
 def test_sequencer_input_goes_to_the_sequencer_module():
-    state, actions = engine.handle(SEQUENCER, press(layout.SEQ), STOPPED)
+    state, actions = engine.handle(SEQUENCER, press(layout.NAVIGATION.seq), STOPPED)
     assert state.mode is Mode.SESSION
     assert actions == [EnterMode(Mode.SESSION)]
 
 
 def test_sequencer_renders_its_own_frame():
     frame = engine.render(SEQUENCER, STOPPED)
-    assert frame[layout.SEQ] == engine.sequencer.render(SEQUENCER, STOPPED)[layout.SEQ]
-    assert (layout.SEQ_VIEW) in frame
+    assert frame[layout.NAVIGATION.seq] == engine.sequencer.render(SEQUENCER, STOPPED)[layout.NAVIGATION.seq]
+    assert (layout.SEQUENCER_GRID.view) in frame
 
 
 def test_seq_sync_runs_only_in_sequencer_mode():

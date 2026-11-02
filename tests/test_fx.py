@@ -154,7 +154,7 @@ SNAP = Snapshot(
 )
 FX = State(fx=True)
 STORED = (FxRack("A", "R", 0, (1.0,)),)
-SLOT_3 = layout.FX_SLOTS[2]
+SLOT_3 = layout.FX.slots[2]
 
 
 def press(key, pressed=True):
@@ -170,13 +170,13 @@ def with_slot(state, slot, value=STORED):
 
 
 def test_toggle_on():
-    state, actions = handle(State(), layout.FX)
+    state, actions = handle(State(), layout.NAVIGATION.fx)
     assert state.fx
     assert actions == [ShowMessage("FX Mode ON")]
 
 
 def test_toggle_off_clears_length():
-    state, actions = handle(replace(FX, fx_length=4), layout.FX)
+    state, actions = handle(replace(FX, fx_length=4), layout.NAVIGATION.fx)
     assert not state.fx
     assert state.fx_length is None
     assert actions == [ShowMessage("FX Mode OFF")]
@@ -184,7 +184,7 @@ def test_toggle_off_clears_length():
 
 def test_fx_turns_mixer_off():
     state = State(mixer=True, undo_open=True, glides=(Glide(0, 0.5, 0.6),))
-    state, actions = handle(state, layout.FX)
+    state, actions = handle(state, layout.NAVIGATION.fx)
     assert state.fx
     assert not state.mixer
     assert not state.undo_open
@@ -193,7 +193,7 @@ def test_fx_turns_mixer_off():
 
 
 def test_mixer_turns_fx_off():
-    state, actions = handle(replace(FX, fx_length=2), layout.MIXER)
+    state, actions = handle(replace(FX, fx_length=2), layout.NAVIGATION.mixer)
     assert state.mixer
     assert not state.fx
     assert state.fx_length is None
@@ -202,12 +202,12 @@ def test_mixer_turns_fx_off():
 
 def test_shift_fx_pad_toggles_the_fader_source():
     state = replace(FX, shift=True)
-    assert handle(state, layout.FX) == (
+    assert handle(state, layout.NAVIGATION.fx) == (
         replace(state, fader_source="mapped"), [ShowMessage("Mapped FX")]
     )
 
 
-@pytest.mark.parametrize("key, bars", list(layout.FX_LENGTHS.items()))
+@pytest.mark.parametrize("key, bars", list(layout.FX.bars.items()))
 def test_length_pad_held(key, bars):
     state, actions = handle(FX, key)
     assert (state.fx_length, actions) == (bars, [])
@@ -279,13 +279,13 @@ def test_shift_slot_does_nothing():
 
 
 def test_copy_message_in_fx():
-    state, actions = handle(FX, layout.COPY)
+    state, actions = handle(FX, layout.NAVIGATION.copy)
     assert state.copy
     assert actions == [ShowMessage("Copy: press a slot to overwrite")]
 
 
 def test_delete_message_in_fx():
-    state, actions = handle(FX, layout.DELETE)
+    state, actions = handle(FX, layout.NAVIGATION.delete)
     assert state.delete
     assert actions == [ShowMessage("Delete Mode ON")]
 
@@ -687,15 +687,15 @@ def test_render_slots_and_lengths():
     state = with_slot(with_slot(with_slot(replace(FX, fx_length=4), 0), 9), 5)
     state = replace(state, fx_landed=9, morph=Morph(5, 0.0, 16.0, 0.0))
     frame = fx.render(state, SNAP)
-    assert frame[layout.FX_SLOTS[0]] == Light(CYAN)
-    assert frame[layout.FX_SLOTS[9]] == Light(CYAN, Blink.TEMPO)
-    assert frame[layout.FX_SLOTS[5]] == Light(CYAN, Blink.FAST)
-    assert frame[layout.FX_SLOTS[1]] == Light(OFF)
+    assert frame[layout.FX.slots[0]] == Light(CYAN)
+    assert frame[layout.FX.slots[9]] == Light(CYAN, Blink.TEMPO)
+    assert frame[layout.FX.slots[5]] == Light(CYAN, Blink.FAST)
+    assert frame[layout.FX.slots[1]] == Light(OFF)
     assert frame[(14, 3)] == Light(WHITE, Blink.FAST)
     for key in ((14, 1), (14, 2), (14, 4), (14, 5)):
         assert frame[key] == Light(WHITE)
     lit = {key for key, light in frame.items() if light != Light(OFF)}
-    assert lit == {layout.FX_SLOTS[i] for i in (0, 5, 9)} | set(layout.FX_LENGTHS)
+    assert lit == {layout.FX.slots[i] for i in (0, 5, 9)} | set(layout.FX.bars)
 
 
 def test_render_column_13_is_dark_with_no_scene_snapshots():
@@ -721,7 +721,7 @@ def test_session_render_in_fx_mode():
     snapshot = replace(SNAP, track_count=3, scene_count=2)
     state = with_slot(FX, 2)
     frame = session.render(state, snapshot)
-    assert frame[layout.FX] == Light(BLUE)
+    assert frame[layout.NAVIGATION.fx] == Light(BLUE)
     assert frame[SLOT_3] == Light(CYAN)
     for column in layout.GRID_COLUMNS:
         if column in layout.FX_FADER_COLUMNS:
@@ -731,19 +731,19 @@ def test_session_render_in_fx_mode():
 
 
 def test_session_render_fx_pad_off():
-    assert session.render(State(), SNAP)[layout.FX] == Light(CYAN)
+    assert session.render(State(), SNAP)[layout.NAVIGATION.fx] == Light(CYAN)
 
 
 def test_session_render_shift_layer_in_fx():
     frame = session.render(replace(with_slot(FX, 2), shift=True), SNAP)
-    assert frame[layout.FX] == Light(ORANGE)
+    assert frame[layout.NAVIGATION.fx] == Light(ORANGE)
     assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))
 
 
 # Scene snapshots
 
 SCENES = replace(SNAP, scene_count=8)
-SCENE_2 = layout.FX_SCENE_SLOTS[1]
+SCENE_2 = layout.FX.scene_slots[1]
 
 
 def with_scene(state, scene, value=STORED):
@@ -793,10 +793,10 @@ def test_scene_pads_follow_the_window():
 
 def test_a_scene_pad_past_the_last_scene_does_nothing():
     snapshot = replace(SNAP, scene_count=3)
-    assert handle(FX, layout.FX_SCENE_SLOTS[2], snapshot=snapshot)[1] == [
+    assert handle(FX, layout.FX.scene_slots[2], snapshot=snapshot)[1] == [
         StoreFxSnapshot(2, scene=True)
     ]
-    assert handle(FX, layout.FX_SCENE_SLOTS[3], snapshot=snapshot) == (FX, [])
+    assert handle(FX, layout.FX.scene_slots[3], snapshot=snapshot) == (FX, [])
 
 
 def test_shift_scene_pad_does_nothing():
@@ -864,7 +864,7 @@ def test_render_scene_snapshots():
     state = with_scene(with_scene(with_scene(FX, 0), 2), 4)
     state = replace(state, fx_landed_scene=2, morph=Morph(4, 0.0, 16.0, 0.0, scene=True))
     frame = fx.render(state, SCENES)
-    keys = layout.FX_SCENE_SLOTS
+    keys = layout.FX.scene_slots
     assert frame[keys[0]] == Light(LIME)
     assert frame[keys[1]] == Light(OFF)
     assert frame[keys[2]] == Light(LIME, Blink.TEMPO)
@@ -876,34 +876,34 @@ def test_a_scene_morph_does_not_blink_the_global_slot_with_its_number():
     state = with_scene(with_slot(FX, 4), 4)
     state = replace(state, morph=Morph(4, 0.0, 16.0, 0.0, scene=True))
     frame = fx.render(state, SCENES)
-    assert frame[layout.FX_SLOTS[4]] == Light(CYAN)
-    assert frame[layout.FX_SCENE_SLOTS[4]] == Light(LIME, Blink.FAST)
+    assert frame[layout.FX.slots[4]] == Light(CYAN)
+    assert frame[layout.FX.scene_slots[4]] == Light(LIME, Blink.FAST)
 
 
 def test_a_global_morph_does_not_blink_the_scene_pad_with_its_number():
     state = with_scene(with_slot(FX, 4), 4)
     state = replace(state, morph=Morph(4, 0.0, 16.0, 0.0))
     frame = fx.render(state, SCENES)
-    assert frame[layout.FX_SLOTS[4]] == Light(CYAN, Blink.FAST)
-    assert frame[layout.FX_SCENE_SLOTS[4]] == Light(LIME)
+    assert frame[layout.FX.slots[4]] == Light(CYAN, Blink.FAST)
+    assert frame[layout.FX.scene_slots[4]] == Light(LIME)
 
 
 def test_render_scene_snapshots_follow_the_window():
     state = replace(with_scene(FX, 3), window=layout.Window(0, 2))
     frame = fx.render(state, SCENES)
-    assert frame[layout.FX_SCENE_SLOTS[1]] == Light(LIME)
-    assert frame[layout.FX_SCENE_SLOTS[3]] == Light(OFF)
+    assert frame[layout.FX.scene_slots[1]] == Light(LIME)
+    assert frame[layout.FX.scene_slots[3]] == Light(OFF)
 
 
 def test_render_scene_snapshots_past_the_last_scene_are_dark():
     # A stale entry past the Set's end, kept until the next save, lights nothing.
     state = with_scene(FX, 3)
-    assert fx.render(state, replace(SNAP, scene_count=3))[layout.FX_SCENE_SLOTS[3]] == Light(OFF)
+    assert fx.render(state, replace(SNAP, scene_count=3))[layout.FX.scene_slots[3]] == Light(OFF)
 
 
 def test_render_scene_snapshots_under_shift_are_dark():
     state = replace(with_scene(FX, 0), shift=True)
-    assert fx.render(state, SCENES)[layout.FX_SCENE_SLOTS[0]] == Light(OFF)
+    assert fx.render(state, SCENES)[layout.FX.scene_slots[0]] == Light(OFF)
 
 
 # Scene launch
@@ -1281,10 +1281,10 @@ def test_the_panel_is_fx_modes_columns_11_to_14(state):
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
 def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
     state = with_slot(state, 2)
-    copying, _ = handle(state, layout.COPY)
+    copying, _ = handle(state, layout.NAVIGATION.copy)
     assert copying.copy
     assert handle(copying, SLOT_3)[1] == [StoreFxSnapshot(2)]
-    deleting, _ = handle(state, layout.DELETE)
+    deleting, _ = handle(state, layout.NAVIGATION.delete)
     assert handle(deleting, SLOT_3)[1] == [
         SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None))),
         ShowMessage("Snapshot 3 cleared"),
@@ -1298,8 +1298,8 @@ def test_stop_leaves_the_panel_alone():
 
 def test_mixer_copy_and_delete_only_hold_for_the_panel():
     state = State(mixer=True, mixer_split=True)
-    assert handle(state, layout.COPY) == (state, [])
-    copying, actions = handle(MIXER_PANEL, layout.COPY)
+    assert handle(state, layout.NAVIGATION.copy) == (state, [])
+    copying, actions = handle(MIXER_PANEL, layout.NAVIGATION.copy)
     assert actions == [ShowMessage("Copy: press a slot to overwrite")]
     copying = replace(MIXER_PANEL, copy=True)
     assert handle(copying, (2, layout.MUTE_ROW)) == (copying, [])
@@ -1320,7 +1320,7 @@ def test_the_panel_renders_as_fx_mode_with_column_10_dark(state):
 
 
 def test_leaving_a_split_view_lets_go_of_a_held_length():
-    state, _ = handle(replace(PANEL, fx_length=4), layout.SESSION)
+    state, _ = handle(replace(PANEL, fx_length=4), layout.NAVIGATION.session)
     assert not state.split and state.fx_length is None
-    state, _ = handle(replace(MIXER_PANEL, fx_length=4), layout.MIXER)
+    state, _ = handle(replace(MIXER_PANEL, fx_length=4), layout.NAVIGATION.mixer)
     assert not state.mixer_split and state.fx_length is None

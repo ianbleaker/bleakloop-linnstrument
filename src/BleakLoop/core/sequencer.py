@@ -279,7 +279,7 @@ def handle(state, event, snapshot):
     if not event.pressed and any((h.column, h.pad) == key for h in state.seq_holds):
         # A held step ends on its cell's release, wherever the finger slid to.
         return _release_step(state, event, view, snapshot)
-    if key == layout.SHIFT:
+    if key == layout.SEQUENCER_GLOBAL.shift:
         return global_column.handle(state, event, snapshot)
     if event.column == layout.NAV_COLUMN:
         return _nav(state, event, snapshot)
@@ -304,17 +304,17 @@ def handle(state, event, snapshot):
 def _nav(state, event, snapshot):
     key = (event.column, event.pad)
     shift_layer = state.shift and not state.copy and not state.delete
-    if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
+    if key == layout.SEQUENCER_NAV.device_clip and not (shift_layer and event.pressed):
         # On Shift's layer the pad is a window move.
         return controls.device_clip(state, event)
     if state.device_clip and event.pressed:
         # Device/Clip's layer replaces column 16's normal and Shift layers, as in Session Mode.
         return controls.device_clip_layer(state, key)
-    if key == layout.COPY and not (shift_layer and event.pressed):
+    if key == layout.SEQUENCER_NAV.copy and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, copy=False, seq_copy_source=None), []
         return replace(state, copy=True), [ShowMessage("Copy: pick a step")]
-    if key == layout.DELETE and not (shift_layer and event.pressed):
+    if key == layout.SEQUENCER_NAV.delete and not (shift_layer and event.pressed):
         if not event.pressed:
             return replace(state, delete=False), []
         return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
@@ -322,18 +322,18 @@ def _nav(state, event, snapshot):
         # Every Seq release too: a Seq + slot hold's release arrives after entry.
         return state, []
     if shift_layer:
-        if key in layout.WINDOW_MOVES:
-            return controls.move_window(state, layout.WINDOW_MOVES[key], snapshot)
-        if key in layout.TEMPO_STEPS:
-            return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
-        if key == layout.FADER_SOURCE:
+        if key in layout.SEQUENCER_NAV_SHIFT.window:
+            return controls.move_window(state, layout.SEQUENCER_NAV_SHIFT.window[key], snapshot)
+        if key in layout.SEQUENCER_NAV_SHIFT.tempo:
+            return state, controls.tempo_step(snapshot, layout.SEQUENCER_NAV_SHIFT.tempo[key])
+        if key == layout.SEQUENCER_NAV_SHIFT.fader_source:
             return controls.toggle_fader_source(state)
         return state, []
-    if key in (layout.SEQ, layout.SESSION):
+    if key in (layout.SEQUENCER_NAV.seq, layout.SEQUENCER_NAV.session):
         return leave(state, snapshot)
-    if key in (layout.MIXER, layout.FX):
+    if key in (layout.SEQUENCER_NAV.mixer, layout.SEQUENCER_NAV.fx):
         state, actions = leave(state, snapshot)
-        state, more = (mixer.toggle if key == layout.MIXER else fx.toggle)(state)
+        state, more = (mixer.toggle if key == layout.SEQUENCER_NAV.mixer else fx.toggle)(state)
         # The new mode's width can be wider than Session's split view.
         window = layout.move_window(
             state.window,
@@ -348,24 +348,24 @@ def _nav(state, event, snapshot):
 
 
 def _side(state, key, view):
-    if key == layout.SEQ_VIEW:
+    if key == layout.SEQUENCER_GRID.view:
         return replace(state, seq_settings=not state.seq_settings), []
-    if key in (layout.SEQ_UP, layout.SEQ_DOWN):
-        step = 1 if key == layout.SEQ_UP else -1
+    if key in (layout.SEQUENCER_GRID.up, layout.SEQUENCER_GRID.down):
+        step = 1 if key == layout.SEQUENCER_GRID.up else -1
         if view.drum is not None and view.is_midi:
             return _scroll(state, view, step)
         return _octave(state, step)
-    if key == layout.SEQ_FOLLOW:
+    if key == layout.SEQUENCER_GRID.follow:
         if state.seq_follow:
             return replace(state, seq_follow=False, seq_page=view_page(state, view)), [
                 ShowMessage("Follow OFF")
             ]
         return replace(state, seq_follow=True), [ShowMessage("Follow ON")]
-    if key not in (layout.SEQ_DOUBLE, layout.SEQ_HALVE):
+    if key not in (layout.SEQUENCER_GRID.double, layout.SEQUENCER_GRID.halve):
         return state, []
     if not view.has_clip or not view.is_midi:
         return state, [ShowMessage("No clip")]
-    if key == layout.SEQ_DOUBLE:
+    if key == layout.SEQUENCER_GRID.double:
         return _write(state, [DuplicateLoop(view.track, view.scene), ShowMessage("Loop doubled")])
     half = (view.loop_end - view.loop_start) / 2
     if half < step_length(state) - EPSILON:
@@ -580,15 +580,15 @@ def _note_pad(state, event, view, snapshot):
 
 def _settings(state, event, view):
     key = (event.column, event.pad)
-    page = layout.SEQ_PAGES.index(key) if key in layout.SEQ_PAGES else None
+    page = layout.SEQUENCER_SETTINGS.pages.index(key) if key in layout.SEQUENCER_SETTINGS.pages else None
     if not event.pressed:
         if page is not None and page == state.seq_page_held:
             return replace(state, seq_page_held=None), []
         return state, []
-    if key in layout.SEQ_RATES:
-        state = replace(state, seq_rate=layout.SEQ_RATES[key])
+    if key in layout.SEQUENCER_SETTINGS.rates:
+        state = replace(state, seq_rate=layout.SEQUENCER_SETTINGS.rates[key])
         return state, [ShowMessage(_rate_name(state))]
-    if key == layout.SEQ_TRIPLET:
+    if key == layout.SEQUENCER_SETTINGS.triplet:
         state = replace(state, seq_triplet=not state.seq_triplet)
         return state, [ShowMessage(_rate_name(state))]
     if page is not None:
@@ -746,14 +746,14 @@ def _note_colour(view, note, pad):
 
 
 def _render_settings(frame, state, view):
-    for key, rate in layout.SEQ_RATES.items():
+    for key, rate in layout.SEQUENCER_SETTINGS.rates.items():
         frame[key] = Light(BLUE if rate == state.seq_rate else CYAN)
-    frame[layout.SEQ_TRIPLET] = Light(ORANGE if state.seq_triplet else PINK)
+    frame[layout.SEQUENCER_SETTINGS.triplet] = Light(ORANGE if state.seq_triplet else PINK)
     span = page_span(state)
     shown = view_page(state, view)
     playing = playhead(state, view)
     playing_page = playing // STEPS if playing is not None else None
-    for page, key in enumerate(layout.SEQ_PAGES):
+    for page, key in enumerate(layout.SEQUENCER_SETTINGS.pages):
         if page == shown:
             colour = BLUE
         elif view.has_clip and page * span < view.loop_end - EPSILON:
@@ -764,27 +764,27 @@ def _render_settings(frame, state, view):
 
 
 def _render_side(frame, state):
-    frame[layout.SEQ_DOUBLE] = Light(RED)
-    frame[layout.SEQ_HALVE] = Light(PINK)
-    frame[layout.SEQ_FOLLOW] = Light(BLUE if state.seq_follow else CYAN)
-    frame[layout.SEQ_UP] = Light(WHITE)
-    frame[layout.SEQ_DOWN] = Light(WHITE)
-    frame[layout.SEQ_VIEW] = Light(BLUE if state.seq_settings else CYAN)
+    frame[layout.SEQUENCER_GRID.double] = Light(RED)
+    frame[layout.SEQUENCER_GRID.halve] = Light(PINK)
+    frame[layout.SEQUENCER_GRID.follow] = Light(BLUE if state.seq_follow else CYAN)
+    frame[layout.SEQUENCER_GRID.up] = Light(WHITE)
+    frame[layout.SEQUENCER_GRID.down] = Light(WHITE)
+    frame[layout.SEQUENCER_GRID.view] = Light(BLUE if state.seq_settings else CYAN)
 
 
 def _render_nav(frame, state):
     if state.shift and not state.copy and not state.delete:
-        for key in layout.WINDOW_MOVES:
+        for key in layout.SEQUENCER_NAV_SHIFT.window:
             frame[key] = Light(YELLOW)
-        for key in layout.TEMPO_STEPS:
+        for key in layout.SEQUENCER_NAV_SHIFT.tempo:
             frame[key] = Light(GREEN)
-        frame[layout.FADER_SOURCE] = Light(ORANGE)
+        frame[layout.SEQUENCER_NAV_SHIFT.fader_source] = Light(ORANGE)
     else:
-        frame[layout.COPY] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
-        frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
-        for key in (layout.SESSION, layout.MIXER, layout.FX):
+        frame[layout.SEQUENCER_NAV.copy] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
+        frame[layout.SEQUENCER_NAV.delete] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
+        for key in (layout.SEQUENCER_NAV.session, layout.SEQUENCER_NAV.mixer, layout.SEQUENCER_NAV.fx):
             frame[key] = Light(CYAN)
-        frame[layout.SEQ] = Light(BLUE)
-        frame[layout.DEVICE_CLIP] = Light(ORANGE)
+        frame[layout.SEQUENCER_NAV.seq] = Light(BLUE)
+        frame[layout.SEQUENCER_NAV.device_clip] = Light(ORANGE)
     if state.device_clip:
-        controls.render_device_clip_layer(frame)
+        controls.render_device_clip_layer(frame, state)

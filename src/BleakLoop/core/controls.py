@@ -79,6 +79,11 @@ def tempo_step(snapshot, step):
     return [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
 
 
+def navigation(state):
+    # The mode's Navigation column: Sequencer Mode has its own.
+    return layout.SEQUENCER_NAV if state.mode is Mode.SEQUENCER else layout.NAVIGATION
+
+
 def device_clip(state, event):
     # A hold pad: held, the Device/Clip layer; a tap with no other press during it flips
     # Live's Detail view.
@@ -91,10 +96,10 @@ def device_clip(state, event):
 
 def device_clip_layer(state, key):
     # Device/Clip held + a column 16 pad.
-    if key in layout.DEVICE_CLIP_TRACK_STEPS:
-        return state, [StepTrack(layout.DEVICE_CLIP_TRACK_STEPS[key])]
-    if key in layout.DEVICE_CLIP_DEVICE_STEPS:
-        return state, [StepDevice(layout.DEVICE_CLIP_DEVICE_STEPS[key])]
+    if key in layout.DEVICE_CLIP.tracks:
+        return state, [StepTrack(layout.DEVICE_CLIP.tracks[key])]
+    if key in layout.DEVICE_CLIP.devices:
+        return state, [StepDevice(layout.DEVICE_CLIP.devices[key])]
     return state, []
 
 
@@ -114,15 +119,15 @@ def toggle_fader_source(state):
     return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
 
 
-def render_device_clip_layer(frame):
+def render_device_clip_layer(frame, state):
     # Over either layer: the whole of column 16.
     for pad in range(1, layout.ROWS + 1):
         frame[(layout.NAV_COLUMN, pad)] = Light(OFF)
-    for key in layout.DEVICE_CLIP_TRACK_STEPS:
+    for key in layout.DEVICE_CLIP.tracks:
         frame[key] = Light(LIME)
-    for key in layout.DEVICE_CLIP_DEVICE_STEPS:
+    for key in layout.DEVICE_CLIP.devices:
         frame[key] = Light(MAGENTA)
-    frame[layout.DEVICE_CLIP] = Light(ORANGE, Blink.FAST)
+    frame[navigation(state).device_clip] = Light(ORANGE, Blink.FAST)
 
 
 def record_length(bars, snapshot):

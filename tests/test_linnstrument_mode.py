@@ -19,7 +19,7 @@ LINNSTRUMENT = State(mode=Mode.LINNSTRUMENT)
 
 @pytest.mark.parametrize("pressed", [True, False])
 def test_global_column_goes_to_global_column(pressed):
-    event = PadPress(*layout.SHIFT, pressed)
+    event = PadPress(*layout.GLOBAL.shift, pressed)
     assert linnstrument_mode.handle(LINNSTRUMENT, event, BASE) == global_column.handle(
         LINNSTRUMENT, event, BASE
     )

@@ -2,6 +2,7 @@
 
 import tomllib
 from pathlib import Path
+from types import SimpleNamespace
 
 from .model import ShowMessage
 
@@ -118,6 +119,19 @@ class Registry:
     def system(self, key, **values):
         return _format(self.data["system"][key], values)[0]
 
+    def section(self, name):
+        # Each button's position by its name, and each group as {position: value}. Mutable,
+        # so a test or a mockup can move one button.
+        found = SimpleNamespace()
+        for id, item in self.items.items():
+            if item["section"] != name or "pad" not in item:
+                continue
+            setattr(found, id.rsplit(".", 1)[1], self.pos(id))
+            if "group" in item:
+                group = item["group"]
+                setattr(found, group.rsplit(".", 1)[1], self.group(group))
+        return found
+
     def group(self, id):
         return {
             self.pos(key): _freeze(item["value"])
@@ -174,6 +188,8 @@ def _validate(data, items):
         section = item["section"]
         if section not in SECTIONS:
             raise ValueError(f"{id}: unknown section {section!r}")
+        if id.rsplit(".", 1)[0] != section.replace("-", "_"):
+            raise ValueError(f"{id}: an ID starts with its section, as {section.replace('-', '_')}.")
         if len(item.get("label", "")) > MAX_LABEL:
             raise ValueError(f"{id}: label longer than {MAX_LABEL} characters")
         if "group" in item and not ("pad" in item and "value" in item):
@@ -256,6 +272,10 @@ def pos(id):
 
 def group(id):
     return _get().group(id)
+
+
+def section(name):
+    return _get().section(name)
 
 
 def say(id, outcome=None, **values):

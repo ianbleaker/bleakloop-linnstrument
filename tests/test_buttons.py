@@ -11,13 +11,13 @@ FIXTURES = Path(__file__).parent / "fixtures" / "buttons"
 
 
 def test_play_stop_comes_from_the_registry():
-    assert layout.PLAY_STOP == (1, 1)
+    assert layout.GLOBAL.play_stop == (1, 1)
 
 
 def test_group_keeps_file_order_and_tuples():
-    assert list(layout.DEVICE_CLIP_TRACK_STEPS) == [(16, 7), (16, 6)]
-    assert layout.WINDOW_MOVES[(16, 5)] == (0, -1)
-    assert layout.FX_SLOTS[8] == (12, 1)
+    assert list(layout.DEVICE_CLIP.tracks) == [(16, 7), (16, 6)]
+    assert layout.NAVIGATION_SHIFT.window[(16, 5)] == (0, -1)
+    assert layout.FX.slots[8] == (12, 1)
 
 
 @pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.toml")), ids=lambda path: path.stem)

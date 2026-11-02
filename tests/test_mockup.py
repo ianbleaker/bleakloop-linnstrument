@@ -45,7 +45,7 @@ def test_a_layout_override_moves_a_pad_and_its_label(tmp_path):
     # Session is blue on column 16 pad 1; moved to pad 3, its label and light go with it.
     spec = {"panels": [{"layer": "session", "columns": [16]}]}
     _, before = run(tmp_path, spec)
-    _, after = run(tmp_path, {**spec, "layout": {"SESSION": "16,3", "FX": "16,1"}})
+    _, after = run(tmp_path, {**spec, "layout": {"NAVIGATION.session": "16,3", "NAVIGATION.fx": "16,1"}})
     assert rect(16, 40, 40, 40, SWATCHES[BLUE]) in before
     assert rect(16, 40 + 2 * 46, 40, 40, SWATCHES[BLUE]) in after
     assert after.index(">FX</text>") < after.index(">Session</text>")
@@ -55,14 +55,14 @@ def test_a_layout_override_leaves_the_shift_function_put(tmp_path):
     # Source, FX's Shift function, stays on pad 3 when FX moves to pad 4.
     spec = {"panels": [{"layer": "session-shift", "columns": [16]}]}
     source = '<text x="36" y="{}" font-size="9" fill="#ffffff" text-anchor="middle">Source</text>'
-    _, after = run(tmp_path, {**spec, "layout": {"FX": "16,4", "RESERVED": []}})
+    _, after = run(tmp_path, {**spec, "layout": {"NAVIGATION.fx": "16,4"}})
     assert source.format(63 + 2 * 46) in after
-    assert layout.FADER_SOURCE == layout.FX == (16, 3)
+    assert layout.NAVIGATION_SHIFT.fader_source == layout.NAVIGATION.fx == (16, 3)
 
 
 def test_a_shift_function_moves_alone():
-    with mockup._layout({"FADER_SOURCE": "16,4", "RESERVED": []}):
-        assert (layout.FX, layout.FADER_SOURCE) == ((16, 3), (16, 4))
+    with mockup._layout({"NAVIGATION_SHIFT.fader_source": "16,4"}):
+        assert (layout.NAVIGATION.fx, layout.NAVIGATION_SHIFT.fader_source) == ((16, 3), (16, 4))
 
 
 def test_ring_labels_follow_their_direction(tmp_path):
@@ -72,7 +72,7 @@ def test_ring_labels_follow_their_direction(tmp_path):
     _, svg = run(
         tmp_path,
         {
-            "layout": {"WINDOW_MOVES": moves, "TEMPO_STEPS": tempo},
+            "layout": {"NAVIGATION_SHIFT.window": moves, "NAVIGATION_SHIFT.tempo": tempo},
             "panels": [{"layer": "session-shift", "columns": [16]}],
         },
     )
@@ -82,15 +82,15 @@ def test_ring_labels_follow_their_direction(tmp_path):
 
 
 def test_a_layout_override_is_undone(tmp_path):
-    session, steps = layout.SESSION, layout.DEVICE_CLIP_TRACK_STEPS
+    session, steps = layout.NAVIGATION.session, layout.DEVICE_CLIP.tracks
     run(
         tmp_path,
         {
-            "layout": {"SESSION": "16,3", "DEVICE_CLIP_TRACK_STEPS": {"16,1": -1, "16,2": 1}},
+            "layout": {"NAVIGATION.session": "16,3", "DEVICE_CLIP.tracks": {"16,1": -1, "16,2": 1}},
             "panels": [{"layer": "session"}],
         },
     )
-    assert (layout.SESSION, layout.DEVICE_CLIP_TRACK_STEPS) == (session, steps)
+    assert (layout.NAVIGATION.session, layout.DEVICE_CLIP.tracks) == (session, steps)
     assert run(tmp_path, {"panels": [{"layer": "session"}]})[1] == draw.map_svg(Layer.SESSION)
 
 
@@ -98,10 +98,10 @@ def test_a_layout_override_is_undone(tmp_path):
     "overrides",
     [
         {"ROWS": 4},
-        {"SESSION": [16, 1]},
-        {"RESERVED": "16,6"},
-        {"WINDOW_MOVES": ["16,1"]},
-        {"DEVICE_CLIP_TRACK_STEPS": {"16,7": {"step": -1}}},
+        {"NAVIGATION.session": [16, 1]},
+        {"NAVIGATION": "16,6"},
+        {"NAVIGATION_SHIFT.window": ["16,1"]},
+        {"DEVICE_CLIP.tracks": {"16,7": {"step": -1}}},
     ],
 )
 def test_a_bad_layout_exits_non_zero(tmp_path, capsys, overrides):

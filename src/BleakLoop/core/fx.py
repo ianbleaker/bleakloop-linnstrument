@@ -223,8 +223,8 @@ def toggle(state):
 def press(state, event, snapshot):
     # Every grid pad in FX Mode, and the split views' snapshot panel, releases included.
     key = (event.column, event.pad)
-    if key in layout.FX_LENGTHS:
-        bars = layout.FX_LENGTHS[key]
+    if key in layout.FX.bars:
+        bars = layout.FX.bars[key]
         if event.pressed:
             return replace(state, fx_length=bars), []
         if state.fx_length == bars:
@@ -233,11 +233,11 @@ def press(state, event, snapshot):
     # Under Shift the grid is dark and does nothing, as Mixer's faders.
     if not event.pressed or state.shift:
         return state, []
-    if key in layout.FX_SLOTS:
-        return _slot_press(state, layout.FX_SLOTS.index(key), False, snapshot)
-    if key in layout.FX_SCENE_SLOTS:
+    if key in layout.FX.slots:
+        return _slot_press(state, layout.FX.slots.index(key), False, snapshot)
+    if key in layout.FX.scene_slots:
         # Column 13 follows the scene pads.
-        scene = state.window.scene + layout.FX_SCENE_SLOTS.index(key)
+        scene = state.window.scene + layout.FX.scene_slots.index(key)
         if scene < snapshot.scene_count:
             return _slot_press(state, scene, True, snapshot)
     return state, []
@@ -269,13 +269,13 @@ def render(state, snapshot):
         return frame
     morph = state.morph
     target = morph.slot if morph is not None and not morph.scene else None
-    for slot, key in enumerate(layout.FX_SLOTS):
+    for slot, key in enumerate(layout.FX.slots):
         if slot == target:
             frame[key] = Light(CYAN, Blink.FAST)
         elif state.fx_slots[slot] is not None:
             frame[key] = Light(CYAN, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
     target = morph.slot if morph is not None and morph.scene else None
-    for row, key in enumerate(layout.FX_SCENE_SLOTS):
+    for row, key in enumerate(layout.FX.scene_slots):
         scene = state.window.scene + row
         if scene >= snapshot.scene_count:
             continue
@@ -284,7 +284,7 @@ def render(state, snapshot):
         elif scene_snapshot(state, scene) is not None:
             landed = scene == state.fx_landed_scene
             frame[key] = Light(LIME, Blink.TEMPO if landed else Blink.STEADY)
-    for key, bars in layout.FX_LENGTHS.items():
+    for key, bars in layout.FX.bars.items():
         frame[key] = Light(WHITE, Blink.FAST if bars == state.fx_length else Blink.STEADY)
     return frame
 

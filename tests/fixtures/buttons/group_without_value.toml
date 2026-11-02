@@ -1,4 +1,4 @@
-[nav.tempo_up]
+[navigation_shift.tempo_up]
 section = "navigation-shift"
 pad = [16, 1]
-group = "nav.tempo"
+group = "navigation_shift.tempo"
