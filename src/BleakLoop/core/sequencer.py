@@ -296,7 +296,7 @@ def handle(state, event, snapshot):
     if held == "delete" and not shifted:
         if not event.pressed:
             return replace(state, delete=False), []
-        return replace(state, delete=True), buttons.say("delete")
+        return replace(state, delete=True), buttons.say("delete", "held_steps")
     if event.column in layout.SEQ_STEP_COLUMNS:
         return _step(state, event, view, snapshot)
     if event.column in layout.SEQ_NOTE_COLUMNS and not state.seq_settings:
@@ -358,12 +358,14 @@ def _cyan(state, snapshot, value):
 
 @functions.register("session", [catalogue.SEQUENCER], light=_cyan)
 def _session(state, snapshot, value):
-    return leave(state, snapshot)
+    state, actions = leave(state, snapshot)
+    return state, actions + buttons.say("session")
 
 
 @functions.register("seq", [catalogue.SEQUENCER], light=lambda state, snapshot, value: Light(BLUE))
 def _seq(state, snapshot, value):
-    return leave(state, snapshot)
+    state, actions = leave(state, snapshot)
+    return state, actions + buttons.say("seq", "left")
 
 
 functions.register("mixer", [catalogue.SEQUENCER], light=_cyan)(_leave_for(mixer.toggle))
@@ -384,7 +386,8 @@ functions.register_hold(
     "view", light=lambda state, snapshot, value: Light(BLUE if state.seq_settings else CYAN)
 )
 def _view(state, snapshot, value):
-    return replace(state, seq_settings=not state.seq_settings), []
+    state = replace(state, seq_settings=not state.seq_settings)
+    return state, buttons.say("view", "settings" if state.seq_settings else "notes")
 
 
 def _shift_notes(step):
@@ -709,17 +712,19 @@ def _page(state, page, view):
     if held is not None and held != page:
         # Hold one page and press another: the loop spans both.
         start, end = min(held, page) * span, (max(held, page) + 1) * span
-        return _write(state, [SetLoop(view.track, view.scene, start, end)])
+        loop = buttons.say("pages", "loop", first=min(held, page) + 1, last=max(held, page) + 1)
+        return _write(state, [SetLoop(view.track, view.scene, start, end), *loop])
     state = replace(state, seq_page_held=page)
+    shown = buttons.say("pages", page=page + 1)
     if page * span >= view.loop_end - EPSILON:
         # Past the end: the loop extends to it.
         state = replace(state, seq_follow=False, seq_page=page)
         loop = SetLoop(view.track, view.scene, view.loop_start, (page + 1) * span)
-        return _write(state, [loop])
+        return _write(state, [loop, *shown])
     playing = playhead(state, view)
     if playing is not None and playing // STEPS == page:
-        return replace(state, seq_follow=True), []
-    return replace(state, seq_follow=False, seq_page=page), []
+        return replace(state, seq_follow=True), shown
+    return replace(state, seq_follow=False, seq_page=page), shown
 
 
 # Render

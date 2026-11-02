@@ -157,10 +157,10 @@ def device_clip(state, event):
     # A hold pad: held, the Device/Clip layer; a tap with no other press during it flips
     # Live's Detail view.
     if event.pressed:
-        return replace(state, device_clip=True, device_clip_used=False), []
+        return replace(state, device_clip=True, device_clip_used=False), buttons.say("device_clip")
     tapped = state.device_clip and not state.device_clip_used
     state = replace(state, device_clip=False, device_clip_used=False)
-    return state, [ToggleDetailView()] if tapped else []
+    return state, [ToggleDetailView(), *buttons.say("device_clip", "tapped")] if tapped else []
 
 
 def navigation_pads(state):
@@ -226,6 +226,13 @@ def record(snapshot):
         return [SetSessionRecord(not snapshot.session_record)]
     actions = [ClearBackToArrangement()] if snapshot.back_to_arranger else []
     return actions + [SetArrangementRecord(not snapshot.arrangement_record)]
+
+
+def record_message(snapshot):
+    # What record() just turned on or off.
+    if snapshot.session_view:
+        return buttons.say("record", "session_off" if snapshot.session_record else "session_on")
+    return buttons.say("record", "arrangement_off" if snapshot.arrangement_record else "arrangement_on")
 
 
 def record_light(snapshot):

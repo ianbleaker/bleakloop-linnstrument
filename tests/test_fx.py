@@ -172,14 +172,14 @@ def with_slot(state, slot, value=STORED):
 def test_toggle_on():
     state, actions = handle(State(), layout.NAVIGATION.fx)
     assert state.fx
-    assert actions == [ShowMessage("FX Mode ON")]
+    assert actions == [ShowMessage("FX Mode: ON")]
 
 
 def test_toggle_off_clears_length():
     state, actions = handle(replace(FX, fx_length=4), layout.NAVIGATION.fx)
     assert not state.fx
     assert state.fx_length is None
-    assert actions == [ShowMessage("FX Mode OFF")]
+    assert actions == [ShowMessage("FX Mode: OFF")]
 
 
 def test_fx_turns_mixer_off():
@@ -189,7 +189,7 @@ def test_fx_turns_mixer_off():
     assert not state.mixer
     assert not state.undo_open
     assert state.glides == ()
-    assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("FX Mode ON")]
+    assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("FX Mode: ON")]
 
 
 def test_mixer_turns_fx_off():
@@ -197,20 +197,22 @@ def test_mixer_turns_fx_off():
     assert state.mixer
     assert not state.fx
     assert state.fx_length is None
-    assert actions == [SetMixer(True), ShowMessage("Mixer Mode ON")]
+    assert actions == [SetMixer(True), ShowMessage("Mixer Mode: ON")]
 
 
 def test_shift_fx_pad_toggles_the_fader_source():
     state = replace(FX, shift=True)
     assert handle(state, layout.NAVIGATION.fx) == (
-        replace(state, fader_source="mapped"), [ShowMessage("Mapped FX")]
+        replace(state, fader_source="mapped"), [ShowMessage("Faders: Mapped FX")]
     )
 
 
 @pytest.mark.parametrize("key, bars", list(layout.FX.bars.items()))
 def test_length_pad_held(key, bars):
     state, actions = handle(FX, key)
-    assert (state.fx_length, actions) == (bars, [])
+    unit = "bar" if bars == 1 else "bars"
+    message = ShowMessage(f"Bars: {bars} {unit}, press a snapshot or scene")
+    assert (state.fx_length, actions) == (bars, [message])
     state, actions = handle(state, key, pressed=False)
     assert (state.fx_length, actions) == (None, [])
 
@@ -287,7 +289,7 @@ def test_copy_message_in_fx():
 def test_delete_message_in_fx():
     state, actions = handle(FX, layout.NAVIGATION.delete)
     assert state.delete
-    assert actions == [ShowMessage("Delete Mode ON")]
+    assert actions == [ShowMessage("Delete: pick a clip or scene")]
 
 
 # Store and recall from RacksRead

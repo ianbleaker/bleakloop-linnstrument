@@ -77,7 +77,7 @@ def handle(state, event, snapshot):
         return _scene_page(state, key, event.pressed, snapshot)
     normal, shift = layers(state)
     if key in _shift_pads(normal):
-        return replace(state, shift=event.pressed), []
+        return replace(state, shift=event.pressed), shift_message(event)
     if not event.pressed:
         return state, []
     # Pads the layer has no button on do nothing.
@@ -98,12 +98,12 @@ def _lit(colour):
 
 @functions.register("play_stop", light=lambda state, snapshot, value: controls.play_light(snapshot))
 def _play_stop(state, snapshot, value):
-    return state, [TogglePlay()]
+    return state, [TogglePlay(), *buttons.say("play_stop", "stop" if snapshot.is_playing else "play")]
 
 
 @functions.register("record", light=lambda state, snapshot, value: controls.record_light(snapshot))
 def _record(state, snapshot, value):
-    return state, controls.record(snapshot)
+    return state, controls.record(snapshot) + controls.record_message(snapshot)
 
 
 @functions.register("capture", light=_lit(LIME))
@@ -155,14 +155,16 @@ def _linnstrument_from_sequencer(state, snapshot, value):
     if state.seq_undo_open:
         state = replace(state, seq_undo_open=False)
         actions.append(EndUndoStep())
-    return modes.enter(state, Mode.LINNSTRUMENT), actions + [EnterMode(Mode.LINNSTRUMENT)]
+    actions += [EnterMode(Mode.LINNSTRUMENT), *buttons.say("linnstrument_mode")]
+    return modes.enter(state, Mode.LINNSTRUMENT), actions
 
 
 @functions.register("linnstrument_mode", [catalogue.SESSION], light=_lit(MAGENTA))
 def _linnstrument_from_session(state, snapshot, value):
     state, actions = mixer.reset(state)
     state, more = faders.reset(state)
-    return modes.enter(state, Mode.LINNSTRUMENT), actions + more + [EnterMode(Mode.LINNSTRUMENT)]
+    entered = [EnterMode(Mode.LINNSTRUMENT), *buttons.say("linnstrument_mode")]
+    return modes.enter(state, Mode.LINNSTRUMENT), actions + more + entered
 
 
 @functions.register("stop_all", light=_lit(RED))
@@ -190,27 +192,30 @@ def _launch_quantization_press(state, snapshot, value):
 
 @functions.register("scene_page", light=_lit(PINK))
 def _scene_page_press(state, snapshot, value):
-    return replace(state, scene_page=True), []
+    return replace(state, scene_page=True), buttons.say("scene_page")
 
 
 @functions.register("close_scenes", light=_lit(WHITE))
 def _close_scenes(state, snapshot, value):
-    return replace(state, scene_page=False), []
+    return replace(state, scene_page=False), buttons.say("close_scenes")
 
 
 def _back(state):
     # Back to the layer Linnstrument Mode was entered from, through its own entry path.
     if state.came_from is Origin.SEQUENCER:
-        return modes.enter(state, Mode.SEQUENCER), [EnterMode(Mode.SEQUENCER)]
+        back = buttons.say("back", "sequencer")
+        return modes.enter(state, Mode.SEQUENCER), [EnterMode(Mode.SEQUENCER), *back]
     state = modes.enter(state, Mode.SESSION)
     actions = [EnterMode(Mode.SESSION)]
     if state.came_from is Origin.MIXER:
         state, more = mixer.toggle(state)
+        back = buttons.say("back", "mixer")
     elif state.came_from is Origin.FX:
         state, more = fx.toggle(state)
+        back = buttons.say("back", "fx")
     else:
-        more = []
-    return state, actions + more
+        more, back = [], buttons.say("back", "session")
+    return state, actions + more + back
 
 
 def _scene_page(state, key, pressed, snapshot):
@@ -334,6 +339,10 @@ def render(state, snapshot):
         frame[button[2]] = functions.light(button, state, snapshot)
     frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
     return frame
+
+
+def shift_message(event):
+    return buttons.say("shift") if event.pressed else []
 
 
 def _shift_pads(section):

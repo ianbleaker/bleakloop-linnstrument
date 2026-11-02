@@ -137,7 +137,7 @@ def test_release_does_nothing(key):
 def test_shift_press_and_release():
     state, actions = handle(SESSION, layout.GLOBAL.shift)
     assert state == SHIFT
-    assert actions == []
+    assert actions == [ShowMessage("Shift")]
     assert handle(state, layout.GLOBAL.shift, pressed=False) == (SESSION, [])
 
 
@@ -165,7 +165,7 @@ def test_shift_nothing_to_redo():
 def test_metronome():
     assert handle(SESSION, layout.GLOBAL.metronome) == (
         SESSION,
-        [ToggleMetronome(), ShowMessage("Metronome ON")],
+        [ToggleMetronome(), ShowMessage("Metronome: ON")],
     )
 
 
@@ -195,14 +195,14 @@ def test_launch_quantization_on_without_memory_is_1_bar():
 
 
 def test_play_stop():
-    assert handle(SESSION, layout.GLOBAL.play_stop) == (SESSION, [TogglePlay()])
+    assert handle(SESSION, layout.GLOBAL.play_stop) == (SESSION, [TogglePlay(), ShowMessage("Play")])
 
 
 def test_mode_pad_enters_linnstrument():
     state = State(shift=False, window=Window(2, 1))
     new, actions = handle(state, layout.GLOBAL.linnstrument_mode)
     assert new == State(mode=Mode.LINNSTRUMENT, window=Window(2, 1))
-    assert actions == [EnterMode(Mode.LINNSTRUMENT)]
+    assert actions == [EnterMode(Mode.LINNSTRUMENT), ShowMessage("Linnstrument Mode")]
 
 
 @pytest.mark.parametrize("key", [layout.GLOBAL.record, layout.GLOBAL.linnstrument_mode])
@@ -420,9 +420,9 @@ SPLIT = State(split=True)
 
 def test_session_pad_toggles_the_split_view():
     state, actions = handle(SESSION, layout.NAVIGATION.session)
-    assert state.split and actions == [ShowMessage("Split view ON")]
+    assert state.split and actions == [ShowMessage("Split view: ON")]
     state, actions = handle(state, layout.NAVIGATION.session)
-    assert not state.split and actions == [ShowMessage("Split view OFF")]
+    assert not state.split and actions == [ShowMessage("Split view: OFF")]
 
 
 @pytest.mark.parametrize("key", [layout.NAVIGATION.mixer, layout.NAVIGATION.fx])
@@ -500,15 +500,15 @@ MIXER_SPLIT = State(mixer=True, mixer_split=True)
 
 def test_mixer_pad_toggles_mixers_split_view():
     state, actions = handle(MIXING, layout.NAVIGATION.mixer)
-    assert state.mixer and state.mixer_split and actions == [ShowMessage("Split view ON")]
+    assert state.mixer and state.mixer_split and actions == [ShowMessage("Split view: ON")]
     state, actions = handle(state, layout.NAVIGATION.mixer)
-    assert state.mixer and not state.mixer_split and actions == [ShowMessage("Split view OFF")]
+    assert state.mixer and not state.mixer_split and actions == [ShowMessage("Split view: OFF")]
 
 
 def test_mixer_split_toggle_drops_a_volume_touch():
     state = replace(MIXING, undo_open=True)
     state, actions = handle(state, layout.NAVIGATION.mixer)
-    assert not state.undo_open and actions == [EndUndoStep(), ShowMessage("Split view ON")]
+    assert not state.undo_open and actions == [EndUndoStep(), ShowMessage("Split view: ON")]
 
 
 def test_each_mode_keeps_its_own_split_view():
@@ -583,8 +583,8 @@ def test_shift_fx_in_fx_mode_toggles_the_fader_source():
     state = replace(FX_ON, shift=True)
     mapped, actions = handle(state, layout.NAVIGATION_SHIFT.fader_source)
     assert mapped == replace(state, fader_source="mapped")
-    assert actions == [ShowMessage("Mapped FX")]
-    assert handle(mapped, layout.NAVIGATION_SHIFT.fader_source) == (state, [ShowMessage("Device FX")])
+    assert actions == [ShowMessage("Faders: Mapped FX")]
+    assert handle(mapped, layout.NAVIGATION_SHIFT.fader_source) == (state, [ShowMessage("Faders: Device FX")])
 
 
 @pytest.mark.parametrize(
@@ -593,19 +593,19 @@ def test_shift_fx_in_fx_mode_toggles_the_fader_source():
 def test_shift_fx_in_session_or_mixer_cycles_through_the_snapshots(state):
     mapped, actions = handle(state, layout.NAVIGATION_SHIFT.fader_source)
     assert mapped == replace(state, fader_source="mapped")
-    assert actions == [ShowMessage("Mapped FX")]
+    assert actions == [ShowMessage("Faders: Mapped FX")]
     snapshots, actions = handle(mapped, layout.NAVIGATION_SHIFT.fader_source)
     assert snapshots == replace(mapped, split_snapshots=True)
-    assert actions == [ShowMessage("FX snapshots")]
+    assert actions == [ShowMessage("Faders: FX snapshots")]
     held = replace(snapshots, fx_length=4)
-    assert handle(held, layout.NAVIGATION_SHIFT.fader_source) == (state, [ShowMessage("Device FX")])
+    assert handle(held, layout.NAVIGATION_SHIFT.fader_source) == (state, [ShowMessage("Faders: Device FX")])
 
 
 def test_cycling_to_the_snapshots_ends_a_fader_touch():
     state = replace(SHIFT, split=True, fader_source="mapped", fader_undo_open=True)
     state, actions = handle(state, layout.NAVIGATION_SHIFT.fader_source)
     assert not state.fader_undo_open
-    assert actions == [EndUndoStep(), ShowMessage("FX snapshots")]
+    assert actions == [EndUndoStep(), ShowMessage("Faders: FX snapshots")]
 
 
 def test_shift_pad_4_does_nothing():
@@ -615,11 +615,11 @@ def test_shift_pad_4_does_nothing():
 def test_shift_tempo_up_and_down():
     assert handle(SHIFT, TEMPO_UP) == (
         SHIFT,
-        [SetTempo(121.0), ShowMessage("Tempo 121.0 BPM")],
+        [SetTempo(121.0), ShowMessage("Tempo: 121.0 BPM")],
     )
     assert handle(SHIFT, TEMPO_DOWN) == (
         SHIFT,
-        [SetTempo(119.0), ShowMessage("Tempo 119.0 BPM")],
+        [SetTempo(119.0), ShowMessage("Tempo: 119.0 BPM")],
     )
 
 
@@ -627,7 +627,7 @@ def test_tempo_clamps_at_999():
     snapshot = replace(SNAP, tempo=998.5)
     assert handle(SHIFT, TEMPO_UP, snapshot) == (
         SHIFT,
-        [SetTempo(999), ShowMessage("Tempo 999.0 BPM")],
+        [SetTempo(999), ShowMessage("Tempo: 999.0 BPM")],
     )
 
 
@@ -635,7 +635,7 @@ def test_tempo_clamps_at_20():
     snapshot = replace(SNAP, tempo=20.5)
     assert handle(SHIFT, TEMPO_DOWN, snapshot) == (
         SHIFT,
-        [SetTempo(20), ShowMessage("Tempo 20.0 BPM")],
+        [SetTempo(20), ShowMessage("Tempo: 20.0 BPM")],
     )
 
 
@@ -643,6 +643,8 @@ def test_tempo_clamps_at_20():
 
 
 DEVICE_CLIP = State(device_clip=True)
+DEVICE_CLIP_HELD = ShowMessage("Device/Clip: tracks and devices")
+TAPPED = [ToggleDetailView(), ShowMessage("Device/Clip view")]
 TRACK_PREV, TRACK_NEXT = (pad_for(layout.DEVICE_CLIP.tracks, step) for step in (-1, 1))
 DEVICE_PREV, DEVICE_NEXT = (pad_for(layout.DEVICE_CLIP.devices, step) for step in (-1, 1))
 
@@ -650,8 +652,8 @@ DEVICE_PREV, DEVICE_NEXT = (pad_for(layout.DEVICE_CLIP.devices, step) for step i
 @pytest.mark.parametrize("state", [SESSION, MIXING, FX_ON])
 def test_device_clip_is_held(state):
     held, actions = handle(state, layout.NAVIGATION.device_clip)
-    assert held.device_clip and actions == []
-    assert handle(held, layout.NAVIGATION.device_clip, pressed=False) == (state, [ToggleDetailView()])
+    assert held.device_clip and actions == [DEVICE_CLIP_HELD]
+    assert handle(held, layout.NAVIGATION.device_clip, pressed=False) == (state, TAPPED)
 
 
 def engine_presses(state, *presses, snapshot=SNAP):
@@ -668,7 +670,7 @@ DOWN, UP = True, False
 
 def test_device_clip_tap_flips_the_detail_view():
     state, actions = engine_presses(SESSION, (layout.NAVIGATION.device_clip, DOWN), (layout.NAVIGATION.device_clip, UP))
-    assert actions == [ToggleDetailView()]
+    assert actions == [DEVICE_CLIP_HELD, *TAPPED]
     assert not state.device_clip and not state.device_clip_used
 
 
@@ -686,7 +688,7 @@ def test_device_clip_and_a_mapped_fx_row_binds_without_flipping():
     _, actions = engine_presses(
         mapped, (layout.NAVIGATION.device_clip, DOWN), ((5, 3), DOWN), ((5, 3), UP), (layout.NAVIGATION.device_clip, UP)
     )
-    assert actions == [BindFader(2)]
+    assert actions == [DEVICE_CLIP_HELD, BindFader(2)]
 
 
 def test_device_clip_on_shifts_layer_never_flips():
@@ -812,17 +814,18 @@ def test_unmute_all_in_mixer_and_fx(state):
 
 
 STOPPING = State(stop=True)
+STOP_HELD = ShowMessage("Stop: pick a track")
 UNARM_ALL = [UnarmAll(), ShowMessage("Unarm all")]
 
 
 def test_stop_press_holds():
-    assert handle(SESSION, layout.VIEW.stop) == (STOPPING, [])
+    assert handle(SESSION, layout.VIEW.stop) == (STOPPING, [STOP_HELD])
 
 
 @pytest.mark.parametrize("state", [SESSION, State(mixer=True), State(fx=True)])
 def test_stop_tap_does_nothing(state):
     held, actions = handle(state, layout.VIEW.stop)
-    assert actions == []
+    assert actions == [STOP_HELD]
     assert handle(held, layout.VIEW.stop, pressed=False) == (state, [])
 
 
@@ -897,14 +900,17 @@ def test_capture():
 
 def test_record_in_session_view():
     snapshot = replace(SNAP, session_record=True)
-    assert handle(SESSION, layout.GLOBAL.record, snapshot) == (SESSION, [SetSessionRecord(False)])
+    assert handle(SESSION, layout.GLOBAL.record, snapshot) == (
+        SESSION,
+        [SetSessionRecord(False), ShowMessage("Session Record: OFF")],
+    )
 
 
 def test_record_in_arrangement_view():
     snapshot = replace(SNAP, session_view=False, back_to_arranger=True)
     assert handle(SESSION, layout.GLOBAL.record, snapshot) == (
         SESSION,
-        [ClearBackToArrangement(), SetArrangementRecord(True)],
+        [ClearBackToArrangement(), SetArrangementRecord(True), ShowMessage("Arrangement Record: ON")],
     )
 
 
@@ -924,7 +930,7 @@ AUDIO_CLIP = ClipView(is_midi=False)
 def test_quantize_takes_first_candidate(clips, target):
     assert handle(SHIFT, layout.GLOBAL_SHIFT.quantize, replace(SNAP, **clips)) == (
         SHIFT,
-        [QuantizeClip(target), ShowMessage("Quantize 1/16")],
+        [QuantizeClip(target), ShowMessage("Quantize: 1/16")],
     )
 
 
@@ -946,8 +952,8 @@ def test_quantize_without_clip():
 
 @pytest.mark.parametrize(
     "bars, after, text",
-    [(None, 1, "Fixed Length 1 bar"), (1, 2, "Fixed Length 2 bars"),
-     (2, 4, "Fixed Length 4 bars"), (4, 8, "Fixed Length 8 bars"), (8, None, "Fixed Length OFF")],
+    [(None, 1, "Fixed Length: 1 bar"), (1, 2, "Fixed Length: 2 bars"),
+     (2, 4, "Fixed Length: 4 bars"), (4, 8, "Fixed Length: 8 bars"), (8, None, "Fixed Length: OFF")],
 )
 def test_fixed_length_cycles(bars, after, text):
     state, actions = handle(State(fixed_length=bars), layout.GLOBAL.fixed_length)
@@ -1061,7 +1067,7 @@ def test_back_after_auto_linnstrument_mode_returns_to_session():
     state, _ = handle(SESSION, (2, 1), ARMED_MIDI)
     state, actions = global_column.handle(state, press(layout.GLOBAL.linnstrument_mode), ARMED_MIDI)
     assert (state.mode, state.mixer, state.fx) == (Mode.SESSION, False, False)
-    assert actions == [EnterMode(Mode.SESSION)]
+    assert actions == [EnterMode(Mode.SESSION), ShowMessage("Back: Session Mode")]
 
 
 def test_fixed_length_survives_auto_linnstrument_mode():
@@ -1095,7 +1101,7 @@ def test_copy_press():
 def test_delete_press():
     new, actions = handle(SESSION, layout.NAVIGATION.delete)
     assert new == State(delete=True)
-    assert actions == [ShowMessage("Delete Mode ON")]
+    assert actions == [ShowMessage("Delete: pick a clip or scene")]
 
 
 @pytest.mark.parametrize("key", [layout.NAVIGATION.copy, layout.NAVIGATION.delete])
@@ -1810,7 +1816,7 @@ ENTERED = [SetArms(((0, True), (1, False))), EnterMode(Mode.SEQUENCER), ShowMess
 
 def tap(state, snapshot):
     held, actions = handle(state, layout.NAVIGATION.seq, snapshot)
-    assert held.seq_held and not held.seq_used and actions == []
+    assert held.seq_held and not held.seq_used and actions == [ShowMessage("Seq: tap for Sequencer, or press a clip")]
     return handle(held, layout.NAVIGATION.seq, snapshot, pressed=False)
 
 

@@ -8,6 +8,7 @@ from BleakLoop.core.model import (
     PadPress,
     SequencerView,
     SetArms,
+    ShowMessage,
     SlideMoved,
     Snapshot,
 )
@@ -38,7 +39,7 @@ def test_default_state_is_session():
 def test_session_input_goes_to_session_module():
     state, actions = engine.handle(SESSION, press(layout.GLOBAL.linnstrument_mode), STOPPED)
     assert state.mode is Mode.LINNSTRUMENT
-    assert actions == [EnterMode(Mode.LINNSTRUMENT)]
+    assert actions == [EnterMode(Mode.LINNSTRUMENT), ShowMessage("Linnstrument Mode")]
 
 
 def test_unowned_slide_releases_the_pad_it_left():
@@ -57,7 +58,7 @@ def test_unowned_slide_releases_the_pad_it_left():
 def test_mode_pad_press_enters_session():
     state, actions = engine.handle(LINNSTRUMENT, press(layout.GLOBAL.linnstrument_mode), STOPPED)
     assert state == State(mode=Mode.SESSION)
-    assert actions == [EnterMode(Mode.SESSION)]
+    assert actions == [EnterMode(Mode.SESSION), ShowMessage("Back: Session Mode")]
 
 
 def test_mode_pad_release_is_ignored():
@@ -67,7 +68,7 @@ def test_mode_pad_release_is_ignored():
 def test_linnstrument_input_goes_to_linnstrument_module():
     state, actions = engine.handle(LINNSTRUMENT, press(layout.GLOBAL.shift), STOPPED)
     assert state.shift
-    assert actions == []
+    assert actions == [ShowMessage("Shift")]
 
 
 @pytest.mark.parametrize("key", [(2, 8), (5, 5), (16, 8)])
@@ -108,7 +109,7 @@ SEQUENCER = State(Mode.SEQUENCER, seq_track=0)
 def test_sequencer_input_goes_to_the_sequencer_module():
     state, actions = engine.handle(SEQUENCER, press(layout.NAVIGATION.seq), STOPPED)
     assert state.mode is Mode.SESSION
-    assert actions == [EnterMode(Mode.SESSION)]
+    assert actions == [EnterMode(Mode.SESSION), ShowMessage("Session Mode")]
 
 
 def test_sequencer_renders_its_own_frame():

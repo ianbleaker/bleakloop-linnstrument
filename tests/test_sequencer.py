@@ -229,30 +229,33 @@ def handle(state, key, snapshot=SNAP_IN, pressed=True, velocity=100):
     return sequencer.handle(state, press(key, pressed, velocity), snapshot)
 
 
+LEFT = ShowMessage("Session Mode")
+
+
 def test_seq_returns_to_session_restoring_the_arm():
     state, actions = handle(ENTERED, layout.NAVIGATION.seq)
     assert state.mode is Mode.SESSION
     assert state.seq_saved_arms is None and state.seq_set_arms is None
     assert state.seq_track is None
-    assert actions == [SetArms(((1, True), (2, False))), EnterMode(Mode.SESSION)]
+    assert actions == [SetArms(((1, True), (2, False))), EnterMode(Mode.SESSION), LEFT]
 
 
 def test_session_returns_to_session():
     state, actions = handle(ENTERED, layout.NAVIGATION.session)
     assert state.mode is Mode.SESSION and not state.mixer and not state.fx
-    assert actions[-1] == EnterMode(Mode.SESSION)
+    assert actions[-2:] == [EnterMode(Mode.SESSION), LEFT]
 
 
 def test_mixer_leaves_for_mixer_mode():
     state, actions = handle(ENTERED, layout.NAVIGATION.mixer)
     assert state.mode is Mode.SESSION and state.mixer
-    assert actions[-2:] == [SetMixer(True), ShowMessage("Mixer Mode ON")]
+    assert actions[-2:] == [SetMixer(True), ShowMessage("Mixer Mode: ON")]
 
 
 def test_fx_leaves_for_fx_mode():
     state, actions = handle(ENTERED, layout.NAVIGATION.fx)
     assert state.mode is Mode.SESSION and state.fx
-    assert actions[-1] == ShowMessage("FX Mode ON")
+    assert actions[-1] == ShowMessage("FX Mode: ON")
 
 
 def test_leaving_for_mixer_widens_the_split_window():
@@ -275,13 +278,13 @@ def test_a_track_changed_by_hand_keeps_its_arm():
     # Track 4 armed by hand, track 2 disarmed by hand.
     snapshot = snap(arms=(False, False, False, None, True, False))
     _, actions = handle(ENTERED, layout.NAVIGATION.seq, snapshot)
-    assert actions == [SetArms(((1, True),)), EnterMode(Mode.SESSION)]
+    assert actions == [SetArms(((1, True),)), EnterMode(Mode.SESSION), LEFT]
 
 
 def test_no_restore_when_the_track_count_changed():
     snapshot = snap(arms=(False, False, True, None, False, False, False))
     _, actions = handle(ENTERED, layout.NAVIGATION.seq, snapshot)
-    assert actions == [EnterMode(Mode.SESSION)]
+    assert actions == [EnterMode(Mode.SESSION), LEFT]
 
 
 def test_leaving_closes_a_slide():
@@ -295,7 +298,7 @@ def test_copy_and_delete_hold(key):
     held, actions = handle(ENTERED, key)
     assert (held.copy if key == layout.NAVIGATION.copy else held.delete)
     assert actions == [
-        ShowMessage("Copy: pick a step" if key == layout.NAVIGATION.copy else "Delete Mode ON")
+        ShowMessage("Copy: pick a step" if key == layout.NAVIGATION.copy else "Delete: pick a step or note pad")
     ]
     assert handle(held, key, pressed=False) == (ENTERED, [])
 
@@ -319,7 +322,7 @@ def test_chord_does_nothing(key):
 
 def test_device_clip_layer_steps_tracks_and_devices():
     held, actions = handle(ENTERED, layout.NAVIGATION.device_clip)
-    assert held.device_clip and actions == []
+    assert held.device_clip and actions == [ShowMessage("Device/Clip: tracks and devices")]
     assert handle(held, TRACK_PREV) == (held, [StepTrack(-1)])
     assert handle(held, DEVICE_NEXT) == (held, [StepDevice(1)])
     # Not Seq: on Device/Clip's layer Seq's pad is Device-.
@@ -339,7 +342,8 @@ def test_device_clip_tap_flips_the_detail_view():
     state, actions = engine_presses(
         ENTERED, (layout.NAVIGATION.device_clip, True), (layout.NAVIGATION.device_clip, False)
     )
-    assert actions == [ToggleDetailView()] and state == ENTERED
+    held = ShowMessage("Device/Clip: tracks and devices")
+    assert actions == [held, ToggleDetailView(), ShowMessage("Device/Clip view")] and state == ENTERED
 
 
 @pytest.mark.parametrize("key", [TRACK_NEXT, layout.GLOBAL.shift])
@@ -383,8 +387,8 @@ def test_shift_fx_toggles_the_fader_source():
     # With no faders on screen too: the source is kept for when they show.
     mapped, actions = handle(SHIFTED, layout.NAVIGATION_SHIFT.fader_source)
     assert mapped == replace(SHIFTED, fader_source="mapped")
-    assert actions == [ShowMessage("Mapped FX")]
-    assert handle(mapped, layout.NAVIGATION_SHIFT.fader_source) == (SHIFTED, [ShowMessage("Device FX")])
+    assert actions == [ShowMessage("Faders: Mapped FX")]
+    assert handle(mapped, layout.NAVIGATION_SHIFT.fader_source) == (SHIFTED, [ShowMessage("Faders: Device FX")])
 
 
 def test_shift_moves_the_window():
@@ -427,7 +431,7 @@ def test_the_moved_arm_restores_on_leaving():
     synced, _ = sequencer.sync(ENTERED, snap(replace(TARGET, track=5), arms=SNAP_IN.arms))
     after = snap(replace(TARGET, track=5), arms=(False, False, False, None, False, True))
     _, actions = handle(synced, layout.NAVIGATION.seq, after)
-    assert actions == [SetArms(((1, True), (5, False))), EnterMode(Mode.SESSION)]
+    assert actions == [SetArms(((1, True), (5, False))), EnterMode(Mode.SESSION), LEFT]
 
 
 def test_sync_leaves_the_arm_on_a_non_midi_track_and_says_so_once():
@@ -456,10 +460,10 @@ def test_linnstrument_and_back_keep_the_arm():
     state, actions = handle(ENTERED, layout.GLOBAL.linnstrument_mode)
     assert state.mode is Mode.LINNSTRUMENT
     assert state.came_from is Origin.SEQUENCER
-    assert actions == [EnterMode(Mode.LINNSTRUMENT)]
+    assert actions == [EnterMode(Mode.LINNSTRUMENT), ShowMessage("Linnstrument Mode")]
     back, actions = global_column.handle(state, press(layout.GLOBAL.linnstrument_mode), SNAP_IN)
     assert back.mode is Mode.SEQUENCER
-    assert actions == [EnterMode(Mode.SEQUENCER)]
+    assert actions == [EnterMode(Mode.SEQUENCER), ShowMessage("Back: Sequencer")]
     assert back.seq_saved_arms == ENTERED.seq_saved_arms
     assert back.seq_set_arms == ENTERED.seq_set_arms
     assert back.seq_track == 2
@@ -467,7 +471,7 @@ def test_linnstrument_and_back_keep_the_arm():
 
 def test_linnstrument_closes_a_slide():
     state, actions = handle(replace(ENTERED, seq_undo_open=True), layout.GLOBAL.linnstrument_mode)
-    assert actions == [EndUndoStep(), EnterMode(Mode.LINNSTRUMENT)]
+    assert actions == [EndUndoStep(), EnterMode(Mode.LINNSTRUMENT), ShowMessage("Linnstrument Mode")]
 
 
 def test_record_clip_records_on_the_selected_track():
@@ -669,7 +673,7 @@ SETTINGS = replace(ENTERED, seq_settings=True)
 
 def test_the_view_pad_switches_between_notes_and_settings():
     state, actions = handle(ENTERED, layout.SEQUENCER_GRID.view)
-    assert state.seq_settings and actions == []
+    assert state.seq_settings and actions == [ShowMessage("View: settings")]
     assert handle(state, layout.SEQUENCER_GRID.view)[0] == ENTERED
 
 
@@ -680,22 +684,22 @@ def test_rates(pad, rate, name):
     snapshot = with_notes(note(0.25, note_id=7))
     state, actions = handle(SETTINGS, (11, pad), snapshot)
     assert state.seq_rate == rate
-    assert actions == [ShowMessage(f"Rate {name}")]
+    assert actions == [ShowMessage(f"Rate: {name}")]
 
 
 def test_triplet():
     state, actions = handle(SETTINGS, layout.SEQUENCER_SETTINGS.triplet)
-    assert state.seq_triplet and actions == [ShowMessage("Rate 1/16 triplet")]
+    assert state.seq_triplet and actions == [ShowMessage("Rate: 1/16 triplet")]
     state, actions = handle(state, layout.SEQUENCER_SETTINGS.triplet)
-    assert not state.seq_triplet and actions == [ShowMessage("Rate 1/16")]
+    assert not state.seq_triplet and actions == [ShowMessage("Rate: 1/16")]
 
 
 @pytest.mark.parametrize("start", [ENTERED, SETTINGS])
 def test_up_and_down_move_an_octave_in_either_view(start):
     state, actions = handle(start, layout.SEQUENCER_GRID.up)
-    assert state.seq_base == 60 and actions == [ShowMessage("Notes from C3")]
+    assert state.seq_base == 60 and actions == [ShowMessage("Note pads: from C3")]
     state, actions = handle(start, layout.SEQUENCER_GRID.down)
-    assert state.seq_base == 36 and actions == [ShowMessage("Notes from C1")]
+    assert state.seq_base == 36 and actions == [ShowMessage("Note pads: from C1")]
 
 
 @pytest.mark.parametrize("base, key", [(96, layout.SEQUENCER_GRID.up), (0, layout.SEQUENCER_GRID.down)])
@@ -720,7 +724,7 @@ LONG = with_notes(loop_end=64.0)  # pages 1-4 at 1/16
 def test_a_page_pins_the_view():
     state, actions = handle(SETTINGS, layout.SEQUENCER_SETTINGS.pages[2], LONG)
     assert (state.seq_follow, state.seq_page, state.seq_page_held) == (False, 2, 2)
-    assert actions == []
+    assert actions == [ShowMessage("Page: 3")]
     assert handle(state, layout.SEQUENCER_SETTINGS.pages[2], LONG, pressed=False)[0].seq_page_held is None
 
 
@@ -735,7 +739,7 @@ def test_the_playing_page_resumes_follow():
 def test_hold_a_page_and_press_another_sets_the_loop(first, second):
     held, _ = handle(SETTINGS, layout.SEQUENCER_SETTINGS.pages[first], LONG)
     state, actions = handle(held, layout.SEQUENCER_SETTINGS.pages[second], LONG)
-    assert actions == [SetLoop(2, 1, 16.0, 64.0)]
+    assert actions == [SetLoop(2, 1, 16.0, 64.0), ShowMessage("Loop: pages 2–4")]
     assert state.seq_page_held == first
     # The second page's release keeps the first held.
     assert handle(state, layout.SEQUENCER_SETTINGS.pages[second], LONG, pressed=False)[0] == state
@@ -743,7 +747,7 @@ def test_hold_a_page_and_press_another_sets_the_loop(first, second):
 
 def test_a_page_past_the_end_extends_the_loop():
     state, actions = handle(SETTINGS, layout.SEQUENCER_SETTINGS.pages[5], with_notes(loop_start=4.0))
-    assert actions == [SetLoop(2, 1, 4.0, 96.0)]
+    assert actions == [SetLoop(2, 1, 4.0, 96.0), ShowMessage("Page: 6")]
     assert (state.seq_follow, state.seq_page) == (False, 5)
 
 
@@ -767,9 +771,9 @@ def test_follow_toggles():
     playing = with_notes(loop_end=64.0, is_playing=True, position=20.0)
     state, actions = handle(ENTERED, layout.SEQUENCER_GRID.follow, playing)
     assert (state.seq_follow, state.seq_page) == (False, 1)
-    assert actions == [ShowMessage("Follow OFF")]
+    assert actions == [ShowMessage("Follow: OFF")]
     state, actions = handle(state, layout.SEQUENCER_GRID.follow, playing)
-    assert state.seq_follow and actions == [ShowMessage("Follow ON")]
+    assert state.seq_follow and actions == [ShowMessage("Follow: ON")]
 
 
 def test_double():
@@ -1216,7 +1220,7 @@ def test_a_drum_pad_selects_the_drum_in_live():
 def test_up_and_down_scroll_the_rack_a_row():
     assert handle(ENTERED, layout.SEQUENCER_GRID.up, drums())[1] == [
         SetDrumScroll(2, 10),
-        ShowMessage("Pads from E1"),
+        ShowMessage("Drum pads: from E1"),
     ]
     assert handle(SETTINGS, layout.SEQUENCER_GRID.down, drums())[1][0] == SetDrumScroll(2, 8)
 
@@ -1273,5 +1277,5 @@ def test_column_15_and_settings_buttons_move(monkeypatch):
     state, _ = handle(SEQ, (15, 3))
     assert state.seq_settings
     state, actions = handle(state, (2, 5))
-    assert state.seq_triplet and actions == [ShowMessage("Rate 1/16 triplet")]
+    assert state.seq_triplet and actions == [ShowMessage("Rate: 1/16 triplet")]
     assert handle(SEQ, (2, 5)) == (SEQ, [])

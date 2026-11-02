@@ -233,7 +233,7 @@ def press(state, event, snapshot):
         # A hold: a timed recall or launch waits on it.
         bars = button[3]
         if event.pressed:
-            return replace(state, fx_length=bars), []
+            return replace(state, fx_length=bars), buttons.say("bars", bars=_count(bars, "bar"))
         if state.fx_length == bars:
             return replace(state, fx_length=None), []
         return state, []

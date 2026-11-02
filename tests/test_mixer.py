@@ -101,7 +101,7 @@ def handle(state, event, snap=SNAP):
 def test_toggle_on():
     state, actions = handle(State(), press(*layout.NAVIGATION.mixer))
     assert state.mixer
-    assert actions == [SetMixer(True), ShowMessage("Mixer Mode ON")]
+    assert actions == [SetMixer(True), ShowMessage("Mixer Mode: ON")]
 
 
 def test_toggle_on_drops_copy_source():
@@ -112,7 +112,7 @@ def test_toggle_on_drops_copy_source():
 def test_toggle_off():
     state, actions = handle(MIXER, press(*layout.NAVIGATION.session))
     assert not state.mixer
-    assert actions == [SetMixer(False), ShowMessage("Mixer Mode OFF")]
+    assert actions == [SetMixer(False), ShowMessage("Mixer Mode: OFF")]
 
 
 def test_toggle_off_resets_fader_state_and_closes_undo():
@@ -127,7 +127,7 @@ def test_toggle_off_resets_fader_state_and_closes_undo():
     state, actions = handle(state, press(*layout.NAVIGATION.session))
     assert (state.touches, state.lifts, state.glides) == ((), (), ())
     assert (state.glide_ms, state.undo_open) == (None, False)
-    assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("Mixer Mode OFF")]
+    assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("Mixer Mode: OFF")]
 
 
 def test_shift_stop_in_mixer_unarms_all():
@@ -151,7 +151,7 @@ def test_mixer_pad_with_copy_or_delete_held_does_not_toggle(held):
 
 def test_mode_pad_from_mixer_closes_undo_then_enters_linnstrument():
     state, actions = handle(replace(MIXER, undo_open=True), press(*layout.GLOBAL.linnstrument_mode))
-    assert actions == [EndUndoStep(), EnterMode(Mode.LINNSTRUMENT)]
+    assert actions == [EndUndoStep(), EnterMode(Mode.LINNSTRUMENT), ShowMessage("Linnstrument Mode")]
     assert state.mode is Mode.LINNSTRUMENT
     assert not state.mixer
     assert not state.undo_open

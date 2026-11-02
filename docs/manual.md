@@ -2,7 +2,7 @@
 
 BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for Ableton Live 12. One pad hands the surface back to you as an instrument.
 
-> **Heads-up:** for more information, look at Live's status bar. BleakLoop will tell you what it's doing or give a hint about what's not working.
+> **Heads-up:** for more information, look at Live's status bar. Every press says what it did, such as "Metronome: ON", and holding Shift, Copy, Delete, Stop, Seq, Device/Clip or a Bars pad says what it opens. When a press can't work, the status bar says why.
 
 ## 1. Setup
 

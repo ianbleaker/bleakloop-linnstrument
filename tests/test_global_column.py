@@ -85,7 +85,7 @@ def with_track(snapshot=BASE, **k):
 
 @pytest.mark.parametrize("state", MODES)
 def test_shift_press_and_release(state):
-    assert handle(state, layout.GLOBAL.shift) == (shifted(state), [])
+    assert handle(state, layout.GLOBAL.shift) == (shifted(state), [ShowMessage("Shift")])
     assert handle(shifted(state), layout.GLOBAL.shift, pressed=False) == (state, [])
 
 
@@ -101,7 +101,8 @@ def test_releases_do_nothing(state, pad):
 @pytest.mark.parametrize("state", MODES)
 @pytest.mark.parametrize("snapshot", [BASE, ARRANGEMENT, with_track()])
 def test_play_stop_is_transport(state, snapshot):
-    assert handle(state, layout.GLOBAL.play_stop, snapshot) == (state, [TogglePlay()])
+    message = "Stop" if snapshot.is_playing else "Play"
+    assert handle(state, layout.GLOBAL.play_stop, snapshot) == (state, [TogglePlay(), ShowMessage(message)])
 
 
 def test_shift_play_stop_stops_all_in_session():
@@ -130,13 +131,15 @@ def test_shift_play_stop_without_selected_track_in_linnstrument():
 
 @pytest.mark.parametrize("snapshot", [BASE, ARRANGEMENT])
 def test_record_in_session(snapshot):
-    assert handle(SESSION, layout.GLOBAL.record, snapshot) == (SESSION, controls.record(snapshot))
+    expected = controls.record(snapshot) + controls.record_message(snapshot)
+    assert handle(SESSION, layout.GLOBAL.record, snapshot) == (SESSION, expected)
 
 
 @pytest.mark.parametrize("snapshot", [BASE, ARRANGEMENT])
 def test_shift_record_in_linnstrument(snapshot):
     state = shifted(LINNSTRUMENT)
-    assert handle(state, layout.GLOBAL.record, snapshot) == (state, controls.record(snapshot))
+    expected = controls.record(snapshot) + controls.record_message(snapshot)
+    assert handle(state, layout.GLOBAL.record, snapshot) == (state, expected)
 
 
 def record_clip(snapshot, state=LINNSTRUMENT):
@@ -226,7 +229,7 @@ def test_shift_capture_quantizes(state):
     snap = replace(BASE, detail_clip=ClipView(is_midi=True))
     assert handle(shifted(state), layout.GLOBAL_SHIFT.quantize, snap) == (
         shifted(state),
-        [QuantizeClip(ClipTarget.DETAIL), ShowMessage("Quantize 1/16")],
+        [QuantizeClip(ClipTarget.DETAIL), ShowMessage("Quantize: 1/16")],
     )
 
 
@@ -256,11 +259,11 @@ def test_shift_metronome_toggles_launch_quantization(state):
 @pytest.mark.parametrize(
     "bars, after, text",
     [
-        (None, 1, "Fixed Length 1 bar"),
-        (1, 2, "Fixed Length 2 bars"),
-        (2, 4, "Fixed Length 4 bars"),
-        (4, 8, "Fixed Length 8 bars"),
-        (8, None, "Fixed Length OFF"),
+        (None, 1, "Fixed Length: 1 bar"),
+        (1, 2, "Fixed Length: 2 bars"),
+        (2, 4, "Fixed Length: 4 bars"),
+        (4, 8, "Fixed Length: 8 bars"),
+        (8, None, "Fixed Length: OFF"),
     ],
 )
 def test_fixed_length_cycles(state, bars, after, text):
@@ -304,22 +307,22 @@ def test_mode_pad_enters_linnstrument():
     state = State(window=Window(2, 1), fixed_length=4)
     assert handle(state, layout.GLOBAL.linnstrument_mode) == (
         modes.enter(state, Mode.LINNSTRUMENT),
-        [EnterMode(Mode.LINNSTRUMENT)],
+        [EnterMode(Mode.LINNSTRUMENT), ShowMessage("Linnstrument Mode")],
     )
 
 
 def test_mode_pad_enters_session():
     state, actions = handle(LINNSTRUMENT, layout.GLOBAL.linnstrument_mode)
     assert state == SESSION
-    assert actions == [EnterMode(Mode.SESSION)]
+    assert actions == [EnterMode(Mode.SESSION), ShowMessage("Back: Session Mode")]
 
 
 @pytest.mark.parametrize(
     "start, mixer, fx, more",
     [
         (SESSION, False, False, []),
-        (State(mixer=True), True, False, [SetMixer(True), ShowMessage("Mixer Mode ON")]),
-        (State(fx=True), False, True, [ShowMessage("FX Mode ON")]),
+        (State(mixer=True), True, False, [SetMixer(True), ShowMessage("Mixer Mode: ON")]),
+        (State(fx=True), False, True, [ShowMessage("FX Mode: ON")]),
     ],
 )
 def test_back_returns_to_the_mode_left(start, mixer, fx, more):
@@ -328,7 +331,8 @@ def test_back_returns_to_the_mode_left(start, mixer, fx, more):
     state, actions = handle(state, layout.GLOBAL.linnstrument_mode)
     assert state.mode is Mode.SESSION
     assert (state.mixer, state.fx) == (mixer, fx)
-    assert actions == [EnterMode(Mode.SESSION)] + more
+    back = "Back: Mixer Mode" if mixer else "Back: FX Mode" if fx else "Back: Session Mode"
+    assert actions == [EnterMode(Mode.SESSION)] + more + [ShowMessage(back)]
 
 
 def test_back_after_scene_page_still_returns_to_mixer():
@@ -369,7 +373,10 @@ def test_shift_mode_in_session_keeps_the_mode():
 
 def test_shift_mode_opens_scene_page():
     state = shifted(LINNSTRUMENT)
-    assert handle(state, layout.LINNSTRUMENT_SHIFT.scene_page) == (replace(state, scene_page=True), [])
+    assert handle(state, layout.LINNSTRUMENT_SHIFT.scene_page) == (
+        replace(state, scene_page=True),
+        [ShowMessage("Scene page: pick a scene")],
+    )
 
 
 def test_scene_page_survives_the_shift_release():
@@ -382,7 +389,7 @@ def test_scene_page_ignores_other_releases(pad):
 
 
 def test_scene_page_closes_on_a_shift_press():
-    assert handle(SCENES, layout.GLOBAL.shift) == (LINNSTRUMENT, [])
+    assert handle(SCENES, layout.GLOBAL.shift) == (LINNSTRUMENT, [ShowMessage("Scene page: closed")])
 
 
 @pytest.mark.parametrize("pad", range(1, 7))
@@ -512,8 +519,8 @@ def test_a_mode_moves_its_own_buttons_alone(monkeypatch):
     monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "play_stop", undo, raising=False)
     monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "undo", play, raising=False)
     sequencer = State(mode=Mode.SEQUENCER)
-    assert handle(sequencer, layout.GLOBAL.undo, BASE)[1] == [TogglePlay()]
-    assert handle(SESSION, layout.GLOBAL.play_stop, BASE)[1] == [TogglePlay()]
+    assert handle(sequencer, layout.GLOBAL.undo, BASE)[1][0] == TogglePlay()
+    assert handle(SESSION, layout.GLOBAL.play_stop, BASE)[1][0] == TogglePlay()
     frame = global_column.render(sequencer, BASE)
     assert frame[layout.GLOBAL.undo] == controls.play_light(BASE)
 

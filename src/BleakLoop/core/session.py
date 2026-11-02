@@ -62,7 +62,7 @@ def handle(state, event, snapshot):
     if state.seq_held and event.pressed and held != "seq":
         return _seq_press(state, event, snapshot)
     if held == "shift":
-        return replace(state, shift=event.pressed), []
+        return replace(state, shift=event.pressed), global_column.shift_message(event)
     # Under Shift, a hold's press gives way to the Shift layer's button on its pad.
     shift_layer = state.shift and not state.copy and not state.delete
     shifted = shift_layer and event.pressed and controls.at(controls.sections(state, shift=True), key) is not None
@@ -87,7 +87,7 @@ def handle(state, event, snapshot):
             return replace(state, delete=False), []
         if state.mixer and not fx.panel_visible(state):
             return state, []
-        return replace(state, delete=True), buttons.say("delete")
+        return replace(state, delete=True), buttons.say("delete", "held")
     if held == "stop" and not shifted:
         return _stop(state, event)
     if normal is not None or controls.at(controls.sections(state, shift=True), key) is not None:
@@ -369,7 +369,7 @@ def _seq(state, event, snapshot):
     if event.pressed:
         if state.copy or state.delete:
             return state, []
-        return replace(state, seq_held=True, seq_used=False), []
+        return replace(state, seq_held=True, seq_used=False), buttons.say("seq")
     if not state.seq_held:
         return state, []
     used = state.seq_used
@@ -396,7 +396,7 @@ def _stop(state, event):
         return replace(state, stop=False), []
     if state.copy or state.delete or state.shift:
         return state, []
-    return replace(state, stop=True), []
+    return replace(state, stop=True), buttons.say("stop", "held")
 
 
 def _stop_track(state, track):

@@ -284,7 +284,7 @@ def test_split_off_resets_the_faders():
     state, _, _ = x(state, 12, 4, centre(13))
     state, actions = session.handle(state, PadPress(*layout.NAVIGATION.session, True), SNAP)
     assert not state.split and state.fader_touches == () and not state.fader_undo_open
-    assert actions == [EndUndoStep(), ShowMessage("Split view OFF")]
+    assert actions == [EndUndoStep(), ShowMessage("Split view: OFF")]
 
 
 def test_split_render_draws_the_faders_in_columns_10_to_14():
@@ -305,7 +305,7 @@ def test_fx_off_resets_the_faders():
     state, _, _ = x(touched(), 5, 3, centre(8))
     state, actions = fx.toggle(state)
     assert state.fader_touches == () and not state.fader_undo_open
-    assert actions == [EndUndoStep(), ShowMessage("FX Mode OFF")]
+    assert actions == [EndUndoStep(), ShowMessage("FX Mode: OFF")]
 
 
 def test_mixer_on_resets_the_faders():

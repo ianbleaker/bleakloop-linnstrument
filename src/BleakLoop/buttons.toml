@@ -528,17 +528,21 @@ bind_select = "Click a parameter in Live first"
 bind_macro = "Map it to a macro instead"
 bind_refused = "Can't bind this parameter"
 
+
 # Functions: each one's label, at most 7 characters, its message, and its outcomes and
 # refusals. Refusals always show; show = false hides the rest.
 
 [functions.play_stop]
 label = "Play"
+[functions.play_stop.outcomes]
+play = "Play"
+stop = "Stop"
 
 [functions.metronome]
 label = "Metro"
 [functions.metronome.outcomes]
-on = "Metronome ON"
-off = "Metronome OFF"
+on = "Metronome: ON"
+off = "Metronome: OFF"
 
 [functions.undo]
 label = "Undo"
@@ -554,7 +558,7 @@ nothing = "Nothing to redo"
 
 [functions.quantize]
 label = "Quant"
-message = "Quantize 1/16"
+message = "Quantize: 1/16"
 [functions.quantize.refusals]
 no_clip = "No clip to quantize"
 audio = "Cannot quantize an audio clip"
@@ -564,13 +568,13 @@ label = "LaunchQ"
 message = "Launch Quantization: {name}"
 
 [functions.tempo]
-message = "Tempo {bpm:.1f} BPM"
+message = "Tempo: {bpm:.1f} BPM"
 
 [functions.fixed_length]
 label = "Length"
-message = "Fixed Length {bars} {unit}"
+message = "Fixed Length: {bars} {unit}"
 [functions.fixed_length.outcomes]
-off = "Fixed Length OFF"
+off = "Fixed Length: OFF"
 
 [functions.stop_all]
 label = "StopAll"
@@ -578,6 +582,11 @@ message = "Stop all clips"
 
 [functions.record]
 label = "Record"
+[functions.record.outcomes]
+session_on = "Session Record: ON"
+session_off = "Session Record: OFF"
+arrangement_on = "Arrangement Record: ON"
+arrangement_off = "Arrangement Record: OFF"
 
 [functions.capture]
 label = "Capture"
@@ -619,6 +628,7 @@ message = "Unarm all"
 
 [functions.shift]
 label = "Shift"
+message = "Shift"
 
 [functions.window]
 message = "Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene}"
@@ -626,34 +636,37 @@ message = "Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_sce
 [functions.fader_source]
 label = "Source"
 [functions.fader_source.outcomes]
-device = "Device FX"
-mapped = "Mapped FX"
-snapshots = "FX snapshots"
+device = "Faders: Device FX"
+mapped = "Faders: Mapped FX"
+snapshots = "Faders: FX snapshots"
 
 [functions.session]
 label = "Session"
+message = "Session Mode"
 [functions.session.outcomes]
-split_on = "Split view ON"
-split_off = "Split view OFF"
+split_on = "Split view: ON"
+split_off = "Split view: OFF"
 
 [functions.mixer]
 label = "Mixer"
 [functions.mixer.outcomes]
-split_on = "Split view ON"
-split_off = "Split view OFF"
-on = "Mixer Mode ON"
-off = "Mixer Mode OFF"
+split_on = "Split view: ON"
+split_off = "Split view: OFF"
+on = "Mixer Mode: ON"
+off = "Mixer Mode: OFF"
 
 [functions.fx]
 label = "FX"
 [functions.fx.outcomes]
-on = "FX Mode ON"
-off = "FX Mode OFF"
+on = "FX Mode: ON"
+off = "FX Mode: OFF"
 
 [functions.seq]
 label = "Seq"
+message = "Seq: tap for Sequencer, or press a clip"
 [functions.seq.outcomes]
 entered = "Sequencer"
+left = "Session Mode"
 [functions.seq.refusals]
 needs_midi = "Sequencer needs a MIDI track"
 
@@ -684,27 +697,43 @@ empty_step = "Step is empty"
 [functions.delete]
 label = "Delete"
 message = "Delete Mode ON"
+[functions.delete.outcomes]
+held = "Delete: pick a clip or scene"
+held_steps = "Delete: pick a step or note pad"
 [functions.delete.refusals]
 last_scene = "Cannot delete last scene"
 
 [functions.stop]
 label = "Stop"
 message = "Stop clips: {track}"
+[functions.stop.outcomes]
+held = "Stop: pick a track"
 
 [functions.linnstrument_mode]
 label = "Linn"
+message = "Linnstrument Mode"
 
 [functions.back]
 label = "Back"
+[functions.back.outcomes]
+session = "Back: Session Mode"
+mixer = "Back: Mixer Mode"
+fx = "Back: FX Mode"
+sequencer = "Back: Sequencer"
 
 [functions.scene_page]
 label = "Scenes"
+message = "Scene page: pick a scene"
 
 [functions.close_scenes]
 label = "Back"
+message = "Scene page: closed"
 
 [functions.device_clip]
 label = "DevClip"
+message = "Device/Clip: tracks and devices"
+[functions.device_clip.outcomes]
+tapped = "Device/Clip view"
 
 [functions.double]
 label = "Double"
@@ -722,34 +751,42 @@ too_short = "Loop can't be shorter than a step"
 [functions.follow]
 label = "Follow"
 [functions.follow.outcomes]
-on = "Follow ON"
-off = "Follow OFF"
+on = "Follow: ON"
+off = "Follow: OFF"
 
 [functions.up]
 label = "Up"
 [functions.up.outcomes]
-notes = "Notes from {note}"
-pads = "Pads from {note}"
+notes = "Note pads: from {note}"
+pads = "Drum pads: from {note}"
 
 [functions.down]
 label = "Down"
 [functions.down.outcomes]
-notes = "Notes from {note}"
-pads = "Pads from {note}"
+notes = "Note pads: from {note}"
+pads = "Drum pads: from {note}"
 
 [functions.view]
 label = "View"
+[functions.view.outcomes]
+settings = "View: settings"
+notes = "View: note pads"
 
 [functions.rates]
-message = "Rate {rate}"
+message = "Rate: {rate}"
 [functions.rates.outcomes]
-triplet = "Rate {rate} triplet"
+triplet = "Rate: {rate} triplet"
 
 [functions.triplet]
 label = "Triplet"
-message = "Rate {rate}"
+message = "Rate: {rate}"
 [functions.triplet.outcomes]
-triplet = "Rate {rate} triplet"
+triplet = "Rate: {rate} triplet"
+
+[functions.pages]
+message = "Page: {page}"
+[functions.pages.outcomes]
+loop = "Loop: pages {first}–{last}"
 
 [functions.slots]
 [functions.slots.outcomes]
@@ -770,6 +807,9 @@ morphing = "{name} {timing}{note}"
 [functions.scene_slots.refusals]
 no_racks = "No racks to store"
 nothing = "{name}: nothing to recall{note}"
+
+[functions.bars]
+message = "Bars: {bars}, press a snapshot or scene"
 
 [functions.faders]
 [functions.faders.outcomes]

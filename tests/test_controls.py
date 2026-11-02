@@ -42,13 +42,13 @@ def test_play_light():
 
 
 def test_metronome_turns_on():
-    assert controls.metronome(BASE) == [ToggleMetronome(), ShowMessage("Metronome ON")]
+    assert controls.metronome(BASE) == [ToggleMetronome(), ShowMessage("Metronome: ON")]
 
 
 def test_metronome_turns_off():
     assert controls.metronome(replace(BASE, metronome=True)) == [
         ToggleMetronome(),
-        ShowMessage("Metronome OFF"),
+        ShowMessage("Metronome: OFF"),
     ]
 
 
