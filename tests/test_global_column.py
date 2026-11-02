@@ -32,6 +32,7 @@ from BleakLoop.core.model import (
     SelectedTrack,
     SetLaunchQuantization,
     SetMixer,
+    SetTempo,
     ShowClip,
     ShowMessage,
     SlotView,
@@ -506,10 +507,34 @@ def test_copy_or_delete_hides_the_shift_layer(held):
 
 def test_a_mode_moves_its_own_buttons_alone(monkeypatch):
     # Sequencer Mode's Play and Undo swap pads; Session Mode's stay put.
-    monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "play_stop", layout.GLOBAL.undo)
-    monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "undo", layout.GLOBAL.play_stop)
+    # Each is a fallback until moved, and the first move hides the other's fallback.
+    undo, play = layout.GLOBAL.undo, layout.GLOBAL.play_stop
+    monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "play_stop", undo, raising=False)
+    monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "undo", play, raising=False)
     sequencer = State(mode=Mode.SEQUENCER)
     assert handle(sequencer, layout.GLOBAL.undo, BASE)[1] == [TogglePlay()]
     assert handle(SESSION, layout.GLOBAL.play_stop, BASE)[1] == [TogglePlay()]
     frame = global_column.render(sequencer, BASE)
     assert frame[layout.GLOBAL.undo] == controls.play_light(BASE)
+
+
+def test_any_song_level_function_works_in_column_1(monkeypatch):
+    # Tempo +1 on Linnstrument Mode's Fixed Length pad: it overrides the fallback there only.
+    monkeypatch.setattr(layout.LINNSTRUMENT, "tempo", {layout.GLOBAL.fixed_length: 1}, raising=False)
+    snapshot = replace(BASE, tempo=120.0)
+    _, actions = handle(LINNSTRUMENT, layout.GLOBAL.fixed_length, snapshot)
+    assert SetTempo(121.0) in actions
+    assert global_column.render(LINNSTRUMENT, snapshot)[layout.GLOBAL.fixed_length] == Light(GREEN)
+    assert handle(SESSION, layout.GLOBAL.fixed_length)[0].fixed_length == 1
+
+
+def test_every_moved_function_runs_in_all_its_modes():
+    from BleakLoop.core import catalogue, functions
+
+    moved = {
+        "play_stop", "record", "capture", "record_clip", "capture_midi", "metronome",
+        "fixed_length", "undo", "redo", "back", "linnstrument_mode", "stop_all", "stop_track",
+        "quantize", "launch_quantization", "scene_page", "close_scenes", "tempo", "unmute_all",
+        "unsolo_all", "unarm_all",
+    }
+    assert {(name, mode) for name in moved for mode in catalogue.MODES[name]} <= functions.registered()

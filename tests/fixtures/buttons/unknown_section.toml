@@ -1,3 +1,2 @@
-[global.undo]
-section = "globals"
+[globals.undo]
 pad = [1, 6]

@@ -1,7 +1,5 @@
 [global.undo]
-section = "global"
 pad = [1, 6]
 
 [global.redo]
-section = "global"
 pad = [1, 6]

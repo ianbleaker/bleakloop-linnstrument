@@ -1,7 +1,5 @@
 [global.undo]
-section = "global"
 pad = [16, 6]
 
 [navigation.delete]
-section = "navigation"
 pad = [16, 6]

@@ -1,4 +1,2 @@
-[global.undo]
-section = "global"
-pad = [1, 6]
+[functions.undo]
 label = "Undo it!"

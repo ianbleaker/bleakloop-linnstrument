@@ -1,17 +1,23 @@
-# Every button: where it sits, its manual label and text, and the status messages it shows.
+# Every button: where it sits and the function it runs, and each function's label, manual
+# text and status messages.
 #
 # Edit a pad here and restart Live to move a button; nothing else to build. Check the file
 # first, from the repo: PYTHONPATH=src python3 -m tools.check_buttons
 #
-# The table path is the button's ID: its section, then its name. Fields:
-#   section  the section the button belongs to: the mode and layer it works in
-#   pad      [column, pad]; column 1 is the Global column, pad 1 the far row
-#   label    the manual pad map's label, at most 7 characters
-#   group    a set of pads read together, such as the tempo steps; value is each pad's value
+# [<section>.<name>] is a button. Fields:
+#   pad    [column, pad]; column 1 is the Global column, pad 1 the far row
+#   does   the function it runs (src/BleakLoop/core/catalogue.py); default: the button's name
+#   value  the function's setting for this pad, as a tempo step or a snapshot slot
+#   label  this pad's label on the manual's pad map, at most 7 characters, over the function's
 #
+# [functions.<name>] is a function, wherever its buttons sit: its label, at most 7
+# characters, and later its manual text and messages.
+#
+# Linnstrument and Sequencer Mode's sections fall back to the Session ones: a pad they don't
+# list does what it does in Session Mode, and is dark if that function can't run there.
 # Every button moves alone, Shift functions included. Fixed regions (clip grid, scene pads,
 # faders, steps, Mute/Select rows) aren't movable, and no two buttons live at once may share
-# a pad. In Linnstrument Mode only column 1 reaches BleakLoop, so its sections stay there.
+# a pad. In Linnstrument Mode only column 1 reaches BleakLoop, so its own sections stay there.
 
 manual_format = "{label}."
 
@@ -19,405 +25,162 @@ manual_format = "{label}."
 # The Global column in Session, Mixer and FX Mode.
 
 [global.play_stop]
-section = "global"
 pad = [1, 1]
-label = "Play"
 
 [global.record]
-section = "global"
 pad = [1, 2]
-label = "Record"
 
 [global.capture]
-section = "global"
 pad = [1, 3]
-label = "Capture"
 
 [global.metronome]
-section = "global"
 pad = [1, 4]
-label = "Metro"
 
 [global.fixed_length]
-section = "global"
 pad = [1, 5]
-label = "Length"
 
 [global.undo]
-section = "global"
 pad = [1, 6]
-label = "Undo"
 
 [global.linnstrument_mode]
-section = "global"
 pad = [1, 7]
-label = "Linn"
 
 [global.shift]
-section = "global"
 pad = [1, 8]
-label = "Shift"
 
 
 # Shift held, in Session, Mixer and FX Mode.
 
 [global_shift.stop_all]
-section = "global-shift"
 pad = [1, 1]
-label = "StopAll"
 
 [global_shift.quantize]
-section = "global-shift"
 pad = [1, 3]
-label = "Quant"
 
 [global_shift.launch_quantization]
-section = "global-shift"
 pad = [1, 4]
-label = "LaunchQ"
 
 [global_shift.redo]
-section = "global-shift"
 pad = [1, 6]
-label = "Redo"
 
 
-# The Global column in Linnstrument Mode. Column 1 only.
-
-[linnstrument.play_stop]
-section = "linnstrument"
-pad = [1, 1]
-label = "Play"
+# Linnstrument Mode's Global column: only what differs from Session Mode's. Column 1 only.
 
 [linnstrument.record_clip]
-section = "linnstrument"
 pad = [1, 2]
-label = "RecClip"
 
 [linnstrument.capture_midi]
-section = "linnstrument"
 pad = [1, 3]
-label = "CapMIDI"
-
-[linnstrument.metronome]
-section = "linnstrument"
-pad = [1, 4]
-label = "Metro"
-
-[linnstrument.fixed_length]
-section = "linnstrument"
-pad = [1, 5]
-label = "Length"
-
-[linnstrument.undo]
-section = "linnstrument"
-pad = [1, 6]
-label = "Undo"
 
 [linnstrument.back]
-section = "linnstrument"
 pad = [1, 7]
-label = "Back"
-
-[linnstrument.shift]
-section = "linnstrument"
-pad = [1, 8]
-label = "Shift"
 
 
-# Shift held, in Linnstrument Mode. Column 1 only.
+# Shift held, in Linnstrument Mode: only what differs. Column 1 only.
 
 [linnstrument_shift.stop_track]
-section = "linnstrument-shift"
 pad = [1, 1]
-label = "StopTrk"
 
 [linnstrument_shift.record]
-section = "linnstrument-shift"
 pad = [1, 2]
-label = "Record"
-
-[linnstrument_shift.quantize]
-section = "linnstrument-shift"
-pad = [1, 3]
-label = "Quant"
-
-[linnstrument_shift.launch_quantization]
-section = "linnstrument-shift"
-pad = [1, 4]
-label = "LaunchQ"
-
-[linnstrument_shift.redo]
-section = "linnstrument-shift"
-pad = [1, 6]
-label = "Redo"
 
 [linnstrument_shift.scene_page]
-section = "linnstrument-shift"
 pad = [1, 7]
-label = "Scenes"
 
 
 # The scene page, in Linnstrument and Sequencer Mode: pads 1-6 are the scenes.
 
 [linnstrument_scenes.back]
-section = "linnstrument-scenes"
 pad = [1, 8]
-label = "Back"
+does = "close_scenes"
 
 
-# The Global column in Sequencer Mode.
-
-[sequencer_global.play_stop]
-section = "sequencer-global"
-pad = [1, 1]
-label = "Play"
+# Sequencer Mode's Global column: only what differs from Session Mode's.
 
 [sequencer_global.record_clip]
-section = "sequencer-global"
 pad = [1, 2]
-label = "RecClip"
 
 [sequencer_global.capture_midi]
-section = "sequencer-global"
 pad = [1, 3]
-label = "CapMIDI"
-
-[sequencer_global.metronome]
-section = "sequencer-global"
-pad = [1, 4]
-label = "Metro"
-
-[sequencer_global.fixed_length]
-section = "sequencer-global"
-pad = [1, 5]
-label = "Length"
-
-[sequencer_global.undo]
-section = "sequencer-global"
-pad = [1, 6]
-label = "Undo"
-
-[sequencer_global.linnstrument_mode]
-section = "sequencer-global"
-pad = [1, 7]
-label = "Linn"
-
-[sequencer_global.shift]
-section = "sequencer-global"
-pad = [1, 8]
-label = "Shift"
 
 
-# Shift held, in Sequencer Mode.
+# Shift held, in Sequencer Mode: only what differs.
 
 [sequencer_global_shift.stop_track]
-section = "sequencer-global-shift"
 pad = [1, 1]
-label = "StopTrk"
 
 [sequencer_global_shift.record]
-section = "sequencer-global-shift"
 pad = [1, 2]
-label = "Record"
-
-[sequencer_global_shift.quantize]
-section = "sequencer-global-shift"
-pad = [1, 3]
-label = "Quant"
-
-[sequencer_global_shift.launch_quantization]
-section = "sequencer-global-shift"
-pad = [1, 4]
-label = "LaunchQ"
-
-[sequencer_global_shift.redo]
-section = "sequencer-global-shift"
-pad = [1, 6]
-label = "Redo"
 
 [sequencer_global_shift.scene_page]
-section = "sequencer-global-shift"
 pad = [1, 7]
-label = "Scenes"
 
 
 # The Navigation column in Session, Mixer and FX Mode.
 
 [navigation.session]
-section = "navigation"
 pad = [16, 1]
-label = "Session"
 
 [navigation.mixer]
-section = "navigation"
 pad = [16, 2]
-label = "Mixer"
 
 [navigation.fx]
-section = "navigation"
 pad = [16, 3]
-label = "FX"
 
 [navigation.reserved]
-section = "navigation"
 pad = [16, 4]
 
 [navigation.seq]
-section = "navigation"
 pad = [16, 5]
-label = "Seq"
 
 [navigation.delete]
-section = "navigation"
 pad = [16, 6]
-label = "Delete"
 
 [navigation.copy]
-section = "navigation"
 pad = [16, 7]
-label = "Copy"
 
 [navigation.device_clip]
-section = "navigation"
 pad = [16, 8]
-label = "DevClip"
 
 
 # Shift held: value is the BPM step or the window's (track step, scene step).
 
 [navigation_shift.tempo_up]
-section = "navigation-shift"
 pad = [16, 1]
-group = "navigation_shift.tempo"
+does = "tempo"
 value = 1
 label = "Tempo+"
 
 [navigation_shift.tempo_down]
-section = "navigation-shift"
 pad = [16, 2]
-group = "navigation_shift.tempo"
+does = "tempo"
 value = -1
 label = "Tempo-"
 
 [navigation_shift.fader_source]
-section = "navigation-shift"
 pad = [16, 3]
-label = "Source"
 
 [navigation_shift.window_up]
-section = "navigation-shift"
 pad = [16, 5]
-group = "navigation_shift.window"
+does = "window"
 value = [0, -1]
 label = "Up"
 
 [navigation_shift.window_down]
-section = "navigation-shift"
 pad = [16, 6]
-group = "navigation_shift.window"
+does = "window"
 value = [0, 1]
 label = "Down"
 
 [navigation_shift.window_right]
-section = "navigation-shift"
 pad = [16, 7]
-group = "navigation_shift.window"
+does = "window"
 value = [1, 0]
 label = "Right"
 
 [navigation_shift.window_left]
-section = "navigation-shift"
 pad = [16, 8]
-group = "navigation_shift.window"
-value = [-1, 0]
-label = "Left"
-
-
-# The Navigation column in Sequencer Mode.
-
-[sequencer_nav.session]
-section = "sequencer-nav"
-pad = [16, 1]
-label = "Session"
-
-[sequencer_nav.mixer]
-section = "sequencer-nav"
-pad = [16, 2]
-label = "Mixer"
-
-[sequencer_nav.fx]
-section = "sequencer-nav"
-pad = [16, 3]
-label = "FX"
-
-[sequencer_nav.seq]
-section = "sequencer-nav"
-pad = [16, 5]
-label = "Seq"
-
-[sequencer_nav.delete]
-section = "sequencer-nav"
-pad = [16, 6]
-label = "Delete"
-
-[sequencer_nav.copy]
-section = "sequencer-nav"
-pad = [16, 7]
-label = "Copy"
-
-[sequencer_nav.device_clip]
-section = "sequencer-nav"
-pad = [16, 8]
-label = "DevClip"
-
-
-# Shift held, in Sequencer Mode.
-
-[sequencer_nav_shift.tempo_up]
-section = "sequencer-nav-shift"
-pad = [16, 1]
-group = "sequencer_nav_shift.tempo"
-value = 1
-label = "Tempo+"
-
-[sequencer_nav_shift.tempo_down]
-section = "sequencer-nav-shift"
-pad = [16, 2]
-group = "sequencer_nav_shift.tempo"
-value = -1
-label = "Tempo-"
-
-[sequencer_nav_shift.fader_source]
-section = "sequencer-nav-shift"
-pad = [16, 3]
-label = "Source"
-
-[sequencer_nav_shift.window_up]
-section = "sequencer-nav-shift"
-pad = [16, 5]
-group = "sequencer_nav_shift.window"
-value = [0, -1]
-label = "Up"
-
-[sequencer_nav_shift.window_down]
-section = "sequencer-nav-shift"
-pad = [16, 6]
-group = "sequencer_nav_shift.window"
-value = [0, 1]
-label = "Down"
-
-[sequencer_nav_shift.window_right]
-section = "sequencer-nav-shift"
-pad = [16, 7]
-group = "sequencer_nav_shift.window"
-value = [1, 0]
-label = "Right"
-
-[sequencer_nav_shift.window_left]
-section = "sequencer-nav-shift"
-pad = [16, 8]
-group = "sequencer_nav_shift.window"
+does = "window"
 value = [-1, 0]
 label = "Left"
 
@@ -425,56 +188,44 @@ label = "Left"
 # Column 15 in Session, Mixer and FX Mode: pads 1-6 are the scenes.
 
 [view.unmute_all]
-section = "view"
 pad = [15, 7]
-label = "Unmute"
 
 [view.stop]
-section = "view"
 pad = [15, 8]
-label = "Stop"
 
 
 # Shift held, in Session, Mixer and FX Mode.
 
 [view_shift.unsolo_all]
-section = "view-shift"
 pad = [15, 7]
-label = "Unsolo"
 
 [view_shift.unarm_all]
-section = "view-shift"
 pad = [15, 8]
-label = "Unarm"
 
 
 # Device/Clip held, in every mode but Linnstrument Mode: value is the track or device step.
 
 [device_clip.track_previous]
-section = "device-clip"
 pad = [16, 7]
-group = "device_clip.tracks"
+does = "tracks"
 value = -1
 label = "Track-"
 
 [device_clip.track_next]
-section = "device-clip"
 pad = [16, 6]
-group = "device_clip.tracks"
+does = "tracks"
 value = 1
 label = "Track+"
 
 [device_clip.device_previous]
-section = "device-clip"
 pad = [16, 5]
-group = "device_clip.devices"
+does = "devices"
 value = -1
 label = "Device-"
 
 [device_clip.device_next]
-section = "device-clip"
 pad = [16, 4]
-group = "device_clip.devices"
+does = "devices"
 value = 1
 label = "Device+"
 
@@ -482,175 +233,148 @@ label = "Device+"
 # FX Mode: value is the snapshot slot, the scene in the window, or the morph length in bars.
 
 [fx.slot_1]
-section = "fx"
 pad = [11, 1]
-group = "fx.slots"
+does = "slots"
 value = 1
 
 [fx.slot_2]
-section = "fx"
 pad = [11, 2]
-group = "fx.slots"
+does = "slots"
 value = 2
 
 [fx.slot_3]
-section = "fx"
 pad = [11, 3]
-group = "fx.slots"
+does = "slots"
 value = 3
 
 [fx.slot_4]
-section = "fx"
 pad = [11, 4]
-group = "fx.slots"
+does = "slots"
 value = 4
 
 [fx.slot_5]
-section = "fx"
 pad = [11, 5]
-group = "fx.slots"
+does = "slots"
 value = 5
 
 [fx.slot_6]
-section = "fx"
 pad = [11, 6]
-group = "fx.slots"
+does = "slots"
 value = 6
 
 [fx.slot_7]
-section = "fx"
 pad = [11, 7]
-group = "fx.slots"
+does = "slots"
 value = 7
 
 [fx.slot_8]
-section = "fx"
 pad = [11, 8]
-group = "fx.slots"
+does = "slots"
 value = 8
 
 [fx.slot_9]
-section = "fx"
 pad = [12, 1]
-group = "fx.slots"
+does = "slots"
 value = 9
 
 [fx.slot_10]
-section = "fx"
 pad = [12, 2]
-group = "fx.slots"
+does = "slots"
 value = 10
 
 [fx.slot_11]
-section = "fx"
 pad = [12, 3]
-group = "fx.slots"
+does = "slots"
 value = 11
 
 [fx.slot_12]
-section = "fx"
 pad = [12, 4]
-group = "fx.slots"
+does = "slots"
 value = 12
 
 [fx.slot_13]
-section = "fx"
 pad = [12, 5]
-group = "fx.slots"
+does = "slots"
 value = 13
 
 [fx.slot_14]
-section = "fx"
 pad = [12, 6]
-group = "fx.slots"
+does = "slots"
 value = 14
 
 [fx.slot_15]
-section = "fx"
 pad = [12, 7]
-group = "fx.slots"
+does = "slots"
 value = 15
 
 [fx.slot_16]
-section = "fx"
 pad = [12, 8]
-group = "fx.slots"
+does = "slots"
 value = 16
 
 [fx.scene_slot_1]
-section = "fx"
 pad = [13, 1]
-group = "fx.scene_slots"
+does = "scene_slots"
 value = 1
 label = "Scene 1"
 
 [fx.scene_slot_2]
-section = "fx"
 pad = [13, 2]
-group = "fx.scene_slots"
+does = "scene_slots"
 value = 2
 label = "Scene 2"
 
 [fx.scene_slot_3]
-section = "fx"
 pad = [13, 3]
-group = "fx.scene_slots"
+does = "scene_slots"
 value = 3
 label = "Scene 3"
 
 [fx.scene_slot_4]
-section = "fx"
 pad = [13, 4]
-group = "fx.scene_slots"
+does = "scene_slots"
 value = 4
 label = "Scene 4"
 
 [fx.scene_slot_5]
-section = "fx"
 pad = [13, 5]
-group = "fx.scene_slots"
+does = "scene_slots"
 value = 5
 label = "Scene 5"
 
 [fx.scene_slot_6]
-section = "fx"
 pad = [13, 6]
-group = "fx.scene_slots"
+does = "scene_slots"
 value = 6
 label = "Scene 6"
 
 [fx.bars_1]
-section = "fx"
 pad = [14, 1]
-group = "fx.bars"
+does = "bars"
 value = 1
 label = "1 bar"
 
 [fx.bars_2]
-section = "fx"
 pad = [14, 2]
-group = "fx.bars"
+does = "bars"
 value = 2
 label = "2 bars"
 
 [fx.bars_4]
-section = "fx"
 pad = [14, 3]
-group = "fx.bars"
+does = "bars"
 value = 4
 label = "4 bars"
 
 [fx.bars_8]
-section = "fx"
 pad = [14, 4]
-group = "fx.bars"
+does = "bars"
 value = 8
 label = "8 bars"
 
 [fx.bars_16]
-section = "fx"
 pad = [14, 5]
-group = "fx.bars"
+does = "bars"
 value = 16
 label = "16 bars"
 
@@ -658,163 +382,243 @@ label = "16 bars"
 # Sequencer Mode column 15, in both views.
 
 [sequencer_grid.double]
-section = "sequencer-grid"
 pad = [15, 1]
-label = "Double"
 
 [sequencer_grid.halve]
-section = "sequencer-grid"
 pad = [15, 2]
-label = "Halve"
 
 [sequencer_grid.follow]
-section = "sequencer-grid"
 pad = [15, 4]
-label = "Follow"
 
 [sequencer_grid.up]
-section = "sequencer-grid"
 pad = [15, 6]
-label = "Up"
 
 [sequencer_grid.down]
-section = "sequencer-grid"
 pad = [15, 7]
-label = "Down"
 
 [sequencer_grid.view]
-section = "sequencer-grid"
 pad = [15, 8]
-label = "View"
 
 
 # Sequencer Mode's settings view: value is the step length in beats, or the page.
 
 [sequencer_settings.rate_4]
-section = "sequencer-settings"
 pad = [11, 1]
-group = "sequencer_settings.rates"
+does = "rates"
 value = 1.0
 label = "1/4"
 
 [sequencer_settings.rate_8]
-section = "sequencer-settings"
 pad = [11, 2]
-group = "sequencer_settings.rates"
+does = "rates"
 value = 0.5
 label = "1/8"
 
 [sequencer_settings.rate_16]
-section = "sequencer-settings"
 pad = [11, 3]
-group = "sequencer_settings.rates"
+does = "rates"
 value = 0.25
 label = "1/16"
 
 [sequencer_settings.rate_32]
-section = "sequencer-settings"
 pad = [11, 4]
-group = "sequencer_settings.rates"
+does = "rates"
 value = 0.125
 label = "1/32"
 
 [sequencer_settings.triplet]
-section = "sequencer-settings"
 pad = [11, 5]
-label = "Triplet"
 
 [sequencer_settings.page_1]
-section = "sequencer-settings"
 pad = [12, 1]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 1
 
 [sequencer_settings.page_2]
-section = "sequencer-settings"
 pad = [12, 2]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 2
 
 [sequencer_settings.page_3]
-section = "sequencer-settings"
 pad = [12, 3]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 3
 
 [sequencer_settings.page_4]
-section = "sequencer-settings"
 pad = [12, 4]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 4
 
 [sequencer_settings.page_5]
-section = "sequencer-settings"
 pad = [12, 5]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 5
 
 [sequencer_settings.page_6]
-section = "sequencer-settings"
 pad = [12, 6]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 6
 
 [sequencer_settings.page_7]
-section = "sequencer-settings"
 pad = [12, 7]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 7
 
 [sequencer_settings.page_8]
-section = "sequencer-settings"
 pad = [12, 8]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 8
 
 [sequencer_settings.page_9]
-section = "sequencer-settings"
 pad = [13, 1]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 9
 
 [sequencer_settings.page_10]
-section = "sequencer-settings"
 pad = [13, 2]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 10
 
 [sequencer_settings.page_11]
-section = "sequencer-settings"
 pad = [13, 3]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 11
 
 [sequencer_settings.page_12]
-section = "sequencer-settings"
 pad = [13, 4]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 12
 
 [sequencer_settings.page_13]
-section = "sequencer-settings"
 pad = [13, 5]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 13
 
 [sequencer_settings.page_14]
-section = "sequencer-settings"
 pad = [13, 6]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 14
 
 [sequencer_settings.page_15]
-section = "sequencer-settings"
 pad = [13, 7]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 15
 
 [sequencer_settings.page_16]
-section = "sequencer-settings"
 pad = [13, 8]
-group = "sequencer_settings.pages"
+does = "pages"
 value = 16
+
+
+# Functions.
+
+[functions.play_stop]
+label = "Play"
+
+[functions.record]
+label = "Record"
+
+[functions.capture]
+label = "Capture"
+
+[functions.metronome]
+label = "Metro"
+
+[functions.fixed_length]
+label = "Length"
+
+[functions.undo]
+label = "Undo"
+
+[functions.linnstrument_mode]
+label = "Linn"
+
+[functions.shift]
+label = "Shift"
+
+[functions.stop_all]
+label = "StopAll"
+
+[functions.quantize]
+label = "Quant"
+
+[functions.launch_quantization]
+label = "LaunchQ"
+
+[functions.redo]
+label = "Redo"
+
+[functions.record_clip]
+label = "RecClip"
+
+[functions.capture_midi]
+label = "CapMIDI"
+
+[functions.back]
+label = "Back"
+
+[functions.stop_track]
+label = "StopTrk"
+
+[functions.scene_page]
+label = "Scenes"
+
+[functions.close_scenes]
+label = "Back"
+
+[functions.session]
+label = "Session"
+
+[functions.mixer]
+label = "Mixer"
+
+[functions.fx]
+label = "FX"
+
+[functions.seq]
+label = "Seq"
+
+[functions.delete]
+label = "Delete"
+
+[functions.copy]
+label = "Copy"
+
+[functions.device_clip]
+label = "DevClip"
+
+[functions.fader_source]
+label = "Source"
+
+[functions.unmute_all]
+label = "Unmute"
+
+[functions.stop]
+label = "Stop"
+
+[functions.unsolo_all]
+label = "Unsolo"
+
+[functions.unarm_all]
+label = "Unarm"
+
+[functions.double]
+label = "Double"
+
+[functions.halve]
+label = "Halve"
+
+[functions.follow]
+label = "Follow"
+
+[functions.up]
+label = "Up"
+
+[functions.down]
+label = "Down"
+
+[functions.view]
+label = "View"
+
+[functions.triplet]
+label = "Triplet"

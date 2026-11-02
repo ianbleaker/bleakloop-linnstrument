@@ -39,9 +39,6 @@ from .model import (
     StopTrackClips,
     ToggleMute,
     ToggleSolo,
-    UnarmAll,
-    UnmuteAll,
-    UnsoloAll,
 )
 from .modes import ClipSource, GroupSource, Mode, SceneSource
 
@@ -95,7 +92,7 @@ def handle(state, event, snapshot):
     if key == layout.VIEW_SHIFT.unarm_all and state.shift and event.pressed:
         if state.copy or state.delete:
             return state, []
-        return state, [UnarmAll(), ShowMessage("Unarm all")]
+        return controls.unarm_all(state, snapshot)
     if key == layout.VIEW.stop:
         return _stop(state, event)
     if fx.panel_visible(state) and event.column in layout.SPLIT_FADER_COLUMNS:
@@ -141,9 +138,9 @@ def handle(state, event, snapshot):
     if event.column == layout.NAV_COLUMN:
         return _nav_column(state, key, snapshot)
     if key == layout.VIEW_SHIFT.unsolo_all and state.shift:
-        return state, [UnsoloAll(), ShowMessage("Unsolo all")]
+        return controls.unsolo_all(state, snapshot)
     if key == layout.VIEW.unmute_all and not state.shift:
-        return state, [UnmuteAll(), ShowMessage("Unmute all")]
+        return controls.unmute_all(state, snapshot)
     if _is_scene(event):
         scene = state.window.scene + event.pad - 1
         if scene < snapshot.scene_count:

@@ -194,9 +194,11 @@ flowchart TD
   end
   subgraph Core
     core_buttons["buttons"]
+    core_catalogue["catalogue"]
     core_controls["controls"]
     core_engine["engine"]
     core_faders["faders"]
+    core_functions["functions"]
     core_fx["fx"]
     core_global_column["global_column"]
     core_layout["layout"]
@@ -214,9 +216,11 @@ flowchart TD
     ableton_v3["ableton.v3"]
   end
   __init__ -.->|lazy| surface
+  core_buttons --> core_catalogue
   core_buttons -.->|lazy| core_layout
   core_buttons --> core_model
   core_controls --> core_faders
+  core_controls --> core_functions
   core_controls --> core_layout
   core_controls --> core_leds
   core_controls --> core_model
@@ -236,6 +240,9 @@ flowchart TD
   core_faders --> core_model
   core_faders --> core_modes
   core_faders --> core_values
+  core_functions --> core_catalogue
+  core_functions --> core_leds
+  core_functions --> core_modes
   core_fx --> core_faders
   core_fx --> core_layout
   core_fx --> core_leds
@@ -243,8 +250,10 @@ flowchart TD
   core_fx --> core_model
   core_fx --> core_modes
   core_fx --> core_values
+  core_global_column --> core_catalogue
   core_global_column --> core_controls
   core_global_column --> core_faders
+  core_global_column --> core_functions
   core_global_column --> core_fx
   core_global_column --> core_layout
   core_global_column --> core_leds

@@ -37,19 +37,20 @@ SEQ_NOTE_COLUMNS = range(11, 15)
 FIXED_LENGTHS = (1, 2, 4, 8)
 
 # Buttons, from buttons.toml: one namespace per section, each button's (column, pad) by name
-# and each group as {(column, pad): value}. The fixed regions above come first, because the
+# and each group as {(column, pad): value} by its function. A mode's section falls back to
+# its Session one (buttons.FALLBACK). The fixed regions above come first, because the
 # registry checks no button sits on them.
 GLOBAL = buttons.section("global")
 GLOBAL_SHIFT = buttons.section("global-shift")
-LINNSTRUMENT = buttons.section("linnstrument")
-LINNSTRUMENT_SHIFT = buttons.section("linnstrument-shift")
+LINNSTRUMENT = buttons.section("linnstrument", GLOBAL)
+LINNSTRUMENT_SHIFT = buttons.section("linnstrument-shift", GLOBAL_SHIFT)
 LINNSTRUMENT_SCENES = buttons.section("linnstrument-scenes")
-SEQUENCER_GLOBAL = buttons.section("sequencer-global")
-SEQUENCER_GLOBAL_SHIFT = buttons.section("sequencer-global-shift")
+SEQUENCER_GLOBAL = buttons.section("sequencer-global", GLOBAL)
+SEQUENCER_GLOBAL_SHIFT = buttons.section("sequencer-global-shift", GLOBAL_SHIFT)
 NAVIGATION = buttons.section("navigation")
 NAVIGATION_SHIFT = buttons.section("navigation-shift")
-SEQUENCER_NAV = buttons.section("sequencer-nav")
-SEQUENCER_NAV_SHIFT = buttons.section("sequencer-nav-shift")
+SEQUENCER_NAV = buttons.section("sequencer-nav", NAVIGATION)
+SEQUENCER_NAV_SHIFT = buttons.section("sequencer-nav-shift", NAVIGATION_SHIFT)
 VIEW = buttons.section("view")
 VIEW_SHIFT = buttons.section("view-shift")
 DEVICE_CLIP = buttons.section("device-clip")

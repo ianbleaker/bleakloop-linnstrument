@@ -1,3 +1,2 @@
 [global.undo]
-section = "global"
 pad = [1, true]

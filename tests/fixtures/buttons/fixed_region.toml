@@ -1,3 +1,4 @@
 [fx.slot_1]
-section = "fx"
 pad = [5, 1]
+does = "slots"
+value = 1

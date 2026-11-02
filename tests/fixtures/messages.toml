@@ -1,18 +1,14 @@
-[global.metronome]
-section = "global"
-pad = [1, 4]
+[functions.metronome]
 message = "Metronome {state}"
-[global.metronome.outcomes]
+[functions.metronome.outcomes]
 off = "Metronome off"
 
-[global.hidden]
-section = "global"
-pad = [1, 5]
+[functions.undo]
 message = "Hidden"
 show = false
-[global.hidden.outcomes]
+[functions.undo.outcomes]
 done = "Hidden done"
-[global.hidden.refusals]
+[functions.undo.refusals]
 no_track = "No selected track"
 
 [system]

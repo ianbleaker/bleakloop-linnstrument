@@ -1,0 +1,8 @@
+[global.fader_source]
+pad = [1, 5]
+
+[global.undo]
+pad = [1, 6]
+
+[linnstrument.back]
+pad = [1, 7]

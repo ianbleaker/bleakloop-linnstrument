@@ -43,23 +43,23 @@ MESSAGES = buttons.load(Path(__file__).parent / "fixtures" / "messages.toml")
 
 
 def test_say_formats_the_message_and_its_outcomes():
-    assert MESSAGES.say("global.metronome", state="ON") == [ShowMessage("Metronome ON")]
-    assert MESSAGES.say("global.metronome", "off") == [ShowMessage("Metronome off")]
+    assert MESSAGES.say("metronome", state="ON") == [ShowMessage("Metronome ON")]
+    assert MESSAGES.say("metronome", "off") == [ShowMessage("Metronome off")]
 
 
 def test_show_false_hides_the_message_and_its_outcomes():
-    assert MESSAGES.say("global.hidden") == []
-    assert MESSAGES.say("global.hidden", "done") == []
+    assert MESSAGES.say("undo") == []
+    assert MESSAGES.say("undo", "done") == []
 
 
 def test_a_refusal_shows_even_when_hidden():
-    assert MESSAGES.refuse("global.hidden", "no_track") == [ShowMessage("No selected track")]
+    assert MESSAGES.refuse("undo", "no_track") == [ShowMessage("No selected track")]
 
 
 def test_a_missing_placeholder_shows_the_raw_template():
-    [message] = MESSAGES.say("global.metronome")
+    [message] = MESSAGES.say("metronome")
     assert message.text == "Metronome {state}"
-    assert "global.metronome" in message.problem
+    assert "metronome" in message.problem
     assert MESSAGES.system("moved") == "Controls moved to channel {channel}"
 
 
@@ -73,3 +73,13 @@ def test_check_command(capsys):
     assert check_buttons.main([]) == 0
     assert check_buttons.main([str(FIXTURES / "layer_clash.toml")]) == 1
     assert "navigation.delete" in capsys.readouterr().err
+
+
+def test_a_fallback_that_cant_run_in_a_mode_is_dark_there():
+    registry = buttons.load(Path(__file__).parent / "fixtures" / "dark_fallback.toml")
+    session = registry.section("global")
+    linnstrument = registry.section("linnstrument", session)
+    assert session.at((1, 5))[1] == "fader_source"
+    assert linnstrument.at((1, 5)) is None
+    assert linnstrument.at((1, 6))[1] == "undo"
+    assert linnstrument.at((1, 7))[1] == "back"

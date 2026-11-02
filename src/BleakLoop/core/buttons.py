@@ -1,9 +1,10 @@
-"""Button registry: position, label, manual text and messages per button, from buttons.toml."""
+"""Button registry, from buttons.toml: where each button sits and the function it runs, and
+each function's label, manual text and messages."""
 
 import tomllib
 from pathlib import Path
-from types import SimpleNamespace
 
+from .catalogue import LINNSTRUMENT, MODES, SEQUENCER, SESSION
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
@@ -76,6 +77,31 @@ LAYERS = {
 # In Linnstrument Mode only the device's left split, column 1, reaches BleakLoop.
 LEFT_SPLIT_SECTIONS = ("linnstrument", "linnstrument-shift", "linnstrument-scenes")
 
+# A mode's section falls back to its base: the base's buttons it doesn't override on the same
+# pad still work there, if their function runs in that mode, and are dark otherwise.
+FALLBACK = {
+    "linnstrument": "global",
+    "linnstrument-shift": "global-shift",
+    "sequencer-global": "global",
+    "sequencer-global-shift": "global-shift",
+    "sequencer-nav": "navigation",
+    "sequencer-nav-shift": "navigation-shift",
+}
+
+
+def section_modes(section):
+    # The modes a section's buttons work in.
+    if section == "linnstrument-scenes":
+        return frozenset({LINNSTRUMENT, SEQUENCER})
+    if section.startswith("linnstrument"):
+        return frozenset({LINNSTRUMENT})
+    if section.startswith("sequencer"):
+        return frozenset({SEQUENCER})
+    if section == "device-clip":
+        return frozenset({SESSION, SEQUENCER})
+    return frozenset({SESSION})
+
+
 MAX_LABEL = 7
 COLUMNS = range(1, 17)
 PADS = range(1, 9)
@@ -99,25 +125,108 @@ def _is_messages(value):
     return isinstance(value, dict) and all(isinstance(text, str) for text in value.values())
 
 
-FIELDS = {
-    "section": lambda value: isinstance(value, str),
+def _is_text(value):
+    return isinstance(value, str)
+
+
+ENTRY_FIELDS = {
     "pad": _is_pad,
-    "label": lambda value: isinstance(value, str),
-    "manual": lambda value: isinstance(value, str),
-    "message": lambda value: isinstance(value, str),
-    "show": lambda value: isinstance(value, bool),
-    "group": lambda value: isinstance(value, str),
+    "does": _is_text,
     "value": _is_value,
+    "label": _is_text,
+}
+
+FUNCTION_FIELDS = {
+    "label": _is_text,
+    "manual": _is_text,
+    "message": _is_text,
+    "show": lambda value: isinstance(value, bool),
     "outcomes": _is_messages,
     "refusals": _is_messages,
 }
 
-TOP_LEVEL = {"manual_format": str, "system": dict}
+TOP_LEVEL = {"manual_format": str, "system": dict, "functions": dict}
+
+
+class Section:
+    """One section's buttons: each by name as its (column, pad), each group by its function
+    as {(column, pad): value}. Mutable, so a test or a mockup can move one button. A name the
+    section doesn't have comes from its fallback, unless overridden there or unable to run."""
+
+    def __init__(self, name, buttons, does, base=None):
+        self.__dict__.update(buttons)
+        self.__dict__["_name"] = name
+        self.__dict__["_does"] = does
+        self.__dict__["_base"] = base
+        self.__dict__["_modes"] = section_modes(name)
+        self.__dict__["_built"] = frozenset(buttons)
+
+    def __getattr__(self, attr):
+        base = self.__dict__.get("_base")
+        if attr.startswith("_") or base is None:
+            raise AttributeError(attr)
+        value = getattr(base, attr)
+        if not MODES[base._does[attr]] & self._modes:
+            raise AttributeError(f"{attr} doesn't run in {self._name}")
+        mine = self._own_pads()
+        if isinstance(value, dict):
+            return {key: step for key, step in value.items() if key not in mine}
+        if value in mine:
+            raise AttributeError(f"{attr} is overridden in {self._name}")
+        return value
+
+    def __setattr__(self, attr, value):
+        # Moving a fallback's button here overrides it; moving it back to the fallback's own
+        # pad drops the override, so the section follows its fallback again.
+        base, built = self._base, self._built
+        if base is not None and attr not in built and attr in base._does:
+            if value == getattr(base, attr, None):
+                self.__dict__.pop(attr, None)
+                return
+            self._does[attr] = base._does[attr]
+        self._does.setdefault(attr, attr)
+        self.__dict__[attr] = value
+
+    def _own(self):
+        return {key: value for key, value in self.__dict__.items() if not key.startswith("_")}
+
+    def _own_pads(self):
+        return {key for _, _, key, _ in _expand(self._own(), self._does)}
+
+    def buttons(self):
+        # (name, function, (column, pad), value) for every button live in this section.
+        mine = list(_expand(self._own(), self._does))
+        taken = {key for _, _, key, _ in mine}
+        inherited = []
+        if self._base is not None:
+            inherited = [
+                button
+                for button in self._base.buttons()
+                if button[2] not in taken and MODES[button[1]] & self._modes
+            ]
+        return mine + inherited
+
+    def at(self, key):
+        # The button live on a pad, or None.
+        return next((button for button in self.buttons() if button[2] == key), None)
+
+
+def _expand(own, does):
+    for name, value in own.items():
+        if isinstance(value, dict):
+            for key, step in value.items():
+                yield name, name, key, step
+        elif isinstance(value, tuple) and value and isinstance(value[0], tuple):
+            for index, key in enumerate(value):
+                yield name, name, key, index + 1
+        else:
+            yield name, does[name], value, None
 
 
 class Registry:
     def __init__(self, data):
         self.data = data
+        self.functions = data.get("functions", {})
         self.items = dict(_walk({key: value for key, value in data.items() if key not in TOP_LEVEL}))
         _validate(data, self.items)
 
@@ -127,44 +236,55 @@ class Registry:
     def entries(self):
         return dict(self.items)
 
+    def function(self, name):
+        return self.functions.get(name, {})
+
     def pos(self, id):
         column, pad = self.entry(id)["pad"]
         return (column, pad)
 
-    def say(self, id, outcome=None, **values):
-        # The button's message, or one of its outcomes; nothing when its show flag is off.
-        item = self.entry(id)
+    def say(self, name, outcome=None, **values):
+        # The function's message, or one of its outcomes; nothing when its show flag is off.
+        item = self.function(name)
         if not item.get("show", True):
             return []
         template = item["outcomes"][outcome] if outcome else item["message"]
-        return [_message(id, template, values)]
+        return [_message(name, template, values)]
 
-    def refuse(self, id, key, **values):
+    def refuse(self, name, key, **values):
         # Always shown, whatever the show flag says: a silent press that does nothing confuses.
-        return [_message(id, self.entry(id)["refusals"][key], values)]
+        return [_message(name, self.function(name)["refusals"][key], values)]
 
     def system(self, key, **values):
         return _format(self.data["system"][key], values)[0]
 
-    def section(self, name):
-        # Each button's position by its name, and each group as {position: value}. Mutable,
-        # so a test or a mockup can move one button.
-        found = SimpleNamespace()
+    def section(self, name, base=None):
+        prefix = name.replace("-", "_")
+        buttons, does = {}, {}
         for id, item in self.items.items():
-            if item["section"] != name or "pad" not in item:
+            if item["section"] != name:
                 continue
-            setattr(found, id.rsplit(".", 1)[1], self.pos(id))
-            if "group" in item:
-                group = item["group"]
-                setattr(found, group.rsplit(".", 1)[1], self.group(group))
-        return found
+            short = id[len(prefix) + 1 :]
+            function = _does(id, item)
+            if "value" in item:
+                group = buttons.setdefault(function, {})
+                group[tuple(item["pad"])] = _freeze(item["value"])
+                does[function] = function
+            else:
+                buttons[short] = tuple(item["pad"])
+                does[short] = function
+        return Section(name, buttons, does, base)
 
-    def group(self, id):
+    def group(self, section, function):
         return {
-            self.pos(key): _freeze(item["value"])
-            for key, item in self.items.items()
-            if item.get("group") == id
+            tuple(item["pad"]): _freeze(item["value"])
+            for id, item in self.items.items()
+            if item["section"] == section and _does(id, item) == function and "value" in item
         }
+
+
+def _does(id, item):
+    return item.get("does", id.rsplit(".", 1)[1])
 
 
 def _format(template, values):
@@ -175,27 +295,25 @@ def _format(template, values):
         return template, f"{template!r} could not be formatted: {error!r}"
 
 
-def _message(id, template, values):
+def _message(name, template, values):
     text, problem = _format(template, values)
-    return ShowMessage(text, f"{id}: {problem}" if problem else "")
+    return ShowMessage(text, f"{name}: {problem}" if problem else "")
 
 
 def _freeze(value):
     return tuple(_freeze(part) for part in value) if isinstance(value, list) else value
 
 
-def _walk(table, prefix=""):
-    # An entry is a table with a section. A table of tables nests further IDs.
-    for key, value in table.items():
-        id = f"{prefix}{key}"
-        if not isinstance(value, dict):
-            raise ValueError(f"{id}: not a table")
-        if "section" in value:
-            yield id, value
-        elif all(isinstance(child, dict) for child in value.values()):
-            yield from _walk(value, f"{id}.")
-        else:
-            raise ValueError(f"{id}: no section")
+def _walk(table):
+    # [<section>.<button>]: the section's name with underscores for hyphens.
+    for key, buttons in table.items():
+        section = key.replace("_", "-")
+        if section not in SECTIONS:
+            raise ValueError(f"{key}: unknown section {section!r}")
+        if not isinstance(buttons, dict) or not all(isinstance(b, dict) for b in buttons.values()):
+            raise ValueError(f"{key}: a section holds button tables, as [{key}.<name>]")
+        for name, item in buttons.items():
+            yield f"{key}.{name}", {**item, "section": section}
 
 
 def _validate(data, items):
@@ -204,25 +322,39 @@ def _validate(data, items):
             raise ValueError(f"{key}: wrong type")
     if not _is_messages(data.get("system", {})):
         raise ValueError("system: every message must be a string")
+    for name, function in data.get("functions", {}).items():
+        if name not in MODES:
+            raise ValueError(f"functions.{name}: no such function")
+        if not isinstance(function, dict):
+            raise ValueError(f"functions.{name}: not a table")
+        for field, value in function.items():
+            if field not in FUNCTION_FIELDS:
+                raise ValueError(f"functions.{name}: unknown field {field!r}")
+            if not FUNCTION_FIELDS[field](value):
+                raise ValueError(f"functions.{name}: {field} has the wrong type")
+        if len(function.get("label", "")) > MAX_LABEL:
+            raise ValueError(f"functions.{name}: label longer than {MAX_LABEL} characters")
     seen = {}
     regions = _regions()
     for id, item in items.items():
-        for field, value in item.items():
-            if field not in FIELDS:
-                raise ValueError(f"{id}: unknown field {field!r}")
-            if not FIELDS[field](value):
-                raise ValueError(f"{id}: {field} has the wrong type")
         section = item["section"]
-        if section not in SECTIONS:
-            raise ValueError(f"{id}: unknown section {section!r}")
-        if id.rsplit(".", 1)[0] != section.replace("-", "_"):
-            raise ValueError(f"{id}: an ID starts with its section, as {section.replace('-', '_')}.")
+        for field, value in item.items():
+            if field == "section":
+                continue
+            if field not in ENTRY_FIELDS:
+                raise ValueError(f"{id}: unknown field {field!r}")
+            if not ENTRY_FIELDS[field](value):
+                raise ValueError(f"{id}: {field} has the wrong type")
+        if "pad" not in item:
+            raise ValueError(f"{id}: no pad")
+        function = _does(id, item)
+        if function not in MODES:
+            raise ValueError(f"{id}: no such function {function!r}")
+        if not MODES[function] & section_modes(section):
+            modes = ", ".join(sorted(MODES[function]))
+            raise ValueError(f"{id}: {function} doesn't run in {section}, only in {modes}")
         if len(item.get("label", "")) > MAX_LABEL:
             raise ValueError(f"{id}: label longer than {MAX_LABEL} characters")
-        if "group" in item and not ("pad" in item and "value" in item):
-            raise ValueError(f"{id}: a group member needs a pad and a value")
-        if "pad" not in item:
-            continue
         column, pad = item["pad"]
         if column not in COLUMNS or pad not in PADS:
             raise ValueError(f"{id}: pad {item['pad']} is off the surface")
@@ -237,20 +369,35 @@ def _validate(data, items):
     _check_layers(items, regions)
 
 
+def _live(items, section):
+    # (id, (column, pad)) for each button live in a section, its fallback's included.
+    own = [(id, tuple(item["pad"])) for id, item in items.items() if item["section"] == section]
+    taken = {key for _, key in own}
+    base = FALLBACK.get(section)
+    if base is None:
+        return own
+    modes = section_modes(section)
+    inherited = [
+        (id, key)
+        for id, key in _live(items, base)
+        if key not in taken and MODES[_does(id, items[id])] & modes
+    ]
+    return own + inherited
+
+
 def _check_layers(items, regions):
     for layer, sections in LAYERS.items():
         fixed = [region for section in sections for region in regions.get(section, ())]
         taken = {}
-        for id, item in items.items():
-            if item["section"] not in sections or "pad" not in item:
-                continue
-            column, pad = key = tuple(item["pad"])
-            if key in taken:
-                raise ValueError(f"{id}: pad {item['pad']} is taken by {taken[key]} in the {layer} layer")
-            taken[key] = id
-            for columns, pads in fixed:
-                if column in columns and pad in pads:
-                    raise ValueError(f"{id}: pad {item['pad']} is in a fixed region of the {layer} layer")
+        for section in sections:
+            for id, key in _live(items, section):
+                column, pad = key
+                if key in taken:
+                    raise ValueError(f"{id}: pad {list(key)} is taken by {taken[key]} in the {layer} layer")
+                taken[key] = id
+                for columns, pads in fixed:
+                    if column in columns and pad in pads:
+                        raise ValueError(f"{id}: pad {list(key)} is in a fixed region of the {layer} layer")
 
 
 def _regions():
@@ -310,24 +457,28 @@ def entries():
     return _get().entries()
 
 
+def function(name):
+    return _get().function(name)
+
+
 def pos(id):
     return _get().pos(id)
 
 
-def group(id):
-    return _get().group(id)
+def group(section, function):
+    return _get().group(section, function)
 
 
-def section(name):
-    return _get().section(name)
+def section(name, base=None):
+    return _get().section(name, base)
 
 
-def say(id, outcome=None, **values):
-    return _get().say(id, outcome, **values)
+def say(name, outcome=None, **values):
+    return _get().say(name, outcome, **values)
 
 
-def refuse(id, key, **values):
-    return _get().refuse(id, key, **values)
+def refuse(name, key, **values):
+    return _get().refuse(name, key, **values)
 
 
 def system(key, **values):

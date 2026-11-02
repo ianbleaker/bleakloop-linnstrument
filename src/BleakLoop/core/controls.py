@@ -4,7 +4,7 @@ Device/Clip layer."""
 
 from dataclasses import replace
 
-from . import faders, layout
+from . import faders, functions, layout
 from .modes import Mode
 from .leds import BLUE, GREEN, LIME, MAGENTA, OFF, ORANGE, RED, WHITE, YELLOW, Blink, Light
 from .model import (
@@ -18,7 +18,10 @@ from .model import (
     StepTrack,
     ToggleDetailView,
     ToggleMetronome,
+    UnarmAll,
     Undo,
+    UnmuteAll,
+    UnsoloAll,
 )
 from .values import TEMPO_MAX, TEMPO_MIN
 
@@ -77,6 +80,32 @@ def tempo_step(snapshot, step):
     # Shift + column 16 pads 7 and 8.
     bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + step))
     return [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
+
+
+@functions.register("tempo", light=lambda state, snapshot, value: Light(GREEN))
+def _tempo(state, snapshot, step):
+    return state, tempo_step(snapshot, step)
+
+
+@functions.register(
+    "unmute_all", light=lambda state, snapshot, value: Light(ORANGE if snapshot.any_muted else OFF)
+)
+def unmute_all(state, snapshot, value=None):
+    return state, [UnmuteAll(), ShowMessage("Unmute all")]
+
+
+@functions.register(
+    "unsolo_all", light=lambda state, snapshot, value: Light(BLUE if snapshot.any_soloed else OFF)
+)
+def unsolo_all(state, snapshot, value=None):
+    return state, [UnsoloAll(), ShowMessage("Unsolo all")]
+
+
+@functions.register(
+    "unarm_all", light=lambda state, snapshot, value: Light(RED if snapshot.any_armed else OFF)
+)
+def unarm_all(state, snapshot, value=None):
+    return state, [UnarmAll(), ShowMessage("Unarm all")]
 
 
 def navigation(state):
