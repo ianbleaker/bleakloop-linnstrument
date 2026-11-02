@@ -526,6 +526,20 @@ def _get():
     return _registry
 
 
+def stamps(path=None, user_path=None):
+    # Each file's (modification time, size), or None while it's missing: a change in either
+    # means the files changed on disk.
+    def stamp(file):
+        try:
+            info = Path(file).stat()
+        except OSError:
+            return None
+        return info.st_mtime_ns, info.st_size
+
+    user_path = user_path or USER_PATH
+    return stamp(path or PATH), None if user_path is None else stamp(user_path)
+
+
 def reload(path=None, user_path=None):
     # Loads the files again and refills layout's sections in place. A file that fails its
     # checks raises and leaves the current layout as it was.

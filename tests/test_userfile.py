@@ -90,3 +90,17 @@ def test_the_user_path_is_only_set_inside_remote_scripts():
     assert buttons.USER_PATH is None
     library = Path("/Users/x/Music/Ableton/User Library")
     assert buttons.user_path(library / "Remote Scripts" / "BleakLoop") == library / "BleakLoop" / "buttons.toml"
+
+
+def test_stamps_change_when_a_file_is_saved_created_or_deleted(tmp_path):
+    shipped, user = tmp_path / "shipped.toml", tmp_path / "user.toml"
+    shipped.write_text("a = 1\n")
+    before = buttons.stamps(shipped, user)
+    assert before[1] is None
+    user.write_text("b = 22\n")
+    created = buttons.stamps(shipped, user)
+    assert created != before
+    user.write_text("b = 333\n")
+    assert buttons.stamps(shipped, user) != created
+    user.unlink()
+    assert buttons.stamps(shipped, user) == before

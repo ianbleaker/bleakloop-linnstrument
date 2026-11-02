@@ -123,6 +123,10 @@ class BleakLoop(ControlSurface):
         self._translated = {}  # (row, column) -> the audition note a note pad is translated to
         self._forwarding = None  # the pad elements' own script forwarding
         self._held_note_pads = set()  # (row, column) of note pads held now
+        self._held_pads = set()  # every pad held now: a buttons reload waits for none
+        self._ticks = 0
+        self._button_stamps = None  # buttons.stamps() as last read
+        self._reload_pending = False
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
         logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
@@ -142,6 +146,7 @@ class BleakLoop(ControlSurface):
     def update_display(self):
         super().update_display()
         if self._started:
+            self._watch_buttons()
             self._check_pending_clip()
             self._load_fx()
             self._load_fx_scenes()
@@ -155,6 +160,10 @@ class BleakLoop(ControlSurface):
             self._refresh()
         elif self._setup is None:
             logger.info("BleakLoop loaded")
+            logger.info("BleakLoop user buttons: %s", buttons.USER_PATH or "none")
+            self._button_stamps = buttons.stamps()
+            if buttons.user_error:
+                logger.warning("BleakLoop: user buttons not loaded: %s", buttons.user_error)
             self._listen_for_nrpn_replies()
             self.request_rebuild_midi_map()
             # Reads first, then the fixed sets: every read reply is in before the computed sets.
@@ -180,11 +189,40 @@ class BleakLoop(ControlSurface):
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
                 self.show_message(self._refusal)
+            if buttons.user_error:
+                self.show_message(f"BleakLoop: user buttons not loaded: {buttons.user_error}")
             # The display tick alone would land tempo blinks up to 100 ms late.
             self._timer = Live.Base.Timer(
                 callback=self._on_blink_timer, interval=values.BLINK_TIMER_MS, repeat=True
             )
             self._timer.start()
+
+    def _watch_buttons(self):
+        # About once a second: a save to either buttons file applies, once no pad is held, so
+        # a release reaches the button its press did.
+        self._ticks += 1
+        if self._ticks % values.BUTTONS_POLL_TICKS == 0:
+            stamps = buttons.stamps()
+            if stamps != self._button_stamps:
+                self._button_stamps = stamps
+                self._reload_pending = True
+        if self._reload_pending and not self._held_pads:
+            self._reload_pending = False
+            self.reload_buttons()
+
+    def reload_buttons(self):
+        # A bad file leaves the current layout working, and says why.
+        try:
+            buttons.reload()
+        except (ValueError, OSError) as error:
+            message = f"BleakLoop: buttons not reloaded: {error}"
+            logger.warning(message)
+            self.show_message(message)
+            return False
+        logger.info("BleakLoop: buttons reloaded")
+        self.show_message("BleakLoop: buttons reloaded")
+        self._refresh()
+        return True
 
     def _follow_selected_device(self):
         # Device FX follows the blue hand, which other control surfaces may move. A click on
@@ -561,6 +599,8 @@ class BleakLoop(ControlSurface):
 
     def _listen_for(self, mode):
         self._remove_listeners()
+        # A release may now reach another listener, or none: a held pad can't block a reload.
+        self._held_pads.clear()
         self._x_listened = False
         if mode in (Mode.SESSION, Mode.SEQUENCER):
             for row in range(layout.ROWS):
@@ -629,6 +669,7 @@ class BleakLoop(ControlSurface):
             self._saved_split.setdefault(parameter, setting)
 
     def _on_pad(self, column, row, value):
+        self._hold(("pad", column, row), value)
         if column in layout.SEQ_NOTE_COLUMNS:
             if value:
                 self._held_note_pads.add((row, column))
@@ -671,7 +712,14 @@ class BleakLoop(ControlSurface):
         if column in layout.GRID_COLUMNS:
             self._state = engine.y_axis(self._state, YAxis(column, layout.pad_of(row), value))
 
+    def _hold(self, key, value):
+        if value:
+            self._held_pads.add(key)
+        else:
+            self._held_pads.discard(key)
+
     def _on_control_note(self, note, value):
+        self._hold(("note", note), value)
         if self._note_map is None:
             if value > 0:
                 self.show_message(self._refusal)
