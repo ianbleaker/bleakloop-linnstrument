@@ -1,4 +1,3 @@
-from itertools import combinations
 from pathlib import Path
 
 import pytest
@@ -32,15 +31,12 @@ def test_sections_are_the_manuals_plus_held_modifiers():
 
 
 @pytest.mark.parametrize("layer", list(pads.LAYERS), ids=lambda layer: layer.name)
-def test_no_two_buttons_share_a_pad_in_a_layer(layer):
-    sections = pads.LAYERS[layer]
-    placed = [
-        (id, item["section"], tuple(item["pad"]))
-        for id, item in buttons.entries().items()
-        if item["section"] in sections and "pad" in item
-    ]
-    clashes = [(a[0], b[0]) for a, b in combinations(placed, 2) if a[2] == b[2]]
-    assert clashes == []
+def test_the_registry_checks_the_manuals_layers(layer):
+    assert buttons.LAYERS[layer.name] == pads.LAYERS[layer]
+
+
+def test_the_shipped_file_loads():
+    assert buttons.load(buttons.PATH).entries() == buttons.entries()
 
 
 MESSAGES = buttons.load(Path(__file__).parent / "fixtures" / "messages.toml")
@@ -69,3 +65,11 @@ def test_a_missing_placeholder_shows_the_raw_template():
 
 def test_system_formats():
     assert MESSAGES.system("moved", channel=3) == "Controls moved to channel 3"
+
+
+def test_check_command(capsys):
+    from tools import check_buttons
+
+    assert check_buttons.main([]) == 0
+    assert check_buttons.main([str(FIXTURES / "layer_clash.toml")]) == 1
+    assert "navigation.delete" in capsys.readouterr().err

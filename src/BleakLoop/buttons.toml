@@ -1,7 +1,7 @@
 # Every button: where it sits, its manual label and text, and the status messages it shows.
 #
 # Edit a pad here and restart Live to move a button; nothing else to build. Check the file
-# first with: PYTHONPATH=src python3 -m BleakLoop.check_buttons
+# first, from the repo: PYTHONPATH=src python3 -m tools.check_buttons
 #
 # The table path is the button's ID: its section, then its name. Fields:
 #   section  the section the button belongs to: the mode and layer it works in
@@ -10,8 +10,8 @@
 #   group    a set of pads read together, such as the tempo steps; value is each pad's value
 #
 # Every button moves alone, Shift functions included. Fixed regions (clip grid, scene pads,
-# faders, steps, Mute/Select rows) aren't movable. In Linnstrument Mode only column 1 reaches
-# BleakLoop, so its sections stay there.
+# faders, steps, Mute/Select rows) aren't movable, and no two buttons live at once may share
+# a pad. In Linnstrument Mode only column 1 reaches BleakLoop, so its sections stay there.
 
 manual_format = "{label}."
 

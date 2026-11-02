@@ -49,6 +49,33 @@ SECTIONS = frozenset(
     }
 )
 
+# The sections live together, by layer: no two of a layer's buttons may share a pad, and none
+# may sit on a fixed region of any of its sections. The first thirteen are the manual's maps
+# (tools/docs/manual/pads.py LAYERS, kept equal by a test); the rest have no map.
+LAYERS = {
+    "SESSION": ("global", "view", "navigation", "session"),
+    "SESSION_SHIFT": ("global-shift", "view-shift", "navigation-shift", "session-shift"),
+    "SPLIT": ("global", "view", "navigation", "split"),
+    "SPLIT_SNAPSHOTS": ("global", "view", "navigation", "split-snapshots"),
+    "MIXER": ("global", "view", "navigation", "mixer"),
+    "MIXER_SPLIT": ("global", "view", "navigation", "mixer-split"),
+    "MIXER_SHIFT": ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
+    "FX": ("global", "view", "navigation", "fx"),
+    "FX_SHIFT": ("global-shift", "view-shift", "navigation-shift", "fx-shift"),
+    "SEQUENCER": ("sequencer-global", "sequencer-nav", "sequencer"),
+    "SEQUENCER_SETTINGS": ("sequencer-global", "sequencer-nav", "sequencer-grid", "sequencer-settings"),
+    "SEQUENCER_SHIFT": ("sequencer-global-shift", "sequencer-nav-shift", "sequencer"),
+    "SEQUENCER_DRUMS": ("sequencer-global", "sequencer-nav", "sequencer"),
+    "SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "split-shift"),
+    "MIXER_SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "mixer-split-shift"),
+    "LINNSTRUMENT": ("linnstrument",),
+    "LINNSTRUMENT_SHIFT": ("linnstrument-shift",),
+    "LINNSTRUMENT_SCENES": ("linnstrument-scenes",),
+}
+
+# In Linnstrument Mode only the device's left split, column 1, reaches BleakLoop.
+LEFT_SPLIT_SECTIONS = ("linnstrument", "linnstrument-shift", "linnstrument-scenes")
+
 MAX_LABEL = 7
 COLUMNS = range(1, 17)
 PADS = range(1, 9)
@@ -199,14 +226,31 @@ def _validate(data, items):
         column, pad = item["pad"]
         if column not in COLUMNS or pad not in PADS:
             raise ValueError(f"{id}: pad {item['pad']} is off the surface")
-        if section.startswith("global") and column != 1:
-            raise ValueError(f"{id}: the Global column is column 1")
+        if section in LEFT_SPLIT_SECTIONS and column != 1:
+            raise ValueError(f"{id}: in Linnstrument Mode only column 1 reaches BleakLoop")
         if (section, column, pad) in seen:
             raise ValueError(f"{id}: pad {item['pad']} is taken by {seen[section, column, pad]}")
         seen[section, column, pad] = id
         for columns, pads in regions.get(section, ()):
             if column in columns and pad in pads:
                 raise ValueError(f"{id}: pad {item['pad']} is in a fixed region of {section}")
+    _check_layers(items, regions)
+
+
+def _check_layers(items, regions):
+    for layer, sections in LAYERS.items():
+        fixed = [region for section in sections for region in regions.get(section, ())]
+        taken = {}
+        for id, item in items.items():
+            if item["section"] not in sections or "pad" not in item:
+                continue
+            column, pad = key = tuple(item["pad"])
+            if key in taken:
+                raise ValueError(f"{id}: pad {item['pad']} is taken by {taken[key]} in the {layer} layer")
+            taken[key] = id
+            for columns, pads in fixed:
+                if column in columns and pad in pads:
+                    raise ValueError(f"{id}: pad {item['pad']} is in a fixed region of the {layer} layer")
 
 
 def _regions():
