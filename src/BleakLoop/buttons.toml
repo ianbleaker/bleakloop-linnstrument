@@ -751,6 +751,13 @@ morphing = "{name} {timing}{note}"
 no_racks = "No racks to store"
 nothing = "{name}: nothing to recall{note}"
 
+[functions.faders]
+[functions.faders.outcomes]
+unbound = "Fader {fader} unbound"
+[functions.faders.refusals]
+needs_mapped = "Shift + FX for Mapped FX"
+not_found = "Fader {fader}: parameter not found"
+
 [functions.scenes]
 [functions.scenes.outcomes]
 timed = "Scene {scene} in {bars}"

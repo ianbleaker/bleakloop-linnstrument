@@ -3,7 +3,7 @@
 import json
 from dataclasses import replace
 
-from . import layout
+from . import buttons, layout
 from .leds import BLUE, MAGENTA, OFF, ORANGE, YELLOW, Light
 from .model import (
     BeginUndoStep,
@@ -79,7 +79,7 @@ def press(state, event, snapshot):
     row = event.pad - 1
     if state.device_clip:
         if not mapped:
-            return state, [ShowMessage("Shift + FX for Mapped FX")]
+            return state, buttons.refuse("faders", "needs_mapped")
         return state, [BindFader(row)]
     if state.delete:
         return _unbind(state, row) if mapped else (state, [])
@@ -88,7 +88,7 @@ def press(state, event, snapshot):
         return state, []
     if view is None:
         if mapped and state.fader_bindings[row] is not None:
-            return state, [ShowMessage(f"Fader {event.pad}: parameter not found")]
+            return state, buttons.refuse("faders", "not_found", fader=event.pad)
         return state, []
     span = columns(state)
     touch = FaderTouch(
@@ -158,7 +158,7 @@ def _unbind(state, row):
         return state, []
     bindings = _put_row(state.fader_bindings, row, None)
     state = replace(state, fader_bindings=bindings)
-    return state, [SaveFaderBindings(dump(bindings)), ShowMessage(f"Fader {row + 1} unbound")]
+    return state, [SaveFaderBindings(dump(bindings)), *buttons.say("faders", "unbound", fader=row + 1)]
 
 
 def _put_row(rows, row, value):

@@ -236,6 +236,7 @@ flowchart TD
   core_engine --> core_modes
   core_engine --> core_sequencer
   core_engine --> core_session
+  core_faders --> core_buttons
   core_faders --> core_layout
   core_faders --> core_leds
   core_faders --> core_model
