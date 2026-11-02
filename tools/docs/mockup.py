@@ -4,7 +4,7 @@ PYTHONPATH=src python3 -m tools.docs.mockup SPEC.json [-o OUT.svg]
 
 A top-level "layout" object moves pads for the figure, by core/layout.py constant name:
 {"SESSION": "16,1", "RESERVED": [], "DEVICE_CLIP_TRACK_STEPS": {"16,7": -1, "16,6": 1}}.
-A moved pad takes its Shift aliases (FX's FADER_SOURCE) along unless they're overridden too.
+Every button moves alone: moving FX leaves its Shift function, FADER_SOURCE, where it was.
 """
 
 import argparse
@@ -40,13 +40,6 @@ BLINKS = {"steady": Blink.STEADY, "tempo": Blink.TEMPO, "fast": Blink.FAST}
 SPEC_KEYS = {"title", "panels", "layout"}
 PANEL_KEYS = {"layer", "columns", "caption", "state", "lights", "labels", "blocks"}
 BLOCK_KEYS = {"name", "columns", "pads"}
-# Shift functions on another button's pad: each follows that button when only it moves.
-ALIASES = {
-    "QUANTIZE": "CAPTURE",
-    "LAUNCH_QUANTIZATION": "METRONOME",
-    "SCENE_PAGE": "MODE_PAD",
-    "FADER_SOURCE": "FX",
-}
 
 
 class SpecError(Exception):
@@ -71,9 +64,6 @@ def _layout(overrides):
     if not isinstance(overrides, dict):
         raise SpecError("layout: must be an object")
     patched = {name: _position(name, value) for name, value in overrides.items()}
-    for alias, name in ALIASES.items():
-        if name in patched and alias not in overrides:
-            patched[alias] = patched[name]
     saved = {name: getattr(layout, name) for name in patched}
     try:
         for name, value in patched.items():

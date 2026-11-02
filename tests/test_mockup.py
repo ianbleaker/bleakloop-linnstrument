@@ -51,20 +51,18 @@ def test_a_layout_override_moves_a_pad_and_its_label(tmp_path):
     assert after.index(">FX</text>") < after.index(">Session</text>")
 
 
-def test_a_layout_override_moves_the_pads_aliases(tmp_path):
-    # Source, FX's Shift function, is drawn on pad 3 and follows FX to pad 4.
+def test_a_layout_override_leaves_the_shift_function_put(tmp_path):
+    # Source, FX's Shift function, stays on pad 3 when FX moves to pad 4.
     spec = {"panels": [{"layer": "session-shift", "columns": [16]}]}
     source = '<text x="36" y="{}" font-size="9" fill="#ffffff" text-anchor="middle">Source</text>'
-    _, before = run(tmp_path, spec)
     _, after = run(tmp_path, {**spec, "layout": {"FX": "16,4", "RESERVED": []}})
-    assert source.format(63 + 2 * 46) in before
-    assert source.format(63 + 3 * 46) in after
+    assert source.format(63 + 2 * 46) in after
     assert layout.FADER_SOURCE == layout.FX == (16, 3)
 
 
-def test_an_overridden_alias_stays_put():
-    with mockup._layout({"FX": "16,4", "FADER_SOURCE": "16,2"}):
-        assert (layout.FX, layout.FADER_SOURCE) == ((16, 4), (16, 2))
+def test_a_shift_function_moves_alone():
+    with mockup._layout({"FADER_SOURCE": "16,4", "RESERVED": []}):
+        assert (layout.FX, layout.FADER_SOURCE) == ((16, 3), (16, 4))
 
 
 def test_ring_labels_follow_their_direction(tmp_path):
