@@ -528,19 +528,9 @@ def test_any_song_level_function_works_in_column_1(monkeypatch):
     assert handle(SESSION, layout.GLOBAL.fixed_length)[0].fixed_length == 1
 
 
-def test_every_moved_function_runs_in_all_its_modes():
+def test_every_function_runs_in_all_its_modes():
     # engine imports every module that registers functions, as Live does.
     from BleakLoop.core import catalogue, engine, functions  # noqa: F401
 
-    moved = {
-        "play_stop", "record", "capture", "record_clip", "capture_midi", "metronome",
-        "fixed_length", "undo", "redo", "back", "linnstrument_mode", "stop_all", "stop_track",
-        "quantize", "launch_quantization", "scene_page", "close_scenes", "tempo", "unmute_all",
-        "unsolo_all", "unarm_all", "window", "fader_source", "device_clip", "shift", "stop",
-    }
-    assert {(name, mode) for name in moved for mode in catalogue.MODES[name]} <= functions.registered()
-    both = {"session", "mixer", "fx", "seq", "copy", "delete"}
-    assert {(name, mode) for name in both for mode in catalogue.MODES[name]} <= functions.registered()
-    own = {"reserved", "double", "halve", "follow", "up", "down", "view", "rates", "triplet", "pages", "slots", "scene_slots", "bars"}
-    own |= {"tracks", "devices"}
-    assert {(name, mode) for name in own for mode in catalogue.MODES[name]} <= functions.registered()
+    expected = {(name, mode) for name, modes in catalogue.MODES.items() for mode in modes}
+    assert functions.registered() == expected
