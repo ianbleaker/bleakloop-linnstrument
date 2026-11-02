@@ -1,0 +1,19 @@
+[global.metronome]
+section = "global"
+pad = [1, 4]
+message = "Metronome {state}"
+[global.metronome.outcomes]
+off = "Metronome off"
+
+[global.hidden]
+section = "global"
+pad = [1, 5]
+message = "Hidden"
+show = false
+[global.hidden.outcomes]
+done = "Hidden done"
+[global.hidden.refusals]
+no_track = "No selected track"
+
+[system]
+moved = "Controls moved to channel {channel}"

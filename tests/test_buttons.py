@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from BleakLoop.core import buttons, layout
+from BleakLoop.core.model import ShowMessage
 from tools.docs.manual import pads
 
 FIXTURES = Path(__file__).parent / "fixtures" / "buttons"
@@ -40,3 +41,31 @@ def test_no_two_buttons_share_a_pad_in_a_layer(layer):
     ]
     clashes = [(a[0], b[0]) for a, b in combinations(placed, 2) if a[2] == b[2]]
     assert clashes == []
+
+
+MESSAGES = buttons.load(Path(__file__).parent / "fixtures" / "messages.toml")
+
+
+def test_say_formats_the_message_and_its_outcomes():
+    assert MESSAGES.say("global.metronome", state="ON") == [ShowMessage("Metronome ON")]
+    assert MESSAGES.say("global.metronome", "off") == [ShowMessage("Metronome off")]
+
+
+def test_show_false_hides_the_message_and_its_outcomes():
+    assert MESSAGES.say("global.hidden") == []
+    assert MESSAGES.say("global.hidden", "done") == []
+
+
+def test_a_refusal_shows_even_when_hidden():
+    assert MESSAGES.refuse("global.hidden", "no_track") == [ShowMessage("No selected track")]
+
+
+def test_a_missing_placeholder_shows_the_raw_template():
+    [message] = MESSAGES.say("global.metronome")
+    assert message.text == "Metronome {state}"
+    assert "global.metronome" in message.problem
+    assert MESSAGES.system("moved") == "Controls moved to channel {channel}"
+
+
+def test_system_formats():
+    assert MESSAGES.system("moved", channel=3) == "Controls moved to channel 3"

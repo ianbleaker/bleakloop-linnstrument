@@ -3,6 +3,8 @@
 import tomllib
 from pathlib import Path
 
+from .model import ShowMessage
+
 PATH = Path(__file__).parent.parent / "buttons.toml"
 
 # The manual's section keys (tools/docs/manual/pads.py SECTIONS), plus the held-modifier
@@ -101,12 +103,40 @@ class Registry:
         column, pad = self.entry(id)["pad"]
         return (column, pad)
 
+    def say(self, id, outcome=None, **values):
+        # The button's message, or one of its outcomes; nothing when its show flag is off.
+        item = self.entry(id)
+        if not item.get("show", True):
+            return []
+        template = item["outcomes"][outcome] if outcome else item["message"]
+        return [_message(id, template, values)]
+
+    def refuse(self, id, key, **values):
+        # Always shown, whatever the show flag says: a silent press that does nothing confuses.
+        return [_message(id, self.entry(id)["refusals"][key], values)]
+
+    def system(self, key, **values):
+        return _format(self.data["system"][key], values)[0]
+
     def group(self, id):
         return {
             self.pos(key): _freeze(item["value"])
             for key, item in self.items.items()
             if item.get("group") == id
         }
+
+
+def _format(template, values):
+    # (text, problem): the raw template, and why, when a placeholder can't be filled.
+    try:
+        return template.format(**values), ""
+    except (KeyError, IndexError, ValueError) as error:
+        return template, f"{template!r} could not be formatted: {error!r}"
+
+
+def _message(id, template, values):
+    text, problem = _format(template, values)
+    return ShowMessage(text, f"{id}: {problem}" if problem else "")
 
 
 def _freeze(value):
@@ -226,3 +256,15 @@ def pos(id):
 
 def group(id):
     return _get().group(id)
+
+
+def say(id, outcome=None, **values):
+    return _get().say(id, outcome, **values)
+
+
+def refuse(id, key, **values):
+    return _get().refuse(id, key, **values)
+
+
+def system(key, **values):
+    return _get().system(key, **values)

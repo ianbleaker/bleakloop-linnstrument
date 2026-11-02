@@ -215,6 +215,7 @@ flowchart TD
   end
   __init__ -.->|lazy| surface
   core_buttons -.->|lazy| core_layout
+  core_buttons --> core_model
   core_controls --> core_faders
   core_controls --> core_layout
   core_controls --> core_leds

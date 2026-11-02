@@ -598,6 +598,8 @@ class SelectDrumPad:
 @dataclass(frozen=True)
 class ShowMessage:
     text: str
+    # Why the text is a raw template: a placeholder it names wasn't given. Logged, not shown.
+    problem: str = ""
 
 
 # The colour of every pad the current mode owns, keyed by (column, pad).

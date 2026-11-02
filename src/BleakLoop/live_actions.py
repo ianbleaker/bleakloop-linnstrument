@@ -492,6 +492,8 @@ def apply(action, song, surface):
     elif isinstance(action, SetMixer):
         surface.set_mixer(action.on)
     elif isinstance(action, ShowMessage):
+        if action.problem:
+            logger.warning("MESSAGE: %s", action.problem)
         surface.show_message(action.text)
     else:
         raise TypeError(f"unknown action: {action!r}")

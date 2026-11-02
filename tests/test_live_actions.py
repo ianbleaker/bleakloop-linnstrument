@@ -9,6 +9,7 @@ sys.modules.setdefault("Live", ModuleType("Live"))
 from BleakLoop import live_actions  # noqa: E402
 from BleakLoop.core.modes import FaderBinding  # noqa: E402
 from BleakLoop.core.model import (  # noqa: E402
+    ShowMessage,
     BindFader,
     CopyGroupClips,
     CopyScene,
@@ -698,3 +699,10 @@ def test_drum_actions_skip_without_a_rack(action):
     apply(action, song)
     assert rack.view.drum_pads_scroll_position == 9
     assert rack.view.selected_drum_pad is rack.drum_pads[36]
+
+
+def test_show_message_logs_its_problem_and_shows_the_text(caplog):
+    surface = Messages()
+    live_actions.apply(ShowMessage("Tempo {bpm}", "nav.tempo_up: no bpm"), None, surface)
+    assert surface.shown == ["Tempo {bpm}"]
+    assert "nav.tempo_up: no bpm" in caplog.text
