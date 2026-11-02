@@ -62,7 +62,7 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 | 16/3 | FX | `fx` |  | on: FX Mode: ON<br>off: FX Mode: OFF |  | yes |
 | 16/4 | reserved | `reserved` |  |  |  | yes |
 | 16/5 | Seq | `seq` | Seq: tap for Sequencer, or press a clip | entered: Sequencer<br>left: Session Mode | needs_midi: Sequencer needs a MIDI track | yes |
-| 16/6 | Delete | `delete` | Delete Mode ON | held: Delete: pick a clip or scene<br>held_steps: Delete: pick a step or note pad | last_scene: Cannot delete last scene | yes |
+| 16/6 | Delete | `delete` |  | held: Delete: pick a clip or scene<br>held_steps: Delete: pick a step or note pad | last_scene: Cannot delete last scene | yes |
 | 16/7 | Copy | `copy` |  | held: Copy: pick a clip or scene<br>held_slots: Copy: press a slot to overwrite<br>picked_clip: Copy: pick an empty slot<br>clip_copied: Clip copied<br>clips_copied: Clips copied<br>picked_scene: Copy: pick an empty scene<br>scene_copied: Scene copied<br>held_steps: Copy: pick a step<br>picked_step: Copy: pick steps | empty_slot: Copy: pick a clip or scene<br>scene_source: Pick a scene target<br>target_full: Target not empty<br>group_target: Cannot copy into a group track<br>kinds: Cannot copy between MIDI and audio tracks<br>other_group: Pick a slot in the same group<br>empty_scene: Scene is empty<br>clip_source: Pick a clip target<br>scene_full: Target scene not empty<br>empty_step: Step is empty | yes |
 | 16/8 | DevClip | `device_clip` | Device/Clip: tracks and devices | tapped: Device/Clip view |  | yes |
 
@@ -199,7 +199,7 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 | 16/2 (from navigation) | Mixer | `mixer` |  | split_on: Split view: ON<br>split_off: Split view: OFF<br>on: Mixer Mode: ON<br>off: Mixer Mode: OFF |  | yes |
 | 16/3 (from navigation) | FX | `fx` |  | on: FX Mode: ON<br>off: FX Mode: OFF |  | yes |
 | 16/5 (from navigation) | Seq | `seq` | Seq: tap for Sequencer, or press a clip | entered: Sequencer<br>left: Session Mode | needs_midi: Sequencer needs a MIDI track | yes |
-| 16/6 (from navigation) | Delete | `delete` | Delete Mode ON | held: Delete: pick a clip or scene<br>held_steps: Delete: pick a step or note pad | last_scene: Cannot delete last scene | yes |
+| 16/6 (from navigation) | Delete | `delete` |  | held: Delete: pick a clip or scene<br>held_steps: Delete: pick a step or note pad | last_scene: Cannot delete last scene | yes |
 | 16/7 (from navigation) | Copy | `copy` |  | held: Copy: pick a clip or scene<br>held_slots: Copy: press a slot to overwrite<br>picked_clip: Copy: pick an empty slot<br>clip_copied: Clip copied<br>clips_copied: Clips copied<br>picked_scene: Copy: pick an empty scene<br>scene_copied: Scene copied<br>held_steps: Copy: pick a step<br>picked_step: Copy: pick steps | empty_slot: Copy: pick a clip or scene<br>scene_source: Pick a scene target<br>target_full: Target not empty<br>group_target: Cannot copy into a group track<br>kinds: Cannot copy between MIDI and audio tracks<br>other_group: Pick a slot in the same group<br>empty_scene: Scene is empty<br>clip_source: Pick a clip target<br>scene_full: Target scene not empty<br>empty_step: Step is empty | yes |
 | 16/8 (from navigation) | DevClip | `device_clip` | Device/Clip: tracks and devices | tapped: Device/Clip view |  | yes |
 

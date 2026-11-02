@@ -731,7 +731,6 @@ empty_step = "Step is empty"
 
 [functions.delete]
 label = "Delete"
-message = "Delete Mode ON"
 manual = "Hold, then press a clip or scene to delete it."
 [functions.delete.manual_in]
 sequencer-nav = "Hold, then press a step to clear it, or a note pad to remove that note from the clip."
