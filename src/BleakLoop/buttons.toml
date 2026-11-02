@@ -629,6 +629,10 @@ label = "FX"
 
 [functions.seq]
 label = "Seq"
+[functions.seq.outcomes]
+entered = "Sequencer"
+[functions.seq.refusals]
+needs_midi = "Sequencer needs a MIDI track"
 
 [functions.copy]
 label = "Copy"
@@ -640,6 +644,8 @@ clip_copied = "Clip copied"
 clips_copied = "Clips copied"
 picked_scene = "Copy: pick an empty scene"
 scene_copied = "Scene copied"
+held_steps = "Copy: pick a step"
+picked_step = "Copy: pick steps"
 [functions.copy.refusals]
 empty_slot = "Copy: pick a clip or scene"
 scene_source = "Pick a scene target"
@@ -650,6 +656,7 @@ other_group = "Pick a slot in the same group"
 empty_scene = "Scene is empty"
 clip_source = "Pick a clip target"
 scene_full = "Target scene not empty"
+empty_step = "Step is empty"
 
 [functions.delete]
 label = "Delete"
@@ -678,21 +685,45 @@ label = "DevClip"
 
 [functions.double]
 label = "Double"
+message = "Loop doubled"
+[functions.double.refusals]
+no_clip = "No clip"
 
 [functions.halve]
 label = "Halve"
+message = "Loop halved"
+[functions.halve.refusals]
+no_clip = "No clip"
+too_short = "Loop can't be shorter than a step"
 
 [functions.follow]
 label = "Follow"
+[functions.follow.outcomes]
+on = "Follow ON"
+off = "Follow OFF"
 
 [functions.up]
 label = "Up"
+[functions.up.outcomes]
+notes = "Notes from {note}"
+pads = "Pads from {note}"
 
 [functions.down]
 label = "Down"
+[functions.down.outcomes]
+notes = "Notes from {note}"
+pads = "Pads from {note}"
 
 [functions.view]
 label = "View"
 
+[functions.rates]
+message = "Rate {rate}"
+[functions.rates.outcomes]
+triplet = "Rate {rate} triplet"
+
 [functions.triplet]
 label = "Triplet"
+message = "Rate {rate}"
+[functions.triplet.outcomes]
+triplet = "Rate {rate} triplet"

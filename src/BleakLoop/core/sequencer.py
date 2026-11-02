@@ -7,7 +7,7 @@ Steps are counted from clip time 0. Step s of the page in view is at column 3 + 
 import math
 from dataclasses import replace
 
-from . import catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, values
+from . import buttons, catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, values
 from .leds import (
     BLUE,
     CYAN,
@@ -37,7 +37,6 @@ from .model import (
     SetArms,
     SetDrumScroll,
     SetLoop,
-    ShowMessage,
 )
 from .modes import Mode, StepHold
 
@@ -45,7 +44,6 @@ STEPS = len(layout.SEQ_STEP_COLUMNS) * layout.ROWS  # per page
 NOTE_COLUMNS = len(layout.SEQ_NOTE_COLUMNS)
 # Float error in note times and the play position: a time this close to a boundary is past it.
 EPSILON = 1e-6
-NEEDS_MIDI = "Sequencer needs a MIDI track"
 RATE_NAMES = {1.0: "1/4", 0.5: "1/8", 0.25: "1/16", 0.125: "1/32"}
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 NATURALS = {0, 2, 4, 5, 7, 9, 11}
@@ -138,7 +136,7 @@ def _create_length(state, snapshot):
 def enter_on_slot(state, track, scene, snapshot):
     # Seq + a clip slot: track is the slot's TrackView.
     if not track.has_midi_input or track.is_foldable or track.set_index is None:
-        return state, [ShowMessage(NEEDS_MIDI)]
+        return state, buttons.refuse("seq", "needs_midi")
     state, actions = _enter(state, snapshot, track.set_index)
     return state, [HighlightSlot(track.set_index, scene)] + actions
 
@@ -147,7 +145,7 @@ def enter_by_tap(state, snapshot):
     # An empty highlighted slot gives way to the Detail-view clip, then the playing clip.
     entry = snapshot.seq_entry
     if entry is None or entry.selected is None or not entry.selected_midi:
-        return state, [ShowMessage(NEEDS_MIDI)]
+        return state, buttons.refuse("seq", "needs_midi")
     track, highlight = entry.selected, []
     if not entry.has_clip:
         if entry.detail is not None:
@@ -177,7 +175,7 @@ def _enter(state, snapshot, track):
     state = modes.enter(state, Mode.SEQUENCER)
     if changes:
         actions.append(SetArms(changes))
-    return state, actions + [EnterMode(Mode.SEQUENCER), ShowMessage("Sequencer")]
+    return state, actions + [EnterMode(Mode.SEQUENCER), *buttons.say("seq", "entered")]
 
 
 def leave(state, snapshot):
@@ -217,7 +215,7 @@ def sync(state, snapshot):
         refused = -1 if view.track is None else view.track
         if state.seq_refused == refused:
             return state, []
-        return replace(state, seq_refused=refused), [ShowMessage(NEEDS_MIDI)]
+        return replace(state, seq_refused=refused), buttons.refuse("seq", "needs_midi")
     state, actions = _close_slide(state)
     old, new, arms = state.seq_track, view.track, snapshot.arms
     changes = []
@@ -294,11 +292,11 @@ def handle(state, event, snapshot):
     if held == "copy" and not shifted:
         if not event.pressed:
             return replace(state, copy=False, seq_copy_source=None), []
-        return replace(state, copy=True), [ShowMessage("Copy: pick a step")]
+        return replace(state, copy=True), buttons.say("copy", "held_steps")
     if held == "delete" and not shifted:
         if not event.pressed:
             return replace(state, delete=False), []
-        return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
+        return replace(state, delete=True), buttons.say("delete")
     if event.column in layout.SEQ_STEP_COLUMNS:
         return _step(state, event, view, snapshot)
     if event.column in layout.SEQ_NOTE_COLUMNS and not state.seq_settings:
@@ -409,30 +407,29 @@ functions.register("down", light=lambda state, snapshot, value: Light(WHITE))(_s
 def _follow(state, snapshot, value):
     if state.seq_follow:
         view = _view_of(snapshot)
-        return replace(state, seq_follow=False, seq_page=view_page(state, view)), [
-            ShowMessage("Follow OFF")
-        ]
-    return replace(state, seq_follow=True), [ShowMessage("Follow ON")]
+        state = replace(state, seq_follow=False, seq_page=view_page(state, view))
+        return state, buttons.say("follow", "off")
+    return replace(state, seq_follow=True), buttons.say("follow", "on")
 
 
 @functions.register("double", light=lambda state, snapshot, value: Light(RED))
 def _double(state, snapshot, value):
     view = _view_of(snapshot)
     if not view.has_clip or not view.is_midi:
-        return state, [ShowMessage("No clip")]
-    return _write(state, [DuplicateLoop(view.track, view.scene), ShowMessage("Loop doubled")])
+        return state, buttons.refuse("double", "no_clip")
+    return _write(state, [DuplicateLoop(view.track, view.scene), *buttons.say("double")])
 
 
 @functions.register("halve", light=lambda state, snapshot, value: Light(PINK))
 def _halve(state, snapshot, value):
     view = _view_of(snapshot)
     if not view.has_clip or not view.is_midi:
-        return state, [ShowMessage("No clip")]
+        return state, buttons.refuse("halve", "no_clip")
     half = (view.loop_end - view.loop_start) / 2
     if half < step_length(state) - EPSILON:
-        return state, [ShowMessage("Loop can't be shorter than a step")]
+        return state, buttons.refuse("halve", "too_short")
     loop = SetLoop(view.track, view.scene, view.loop_start, view.loop_start + half)
-    return _write(state, [loop, ShowMessage("Loop halved")])
+    return _write(state, [loop, *buttons.say("halve")])
 
 
 @functions.register(
@@ -440,7 +437,7 @@ def _halve(state, snapshot, value):
 )
 def _rate(state, snapshot, rate):
     state = replace(state, seq_rate=rate)
-    return state, [ShowMessage(_rate_name(state))]
+    return state, _rate_message("rates", state)
 
 
 @functions.register(
@@ -448,7 +445,7 @@ def _rate(state, snapshot, rate):
 )
 def _triplet(state, snapshot, value):
     state = replace(state, seq_triplet=not state.seq_triplet)
-    return state, [ShowMessage(_rate_name(state))]
+    return state, _rate_message("triplet", state)
 
 
 def _page_light(state, snapshot, value):
@@ -633,11 +630,11 @@ def _copy_step(state, g, view, snapshot):
     source = state.seq_copy_source
     if source is None:
         if not notes:
-            return state, [ShowMessage("Step is empty")]
+            return state, buttons.refuse("copy", "empty_step")
         copied = tuple(
             (note.pitch, note.start - g * length, note.duration, note.velocity) for note in notes
         )
-        return replace(state, seq_copy_source=(g, copied)), [ShowMessage("Copy: pick steps")]
+        return replace(state, seq_copy_source=(g, copied)), buttons.say("copy", "picked_step")
     if g == source[0]:
         return state, []
     add = tuple(
@@ -674,16 +671,20 @@ def _note_pad(state, event, view, snapshot):
 # Settings view
 
 
-def _rate_name(state):
-    name = RATE_NAMES[state.seq_rate]
-    return f"Rate {name} triplet" if state.seq_triplet else f"Rate {name}"
+def _rate_message(function, state):
+    rate = RATE_NAMES[state.seq_rate]
+    return buttons.say(function, "triplet" if state.seq_triplet else None, rate=rate)
+
+
+def _direction(step):
+    return "up" if step > 0 else "down"
 
 
 def _octave(state, step):
     base = min(MAX_BASE, max(0, state.seq_base + 12 * step))
     if base == state.seq_base:
         return state, []
-    return replace(state, seq_base=base), [ShowMessage(f"Notes from {note_name(base)}")]
+    return replace(state, seq_base=base), buttons.say(_direction(step), "notes", note=note_name(base))
 
 
 def _scroll(state, view, step):
@@ -691,8 +692,8 @@ def _scroll(state, view, step):
     scroll = min(MAX_SCROLL, max(0, view.drum.scroll + step))
     if scroll == view.drum.scroll:
         return state, []
-    message = ShowMessage(f"Pads from {note_name(4 * scroll)}")
-    return state, [SetDrumScroll(view.track, scroll), message]
+    message = buttons.say(_direction(step), "pads", note=note_name(4 * scroll))
+    return state, [SetDrumScroll(view.track, scroll), *message]
 
 
 def note_name(note):
