@@ -107,7 +107,7 @@ With **Device/Clip** held:
 
 <!-- callouts:device-clip -->
 - **Devices**: Select the previous or next device on the selected track.
-- **Tracks**: Select the previous or next track, through the returns and master.
+- **Tracks**: Select the previous or next track, through the returns and master, and give its first rack the blue hand.
 - **Device/Clip**: Hold it for this layer. A tap, pressing nothing else, flips Live between Device and Clip view instead.
 <!-- /callouts:device-clip -->
 
@@ -127,7 +127,7 @@ With **Device/Clip** held:
 <!-- callouts:session -->
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+- **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 
 With **Shift** held:
 
@@ -145,7 +145,7 @@ The split view shows 8 tracks and a panel side by side. Press Session (column 16
 <!-- callouts:split -->
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+- **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 - **Faders**: One fader per row, as in FX Mode, from the source Shift + FX picks. Its third choice shows the snapshots instead.
 
 With **Shift** held:
@@ -162,7 +162,7 @@ With the snapshots in the panel, columns 11–14 work as FX Mode's, and column 1
 <!-- callouts:split-snapshots -->
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+- **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 - **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
@@ -189,7 +189,7 @@ With **Shift** held:
 <!-- callouts:mixer -->
 - **Faders**: One volume fader per track.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+- **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 
 With **Shift** held:
 
@@ -206,7 +206,7 @@ The split view shows 8 tracks' volume faders and the same panel as Session Mode'
 <!-- callouts:mixer-split -->
 - **Volume faders**: One volume fader per track.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
-- **Select and arm**: Select the track and arm it alone. Press the selected, armed track to disarm it.
+- **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 - **Panel**: One fader per row, as in FX Mode, from the source Shift + FX picks. Its third choice shows the snapshots instead.
 
 With **Shift** held:
@@ -354,8 +354,9 @@ Recording on a MIDI track switches to Linnstrument Mode, so you can play straigh
 **Select and arm row** (pad 8):
 
 - Press a track to select it and arm it. Every other track is disarmed, whatever Live's Exclusive Arm preference says.
-- Press the selected, armed track to disarm it. It stays selected.
+- Pressing the selected, armed track leaves it armed. Disarm it with Shift, below.
 - A track that can't be armed, such as a group track, is only selected.
+- The blue hand moves to the track's first Instrument, Drum or Audio Effect Rack with a mapped macro, or its first such rack if none has one, so Device FX shows its macros. Only racks directly on the track count, and a track without one keeps Live's selection. Device/Clip + Tracks does the same.
 - Hold Shift and press a track to arm or disarm it alone. The selection and the other tracks stay as they are, so you can arm several tracks.
 - Red while armed, white while selected, lime otherwise. A track that can't be armed is dark unless it's selected.
 
@@ -389,7 +390,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 ### FX faders and Mapped FX
 
-**Faders** (columns 2–10): one fader per row. They have two sources, switched with Shift + FX: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. The fader source starts on Device FX each time Live starts or a Set opens.
+**Faders** (columns 2–10): one fader per row. They have two sources, switched with Shift + FX: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. Selecting a track with pad 8 or Device/Clip + Tracks moves it to the track's first rack (see Select and arm row). The fader source starts on Device FX each time Live starts or a Set opens.
 
 - In Device FX, a rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
 - Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 10 the maximum. Slide along the row to move it.

@@ -364,8 +364,7 @@ def _select_row(state, track):
         return [SetArm(track.index, not track.arm)] if track.can_be_armed else []
     if not track.can_be_armed:
         return [SelectTrack(track.index)]
-    if track.selected and track.arm:
-        return [SetArm(track.index, False)]
+    # Pressing the selected, armed track arms it again: Shift + the pad disarms.
     return [SelectTrack(track.index), ArmExclusive(track.index, True)]
 
 

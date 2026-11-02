@@ -22,6 +22,7 @@ from BleakLoop.core.model import (  # noqa: E402
     ModifyNotes,
     RemovePitch,
     SelectDrumPad,
+    SelectTrack,
     SaveFaderBindings,
     SaveFxScenes,
     SetArm,
@@ -232,8 +233,9 @@ class Messages:
 
 
 def dev_song(selected, device=None):
-    a, b = SimpleNamespace(name="A"), SimpleNamespace(name="B")
-    ret, master = SimpleNamespace(name="Reverb"), SimpleNamespace(name="Master")
+    a, b = SimpleNamespace(name="A", devices=[]), SimpleNamespace(name="B", devices=[])
+    ret = SimpleNamespace(name="Reverb", devices=[])
+    master = SimpleNamespace(name="Master", devices=[])
     tracks = {"A": a, "B": b, "Reverb": ret, "Master": master}
     return SimpleNamespace(
         visible_tracks=[a, b],
@@ -260,6 +262,66 @@ def test_step_track_stops_at_the_ends(selected, step):
     live_actions.apply(StepTrack(step), song, surface)
     assert song.view.selected_track.name == selected
     assert surface.shown == ["No more tracks"]
+
+
+def rack_device(name, class_name, mapped=False):
+    return SimpleNamespace(name=name, class_name=class_name, has_macro_mappings=mapped)
+
+
+def focus_song(devices):
+    # One track holding these devices; chosen: what select_device was handed.
+    track = SimpleNamespace(name="A", devices=devices)
+    chosen = []
+    song = SimpleNamespace(
+        visible_tracks=[track],
+        appointed_device=None,
+        view=SimpleNamespace(selected_track=None, select_device=chosen.append),
+    )
+    return song, chosen
+
+
+@pytest.mark.parametrize(
+    "devices, expected",
+    [
+        # The first rack with a mapped macro, past an unmapped one and a MIDI Effect Rack.
+        (
+            [
+                rack_device("Arp", "MidiEffectGroupDevice", mapped=True),
+                rack_device("Empty", "InstrumentGroupDevice"),
+                rack_device("Keys", "InstrumentGroupDevice", mapped=True),
+            ],
+            "Keys",
+        ),
+        ([rack_device("Kit", "DrumGroupDevice", mapped=True)], "Kit"),
+        (
+            [rack_device("EQ", "Eq8"), rack_device("Bus", "AudioEffectGroupDevice", mapped=True)],
+            "Bus",
+        ),
+        # No rack has a mapped macro: the first rack.
+        ([rack_device("Synth", "InstrumentVector"), rack_device("Wrap", "AudioEffectGroupDevice")], "Wrap"),
+    ],
+)
+def test_select_track_hands_the_blue_hand_to_its_rack(devices, expected):
+    song, chosen = focus_song(devices)
+    live_actions.apply(SelectTrack(0), song, Messages())
+    assert song.view.selected_track.name == "A"
+    assert [d.name for d in chosen] == [expected]
+    assert song.appointed_device.name == expected
+
+
+def test_select_track_without_a_rack_leaves_the_device_alone():
+    song, chosen = focus_song([rack_device("Arp", "MidiEffectGroupDevice", mapped=True)])
+    live_actions.apply(SelectTrack(0), song, Messages())
+    assert chosen == [] and song.appointed_device is None
+
+
+def test_step_track_hands_the_blue_hand_to_its_rack():
+    song = dev_song("A")
+    song.visible_tracks[1].devices = [rack_device("Keys", "InstrumentGroupDevice", mapped=True)]
+    chosen = []
+    song.view.select_device = chosen.append
+    live_actions.apply(StepTrack(1), song, Messages())
+    assert [d.name for d in chosen] == ["Keys"] and song.appointed_device.name == "Keys"
 
 
 def device_song(selected_index=None, nested=False):
