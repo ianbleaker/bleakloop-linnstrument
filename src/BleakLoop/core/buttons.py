@@ -141,6 +141,7 @@ FUNCTION_FIELDS = {
     "manual": _is_text,
     "message": _is_text,
     "show": lambda value: isinstance(value, bool),
+    "manual_in": _is_messages,  # the manual's text in one section, over manual
     "outcomes": _is_messages,
     "refusals": _is_messages,
 }
@@ -239,6 +240,22 @@ class Registry:
     def function(self, name):
         return self.functions.get(name, {})
 
+    def label(self, name, section, value=None):
+        # A pad's label: its own button's, for a group's pad, else its function's.
+        while section is not None:
+            for id, item in self.items.items():
+                if item["section"] == section and _does(id, item) == name and "label" in item:
+                    if value is None or _freeze(item.get("value")) == value:
+                        return item["label"]
+            section = FALLBACK.get(section)
+        return self.function(name).get("label", name)
+
+    def manual(self, name, section, label):
+        # The manual's text for a function in a section, or the default built from its label.
+        function = self.function(name)
+        text = function.get("manual_in", {}).get(section) or function.get("manual")
+        return text or self.data.get("manual_format", "{label}.").format(label=label)
+
     def pos(self, id):
         column, pad = self.entry(id)["pad"]
         return (column, pad)
@@ -334,6 +351,9 @@ def _validate(data, items):
                 raise ValueError(f"functions.{name}: {field} has the wrong type")
         if len(function.get("label", "")) > MAX_LABEL:
             raise ValueError(f"functions.{name}: label longer than {MAX_LABEL} characters")
+        for section in function.get("manual_in", {}):
+            if section not in SECTIONS:
+                raise ValueError(f"functions.{name}.manual_in: unknown section {section!r}")
     seen = {}
     regions = _regions()
     for id, item in items.items():
@@ -463,6 +483,14 @@ def function(name):
 
 def pos(id):
     return _get().pos(id)
+
+
+def label(name, section, value=None):
+    return _get().label(name, section, value)
+
+
+def manual(name, section, label):
+    return _get().manual(name, section, label)
 
 
 def group(section, function):

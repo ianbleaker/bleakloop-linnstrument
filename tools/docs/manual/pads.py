@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, replace
 
-from BleakLoop.core import layout
+from BleakLoop.core import buttons, layout
 
 from .scenes import Layer
 
@@ -50,8 +50,31 @@ ALL_PADS = range(1, layout.ROWS + 1)
 SCENE_PADS = range(1, layout.WINDOW_SCENES + 1)
 
 
-def _one(name, key, callout, label=None):
-    return Item(name, {key: label or name}, callout)
+def _ns(section):
+    return getattr(layout, section.upper().replace("-", "_"))
+
+
+def _one(name, section, button):
+    # One pad: its label and the manual's text come from buttons.toml.
+    key = getattr(_ns(section), button)
+    function = _ns(section).at(key)[1]
+    label = buttons.label(function, section)
+    return Item(name, {key: label}, buttons.manual(function, section, label))
+
+
+def _group(name, section, *functions):
+    # A function's pads, or several functions' (Up/Down): each pad's label, the first's text.
+    labels = {}
+    for function in functions:
+        pads = getattr(_ns(section), function)
+        if isinstance(pads, dict):
+            pairs = pads.items()
+        elif pads and isinstance(pads[0], tuple):
+            pairs = ((key, index + 1) for index, key in enumerate(pads))
+        else:
+            pairs = [(pads, None)]
+        labels.update({key: buttons.label(function, section, value) for key, value in pairs})
+    return Item(name, labels, buttons.manual(functions[0], section, None))
 
 
 def _scenes(column, callout):
@@ -59,184 +82,89 @@ def _scenes(column, callout):
     return Item("Scenes", labels, callout)
 
 
-# Built per mode: each mode's Global and Navigation column are their own buttons.
-def _play(pads):
-    return _one("Play", pads.play_stop, "Start/stop. Blinks on the beat while playing.")
-
-
-def _metronome(pads):
-    return _one("Metronome", pads.metronome, "Metronome on/off. Blinks while on.", label="Metro")
-
-
-def _fixed_length(pads):
-    return _one(
-        "Fixed Length",
-        pads.fixed_length,
-        "Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, "
-        "then off.",
-        label="Length",
-    )
-
-
-def _undo(pads):
-    return _one("Undo", pads.undo, "Undo.")
-
-
-def _shift(pads):
-    return _one("Shift", pads.shift, "Hold for the Shift layer.")
-
-
-def _quantize(pads):
-    return _one(
-        "Quantize", pads.quantize, "Quantize the current MIDI clip to 1/16 notes.", label="Quant"
-    )
-
-
-def _launch_quantization(pads):
-    return _one(
-        "Launch quantization",
-        pads.launch_quantization,
-        "Launch quantization on/off; red while off.",
-        label="LaunchQ",
-    )
-
-
-def _redo(pads):
-    return _one("Redo", pads.redo, "Redo.")
-
-
 # A held pad's label names it and says so, one word per line.
-def _shift_held(pads):
-    return Item("Shift", {pads.shift: "SHIFT\nHELD"}, "Held.", variant=False)
+def _shift_held(section):
+    return Item("Shift", {getattr(_ns(section), "shift"): "SHIFT\nHELD"}, "Held.", variant=False)
 
 
-def _device_clip(pads):
-    return _one(
-        "Device/Clip",
-        pads.device_clip,
-        "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks "
-        "and devices.",
-        label="DevClip",
+def _global(section, record, capture, mode):
+    # The Global column: Session Mode's, or a mode's own over it.
+    return (
+        _one("Play", section, "play_stop"),
+        _one(*record),
+        _one(*capture),
+        _one("Metronome", section, "metronome"),
+        _one("Fixed Length", section, "fixed_length"),
+        _one("Undo", section, "undo"),
+        _one(*mode),
+        _one("Shift", section, "shift"),
     )
 
 
-def _tempo(pads):
-    return Item(
-        "Tempo",
-        {key: "Tempo+" if step > 0 else "Tempo-" for key, step in pads.tempo.items()},
-        "Tempo +1 or -1 BPM.",
+def _player_shift(section, normal):
+    # Linnstrument and Sequencer Mode's Shift layer.
+    return (
+        _one("Stop track", section, "stop_track"),
+        _one("Record", section, "record"),
+        _one("Quantize", section, "quantize"),
+        _one("Launch quantization", section, "launch_quantization"),
+        _one("Redo", section, "redo"),
+        _one("Scene page", section, "scene_page"),
+        _shift_held(normal),
     )
 
 
-def _window_moves(pads):
-    return Item(
-        "Window directions",
-        {
-            key: {(0, -1): "Up", (0, 1): "Down", (-1, 0): "Left", (1, 0): "Right"}[step]
-            for key, step in pads.window.items()
-        },
-        "Move the Ableton session ring in the selected direction.",
+def _navigation(section):
+    return (
+        _one("Copy", section, "copy"),
+        _one("Delete", section, "delete"),
+        _one("Session", section, "session"),
+        _one("Mixer", section, "mixer"),
+        _one("FX", section, "fx"),
+        _one("Seq", section, "seq"),
+        _one("Device/Clip", section, "device_clip"),
     )
 
 
-def _fader_source(pads):
-    return _one(
-        "Fader source",
-        pads.fader_source,
-        "Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument "
-        "Mode. In Session and Mixer Mode, the split view's snapshots come third.",
-        label="Source",
+def _navigation_shift(section):
+    return (
+        _group("Window directions", section, "window"),
+        _group("Tempo", section, "tempo"),
+        _one("Fader source", section, "fader_source"),
     )
 
 
 # Columns 1, 15 and 16: the same in Session, Mixer and FX Mode.
-_GLOBAL = (
-    _play(layout.GLOBAL),
-    _one(
-        "Record",
-        layout.GLOBAL.record,
-        "Session Record on/off (Arrangement Record in Arrangement View). Blinks while "
-        "recording. In Linnstrument Mode, records a new clip on the selected track.",
-    ),
-    _one(
-        "Capture",
-        layout.GLOBAL.capture,
-        "Capture and Insert Scene. In Linnstrument Mode, captures MIDI.",
-    ),
-    _metronome(layout.GLOBAL),
-    _fixed_length(layout.GLOBAL),
-    _undo(layout.GLOBAL),
-    _one("Linnstrument Mode", layout.GLOBAL.linnstrument_mode, "Switch to Linnstrument Mode.", label="Linn"),
-    _shift(layout.GLOBAL),
+_GLOBAL = _global(
+    "global",
+    ("Record", "global", "record"),
+    ("Capture", "global", "capture"),
+    ("Linnstrument Mode", "global", "linnstrument_mode"),
 )
 
 _GLOBAL_SHIFT = (
-    _one(
-        "Stop all",
-        layout.GLOBAL_SHIFT.stop_all,
-        "Stop all clips. In Linnstrument Mode, stops the selected track's clips.",
-        label="StopAll",
-    ),
-    _quantize(layout.GLOBAL_SHIFT),
-    _launch_quantization(layout.GLOBAL_SHIFT),
-    _redo(layout.GLOBAL_SHIFT),
-    _shift_held(layout.GLOBAL),
+    _one("Stop all", "global-shift", "stop_all"),
+    _one("Quantize", "global-shift", "quantize"),
+    _one("Launch quantization", "global-shift", "launch_quantization"),
+    _one("Redo", "global-shift", "redo"),
+    _shift_held("global"),
 )
 
 _VIEW = (
     _scenes(layout.SCENE_COLUMN, "Launch a scene. Its FX snapshot, if it has one, lands as it starts."),
-    _one(
-        "Unmute all",
-        layout.VIEW.unmute_all,
-        "Unmute every track and return track in the Set. Orange while any is muted.",
-        label="Unmute",
-    ),
-    _one(
-        "Stop",
-        layout.VIEW.stop,
-        "Hold, then press a track's pad to stop that track's clips.",
-    ),
+    _one("Unmute all", "view", "unmute_all"),
+    _one("Stop", "view", "stop"),
 )
 
 _VIEW_SHIFT = (
     _scenes(layout.SCENE_COLUMN, "Launch with legato, leaving the FX snapshot alone."),
-    _one(
-        "Unsolo all",
-        layout.VIEW_SHIFT.unsolo_all,
-        "Unsolo every track and return track in the Set. Blue while any is soloed.",
-        label="Unsolo",
-    ),
-    _one(
-        "Unarm all",
-        layout.VIEW_SHIFT.unarm_all,
-        "Disarm every track in the Set. Red while any is armed.",
-        label="Unarm",
-    ),
+    _one("Unsolo all", "view-shift", "unsolo_all"),
+    _one("Unarm all", "view-shift", "unarm_all"),
 )
 
-_NAVIGATION = (
-    _one(
-        "Copy",
-        layout.NAVIGATION.copy,
-        "Hold, press a clip, then an empty slot.",
-    ),
-    _one("Delete", layout.NAVIGATION.delete, "Hold, then press a clip or scene to delete it."),
-    _one("Session", layout.NAVIGATION.session, "Session Mode. In Session Mode, toggles the split view."),
-    _one("Mixer", layout.NAVIGATION.mixer, "Mixer Mode. In Mixer Mode, toggles the split view."),
-    _one("FX", layout.NAVIGATION.fx, "FX Mode. Press again for Session Mode."),
-    _one(
-        "Seq",
-        layout.NAVIGATION.seq,
-        "Hold and press a clip, or tap, for Sequencer Mode.",
-    ),
-    _device_clip(layout.NAVIGATION),
-)
+_NAVIGATION = _navigation("navigation")
 
-_NAVIGATION_SHIFT = (
-    _window_moves(layout.NAVIGATION_SHIFT),
-    _tempo(layout.NAVIGATION_SHIFT),
-    _fader_source(layout.NAVIGATION_SHIFT),
-)
+_NAVIGATION_SHIFT = _navigation_shift("navigation-shift")
 
 MUTE = Block(
     "Mute",
@@ -327,18 +255,8 @@ _FX = (
         "Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. "
         "Press an empty slot to store, a stored one to recall.",
     ),
-    Item(
-        "Scene snapshots",
-        {key: f"Scene {pad}" for key, pad in zip(layout.FX.scene_slots, SCENE_PADS)},
-        "A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a "
-        "stored one to recall. Launching the scene morphs to it.",
-    ),
-    Item(
-        "Bars",
-        {key: f"{bars} bar" if bars == 1 else f"{bars} bars" for key, bars in layout.FX.bars.items()},
-        "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a "
-        "scene to launch it on that bar line.",
-    ),
+    _group("Scene snapshots", "fx", "scene_slots"),
+    _group("Bars", "fx", "bars"),
 )
 
 # The split views' snapshot panel: FX Mode's columns 11-14, column 10 dark.
@@ -359,17 +277,8 @@ _MIXER_SPLIT = (
 _MIXER_SPLIT_SHIFT = tuple(replace(block, columns=SPLIT_TRACK_COLUMNS) for block in _MIXER_SHIFT)
 
 _DEVICE_CLIP = (
-    Item(
-        "Tracks",
-        {key: "Track-" if step < 0 else "Track+" for key, step in layout.DEVICE_CLIP.tracks.items()},
-        "Select the previous or next track, through the returns and master, and give its "
-        "first rack the blue hand.",
-    ),
-    Item(
-        "Devices",
-        {key: "Device-" if step < 0 else "Device+" for key, step in layout.DEVICE_CLIP.devices.items()},
-        "Select the previous or next device on the selected track.",
-    ),
+    _group("Tracks", "device-clip", "tracks"),
+    _group("Devices", "device-clip", "devices"),
     Item(
         "Device/Clip",
         {layout.NAVIGATION.device_clip: "DEV\nHELD"},
@@ -379,107 +288,34 @@ _DEVICE_CLIP = (
     ),
 )
 
-def _record_clip(pads):
-    return _one(
-        "Record Clip", pads.record_clip, "Record a new clip on the selected track.", label="RecClip"
-    )
-
-
-def _capture_midi(pads):
-    return _one("Capture MIDI", pads.capture_midi, "Capture MIDI.", label="CapMIDI")
-
-
-def _stop_track(pads):
-    return _one("Stop track", pads.stop_track, "Stop the selected track's clips.", label="StopTrk")
-
-
-def _session_record(pads):
-    return _one(
-        "Record",
-        pads.record,
-        "Session Record on/off (Arrangement Record in Arrangement View). Blinks while "
-        "recording.",
-    )
-
-
-def _scene_page(pads):
-    return _one("Scene page", pads.scene_page, "Show the scene page.", label="Scenes")
-
-
-def _player_shift(pads, normal):
-    # Linnstrument and Sequencer Mode's Shift layer.
-    return (
-        _stop_track(pads),
-        _session_record(pads),
-        _quantize(pads),
-        _launch_quantization(pads),
-        _redo(pads),
-        _scene_page(pads),
-        _shift_held(normal),
-    )
-
-
-_LINNSTRUMENT = (
-    _play(layout.LINNSTRUMENT),
-    _record_clip(layout.LINNSTRUMENT),
-    _capture_midi(layout.LINNSTRUMENT),
-    _metronome(layout.LINNSTRUMENT),
-    _fixed_length(layout.LINNSTRUMENT),
-    _undo(layout.LINNSTRUMENT),
-    _one("Back", layout.LINNSTRUMENT.back, "Back to the mode you came from: Session, Mixer, FX or Sequencer."),
-    _shift(layout.LINNSTRUMENT),
+_LINNSTRUMENT = _global(
+    "linnstrument",
+    ("Record Clip", "linnstrument", "record_clip"),
+    ("Capture MIDI", "linnstrument", "capture_midi"),
+    ("Back", "linnstrument", "back"),
 )
 
-_LINNSTRUMENT_SHIFT = _player_shift(layout.LINNSTRUMENT_SHIFT, layout.LINNSTRUMENT)
+_LINNSTRUMENT_SHIFT = _player_shift("linnstrument-shift", "linnstrument")
 
 _LINNSTRUMENT_SCENES = (
     _scenes(layout.GLOBAL_COLUMN, "Launch a scene and its FX snapshot, and go back to the controls."),
-    _one("Back", layout.LINNSTRUMENT_SCENES.back, "Back to the controls without launching."),
+    _one("Back", "linnstrument-scenes", "back"),
 )
 
 # Sequencer Mode: the Global column as in Linnstrument Mode, and its own columns 15 and 16.
-_SEQUENCER_GLOBAL = (
-    _play(layout.SEQUENCER_GLOBAL),
-    _record_clip(layout.SEQUENCER_GLOBAL),
-    _capture_midi(layout.SEQUENCER_GLOBAL),
-    _metronome(layout.SEQUENCER_GLOBAL),
-    _fixed_length(layout.SEQUENCER_GLOBAL),
-    _undo(layout.SEQUENCER_GLOBAL),
-    _one(
-        "Linnstrument Mode",
-        layout.SEQUENCER_GLOBAL.linnstrument_mode,
-        "Switch to Linnstrument Mode, keeping the arm. Back returns here.",
-        label="Linn",
-    ),
-    _shift(layout.SEQUENCER_GLOBAL),
+_SEQUENCER_GLOBAL = _global(
+    "sequencer-global",
+    ("Record Clip", "sequencer-global", "record_clip"),
+    ("Capture MIDI", "sequencer-global", "capture_midi"),
+    ("Linnstrument Mode", "sequencer-global", "linnstrument_mode"),
 )
 
-SEQ_COPY = _one(
-    "Copy", layout.SEQUENCER_NAV.copy, "Hold, press a step, then press steps to paste it onto."
-)
-SEQ_DELETE = _one(
-    "Delete",
-    layout.SEQUENCER_NAV.delete,
-    "Hold, then press a step to clear it, or a note pad to remove that note from the clip.",
-)
+_SEQUENCER_NAV = _navigation("sequencer-nav")
+SEQ_COPY, SEQ_DELETE = _SEQUENCER_NAV[:2]
 
-_SEQUENCER_NAV = (
-    SEQ_COPY,
-    SEQ_DELETE,
-    _one("Session", layout.SEQUENCER_NAV.session, "Back to Session Mode."),
-    _one("Mixer", layout.SEQUENCER_NAV.mixer, "Mixer Mode."),
-    _one("FX", layout.SEQUENCER_NAV.fx, "FX Mode."),
-    _one("Seq", layout.SEQUENCER_NAV.seq, "Back to Session Mode."),
-    _device_clip(layout.SEQUENCER_NAV),
-)
+_SEQUENCER_GLOBAL_SHIFT = _player_shift("sequencer-global-shift", "sequencer-global")
 
-_SEQUENCER_GLOBAL_SHIFT = _player_shift(layout.SEQUENCER_GLOBAL_SHIFT, layout.SEQUENCER_GLOBAL)
-
-_SEQUENCER_NAV_SHIFT = (
-    _window_moves(layout.SEQUENCER_NAV_SHIFT),
-    _tempo(layout.SEQUENCER_NAV_SHIFT),
-    _fader_source(layout.SEQUENCER_NAV_SHIFT),
-)
+_SEQUENCER_NAV_SHIFT = _navigation_shift("sequencer-nav-shift")
 
 # Steps and column 15, the same in both views.
 _SEQUENCER_GRID = (
@@ -491,24 +327,11 @@ _SEQUENCER_GRID = (
         "press a later one for one long note, or slide along the row to change its "
         "velocity.",
     ),
-    _one("Double", layout.SEQUENCER_GRID.double, "Double the loop, notes and all."),
-    _one("Halve", layout.SEQUENCER_GRID.halve, "Halve the loop. Notes past the new end stay in the clip."),
-    _one(
-        "Follow",
-        layout.SEQUENCER_GRID.follow,
-        "Follow on/off: the steps show the page that's playing. Blue while on.",
-    ),
-    Item(
-        "Up/Down",
-        {layout.SEQUENCER_GRID.up: "Up", layout.SEQUENCER_GRID.down: "Down"},
-        "Move the note pads an octave up or down.",
-    ),
-    _one(
-        "View",
-        layout.SEQUENCER_GRID.view,
-        "Switch columns 11–14 between the note pads and the settings.",
-        label="View",
-    ),
+    _one("Double", "sequencer-grid", "double"),
+    _one("Halve", "sequencer-grid", "halve"),
+    _one("Follow", "sequencer-grid", "follow"),
+    _group("Up/Down", "sequencer-grid", "up", "down"),
+    _one("View", "sequencer-grid", "view"),
 )
 
 _SEQUENCER = (
@@ -523,12 +346,8 @@ _SEQUENCER = (
 )
 
 _SEQUENCER_SETTINGS = (
-    Item(
-        "Rates",
-        dict(zip(layout.SEQUENCER_SETTINGS.rates, ("1/4", "1/8", "1/16", "1/32"))),
-        "The step length: 1/4, 1/8, 1/16 or 1/32. The current one is blue.",
-    ),
-    _one("Triplet", layout.SEQUENCER_SETTINGS.triplet, "Triplet steps on/off: orange while on."),
+    _group("Rates", "sequencer-settings", "rates"),
+    _one("Triplet", "sequencer-settings", "triplet"),
     Block(
         "Pages",
         range(layout.SEQUENCER_SETTINGS.pages[0][0], layout.SEQUENCER_SETTINGS.pages[-1][0] + 1),
