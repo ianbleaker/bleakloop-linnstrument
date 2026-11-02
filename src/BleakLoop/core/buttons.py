@@ -511,3 +511,8 @@ def refuse(name, key, /, **values):
 
 def system(key, /, **values):
     return _get().system(key, **values)
+
+
+def systems():
+    # Every [system] message, unformatted.
+    return dict(_get().data.get("system", {}))

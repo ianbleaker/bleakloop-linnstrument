@@ -1,4 +1,5 @@
-"""Generate the manual's and the architecture doc's generated parts, or check they're current.
+"""Generate the manual's, the button reference's and the architecture doc's generated parts, or
+check they're current.
 
 PYTHONPATH=src python3 -m tools.docs [--check]
 """
@@ -6,12 +7,13 @@ PYTHONPATH=src python3 -m tools.docs [--check]
 import sys
 from pathlib import Path
 
+from . import buttons
 from .architecture import generate as architecture
 from .manual import generate as manual
 from .markers import MissingMarkers, read
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGETS = (manual, architecture)
+TARGETS = (manual, buttons, architecture)
 
 
 def expected():

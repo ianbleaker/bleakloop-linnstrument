@@ -13,6 +13,8 @@ While BleakLoop loads, a rainbow rolls across the pads for about 3 seconds, and 
 
 While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1, the Global column, its control split. When Live closes, or you choose another control surface, it puts your own split settings back.
 
+[Where every button is, and what it says](buttons.md): the button reference. To move a button or change what it says, edit `src/BleakLoop/buttons.toml` and restart Live; check the file first with `PYTHONPATH=src python3 -m tools.check_buttons` from the repo.
+
 ## 2. Function Reference
 
 ### Overview
