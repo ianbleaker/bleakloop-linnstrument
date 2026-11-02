@@ -456,6 +456,10 @@ class BleakLoop(ControlSurface):
             self._refresh()
         self._longest_tick_ms = max(self._longest_tick_ms, (time.monotonic() - start) * 1000)
         if state.morph is None:
+            if morph.wrapped:
+                started = morph.launch and morph.triggered and triggered is False
+                how = "as the scene started" if started else "on its end"
+                logger.info("FX: morph landed after a loop wrap, %s", how)
             logger.info("FX: morph landed, longest tick %.1f ms", self._longest_tick_ms)
             self._longest_tick_ms = 0.0
 

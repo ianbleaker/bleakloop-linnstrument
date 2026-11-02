@@ -74,8 +74,8 @@ def tick(state, now_ms):
 
 
 def fx_tick(state, transport, values, triggered=None):
-    # The morph on the 10 ms timer, in every mode: values per morphing macro, whether a launch
-    # morph's scene waits to launch, and a redraw flag.
+    # The morph on the 10 ms timer, in every mode: values per morphing macro, a launch morph's
+    # scene wait (live_state.read_launch_triggered), and a redraw flag.
     if state.morph is None:
         return state, [], False
     return fx.tick(state, transport, values, triggered)

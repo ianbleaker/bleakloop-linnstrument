@@ -336,7 +336,7 @@ def racks_read(state, event, snapshot):
 
 def tick(state, transport, values, triggered=None):
     # On the 10 ms timer: values holds each morphing macro's live value, None if unreadable;
-    # triggered is whether a launch morph's scene waits to launch, None if it's gone.
+    # triggered is live_state.read_launch_triggered's.
     morph = state.morph
     # A macro turned by hand, or gone, drops out and keeps its value.
     macros = [
@@ -353,6 +353,9 @@ def tick(state, transport, values, triggered=None):
         morph = replace(morph, start_beats=start, end_beats=end, wrapped=True)
     if morph.launch and triggered:
         morph = replace(morph, triggered=True)
+    elif morph.launch and triggered is None:
+        # Another scene's launch took the wait over, or the scene went: the predicted time.
+        morph = replace(morph, triggered=False)
     # A stop or a backward jump lands at once: there's nothing to interpolate to.
     if played is None or _lands(morph, now, triggered):
         writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
@@ -382,7 +385,7 @@ def _lands(morph, now, triggered):
     # as does every morph without a wrap: then the prediction is Live's own boundary, and
     # another scene's launch, which cancels this one's wait, leaves the morph alone.
     if morph.launch and morph.wrapped and morph.triggered:
-        return not triggered
+        return triggered is False
     return now >= morph.end_beats
 
 

@@ -623,6 +623,15 @@ def test_after_a_wrap_a_launch_morph_holds_at_its_targets_while_the_scene_starts
     assert state.morph is not None
 
 
+def test_after_a_wrap_another_scene_taking_the_wait_over_leaves_the_morph_alone():
+    state, _, _ = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
+    state, _, redraw = loop_tick(state, 6.0, written(state), triggered=None)
+    assert not redraw
+    assert not state.morph.triggered
+    state, _, redraw = loop_tick(state, 8.0, written(state), triggered=None)
+    assert (state.morph, redraw) == (None, True)
+
+
 def test_after_a_wrap_a_launch_morph_lands_early_if_the_scene_starts_early():
     state, _, _ = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
     state, _, redraw = loop_tick(state, 6.0, triggered=False)

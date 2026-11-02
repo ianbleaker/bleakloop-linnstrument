@@ -440,12 +440,15 @@ def read_macro_values(song, morph):
 
 
 def read_launch_triggered(song, morph):
-    # Whether a launch morph's scene waits to launch; None for any other morph, or a scene
-    # that's gone.
+    # Whether a launch morph's scene waits to launch: True, or False once it has stopped
+    # waiting with no other scene waiting, which is Live starting it. None for any other
+    # morph, a scene that's gone, or a wait another scene's launch has taken over.
     scenes = song.scenes
     if not morph.launch or morph.slot is None or morph.slot >= len(scenes):
         return None
-    return scenes[morph.slot].is_triggered
+    if scenes[morph.slot].is_triggered:
+        return True
+    return None if any(scene.is_triggered for scene in scenes) else False
 
 
 def macro_parameters(song, macros_wanted):
