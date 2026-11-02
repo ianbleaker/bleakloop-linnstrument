@@ -20,7 +20,7 @@ def handle(state, event, snapshot):
         state.device_clip
         and isinstance(event, PadPress)
         and event.pressed
-        and (event.column, event.pad) != controls.navigation(state).device_clip
+        and (event.column, event.pad) not in controls.pads(state, "device_clip")
     ):
         # Any other press during a Device/Clip hold makes it a hold, not a tap.
         state = replace(state, device_clip_used=True)

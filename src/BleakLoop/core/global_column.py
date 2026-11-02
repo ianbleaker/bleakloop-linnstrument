@@ -77,7 +77,7 @@ def handle(state, event, snapshot):
     if state.scene_page:
         return _scene_page(state, key, event.pressed, snapshot)
     normal, shift = layers(state)
-    if key == normal.shift:
+    if key in _shift_pads(normal):
         return replace(state, shift=event.pressed), []
     if not event.pressed:
         return state, []
@@ -86,6 +86,11 @@ def handle(state, event, snapshot):
     if button is None:
         return state, []
     return functions.press(button, state, snapshot)
+
+
+functions.register_hold(
+    "shift", light=lambda state, snapshot, value: Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
+)
 
 
 def _lit(colour):
@@ -211,15 +216,15 @@ def _back(state):
 
 def _scene_page(state, key, pressed, snapshot):
     # Opened while Shift is held: that hold's release mustn't close it, Back's press does.
-    shift = layers(state)[0].shift
+    shift = _shift_pads(layers(state)[0])
     if not pressed:
-        if key == shift:
+        if key in shift:
             return replace(state, shift=False), []
         return state, []
     button = layout.LINNSTRUMENT_SCENES.at(key)
     if button is not None:
         return functions.press(button, state, snapshot)
-    if key[0] != layout.GLOBAL_COLUMN or key == shift:
+    if key[0] != layout.GLOBAL_COLUMN or key in shift:
         return state, []
     if key[1] > layout.WINDOW_SCENES:
         return state, []  # dark: the page shows the window's scenes only
@@ -321,12 +326,17 @@ def render(state, snapshot):
             )
         for button in layout.LINNSTRUMENT_SCENES.buttons():
             frame[button[2]] = functions.light(button, state, snapshot)
-        frame[normal.shift] = shift_held
+        frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
         return frame
     # Every pad the column's layers use goes dark, then the live layer lights its own.
     frame = {button[2]: Light(OFF) for button in normal.buttons() + shift.buttons()}
     live = shift if state.shift and not state.copy and not state.delete else normal
     for button in live.buttons():
         frame[button[2]] = functions.light(button, state, snapshot)
-    frame[normal.shift] = shift_held
+    frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
     return frame
+
+
+def _shift_pads(section):
+    # Shift lights and works on both layers.
+    return {button[2] for button in section.buttons() if button[1] == "shift"}

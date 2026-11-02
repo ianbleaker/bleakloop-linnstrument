@@ -108,9 +108,45 @@ def unarm_all(state, snapshot, value=None):
     return state, [UnarmAll(), ShowMessage("Unarm all")]
 
 
-def navigation(state):
-    # The mode's Navigation column: Sequencer Mode has its own.
-    return layout.SEQUENCER_NAV if state.mode is Mode.SEQUENCER else layout.NAVIGATION
+@functions.register("window", light=lambda state, snapshot, value: Light(YELLOW))
+def _window(state, snapshot, steps):
+    return move_window(state, steps, snapshot)
+
+
+@functions.register("fader_source", light=lambda state, snapshot, value: Light(ORANGE))
+def _fader_source(state, snapshot, value):
+    return toggle_fader_source(state)
+
+
+functions.register_hold("device_clip", light=lambda state, snapshot, value: Light(ORANGE))
+
+
+def sections(state, shift=False):
+    # The mode's button sections, normal or Shift layer, in lookup order. Fixed regions and
+    # Device/Clip's layer aren't sections here.
+    if state.mode is Mode.LINNSTRUMENT:
+        return (layout.LINNSTRUMENT_SHIFT,) if shift else (layout.LINNSTRUMENT,)
+    if state.mode is Mode.SEQUENCER:
+        if shift:
+            return (layout.SEQUENCER_GLOBAL_SHIFT, layout.SEQUENCER_NAV_SHIFT)
+        return (layout.SEQUENCER_GLOBAL, layout.SEQUENCER_NAV)
+    if shift:
+        return (layout.GLOBAL_SHIFT, layout.VIEW_SHIFT, layout.NAVIGATION_SHIFT)
+    return (layout.GLOBAL, layout.VIEW, layout.NAVIGATION)
+
+
+def at(sections, key):
+    # The button live on a pad in the first section that has one, or None.
+    for section in sections:
+        button = section.at(key)
+        if button is not None:
+            return button
+    return None
+
+
+def pads(state, name):
+    # The pads of a function's buttons on the mode's normal layer.
+    return {button[2] for section in sections(state) for button in section.buttons() if button[1] == name}
 
 
 def device_clip(state, event):
@@ -156,7 +192,7 @@ def render_device_clip_layer(frame, state):
         frame[key] = Light(LIME)
     for key in layout.DEVICE_CLIP.devices:
         frame[key] = Light(MAGENTA)
-    frame[navigation(state).device_clip] = Light(ORANGE, Blink.FAST)
+    frame.update(dict.fromkeys(pads(state, "device_clip"), Light(ORANGE, Blink.FAST)))
 
 
 def record_length(bars, snapshot):

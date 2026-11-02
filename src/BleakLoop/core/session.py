@@ -2,11 +2,10 @@
 
 from dataclasses import replace
 
-from . import controls, faders, fx, global_column, layout, mixer, modes, sequencer
+from . import catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, sequencer
 from .leds import (
     BLUE,
     CYAN,
-    GREEN,
     LIME,
     MAGENTA,
     OFF,
@@ -59,22 +58,23 @@ def handle(state, event, snapshot):
         # A fader touch ends on its cell's release, wherever the finger slid to.
         return faders.press(state, event, snapshot)
     key = (event.column, event.pad)
-    if state.seq_held and event.pressed and key != layout.NAVIGATION.seq:
+    normal = controls.at(controls.sections(state), key)
+    held = normal[1] if normal is not None else None
+    if state.seq_held and event.pressed and held != "seq":
         return _seq_press(state, event, snapshot)
-    if key == layout.GLOBAL.shift:
-        return global_column.handle(state, event, snapshot)
-    # Under Shift, Copy and Delete's pads are window moves.
+    if held == "shift":
+        return replace(state, shift=event.pressed), []
+    # Under Shift, a hold's press gives way to the Shift layer's button on its pad.
     shift_layer = state.shift and not state.copy and not state.delete
-    if key == layout.NAVIGATION.device_clip and not (shift_layer and event.pressed):
-        # On Shift's layer the pad is a window move.
+    shifted = shift_layer and event.pressed and controls.at(controls.sections(state, shift=True), key) is not None
+    if held == "device_clip" and not shifted:
         return controls.device_clip(state, event)
-    if state.device_clip and event.column == layout.NAV_COLUMN and event.pressed:
-        # Device/Clip's layer replaces column 16's normal and Shift layers.
+    if state.device_clip and event.pressed and key in _navigation_pads():
+        # Device/Clip's layer replaces the Navigation column's normal and Shift layers.
         return controls.device_clip_layer(state, key)
-    if key == layout.NAVIGATION.seq and not (shift_layer and event.pressed):
-        # On Shift's layer the pad is a window move.
+    if held == "seq" and not shifted:
         return _seq(state, event, snapshot)
-    if key == layout.NAVIGATION.copy and not (shift_layer and event.pressed):
+    if held == "copy" and not shifted:
         if not event.pressed:
             return replace(state, copy=False, copy_source=None), []
         # In Mixer Mode, Copy and Delete only work on the split view's snapshots.
@@ -83,18 +83,16 @@ def handle(state, event, snapshot):
         if state.fx or state.mixer:
             return replace(state, copy=True), [ShowMessage("Copy: press a slot to overwrite")]
         return replace(state, copy=True), [ShowMessage("Copy: pick a clip or scene")]
-    if key == layout.NAVIGATION.delete and not (shift_layer and event.pressed):
+    if held == "delete" and not shifted:
         if not event.pressed:
             return replace(state, delete=False), []
         if state.mixer and not fx.panel_visible(state):
             return state, []
         return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
-    if key == layout.VIEW_SHIFT.unarm_all and state.shift and event.pressed:
-        if state.copy or state.delete:
-            return state, []
-        return controls.unarm_all(state, snapshot)
-    if key == layout.VIEW.stop:
+    if held == "stop" and not shifted:
         return _stop(state, event)
+    if normal is not None or controls.at(controls.sections(state, shift=True), key) is not None:
+        return _button(state, event, key, snapshot)
     if fx.panel_visible(state) and event.column in layout.SPLIT_FADER_COLUMNS:
         # The split view's snapshots, releases included, as FX Mode's: Stop leaves them alone.
         return fx.press(state, event, snapshot)
@@ -127,20 +125,12 @@ def handle(state, event, snapshot):
         return _copy(state, event, snapshot)
     if state.delete:
         return _delete(state, event, snapshot)
-    if event.column == layout.GLOBAL_COLUMN:
-        return global_column.handle(state, event, snapshot)
     if event.column in layout.GRID_COLUMNS:
         if event.pad == layout.MUTE_ROW:
             return state, _mute_row(state, _track(event.column, snapshot))
         if event.pad == layout.SELECT_ROW:
             return state, _select_row(state, _track(event.column, snapshot))
         return _slot(state, event, snapshot)
-    if event.column == layout.NAV_COLUMN:
-        return _nav_column(state, key, snapshot)
-    if key == layout.VIEW_SHIFT.unsolo_all and state.shift:
-        return controls.unsolo_all(state, snapshot)
-    if key == layout.VIEW.unmute_all and not state.shift:
-        return controls.unmute_all(state, snapshot)
     if _is_scene(event):
         scene = state.window.scene + event.pad - 1
         if scene < snapshot.scene_count:
@@ -153,6 +143,82 @@ def handle(state, event, snapshot):
                 return fx.timed_launch(state, scene, snapshot)
             return state, [FireScene(scene, legato=False), *fx.scene_launch(state, scene, snapshot)]
     return state, []
+
+
+def _navigation_pads():
+    sections = (layout.NAVIGATION, layout.NAVIGATION_SHIFT, layout.DEVICE_CLIP)
+    return {button[2] for section in sections for button in section.buttons()}
+
+
+def _button(state, event, key, snapshot):
+    # A press on a button that isn't a hold: its layer's function, unless a hold takes it.
+    if not event.pressed or state.copy or state.delete:
+        return state, []
+    button = controls.at(controls.sections(state, shift=True) if state.shift else controls.sections(state), key)
+    if button is None:
+        return state, []
+    return functions.press(button, state, snapshot)
+
+
+def _current(state):
+    return "mixer" if state.mixer else "fx" if state.fx else "session"
+
+
+def _mode_light(name):
+    # Modes are cyan, the current one blue, or pink in its split view.
+    def light(state, snapshot, value):
+        if _current(state) != name:
+            return Light(CYAN)
+        return Light(PINK if faders.split_view(state) else BLUE)
+
+    return light
+
+
+@functions.register("session", [catalogue.SESSION], light=_mode_light("session"))
+def _session_press(state, snapshot, value):
+    # The current mode's pad goes back to Session.
+    if state.mixer:
+        return _widen(state, mixer.toggle, snapshot)
+    if state.fx:
+        return fx.toggle(state)
+    return _toggle_split(state, snapshot)
+
+
+@functions.register("mixer", [catalogue.SESSION], light=_mode_light("mixer"))
+def _mixer_press(state, snapshot, value):
+    if state.mixer:
+        return _toggle_split(state, snapshot)
+    return _widen(state, mixer.toggle, snapshot)
+
+
+@functions.register("fx", [catalogue.SESSION], light=_mode_light("fx"))
+def _fx_press(state, snapshot, value):
+    return _widen(state, fx.toggle, snapshot)
+
+
+@functions.register("reserved")
+def _reserved(state, snapshot, value):
+    return state, []
+
+
+functions.register_hold(
+    "seq",
+    [catalogue.SESSION],
+    light=lambda state, snapshot, value: Light(CYAN, Blink.FAST) if state.seq_held else Light(CYAN),
+)
+functions.register_hold(
+    "copy",
+    [catalogue.SESSION],
+    light=lambda state, snapshot, value: Light(RED, Blink.FAST) if state.copy else Light(MAGENTA),
+)
+functions.register_hold(
+    "delete",
+    [catalogue.SESSION],
+    light=lambda state, snapshot, value: Light(RED, Blink.FAST if state.delete else Blink.STEADY),
+)
+functions.register_hold(
+    "stop", light=lambda state, snapshot, value: Light(RED, Blink.FAST if state.stop else Blink.STEADY)
+)
 
 
 def _track(column, snapshot):
@@ -366,31 +432,6 @@ def _select_row(state, track):
     return [SelectTrack(track.index), ArmExclusive(track.index, True)]
 
 
-def _nav_column(state, key, snapshot):
-    if state.shift:
-        if key in layout.NAVIGATION_SHIFT.window:
-            return controls.move_window(state, layout.NAVIGATION_SHIFT.window[key], snapshot)
-        if key in layout.NAVIGATION_SHIFT.tempo:
-            return state, controls.tempo_step(snapshot, layout.NAVIGATION_SHIFT.tempo[key])
-        if key == layout.NAVIGATION_SHIFT.fader_source:
-            return controls.toggle_fader_source(state)
-        return state, []
-    # The reserved pad and Seq have no match here. The current mode's pad goes back to Session.
-    if key == layout.NAVIGATION.session:
-        if state.mixer:
-            return _widen(state, mixer.toggle, snapshot)
-        if state.fx:
-            return fx.toggle(state)
-        return _toggle_split(state, snapshot)
-    if key == layout.NAVIGATION.mixer:
-        if state.mixer:
-            return _toggle_split(state, snapshot)
-        return _widen(state, mixer.toggle, snapshot)
-    if key == layout.NAVIGATION.fx:
-        return _widen(state, fx.toggle, snapshot)
-    return state, []
-
-
 def _widen(state, toggle, snapshot):
     # Leaving a split view for 13 tracks keeps the last tracks filling the window.
     width = controls.window_tracks(state)
@@ -451,19 +492,19 @@ def render(state, snapshot):
         frame[(layout.SCENE_COLUMN, pad)] = controls.scene_light(
             snapshot, state.window.scene, pad - 1, controls.waiting_scene(state)
         )
-    if shift_layer:
-        _render_shift_layer(frame)
-        frame[layout.VIEW_SHIFT.unsolo_all] = Light(BLUE if snapshot.any_soloed else OFF)
-    else:
-        _render_normal_layer(frame, state)
-        frame[layout.VIEW.unmute_all] = Light(ORANGE if snapshot.any_muted else OFF)
+    # The live layer's buttons. Global's are global_column's, drawn last.
+    live = controls.sections(state, shift=True) if shift_layer else controls.sections(state)
+    for section in live[1:]:
+        for button in section.buttons():
+            frame[button[2]] = functions.light(button, state, snapshot)
     if state.device_clip:
         controls.render_device_clip_layer(frame, state)
-    if shift_layer and not state.stop:
-        # Unarm all: lit while there's an arm to undo.
-        frame[layout.VIEW_SHIFT.unarm_all] = Light(RED if snapshot.any_armed else OFF)
-    else:
-        frame[layout.VIEW.stop] = Light(RED, Blink.FAST if state.stop else Blink.STEADY)
+    if shift_layer and state.stop:
+        # A held Stop stays lit over the Shift layer.
+        for section in controls.sections(state)[1:]:
+            for button in section.buttons():
+                if button[1] == "stop":
+                    frame[button[2]] = functions.light(button, state, snapshot)
     frame.update(global_column.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame
@@ -537,26 +578,3 @@ def _select_light(track):
     if track.selected:
         return Light(WHITE)
     return Light(LIME if track.can_be_armed else OFF)
-
-
-def _render_normal_layer(frame, state):
-    # Held Copy and Delete blink.
-    frame[layout.NAVIGATION.copy] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
-    frame[layout.NAVIGATION.delete] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
-    # Modes are cyan, the current one blue.
-    current = layout.NAVIGATION.mixer if state.mixer else layout.NAVIGATION.fx if state.fx else layout.NAVIGATION.session
-    for key in (layout.NAVIGATION.session, layout.NAVIGATION.mixer, layout.NAVIGATION.fx, layout.NAVIGATION.seq):
-        frame[key] = Light(BLUE if key == current else CYAN)
-    if faders.split_view(state):
-        frame[current] = Light(PINK)
-    if state.seq_held:
-        frame[layout.NAVIGATION.seq] = Light(CYAN, Blink.FAST)
-    frame[layout.NAVIGATION.device_clip] = Light(ORANGE)
-
-
-def _render_shift_layer(frame):
-    for key in layout.NAVIGATION_SHIFT.window:
-        frame[key] = Light(YELLOW)
-    for key in layout.NAVIGATION_SHIFT.tempo:
-        frame[key] = Light(GREEN)
-    frame[layout.NAVIGATION_SHIFT.fader_source] = Light(ORANGE)

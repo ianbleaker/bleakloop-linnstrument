@@ -1928,3 +1928,38 @@ def test_seq_entry_sets_only_changed_arms():
 def test_seq_blinks_while_held():
     assert session.render(SESSION, SNAP)[layout.NAVIGATION.seq] == Light(CYAN)
     assert session.render(SEQ_HELD, SNAP)[layout.NAVIGATION.seq] == Light(CYAN, Blink.FAST)
+
+
+# Buttons moved across columns
+
+
+def swap(monkeypatch, a, name_a, b, name_b):
+    pad_a, pad_b = getattr(a, name_a), getattr(b, name_b)
+    monkeypatch.setattr(a, name_a, pad_b)
+    monkeypatch.setattr(b, name_b, pad_a)
+
+
+def test_a_global_button_works_in_column_16(monkeypatch):
+    swap(monkeypatch, layout.GLOBAL, "undo", layout.NAVIGATION, "reserved")
+    snapshot = replace(SNAP, can_undo=True)
+    assert handle(SESSION, (16, 4), snapshot) == (SESSION, [Undo(), ShowMessage("Undo")])
+    assert handle(SESSION, (1, 6), snapshot) == (SESSION, [])
+    assert session.render(SESSION, snapshot)[(16, 4)] == Light(WHITE)
+
+
+def test_a_hold_works_in_column_1(monkeypatch):
+    swap(monkeypatch, layout.NAVIGATION, "copy", layout.GLOBAL, "fixed_length")
+    state, _ = handle(SESSION, (1, 5))
+    assert state.copy
+    assert handle(state, (1, 5), pressed=False)[0] == SESSION
+    assert session.render(state, SNAP)[(1, 5)] == Light(RED, Blink.FAST)
+    assert handle(SESSION, (16, 7))[0].fixed_length == 1
+
+
+def test_a_view_button_works_in_column_1(monkeypatch):
+    swap(monkeypatch, layout.VIEW, "unmute_all", layout.GLOBAL, "capture")
+    assert handle(SESSION, (1, 3)) == (SESSION, [UnmuteAll(), ShowMessage("Unmute all")])
+    assert handle(SESSION, (15, 7))[1] == [
+        CaptureAndInsertScene(),
+        ShowMessage("Capture and Insert Scene"),
+    ]

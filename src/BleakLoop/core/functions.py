@@ -14,8 +14,12 @@ from .modes import Mode
 
 @dataclass(frozen=True)
 class Function:
-    press: object  # (state, snapshot, value) -> (state, actions)
+    press: object  # (state, snapshot, value) -> (state, actions); None for a hold
     light: object  # (state, snapshot, value) -> Light
+
+
+# Holds: pressed and released, in an order each mode's handle() keeps itself.
+HOLDS = frozenset({"shift", "device_clip", "seq", "copy", "delete", "stop"})
 
 
 _FUNCTIONS = {}  # (name, mode) -> Function
@@ -30,6 +34,8 @@ def register(name, modes=None, light=None):
         raise ValueError(f"{name} doesn't run in {sorted(modes - MODES[name])}")
 
     def add(press):
+        if (press is None) != (name in HOLDS):
+            raise ValueError(f"{name}: a hold registers only its light, a tap its press")
         for mode in modes:
             if (name, mode) in _FUNCTIONS:
                 raise ValueError(f"{name} is registered twice in {mode}")
@@ -37,6 +43,10 @@ def register(name, modes=None, light=None):
         return press
 
     return add
+
+
+def register_hold(name, modes=None, light=None):
+    register(name, modes, light)(None)
 
 
 def _dark(state, snapshot, value):
@@ -50,7 +60,7 @@ def get(name, state):
 def press(button, state, snapshot):
     # A button is (name, function, (column, pad), value), as buttons.Section lists it.
     function = get(button[1], state)
-    if function is None:
+    if function is None or function.press is None:
         return state, []
     return function.press(state, snapshot, button[3])
 
