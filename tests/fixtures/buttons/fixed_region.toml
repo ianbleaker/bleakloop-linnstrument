@@ -1,0 +1,4 @@
+[fx.slot_1]
+pad = [5, 1]
+does = "slots"
+value = 1

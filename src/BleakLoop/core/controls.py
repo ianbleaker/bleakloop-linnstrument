@@ -4,7 +4,7 @@ Device/Clip layer."""
 
 from dataclasses import replace
 
-from . import faders, layout
+from . import buttons, faders, functions, layout
 from .modes import Mode
 from .leds import BLUE, GREEN, LIME, MAGENTA, OFF, ORANGE, RED, WHITE, YELLOW, Blink, Light
 from .model import (
@@ -13,12 +13,14 @@ from .model import (
     SetArrangementRecord,
     SetSessionRecord,
     SetTempo,
-    ShowMessage,
     StepDevice,
     StepTrack,
     ToggleDetailView,
     ToggleMetronome,
+    UnarmAll,
     Undo,
+    UnmuteAll,
+    UnsoloAll,
 )
 from .values import TEMPO_MAX, TEMPO_MIN
 
@@ -34,20 +36,20 @@ def play_light(snapshot):
 def metronome(snapshot):
     return [
         ToggleMetronome(),
-        ShowMessage("Metronome OFF" if snapshot.metronome else "Metronome ON"),
+        *buttons.say("metronome", "off" if snapshot.metronome else "on"),
     ]
 
 
 def undo(snapshot):
     if snapshot.can_undo:
-        return [Undo(), ShowMessage("Undo")]
-    return [ShowMessage("Nothing to undo")]
+        return [Undo(), *buttons.say("undo")]
+    return buttons.refuse("undo", "nothing")
 
 
 def redo(snapshot):
     if snapshot.can_redo:
-        return [Redo(), ShowMessage("Redo")]
-    return [ShowMessage("Nothing to redo")]
+        return [Redo(), *buttons.say("redo")]
+    return buttons.refuse("redo", "nothing")
 
 
 def window_tracks(state):
@@ -66,36 +68,126 @@ def move_window(state, steps, snapshot):
         return state, []
     last_track = min(window.track + width, snapshot.track_count)
     last_scene = min(window.scene + layout.WINDOW_SCENES, snapshot.scene_count)
-    message = (
-        f"Tracks {window.track + 1}–{last_track}, "
-        f"Scenes {window.scene + 1}–{last_scene}"
+    message = buttons.say(
+        "window",
+        first_track=window.track + 1,
+        last_track=last_track,
+        first_scene=window.scene + 1,
+        last_scene=last_scene,
     )
-    return replace(state, window=window), [ShowMessage(message)]
+    return replace(state, window=window), message
 
 
 def tempo_step(snapshot, step):
     # Shift + column 16 pads 7 and 8.
     bpm = min(TEMPO_MAX, max(TEMPO_MIN, snapshot.tempo + step))
-    return [SetTempo(bpm), ShowMessage(f"Tempo {bpm:.1f} BPM")]
+    return [SetTempo(bpm), *buttons.say("tempo", bpm=bpm)]
+
+
+@functions.register("tempo", light=lambda state, snapshot, value: Light(GREEN))
+def _tempo(state, snapshot, step):
+    return state, tempo_step(snapshot, step)
+
+
+@functions.register(
+    "unmute_all", light=lambda state, snapshot, value: Light(ORANGE if snapshot.any_muted else OFF)
+)
+def unmute_all(state, snapshot, value=None):
+    return state, [UnmuteAll(), *buttons.say("unmute_all")]
+
+
+@functions.register(
+    "unsolo_all", light=lambda state, snapshot, value: Light(BLUE if snapshot.any_soloed else OFF)
+)
+def unsolo_all(state, snapshot, value=None):
+    return state, [UnsoloAll(), *buttons.say("unsolo_all")]
+
+
+@functions.register(
+    "unarm_all", light=lambda state, snapshot, value: Light(RED if snapshot.any_armed else OFF)
+)
+def unarm_all(state, snapshot, value=None):
+    return state, [UnarmAll(), *buttons.say("unarm_all")]
+
+
+@functions.register("window", light=lambda state, snapshot, value: Light(YELLOW))
+def _window(state, snapshot, steps):
+    return move_window(state, steps, snapshot)
+
+
+@functions.register("fader_source", light=lambda state, snapshot, value: Light(ORANGE))
+def _fader_source(state, snapshot, value):
+    return toggle_fader_source(state)
+
+
+functions.register_hold("device_clip", light=lambda state, snapshot, value: Light(ORANGE))
+
+
+def sections(state, shift=False):
+    # The mode's button sections, normal or Shift layer, in lookup order. Fixed regions and
+    # Device/Clip's layer aren't sections here.
+    if state.mode is Mode.LINNSTRUMENT:
+        return (layout.LINNSTRUMENT_SHIFT,) if shift else (layout.LINNSTRUMENT,)
+    if state.mode is Mode.SEQUENCER:
+        # Column 15 and the settings work on both layers.
+        own = (layout.SEQUENCER_GRID, *((layout.SEQUENCER_SETTINGS,) if state.seq_settings else ()))
+        if shift:
+            return (layout.SEQUENCER_GLOBAL_SHIFT, layout.SEQUENCER_NAV_SHIFT, *own)
+        return (layout.SEQUENCER_GLOBAL, layout.SEQUENCER_NAV, *own)
+    if shift:
+        return (layout.GLOBAL_SHIFT, layout.VIEW_SHIFT, layout.NAVIGATION_SHIFT)
+    return (layout.GLOBAL, layout.VIEW, layout.NAVIGATION)
+
+
+def at(sections, key):
+    # The button live on a pad in the first section that has one, or None.
+    for section in sections:
+        button = section.at(key)
+        if button is not None:
+            return button
+    return None
+
+
+def pads(state, name):
+    # The pads of a function's buttons on the mode's normal layer.
+    return {button[2] for section in sections(state) for button in section.buttons() if button[1] == name}
 
 
 def device_clip(state, event):
     # A hold pad: held, the Device/Clip layer; a tap with no other press during it flips
     # Live's Detail view.
     if event.pressed:
-        return replace(state, device_clip=True, device_clip_used=False), []
+        return replace(state, device_clip=True, device_clip_used=False), buttons.say("device_clip")
     tapped = state.device_clip and not state.device_clip_used
     state = replace(state, device_clip=False, device_clip_used=False)
-    return state, [ToggleDetailView()] if tapped else []
+    return state, [ToggleDetailView(), *buttons.say("device_clip", "tapped")] if tapped else []
+
+
+def navigation_pads(state):
+    # The pads Device/Clip's layer takes over: the Navigation column's, both layers, and its own.
+    if state.mode is Mode.SEQUENCER:
+        sections = (layout.SEQUENCER_NAV, layout.SEQUENCER_NAV_SHIFT, layout.DEVICE_CLIP)
+    else:
+        sections = (layout.NAVIGATION, layout.NAVIGATION_SHIFT, layout.DEVICE_CLIP)
+    return {button[2] for section in sections for button in section.buttons()}
 
 
 def device_clip_layer(state, key):
-    # Device/Clip held + a column 16 pad.
-    if key in layout.DEVICE_CLIP_TRACK_STEPS:
-        return state, [StepTrack(layout.DEVICE_CLIP_TRACK_STEPS[key])]
-    if key in layout.DEVICE_CLIP_DEVICE_STEPS:
-        return state, [StepDevice(layout.DEVICE_CLIP_DEVICE_STEPS[key])]
-    return state, []
+    # Device/Clip held + a press on a pad its layer takes.
+    button = layout.DEVICE_CLIP.at(key)
+    if button is None:
+        return state, []
+    return functions.press(button, state, snapshot=None)
+
+
+@functions.register("tracks", light=lambda state, snapshot, step: Light(LIME))
+def _track_step(state, snapshot, step):
+    return state, [StepTrack(step)]
+
+
+@functions.register("devices", light=lambda state, snapshot, step: Light(MAGENTA))
+def _device_step(state, snapshot, step):
+    return state, [StepDevice(step)]
 
 
 def toggle_fader_source(state):
@@ -104,25 +196,22 @@ def toggle_fader_source(state):
     panel = state.mode is Mode.SESSION and not state.fx
     if state.split_snapshots and panel:
         state = replace(state, split_snapshots=False, fader_source="device", fx_length=None)
-        return state, [ShowMessage("Device FX")]
+        return state, buttons.say("fader_source", "device")
     if state.fader_source == "mapped" and panel:
         # The faders stop showing.
         state, actions = faders.reset(state)
-        return replace(state, split_snapshots=True), actions + [ShowMessage("FX snapshots")]
+        return replace(state, split_snapshots=True), actions + buttons.say("fader_source", "snapshots")
     mapped = state.fader_source == "device"
     state = replace(state, fader_source="mapped" if mapped else "device")
-    return state, [ShowMessage("Mapped FX" if mapped else "Device FX")]
+    return state, buttons.say("fader_source", "mapped" if mapped else "device")
 
 
-def render_device_clip_layer(frame):
-    # Over either layer: the whole of column 16.
-    for pad in range(1, layout.ROWS + 1):
-        frame[(layout.NAV_COLUMN, pad)] = Light(OFF)
-    for key in layout.DEVICE_CLIP_TRACK_STEPS:
-        frame[key] = Light(LIME)
-    for key in layout.DEVICE_CLIP_DEVICE_STEPS:
-        frame[key] = Light(MAGENTA)
-    frame[layout.DEVICE_CLIP] = Light(ORANGE, Blink.FAST)
+def render_device_clip_layer(frame, state, snapshot=None):
+    # Over either layer: the Navigation pads go dark, then the layer's own light.
+    frame.update(dict.fromkeys(navigation_pads(state), Light(OFF)))
+    for button in layout.DEVICE_CLIP.buttons():
+        frame[button[2]] = functions.light(button, state, snapshot)
+    frame.update(dict.fromkeys(pads(state, "device_clip"), Light(ORANGE, Blink.FAST)))
 
 
 def record_length(bars, snapshot):
@@ -137,6 +226,13 @@ def record(snapshot):
         return [SetSessionRecord(not snapshot.session_record)]
     actions = [ClearBackToArrangement()] if snapshot.back_to_arranger else []
     return actions + [SetArrangementRecord(not snapshot.arrangement_record)]
+
+
+def record_message(snapshot):
+    # What record() just turned on or off.
+    if snapshot.session_view:
+        return buttons.say("record", "session_off" if snapshot.session_record else "session_on")
+    return buttons.say("record", "arrangement_off" if snapshot.arrangement_record else "arrangement_on")
 
 
 def record_light(snapshot):

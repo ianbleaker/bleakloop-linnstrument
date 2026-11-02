@@ -2,7 +2,7 @@
 
 BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for Ableton Live 12. One pad hands the surface back to you as an instrument.
 
-> **Heads-up:** for more information, look at Live's status bar. BleakLoop will tell you what it's doing or give a hint about what's not working.
+> **Heads-up:** for more information, look at Live's status bar. Every press says what it did, such as "Metronome: ON", and holding Shift, Copy, Delete, Stop, Seq, Device/Clip or a Bars pad says what it opens. When a press can't work, the status bar says why.
 
 ## 1. Setup
 
@@ -12,6 +12,8 @@ BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for
 While BleakLoop loads, a rainbow rolls across the pads for about 3 seconds, and the pads don't play. Then BleakLoop starts in Session Mode. Its Linnstrument Mode controls use a MIDI channel that your right split doesn't use. Only if your right split uses all 16 does BleakLoop borrow one of its MPE channels, and it gives it back when Live closes.
 
 While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1, the Global column, its control split. When Live closes, or you choose another control surface, it puts your own split settings back.
+
+[Where every button is, and what it says](buttons.md): the button reference. To move a button or change what it says, edit `src/BleakLoop/buttons.toml` and restart Live; check the file first with `PYTHONPATH=src python3 -m tools.check_buttons` from the repo.
 
 ## 2. Function Reference
 

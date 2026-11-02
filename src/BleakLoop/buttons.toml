@@ -1,0 +1,884 @@
+# Every button: where it sits and the function it runs, and each function's label, manual
+# text and status messages.
+#
+# Edit a pad here and restart Live to move a button; nothing else to build. Check the file
+# first, from the repo: PYTHONPATH=src python3 -m tools.check_buttons
+#
+# [<section>.<name>] is a button. Fields:
+#   pad    [column, pad]; column 1 is the Global column, pad 1 the far row
+#   does   the function it runs (src/BleakLoop/core/catalogue.py); default: the button's name
+#   value  the function's setting for this pad, as a tempo step or a snapshot slot
+#   label  this pad's label on the manual's pad map, at most 7 characters, over the function's
+#
+# [functions.<name>] is a function, wherever its buttons sit: its label, at most 7
+# characters, and later its manual text and messages.
+#
+# Linnstrument and Sequencer Mode's sections fall back to the Session ones: a pad they don't
+# list does what it does in Session Mode, and is dark if that function can't run there.
+# Every button moves alone, Shift functions included. Fixed regions (clip grid, scene pads,
+# faders, steps, Mute/Select rows) aren't movable, and no two buttons live at once may share
+# a pad. In Linnstrument Mode only column 1 reaches BleakLoop, so its own sections stay there.
+
+manual_format = "{label}."
+
+
+# The Global column in Session, Mixer and FX Mode.
+
+[global.play_stop]
+pad = [1, 1]
+
+[global.record]
+pad = [1, 2]
+
+[global.capture]
+pad = [1, 3]
+
+[global.metronome]
+pad = [1, 4]
+
+[global.fixed_length]
+pad = [1, 5]
+
+[global.undo]
+pad = [1, 6]
+
+[global.linnstrument_mode]
+pad = [1, 7]
+
+[global.shift]
+pad = [1, 8]
+
+
+# Shift held, in Session, Mixer and FX Mode.
+
+[global_shift.stop_all]
+pad = [1, 1]
+
+[global_shift.quantize]
+pad = [1, 3]
+
+[global_shift.launch_quantization]
+pad = [1, 4]
+
+[global_shift.redo]
+pad = [1, 6]
+
+
+# Linnstrument Mode's Global column: only what differs from Session Mode's. Column 1 only.
+
+[linnstrument.record_clip]
+pad = [1, 2]
+
+[linnstrument.capture_midi]
+pad = [1, 3]
+
+[linnstrument.back]
+pad = [1, 7]
+
+
+# Shift held, in Linnstrument Mode: only what differs. Column 1 only.
+
+[linnstrument_shift.stop_track]
+pad = [1, 1]
+
+[linnstrument_shift.record]
+pad = [1, 2]
+
+[linnstrument_shift.scene_page]
+pad = [1, 7]
+
+
+# The scene page, in Linnstrument and Sequencer Mode: pads 1-6 are the scenes.
+
+[linnstrument_scenes.back]
+pad = [1, 8]
+does = "close_scenes"
+
+
+# Sequencer Mode's Global column: only what differs from Session Mode's.
+
+[sequencer_global.record_clip]
+pad = [1, 2]
+
+[sequencer_global.capture_midi]
+pad = [1, 3]
+
+
+# Shift held, in Sequencer Mode: only what differs.
+
+[sequencer_global_shift.stop_track]
+pad = [1, 1]
+
+[sequencer_global_shift.record]
+pad = [1, 2]
+
+[sequencer_global_shift.scene_page]
+pad = [1, 7]
+
+
+# The Navigation column in Session, Mixer and FX Mode.
+
+[navigation.session]
+pad = [16, 1]
+
+[navigation.mixer]
+pad = [16, 2]
+
+[navigation.fx]
+pad = [16, 3]
+
+[navigation.reserved]
+pad = [16, 4]
+
+[navigation.seq]
+pad = [16, 5]
+
+[navigation.delete]
+pad = [16, 6]
+
+[navigation.copy]
+pad = [16, 7]
+
+[navigation.device_clip]
+pad = [16, 8]
+
+
+# Shift held: value is the BPM step or the window's (track step, scene step).
+
+[navigation_shift.tempo_up]
+pad = [16, 1]
+does = "tempo"
+value = 1
+label = "Tempo+"
+
+[navigation_shift.tempo_down]
+pad = [16, 2]
+does = "tempo"
+value = -1
+label = "Tempo-"
+
+[navigation_shift.fader_source]
+pad = [16, 3]
+
+[navigation_shift.window_up]
+pad = [16, 5]
+does = "window"
+value = [0, -1]
+label = "Up"
+
+[navigation_shift.window_down]
+pad = [16, 6]
+does = "window"
+value = [0, 1]
+label = "Down"
+
+[navigation_shift.window_right]
+pad = [16, 7]
+does = "window"
+value = [1, 0]
+label = "Right"
+
+[navigation_shift.window_left]
+pad = [16, 8]
+does = "window"
+value = [-1, 0]
+label = "Left"
+
+
+# Column 15 in Session, Mixer and FX Mode: pads 1-6 are the scenes.
+
+[view.unmute_all]
+pad = [15, 7]
+
+[view.stop]
+pad = [15, 8]
+
+
+# Shift held, in Session, Mixer and FX Mode.
+
+[view_shift.unsolo_all]
+pad = [15, 7]
+
+[view_shift.unarm_all]
+pad = [15, 8]
+
+
+# Device/Clip held, in every mode but Linnstrument Mode: value is the track or device step.
+
+[device_clip.track_previous]
+pad = [16, 7]
+does = "tracks"
+value = -1
+label = "Track-"
+
+[device_clip.track_next]
+pad = [16, 6]
+does = "tracks"
+value = 1
+label = "Track+"
+
+[device_clip.device_previous]
+pad = [16, 5]
+does = "devices"
+value = -1
+label = "Device-"
+
+[device_clip.device_next]
+pad = [16, 4]
+does = "devices"
+value = 1
+label = "Device+"
+
+
+# FX Mode: value is the snapshot slot, the scene in the window, or the morph length in bars.
+
+[fx.slot_1]
+pad = [11, 1]
+does = "slots"
+value = 1
+
+[fx.slot_2]
+pad = [11, 2]
+does = "slots"
+value = 2
+
+[fx.slot_3]
+pad = [11, 3]
+does = "slots"
+value = 3
+
+[fx.slot_4]
+pad = [11, 4]
+does = "slots"
+value = 4
+
+[fx.slot_5]
+pad = [11, 5]
+does = "slots"
+value = 5
+
+[fx.slot_6]
+pad = [11, 6]
+does = "slots"
+value = 6
+
+[fx.slot_7]
+pad = [11, 7]
+does = "slots"
+value = 7
+
+[fx.slot_8]
+pad = [11, 8]
+does = "slots"
+value = 8
+
+[fx.slot_9]
+pad = [12, 1]
+does = "slots"
+value = 9
+
+[fx.slot_10]
+pad = [12, 2]
+does = "slots"
+value = 10
+
+[fx.slot_11]
+pad = [12, 3]
+does = "slots"
+value = 11
+
+[fx.slot_12]
+pad = [12, 4]
+does = "slots"
+value = 12
+
+[fx.slot_13]
+pad = [12, 5]
+does = "slots"
+value = 13
+
+[fx.slot_14]
+pad = [12, 6]
+does = "slots"
+value = 14
+
+[fx.slot_15]
+pad = [12, 7]
+does = "slots"
+value = 15
+
+[fx.slot_16]
+pad = [12, 8]
+does = "slots"
+value = 16
+
+[fx.scene_slot_1]
+pad = [13, 1]
+does = "scene_slots"
+value = 1
+label = "Scene 1"
+
+[fx.scene_slot_2]
+pad = [13, 2]
+does = "scene_slots"
+value = 2
+label = "Scene 2"
+
+[fx.scene_slot_3]
+pad = [13, 3]
+does = "scene_slots"
+value = 3
+label = "Scene 3"
+
+[fx.scene_slot_4]
+pad = [13, 4]
+does = "scene_slots"
+value = 4
+label = "Scene 4"
+
+[fx.scene_slot_5]
+pad = [13, 5]
+does = "scene_slots"
+value = 5
+label = "Scene 5"
+
+[fx.scene_slot_6]
+pad = [13, 6]
+does = "scene_slots"
+value = 6
+label = "Scene 6"
+
+[fx.bars_1]
+pad = [14, 1]
+does = "bars"
+value = 1
+label = "1 bar"
+
+[fx.bars_2]
+pad = [14, 2]
+does = "bars"
+value = 2
+label = "2 bars"
+
+[fx.bars_4]
+pad = [14, 3]
+does = "bars"
+value = 4
+label = "4 bars"
+
+[fx.bars_8]
+pad = [14, 4]
+does = "bars"
+value = 8
+label = "8 bars"
+
+[fx.bars_16]
+pad = [14, 5]
+does = "bars"
+value = 16
+label = "16 bars"
+
+
+# Sequencer Mode column 15, in both views.
+
+[sequencer_grid.double]
+pad = [15, 1]
+
+[sequencer_grid.halve]
+pad = [15, 2]
+
+[sequencer_grid.follow]
+pad = [15, 4]
+
+[sequencer_grid.up]
+pad = [15, 6]
+
+[sequencer_grid.down]
+pad = [15, 7]
+
+[sequencer_grid.view]
+pad = [15, 8]
+
+
+# Sequencer Mode's settings view: value is the step length in beats, or the page.
+
+[sequencer_settings.rate_4]
+pad = [11, 1]
+does = "rates"
+value = 1.0
+label = "1/4"
+
+[sequencer_settings.rate_8]
+pad = [11, 2]
+does = "rates"
+value = 0.5
+label = "1/8"
+
+[sequencer_settings.rate_16]
+pad = [11, 3]
+does = "rates"
+value = 0.25
+label = "1/16"
+
+[sequencer_settings.rate_32]
+pad = [11, 4]
+does = "rates"
+value = 0.125
+label = "1/32"
+
+[sequencer_settings.triplet]
+pad = [11, 5]
+
+[sequencer_settings.page_1]
+pad = [12, 1]
+does = "pages"
+value = 1
+
+[sequencer_settings.page_2]
+pad = [12, 2]
+does = "pages"
+value = 2
+
+[sequencer_settings.page_3]
+pad = [12, 3]
+does = "pages"
+value = 3
+
+[sequencer_settings.page_4]
+pad = [12, 4]
+does = "pages"
+value = 4
+
+[sequencer_settings.page_5]
+pad = [12, 5]
+does = "pages"
+value = 5
+
+[sequencer_settings.page_6]
+pad = [12, 6]
+does = "pages"
+value = 6
+
+[sequencer_settings.page_7]
+pad = [12, 7]
+does = "pages"
+value = 7
+
+[sequencer_settings.page_8]
+pad = [12, 8]
+does = "pages"
+value = 8
+
+[sequencer_settings.page_9]
+pad = [13, 1]
+does = "pages"
+value = 9
+
+[sequencer_settings.page_10]
+pad = [13, 2]
+does = "pages"
+value = 10
+
+[sequencer_settings.page_11]
+pad = [13, 3]
+does = "pages"
+value = 11
+
+[sequencer_settings.page_12]
+pad = [13, 4]
+does = "pages"
+value = 12
+
+[sequencer_settings.page_13]
+pad = [13, 5]
+does = "pages"
+value = 13
+
+[sequencer_settings.page_14]
+pad = [13, 6]
+does = "pages"
+value = 14
+
+[sequencer_settings.page_15]
+pad = [13, 7]
+does = "pages"
+value = 15
+
+[sequencer_settings.page_16]
+pad = [13, 8]
+does = "pages"
+value = 16
+
+# Messages not tied to a button: the device setup, the track and device names Device/Clip's
+# steps show, and Mapped FX's binding.
+[system]
+refuse_duplicates = "Row Offset repeats notes in the Global column: controls off"
+refuse_row_offset = "Couldn't read Row Offset: controls off"
+refuse_right_split = "Couldn't read the right split: controls off"
+refuse_channels = "The right split uses every channel: controls off"
+controls_on = "Global column controls on"
+controls_moved = "The right split took the Global column's channel: controls moved to channel {channel}"
+octave_reset = "Left split Octave/Transpose reset: select the right split to change yours"
+track = "{track}"
+no_more_tracks = "No more tracks"
+device = "{device}"
+no_more_devices = "No more devices"
+bound = "Fader {fader}: {owner} {parameter}"
+bind_select = "Click a parameter in Live first"
+bind_macro = "Map it to a macro instead"
+bind_refused = "Can't bind this parameter"
+
+
+# Functions: each one's label, at most 7 characters, its message, and its outcomes and
+# refusals. Refusals always show; show = false hides the rest.
+
+[functions.play_stop]
+label = "Play"
+manual = "Start/stop. Blinks on the beat while playing."
+[functions.play_stop.outcomes]
+play = "Play"
+stop = "Stop"
+
+[functions.metronome]
+label = "Metro"
+manual = "Metronome on/off. Blinks while on."
+[functions.metronome.outcomes]
+on = "Metronome: ON"
+off = "Metronome: OFF"
+
+[functions.undo]
+label = "Undo"
+message = "Undo"
+[functions.undo.refusals]
+nothing = "Nothing to undo"
+
+[functions.redo]
+label = "Redo"
+message = "Redo"
+[functions.redo.refusals]
+nothing = "Nothing to redo"
+
+[functions.quantize]
+label = "Quant"
+message = "Quantize: 1/16"
+manual = "Quantize the current MIDI clip to 1/16 notes."
+[functions.quantize.refusals]
+no_clip = "No clip to quantize"
+audio = "Cannot quantize an audio clip"
+
+[functions.launch_quantization]
+label = "LaunchQ"
+message = "Launch Quantization: {name}"
+manual = "Launch quantization on/off; red while off."
+
+[functions.tempo]
+message = "Tempo: {bpm:.1f} BPM"
+manual = "Tempo +1 or -1 BPM."
+
+[functions.fixed_length]
+label = "Length"
+message = "Fixed Length: {bars} {unit}"
+manual = "Record new clips at exactly 1, 2, 4 or 8 bars. Each press steps to the next length, then off."
+[functions.fixed_length.outcomes]
+off = "Fixed Length: OFF"
+
+[functions.stop_all]
+label = "StopAll"
+message = "Stop all clips"
+manual = "Stop all clips. In Linnstrument Mode, stops the selected track's clips."
+
+[functions.record]
+label = "Record"
+manual = "Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording."
+[functions.record.manual_in]
+global = "Session Record on/off (Arrangement Record in Arrangement View). Blinks while recording. In Linnstrument Mode, records a new clip on the selected track."
+[functions.record.outcomes]
+session_on = "Session Record: ON"
+session_off = "Session Record: OFF"
+arrangement_on = "Arrangement Record: ON"
+arrangement_off = "Arrangement Record: OFF"
+
+[functions.capture]
+label = "Capture"
+message = "Capture and Insert Scene"
+manual = "Capture and Insert Scene. In Linnstrument Mode, captures MIDI."
+
+[functions.capture_midi]
+label = "CapMIDI"
+message = "Capture MIDI"
+manual = "Capture MIDI."
+[functions.capture_midi.refusals]
+nothing = "Nothing to capture"
+
+[functions.record_clip]
+label = "RecClip"
+message = "Record Clip"
+manual = "Record a new clip on the selected track."
+[functions.record_clip.outcomes]
+new_scene = "Record Clip: new scene"
+[functions.record_clip.refusals]
+no_track = "No selected track"
+group_track = "Cannot record on a group track"
+not_armed = "Track not armed"
+
+[functions.stop_track]
+label = "StopTrk"
+message = "Stop clips: {track}"
+manual = "Stop the selected track's clips."
+[functions.stop_track.refusals]
+no_track = "No selected track"
+
+[functions.unmute_all]
+label = "Unmute"
+message = "Unmute all"
+manual = "Unmute every track and return track in the Set. Orange while any is muted."
+
+[functions.unsolo_all]
+label = "Unsolo"
+message = "Unsolo all"
+manual = "Unsolo every track and return track in the Set. Blue while any is soloed."
+
+[functions.unarm_all]
+label = "Unarm"
+message = "Unarm all"
+manual = "Disarm every track in the Set. Red while any is armed."
+
+[functions.shift]
+label = "Shift"
+message = "Shift"
+manual = "Hold for the Shift layer."
+
+[functions.window]
+message = "Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene}"
+manual = "Move the Ableton session ring in the selected direction."
+
+[functions.fader_source]
+label = "Source"
+manual = "Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode. In Session and Mixer Mode, the split view's snapshots come third."
+[functions.fader_source.outcomes]
+device = "Faders: Device FX"
+mapped = "Faders: Mapped FX"
+snapshots = "Faders: FX snapshots"
+
+[functions.session]
+label = "Session"
+message = "Session Mode"
+manual = "Session Mode. In Session Mode, toggles the split view."
+[functions.session.manual_in]
+sequencer-nav = "Back to Session Mode."
+[functions.session.outcomes]
+split_on = "Split view: ON"
+split_off = "Split view: OFF"
+
+[functions.mixer]
+label = "Mixer"
+manual = "Mixer Mode. In Mixer Mode, toggles the split view."
+[functions.mixer.manual_in]
+sequencer-nav = "Mixer Mode."
+[functions.mixer.outcomes]
+split_on = "Split view: ON"
+split_off = "Split view: OFF"
+on = "Mixer Mode: ON"
+off = "Mixer Mode: OFF"
+
+[functions.fx]
+label = "FX"
+manual = "FX Mode. Press again for Session Mode."
+[functions.fx.manual_in]
+sequencer-nav = "FX Mode."
+[functions.fx.outcomes]
+on = "FX Mode: ON"
+off = "FX Mode: OFF"
+
+[functions.seq]
+label = "Seq"
+message = "Seq: tap for Sequencer, or press a clip"
+manual = "Hold and press a clip, or tap, for Sequencer Mode."
+[functions.seq.manual_in]
+sequencer-nav = "Back to Session Mode."
+[functions.seq.outcomes]
+entered = "Sequencer"
+left = "Session Mode"
+[functions.seq.refusals]
+needs_midi = "Sequencer needs a MIDI track"
+
+[functions.copy]
+label = "Copy"
+manual = "Hold, press a clip, then an empty slot."
+[functions.copy.manual_in]
+sequencer-nav = "Hold, press a step, then press steps to paste it onto."
+[functions.copy.outcomes]
+held = "Copy: pick a clip or scene"
+held_slots = "Copy: press a slot to overwrite"
+picked_clip = "Copy: pick an empty slot"
+clip_copied = "Clip copied"
+clips_copied = "Clips copied"
+picked_scene = "Copy: pick an empty scene"
+scene_copied = "Scene copied"
+held_steps = "Copy: pick a step"
+picked_step = "Copy: pick steps"
+[functions.copy.refusals]
+empty_slot = "Copy: pick a clip or scene"
+scene_source = "Pick a scene target"
+target_full = "Target not empty"
+group_target = "Cannot copy into a group track"
+kinds = "Cannot copy between MIDI and audio tracks"
+other_group = "Pick a slot in the same group"
+empty_scene = "Scene is empty"
+clip_source = "Pick a clip target"
+scene_full = "Target scene not empty"
+empty_step = "Step is empty"
+
+[functions.delete]
+label = "Delete"
+manual = "Hold, then press a clip or scene to delete it."
+[functions.delete.manual_in]
+sequencer-nav = "Hold, then press a step to clear it, or a note pad to remove that note from the clip."
+[functions.delete.outcomes]
+held = "Delete: pick a clip or scene"
+held_steps = "Delete: pick a step or note pad"
+[functions.delete.refusals]
+last_scene = "Cannot delete last scene"
+
+[functions.stop]
+label = "Stop"
+message = "Stop clips: {track}"
+manual = "Hold, then press a track's pad to stop that track's clips."
+[functions.stop.outcomes]
+held = "Stop: pick a track"
+
+[functions.linnstrument_mode]
+label = "Linn"
+message = "Linnstrument Mode"
+manual = "Switch to Linnstrument Mode."
+[functions.linnstrument_mode.manual_in]
+sequencer-global = "Switch to Linnstrument Mode, keeping the arm. Back returns here."
+
+[functions.back]
+label = "Back"
+manual = "Back to the mode you came from: Session, Mixer, FX or Sequencer."
+[functions.back.outcomes]
+session = "Back: Session Mode"
+mixer = "Back: Mixer Mode"
+fx = "Back: FX Mode"
+sequencer = "Back: Sequencer"
+
+[functions.scene_page]
+label = "Scenes"
+message = "Scene page: pick a scene"
+manual = "Show the scene page."
+
+[functions.close_scenes]
+label = "Back"
+message = "Scene page: closed"
+manual = "Back to the controls without launching."
+
+[functions.device_clip]
+label = "DevClip"
+message = "Device/Clip: tracks and devices"
+manual = "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices."
+[functions.device_clip.outcomes]
+tapped = "Device/Clip view"
+
+[functions.tracks]
+manual = "Select the previous or next track, through the returns and master, and give its first rack the blue hand."
+
+[functions.devices]
+manual = "Select the previous or next device on the selected track."
+
+[functions.double]
+label = "Double"
+message = "Loop doubled"
+manual = "Double the loop, notes and all."
+[functions.double.refusals]
+no_clip = "No clip"
+
+[functions.halve]
+label = "Halve"
+message = "Loop halved"
+manual = "Halve the loop. Notes past the new end stay in the clip."
+[functions.halve.refusals]
+no_clip = "No clip"
+too_short = "Loop can't be shorter than a step"
+
+[functions.follow]
+label = "Follow"
+manual = "Follow on/off: the steps show the page that's playing. Blue while on."
+[functions.follow.outcomes]
+on = "Follow: ON"
+off = "Follow: OFF"
+
+[functions.up]
+label = "Up"
+manual = "Move the note pads an octave up or down."
+[functions.up.outcomes]
+notes = "Note pads: from {note}"
+pads = "Drum pads: from {note}"
+
+[functions.down]
+label = "Down"
+[functions.down.outcomes]
+notes = "Note pads: from {note}"
+pads = "Drum pads: from {note}"
+
+[functions.view]
+label = "View"
+manual = "Switch columns 11–14 between the note pads and the settings."
+[functions.view.outcomes]
+settings = "View: settings"
+notes = "View: note pads"
+
+[functions.rates]
+message = "Rate: {rate}"
+manual = "The step length: 1/4, 1/8, 1/16 or 1/32. The current one is blue."
+[functions.rates.outcomes]
+triplet = "Rate: {rate} triplet"
+
+[functions.triplet]
+label = "Triplet"
+message = "Rate: {rate}"
+manual = "Triplet steps on/off: orange while on."
+[functions.triplet.outcomes]
+triplet = "Rate: {rate} triplet"
+
+[functions.pages]
+message = "Page: {page}"
+[functions.pages.outcomes]
+loop = "Loop: pages {first}–{last}"
+
+[functions.slots]
+[functions.slots.outcomes]
+cleared = "{name} cleared"
+stored = "{name} stored ({racks})"
+recalled = "{name} recalled{note}"
+morphing = "{name} {timing}{note}"
+[functions.slots.refusals]
+no_racks = "No racks to store"
+nothing = "{name}: nothing to recall{note}"
+
+[functions.scene_slots]
+manual = "A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it."
+[functions.scene_slots.outcomes]
+cleared = "{name} cleared"
+stored = "{name} stored ({racks})"
+recalled = "{name} recalled{note}"
+morphing = "{name} {timing}{note}"
+[functions.scene_slots.refusals]
+no_racks = "No racks to store"
+nothing = "{name}: nothing to recall{note}"
+
+[functions.bars]
+message = "Bars: {bars}, press a snapshot or scene"
+manual = "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line."
+
+[functions.faders]
+[functions.faders.outcomes]
+unbound = "Fader {fader} unbound"
+[functions.faders.refusals]
+needs_mapped = "Shift + FX for Mapped FX"
+not_found = "Fader {fader}: parameter not found"
+
+[functions.scenes]
+[functions.scenes.outcomes]
+timed = "Scene {scene} in {bars}"
+cancelled = "Scene {scene} launch cancelled"

@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from . import buttons
+
 ROWS = 8
 COLUMNS = 17  # column 0 is the device's hardware buttons
 
@@ -20,38 +22,6 @@ WINDOW_SCENES = 6
 MUTE_ROW = 7
 SELECT_ROW = 8
 
-# (column, pad)
-PLAY_STOP = (GLOBAL_COLUMN, 1)
-RECORD = (GLOBAL_COLUMN, 2)
-CAPTURE = (GLOBAL_COLUMN, 3)
-QUANTIZE = CAPTURE  # pad 3's Shift function
-METRONOME = (GLOBAL_COLUMN, 4)
-LAUNCH_QUANTIZATION = METRONOME  # pad 4's Shift function
-FIXED_LENGTH = (GLOBAL_COLUMN, 5)
-UNDO = (GLOBAL_COLUMN, 6)
-MODE_PAD = (GLOBAL_COLUMN, 7)
-SCENE_PAGE = MODE_PAD  # pad 7's Shift function in Linnstrument Mode
-SHIFT = (GLOBAL_COLUMN, 8)
-SESSION = (NAV_COLUMN, 1)
-MIXER = (NAV_COLUMN, 2)
-FX = (NAV_COLUMN, 3)
-FADER_SOURCE = FX  # FX's Shift function
-# Unlit and unused until Chord (16/4) is built.
-RESERVED = ((NAV_COLUMN, 4),)
-SEQ = (NAV_COLUMN, 5)
-DELETE = (NAV_COLUMN, 6)
-COPY = (NAV_COLUMN, 7)
-DEVICE_CLIP = (NAV_COLUMN, 8)
-UNMUTE_ALL = (SCENE_COLUMN, 7)
-STOP = (SCENE_COLUMN, 8)
-
-# FX Mode: slot N is FX_SLOTS[N - 1].
-FX_SLOTS = tuple((11, pad) for pad in range(1, 9)) + tuple((12, pad) for pad in range(1, 9))
-# FX Mode column 13: scene N in the window's snapshot is FX_SCENE_SLOTS[N - 1]. Pads 7-8 are
-# unused.
-FX_SCENE_SLOTS = tuple((13, pad) for pad in range(1, WINDOW_SCENES + 1))
-# Column 14: morph length in bars.
-FX_LENGTHS = {(14, 1): 1, (14, 2): 2, (14, 3): 4, (14, 4): 8, (14, 5): 16}
 # FX Mode: one horizontal fader per pad row.
 FX_FADER_COLUMNS = range(2, 11)
 
@@ -59,40 +29,39 @@ FX_FADER_COLUMNS = range(2, 11)
 SPLIT_TRACKS = 8
 SPLIT_FADER_COLUMNS = range(10, 15)
 
-# bars, in Fixed Length's cycle order
-FIXED_LENGTHS = (1, 2, 4, 8)
-
-# Shift + column 16 pads 5-8, in every mode but Linnstrument Mode: (track step, scene step).
-WINDOW_MOVES = {
-    (NAV_COLUMN, 5): (0, -1),
-    (NAV_COLUMN, 6): (0, 1),
-    (NAV_COLUMN, 7): (1, 0),
-    (NAV_COLUMN, 8): (-1, 0),
-}
-
-# Shift + column 16 pads 1 and 2: BPM step.
-TEMPO_STEPS = {(NAV_COLUMN, 1): 1, (NAV_COLUMN, 2): -1}
-
 # Sequencer Mode: steps in columns 3-10, note pads or settings in 11-14.
 SEQ_STEP_COLUMNS = range(3, 11)
 SEQ_NOTE_COLUMNS = range(11, 15)
-# Settings view: step length in beats per rate pad.
-SEQ_RATES = {(11, 1): 1.0, (11, 2): 0.5, (11, 3): 0.25, (11, 4): 0.125}
-SEQ_TRIPLET = (11, 5)
-# Settings view: page N is SEQ_PAGES[N], column 12 then column 13.
-SEQ_PAGES = tuple((12, pad) for pad in range(1, 9)) + tuple((13, pad) for pad in range(1, 9))
-SEQ_DOUBLE = (SCENE_COLUMN, 1)
-SEQ_HALVE = (SCENE_COLUMN, 2)
-SEQ_FOLLOW = (SCENE_COLUMN, 4)
-# Up and Down sit above the view switch, in reach in both views.
-SEQ_UP = (SCENE_COLUMN, 6)
-SEQ_DOWN = (SCENE_COLUMN, 7)
-SEQ_VIEW = (SCENE_COLUMN, 8)
 
-# Device/Clip + column 16 pads 7-4: track step, device step.
-DEVICE_CLIP_TRACK_STEPS = {(NAV_COLUMN, 7): -1, (NAV_COLUMN, 6): 1}
-DEVICE_CLIP_DEVICE_STEPS = {(NAV_COLUMN, 5): -1, (NAV_COLUMN, 4): 1}
+# bars, in Fixed Length's cycle order
+FIXED_LENGTHS = (1, 2, 4, 8)
 
+# Buttons, from buttons.toml: one namespace per section, each button's (column, pad) by name
+# and each group as {(column, pad): value} by its function. A mode's section falls back to
+# its Session one (buttons.FALLBACK). The fixed regions above come first, because the
+# registry checks no button sits on them.
+GLOBAL = buttons.section("global")
+GLOBAL_SHIFT = buttons.section("global-shift")
+LINNSTRUMENT = buttons.section("linnstrument", GLOBAL)
+LINNSTRUMENT_SHIFT = buttons.section("linnstrument-shift", GLOBAL_SHIFT)
+LINNSTRUMENT_SCENES = buttons.section("linnstrument-scenes")
+SEQUENCER_GLOBAL = buttons.section("sequencer-global", GLOBAL)
+SEQUENCER_GLOBAL_SHIFT = buttons.section("sequencer-global-shift", GLOBAL_SHIFT)
+NAVIGATION = buttons.section("navigation")
+NAVIGATION_SHIFT = buttons.section("navigation-shift")
+SEQUENCER_NAV = buttons.section("sequencer-nav", NAVIGATION)
+SEQUENCER_NAV_SHIFT = buttons.section("sequencer-nav-shift", NAVIGATION_SHIFT)
+VIEW = buttons.section("view")
+VIEW_SHIFT = buttons.section("view-shift")
+DEVICE_CLIP = buttons.section("device-clip")
+SEQUENCER_GRID = buttons.section("sequencer-grid")
+SEQUENCER_SETTINGS = buttons.section("sequencer-settings")
+FX = buttons.section("fx")
+# Read by index: slot N is FX.slots[N - 1], window scene N is FX.scene_slots[N - 1] and page
+# N is SEQUENCER_SETTINGS.pages[N].
+FX.slots = tuple(FX.slots)
+FX.scene_slots = tuple(FX.scene_slots)
+SEQUENCER_SETTINGS.pages = tuple(SEQUENCER_SETTINGS.pages)
 
 def device_row(pad):
     if not 1 <= pad <= ROWS:

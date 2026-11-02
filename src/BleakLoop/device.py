@@ -1,6 +1,6 @@
 """LinnStrument message building and the LED driver (architecture section 5). Pure Python."""
 
-from .core import layout
+from .core import buttons, layout
 from .core.leds import (
     BLUE,
     CYAN,
@@ -69,13 +69,14 @@ READ_NUMBERS = [
     NRPN_RIGHT_PER_ROW_LOWEST,
 ]
 
-REFUSE_DUPLICATES = "Row Offset repeats notes in the Global column: controls off"
-REFUSE_ROW_OFFSET = "Couldn't read Row Offset: controls off"
-REFUSE_RIGHT_SPLIT = "Couldn't read the right split: controls off"
-REFUSE_CHANNELS = "The right split uses every channel: controls off"
-CONTROLS_ON = "Global column controls on"
-CONTROLS_MOVED = "The right split took the Global column's channel: controls moved to channel {}"
-OCTAVE_RESET = "Left split Octave/Transpose reset: select the right split to change yours"
+# Wording from buttons.toml's [system] table. A refusal is compared by value, so each is read
+# once at load.
+REFUSE_DUPLICATES = buttons.system("refuse_duplicates")
+REFUSE_ROW_OFFSET = buttons.system("refuse_row_offset")
+REFUSE_RIGHT_SPLIT = buttons.system("refuse_right_split")
+REFUSE_CHANNELS = buttons.system("refuse_channels")
+CONTROLS_ON = buttons.system("controls_on")
+OCTAVE_RESET = buttons.system("octave_reset")
 
 
 def cc(channel, number, value):

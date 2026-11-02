@@ -99,9 +99,9 @@ def handle(state, event, snap=SNAP):
 
 
 def test_toggle_on():
-    state, actions = handle(State(), press(*layout.MIXER))
+    state, actions = handle(State(), press(*layout.NAVIGATION.mixer))
     assert state.mixer
-    assert actions == [SetMixer(True), ShowMessage("Mixer Mode ON")]
+    assert actions == [SetMixer(True), ShowMessage("Mixer Mode: ON")]
 
 
 def test_toggle_on_drops_copy_source():
@@ -110,9 +110,9 @@ def test_toggle_on_drops_copy_source():
 
 
 def test_toggle_off():
-    state, actions = handle(MIXER, press(*layout.SESSION))
+    state, actions = handle(MIXER, press(*layout.NAVIGATION.session))
     assert not state.mixer
-    assert actions == [SetMixer(False), ShowMessage("Mixer Mode OFF")]
+    assert actions == [SetMixer(False), ShowMessage("Mixer Mode: OFF")]
 
 
 def test_toggle_off_resets_fader_state_and_closes_undo():
@@ -124,34 +124,34 @@ def test_toggle_off_resets_fader_state_and_closes_undo():
         glide_ms=5.0,
         undo_open=True,
     )
-    state, actions = handle(state, press(*layout.SESSION))
+    state, actions = handle(state, press(*layout.NAVIGATION.session))
     assert (state.touches, state.lifts, state.glides) == ((), (), ())
     assert (state.glide_ms, state.undo_open) == (None, False)
-    assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("Mixer Mode OFF")]
+    assert actions == [EndUndoStep(), SetMixer(False), ShowMessage("Mixer Mode: OFF")]
 
 
 def test_shift_stop_in_mixer_unarms_all():
-    state, actions = handle(replace(MIXER, shift=True), press(*layout.STOP))
+    state, actions = handle(replace(MIXER, shift=True), press(*layout.VIEW.stop))
     assert state.mixer and not state.stop
     assert actions == [UnarmAll(), ShowMessage("Unarm all")]
 
 
 def test_shift_play_stop_in_mixer_stops_all():
-    state, actions = handle(replace(MIXER, shift=True), press(*layout.PLAY_STOP))
+    state, actions = handle(replace(MIXER, shift=True), press(*layout.GLOBAL.play_stop))
     assert state.mixer
     assert actions == [StopAllClips(), ShowMessage("Stop all clips")]
 
 
 @pytest.mark.parametrize("held", [{"copy": True}, {"delete": True}])
 def test_mixer_pad_with_copy_or_delete_held_does_not_toggle(held):
-    state, actions = handle(State(**held), press(*layout.MIXER))
+    state, actions = handle(State(**held), press(*layout.NAVIGATION.mixer))
     assert not state.mixer
     assert actions == []
 
 
 def test_mode_pad_from_mixer_closes_undo_then_enters_linnstrument():
-    state, actions = handle(replace(MIXER, undo_open=True), press(*layout.MODE_PAD))
-    assert actions == [EndUndoStep(), EnterMode(Mode.LINNSTRUMENT)]
+    state, actions = handle(replace(MIXER, undo_open=True), press(*layout.GLOBAL.linnstrument_mode))
+    assert actions == [EndUndoStep(), EnterMode(Mode.LINNSTRUMENT), ShowMessage("Linnstrument Mode")]
     assert state.mode is Mode.LINNSTRUMENT
     assert not state.mixer
     assert not state.undo_open
@@ -360,7 +360,7 @@ def test_overshoot_release_on_a_row_starts_no_dead_slide():
 
 
 def test_leaving_mixer_drops_dead_slides():
-    state, _ = handle(tapped_mute(), press(*layout.MIXER))
+    state, _ = handle(tapped_mute(), press(*layout.NAVIGATION.mixer))
     assert state.dead == ()
 
 
@@ -637,12 +637,12 @@ def test_faders_dark_under_shift():
     assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 7))
     assert frame[(3, 7)] == Light(CYAN)
     assert frame[(3, 8)] == Light(LIME)
-    assert frame[layout.PLAY_STOP] == Light(RED)
+    assert frame[layout.GLOBAL.play_stop] == Light(RED)
 
 
 @pytest.mark.parametrize("state, colour", [(State(), CYAN), (MIXER, BLUE)])
 def test_mixer_pad_light(state, colour):
-    assert session.render(state, SNAP)[layout.MIXER] == Light(colour)
+    assert session.render(state, SNAP)[layout.NAVIGATION.mixer] == Light(colour)
 
 
 def test_mixer_off_draws_the_grid():

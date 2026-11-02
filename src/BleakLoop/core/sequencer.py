@@ -7,7 +7,7 @@ Steps are counted from clip time 0. Step s of the page in view is at column 3 + 
 import math
 from dataclasses import replace
 
-from . import controls, faders, fx, global_column, layout, mixer, modes, values
+from . import buttons, catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, values
 from .leds import (
     BLUE,
     CYAN,
@@ -37,7 +37,6 @@ from .model import (
     SetArms,
     SetDrumScroll,
     SetLoop,
-    ShowMessage,
 )
 from .modes import Mode, StepHold
 
@@ -45,7 +44,6 @@ STEPS = len(layout.SEQ_STEP_COLUMNS) * layout.ROWS  # per page
 NOTE_COLUMNS = len(layout.SEQ_NOTE_COLUMNS)
 # Float error in note times and the play position: a time this close to a boundary is past it.
 EPSILON = 1e-6
-NEEDS_MIDI = "Sequencer needs a MIDI track"
 RATE_NAMES = {1.0: "1/4", 0.5: "1/8", 0.25: "1/16", 0.125: "1/32"}
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 NATURALS = {0, 2, 4, 5, 7, 9, 11}
@@ -138,7 +136,7 @@ def _create_length(state, snapshot):
 def enter_on_slot(state, track, scene, snapshot):
     # Seq + a clip slot: track is the slot's TrackView.
     if not track.has_midi_input or track.is_foldable or track.set_index is None:
-        return state, [ShowMessage(NEEDS_MIDI)]
+        return state, buttons.refuse("seq", "needs_midi")
     state, actions = _enter(state, snapshot, track.set_index)
     return state, [HighlightSlot(track.set_index, scene)] + actions
 
@@ -147,7 +145,7 @@ def enter_by_tap(state, snapshot):
     # An empty highlighted slot gives way to the Detail-view clip, then the playing clip.
     entry = snapshot.seq_entry
     if entry is None or entry.selected is None or not entry.selected_midi:
-        return state, [ShowMessage(NEEDS_MIDI)]
+        return state, buttons.refuse("seq", "needs_midi")
     track, highlight = entry.selected, []
     if not entry.has_clip:
         if entry.detail is not None:
@@ -177,7 +175,7 @@ def _enter(state, snapshot, track):
     state = modes.enter(state, Mode.SEQUENCER)
     if changes:
         actions.append(SetArms(changes))
-    return state, actions + [EnterMode(Mode.SEQUENCER), ShowMessage("Sequencer")]
+    return state, actions + [EnterMode(Mode.SEQUENCER), *buttons.say("seq", "entered")]
 
 
 def leave(state, snapshot):
@@ -217,7 +215,7 @@ def sync(state, snapshot):
         refused = -1 if view.track is None else view.track
         if state.seq_refused == refused:
             return state, []
-        return replace(state, seq_refused=refused), [ShowMessage(NEEDS_MIDI)]
+        return replace(state, seq_refused=refused), buttons.refuse("seq", "needs_midi")
     state, actions = _close_slide(state)
     old, new, arms = state.seq_track, view.track, snapshot.arms
     changes = []
@@ -279,61 +277,67 @@ def handle(state, event, snapshot):
     if not event.pressed and any((h.column, h.pad) == key for h in state.seq_holds):
         # A held step ends on its cell's release, wherever the finger slid to.
         return _release_step(state, event, view, snapshot)
-    if key == layout.SHIFT:
+    normal = controls.at(controls.sections(state), key)
+    held = normal[1] if normal is not None else None
+    if held == "shift":
         return global_column.handle(state, event, snapshot)
-    if event.column == layout.NAV_COLUMN:
-        return _nav(state, event, snapshot)
+    # Under Shift, a hold's press gives way to the Shift layer's button on its pad.
+    shift_layer = state.shift and not state.copy and not state.delete
+    shifted = shift_layer and event.pressed and layout.SEQUENCER_NAV_SHIFT.at(key) is not None
+    if held == "device_clip" and not shifted:
+        return controls.device_clip(state, event)
+    if state.device_clip and event.pressed and key in controls.navigation_pads(state):
+        # Device/Clip's layer replaces the Navigation column's normal and Shift layers.
+        return controls.device_clip_layer(state, key)
+    if held == "copy" and not shifted:
+        if not event.pressed:
+            return replace(state, copy=False, seq_copy_source=None), []
+        return replace(state, copy=True), buttons.say("copy", "held_steps")
+    if held == "delete" and not shifted:
+        if not event.pressed:
+            return replace(state, delete=False), []
+        return replace(state, delete=True), buttons.say("delete", "held_steps")
     if event.column in layout.SEQ_STEP_COLUMNS:
         return _step(state, event, view, snapshot)
-    if event.column in layout.SEQ_NOTE_COLUMNS:
-        if state.seq_settings:
-            return _settings(state, event, view)
+    if event.column in layout.SEQ_NOTE_COLUMNS and not state.seq_settings:
         return _note_pad(state, event, view, snapshot)
+    setting = layout.SEQUENCER_SETTINGS.at(key) if state.seq_settings else None
+    if setting is not None:
+        # The settings take every press and release, whatever is held.
+        if not event.pressed:
+            return _page_release(state, setting), []
+        return functions.press(setting, state, snapshot)
     if not event.pressed:
         return state, []
+    if key in controls.navigation_pads(state):
+        # Navigation's buttons work under Copy and Delete too.
+        button = (layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV).at(key)
+        return functions.press(button, state, snapshot) if button else (state, [])
     # Copy over Delete over Shift.
     if state.copy or state.delete:
         return state, []
-    if event.column == layout.GLOBAL_COLUMN:
+    if state.scene_page and event.column == layout.GLOBAL_COLUMN:
         return global_column.handle(state, event, snapshot)
-    if event.column == layout.SCENE_COLUMN:
-        return _side(state, key, view)
-    return state, []
+    button = controls.at(controls.sections(state, shift=state.shift), key)
+    if button is None:
+        return state, []
+    return functions.press(button, state, snapshot)
 
 
-def _nav(state, event, snapshot):
-    key = (event.column, event.pad)
-    shift_layer = state.shift and not state.copy and not state.delete
-    if key == layout.DEVICE_CLIP and not (shift_layer and event.pressed):
-        # On Shift's layer the pad is a window move.
-        return controls.device_clip(state, event)
-    if state.device_clip and event.pressed:
-        # Device/Clip's layer replaces column 16's normal and Shift layers, as in Session Mode.
-        return controls.device_clip_layer(state, key)
-    if key == layout.COPY and not (shift_layer and event.pressed):
-        if not event.pressed:
-            return replace(state, copy=False, seq_copy_source=None), []
-        return replace(state, copy=True), [ShowMessage("Copy: pick a step")]
-    if key == layout.DELETE and not (shift_layer and event.pressed):
-        if not event.pressed:
-            return replace(state, delete=False), []
-        return replace(state, delete=True), [ShowMessage("Delete Mode ON")]
-    if not event.pressed:
-        # Every Seq release too: a Seq + slot hold's release arrives after entry.
-        return state, []
-    if shift_layer:
-        if key in layout.WINDOW_MOVES:
-            return controls.move_window(state, layout.WINDOW_MOVES[key], snapshot)
-        if key in layout.TEMPO_STEPS:
-            return state, controls.tempo_step(snapshot, layout.TEMPO_STEPS[key])
-        if key == layout.FADER_SOURCE:
-            return controls.toggle_fader_source(state)
-        return state, []
-    if key in (layout.SEQ, layout.SESSION):
-        return leave(state, snapshot)
-    if key in (layout.MIXER, layout.FX):
+def _page_release(state, button):
+    if button[1] == "pages" and button[3] - 1 == state.seq_page_held:
+        return replace(state, seq_page_held=None)
+    return state
+
+
+def _view_of(snapshot):
+    return snapshot.sequencer or SequencerView()
+
+
+def _leave_for(toggle):
+    def press(state, snapshot, value):
         state, actions = leave(state, snapshot)
-        state, more = (mixer.toggle if key == layout.MIXER else fx.toggle)(state)
+        state, more = toggle(state)
         # The new mode's width can be wider than Session's split view.
         window = layout.move_window(
             state.window,
@@ -344,34 +348,126 @@ def _nav(state, event, snapshot):
             controls.window_tracks(state),
         )
         return replace(state, window=window), actions + more
-    return state, []
+
+    return press
 
 
-def _side(state, key, view):
-    if key == layout.SEQ_VIEW:
-        return replace(state, seq_settings=not state.seq_settings), []
-    if key in (layout.SEQ_UP, layout.SEQ_DOWN):
-        step = 1 if key == layout.SEQ_UP else -1
+def _cyan(state, snapshot, value):
+    return Light(CYAN)
+
+
+@functions.register("session", [catalogue.SEQUENCER], light=_cyan)
+def _session(state, snapshot, value):
+    state, actions = leave(state, snapshot)
+    return state, actions + buttons.say("session")
+
+
+@functions.register("seq", [catalogue.SEQUENCER], light=lambda state, snapshot, value: Light(BLUE))
+def _seq(state, snapshot, value):
+    state, actions = leave(state, snapshot)
+    return state, actions + buttons.say("seq", "left")
+
+
+functions.register("mixer", [catalogue.SEQUENCER], light=_cyan)(_leave_for(mixer.toggle))
+functions.register("fx", [catalogue.SEQUENCER], light=_cyan)(_leave_for(fx.toggle))
+functions.register_hold(
+    "copy",
+    [catalogue.SEQUENCER],
+    light=lambda state, snapshot, value: Light(RED, Blink.FAST) if state.copy else Light(MAGENTA),
+)
+functions.register_hold(
+    "delete",
+    [catalogue.SEQUENCER],
+    light=lambda state, snapshot, value: Light(RED, Blink.FAST if state.delete else Blink.STEADY),
+)
+
+
+@functions.register(
+    "view", light=lambda state, snapshot, value: Light(BLUE if state.seq_settings else CYAN)
+)
+def _view(state, snapshot, value):
+    state = replace(state, seq_settings=not state.seq_settings)
+    return state, buttons.say("view", "settings" if state.seq_settings else "notes")
+
+
+def _shift_notes(step):
+    def press(state, snapshot, value):
+        view = _view_of(snapshot)
         if view.drum is not None and view.is_midi:
             return _scroll(state, view, step)
         return _octave(state, step)
-    if key == layout.SEQ_FOLLOW:
-        if state.seq_follow:
-            return replace(state, seq_follow=False, seq_page=view_page(state, view)), [
-                ShowMessage("Follow OFF")
-            ]
-        return replace(state, seq_follow=True), [ShowMessage("Follow ON")]
-    if key not in (layout.SEQ_DOUBLE, layout.SEQ_HALVE):
-        return state, []
+
+    return press
+
+
+functions.register("up", light=lambda state, snapshot, value: Light(WHITE))(_shift_notes(1))
+functions.register("down", light=lambda state, snapshot, value: Light(WHITE))(_shift_notes(-1))
+
+
+@functions.register(
+    "follow", light=lambda state, snapshot, value: Light(BLUE if state.seq_follow else CYAN)
+)
+def _follow(state, snapshot, value):
+    if state.seq_follow:
+        view = _view_of(snapshot)
+        state = replace(state, seq_follow=False, seq_page=view_page(state, view))
+        return state, buttons.say("follow", "off")
+    return replace(state, seq_follow=True), buttons.say("follow", "on")
+
+
+@functions.register("double", light=lambda state, snapshot, value: Light(RED))
+def _double(state, snapshot, value):
+    view = _view_of(snapshot)
     if not view.has_clip or not view.is_midi:
-        return state, [ShowMessage("No clip")]
-    if key == layout.SEQ_DOUBLE:
-        return _write(state, [DuplicateLoop(view.track, view.scene), ShowMessage("Loop doubled")])
+        return state, buttons.refuse("double", "no_clip")
+    return _write(state, [DuplicateLoop(view.track, view.scene), *buttons.say("double")])
+
+
+@functions.register("halve", light=lambda state, snapshot, value: Light(PINK))
+def _halve(state, snapshot, value):
+    view = _view_of(snapshot)
+    if not view.has_clip or not view.is_midi:
+        return state, buttons.refuse("halve", "no_clip")
     half = (view.loop_end - view.loop_start) / 2
     if half < step_length(state) - EPSILON:
-        return state, [ShowMessage("Loop can't be shorter than a step")]
+        return state, buttons.refuse("halve", "too_short")
     loop = SetLoop(view.track, view.scene, view.loop_start, view.loop_start + half)
-    return _write(state, [loop, ShowMessage("Loop halved")])
+    return _write(state, [loop, *buttons.say("halve")])
+
+
+@functions.register(
+    "rates", light=lambda state, snapshot, rate: Light(BLUE if rate == state.seq_rate else CYAN)
+)
+def _rate(state, snapshot, rate):
+    state = replace(state, seq_rate=rate)
+    return state, _rate_message("rates", state)
+
+
+@functions.register(
+    "triplet", light=lambda state, snapshot, value: Light(ORANGE if state.seq_triplet else PINK)
+)
+def _triplet(state, snapshot, value):
+    state = replace(state, seq_triplet=not state.seq_triplet)
+    return state, _rate_message("triplet", state)
+
+
+def _page_light(state, snapshot, value):
+    view = _view_of(snapshot)
+    page = value - 1
+    playing = playhead(state, view)
+    if page == view_page(state, view):
+        colour = BLUE
+    elif view.has_clip and page * page_span(state) < view.loop_end - EPSILON:
+        colour = CYAN
+    else:
+        return Light(OFF)
+    playing_page = playing // STEPS if playing is not None else None
+    return Light(colour, Blink.TEMPO if page == playing_page else Blink.STEADY)
+
+
+@functions.register("pages", light=_page_light)
+def _page_press(state, snapshot, value):
+    return _page(state, value - 1, _view_of(snapshot))
 
 
 # Slides: hold a step and slide along its row (stage 2)
@@ -537,11 +633,11 @@ def _copy_step(state, g, view, snapshot):
     source = state.seq_copy_source
     if source is None:
         if not notes:
-            return state, [ShowMessage("Step is empty")]
+            return state, buttons.refuse("copy", "empty_step")
         copied = tuple(
             (note.pitch, note.start - g * length, note.duration, note.velocity) for note in notes
         )
-        return replace(state, seq_copy_source=(g, copied)), [ShowMessage("Copy: pick steps")]
+        return replace(state, seq_copy_source=(g, copied)), buttons.say("copy", "picked_step")
     if g == source[0]:
         return state, []
     add = tuple(
@@ -578,34 +674,20 @@ def _note_pad(state, event, view, snapshot):
 # Settings view
 
 
-def _settings(state, event, view):
-    key = (event.column, event.pad)
-    page = layout.SEQ_PAGES.index(key) if key in layout.SEQ_PAGES else None
-    if not event.pressed:
-        if page is not None and page == state.seq_page_held:
-            return replace(state, seq_page_held=None), []
-        return state, []
-    if key in layout.SEQ_RATES:
-        state = replace(state, seq_rate=layout.SEQ_RATES[key])
-        return state, [ShowMessage(_rate_name(state))]
-    if key == layout.SEQ_TRIPLET:
-        state = replace(state, seq_triplet=not state.seq_triplet)
-        return state, [ShowMessage(_rate_name(state))]
-    if page is not None:
-        return _page(state, page, view)
-    return state, []
+def _rate_message(function, state):
+    rate = RATE_NAMES[state.seq_rate]
+    return buttons.say(function, "triplet" if state.seq_triplet else None, rate=rate)
 
 
-def _rate_name(state):
-    name = RATE_NAMES[state.seq_rate]
-    return f"Rate {name} triplet" if state.seq_triplet else f"Rate {name}"
+def _direction(step):
+    return "up" if step > 0 else "down"
 
 
 def _octave(state, step):
     base = min(MAX_BASE, max(0, state.seq_base + 12 * step))
     if base == state.seq_base:
         return state, []
-    return replace(state, seq_base=base), [ShowMessage(f"Notes from {note_name(base)}")]
+    return replace(state, seq_base=base), buttons.say(_direction(step), "notes", note=note_name(base))
 
 
 def _scroll(state, view, step):
@@ -613,8 +695,8 @@ def _scroll(state, view, step):
     scroll = min(MAX_SCROLL, max(0, view.drum.scroll + step))
     if scroll == view.drum.scroll:
         return state, []
-    message = ShowMessage(f"Pads from {note_name(4 * scroll)}")
-    return state, [SetDrumScroll(view.track, scroll), message]
+    message = buttons.say(_direction(step), "pads", note=note_name(4 * scroll))
+    return state, [SetDrumScroll(view.track, scroll), *message]
 
 
 def note_name(note):
@@ -630,17 +712,19 @@ def _page(state, page, view):
     if held is not None and held != page:
         # Hold one page and press another: the loop spans both.
         start, end = min(held, page) * span, (max(held, page) + 1) * span
-        return _write(state, [SetLoop(view.track, view.scene, start, end)])
+        loop = buttons.say("pages", "loop", first=min(held, page) + 1, last=max(held, page) + 1)
+        return _write(state, [SetLoop(view.track, view.scene, start, end), *loop])
     state = replace(state, seq_page_held=page)
+    shown = buttons.say("pages", page=page + 1)
     if page * span >= view.loop_end - EPSILON:
         # Past the end: the loop extends to it.
         state = replace(state, seq_follow=False, seq_page=page)
         loop = SetLoop(view.track, view.scene, view.loop_start, (page + 1) * span)
-        return _write(state, [loop])
+        return _write(state, [loop, *shown])
     playing = playhead(state, view)
     if playing is not None and playing // STEPS == page:
-        return replace(state, seq_follow=True), []
-    return replace(state, seq_follow=False, seq_page=page), []
+        return replace(state, seq_follow=True), shown
+    return replace(state, seq_follow=False, seq_page=page), shown
 
 
 # Render
@@ -659,10 +743,7 @@ def render(state, snapshot):
         _render_meters(frame, state, view)
         if not state.seq_settings:
             _render_note_pads(frame, state, view)
-    if state.seq_settings:
-        _render_settings(frame, state, view)
-    _render_side(frame, state)
-    _render_nav(frame, state)
+    _render_buttons(frame, state, snapshot)
     return frame
 
 
@@ -745,46 +826,13 @@ def _note_colour(view, note, pad):
     return WHITE if note % 12 in NATURALS else MAGENTA
 
 
-def _render_settings(frame, state, view):
-    for key, rate in layout.SEQ_RATES.items():
-        frame[key] = Light(BLUE if rate == state.seq_rate else CYAN)
-    frame[layout.SEQ_TRIPLET] = Light(ORANGE if state.seq_triplet else PINK)
-    span = page_span(state)
-    shown = view_page(state, view)
-    playing = playhead(state, view)
-    playing_page = playing // STEPS if playing is not None else None
-    for page, key in enumerate(layout.SEQ_PAGES):
-        if page == shown:
-            colour = BLUE
-        elif view.has_clip and page * span < view.loop_end - EPSILON:
-            colour = CYAN
-        else:
-            continue
-        frame[key] = Light(colour, Blink.TEMPO if page == playing_page else Blink.STEADY)
-
-
-def _render_side(frame, state):
-    frame[layout.SEQ_DOUBLE] = Light(RED)
-    frame[layout.SEQ_HALVE] = Light(PINK)
-    frame[layout.SEQ_FOLLOW] = Light(BLUE if state.seq_follow else CYAN)
-    frame[layout.SEQ_UP] = Light(WHITE)
-    frame[layout.SEQ_DOWN] = Light(WHITE)
-    frame[layout.SEQ_VIEW] = Light(BLUE if state.seq_settings else CYAN)
-
-
-def _render_nav(frame, state):
-    if state.shift and not state.copy and not state.delete:
-        for key in layout.WINDOW_MOVES:
-            frame[key] = Light(YELLOW)
-        for key in layout.TEMPO_STEPS:
-            frame[key] = Light(GREEN)
-        frame[layout.FADER_SOURCE] = Light(ORANGE)
-    else:
-        frame[layout.COPY] = Light(RED, Blink.FAST) if state.copy else Light(MAGENTA)
-        frame[layout.DELETE] = Light(RED, Blink.FAST if state.delete else Blink.STEADY)
-        for key in (layout.SESSION, layout.MIXER, layout.FX):
-            frame[key] = Light(CYAN)
-        frame[layout.SEQ] = Light(BLUE)
-        frame[layout.DEVICE_CLIP] = Light(ORANGE)
+def _render_buttons(frame, state, snapshot):
+    # Column 15 and the settings on both layers; the Navigation column's live layer.
+    shift_layer = state.shift and not state.copy and not state.delete
+    own = controls.sections(state)[2:]
+    navigation = layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV
+    for section in (*own, navigation):
+        for button in section.buttons():
+            frame[button[2]] = functions.light(button, state, snapshot)
     if state.device_clip:
-        controls.render_device_clip_layer(frame)
+        controls.render_device_clip_layer(frame, state, snapshot)

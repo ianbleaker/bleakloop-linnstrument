@@ -1,0 +1,15 @@
+[functions.metronome]
+message = "Metronome {state}"
+[functions.metronome.outcomes]
+off = "Metronome off"
+
+[functions.undo]
+message = "Hidden"
+show = false
+[functions.undo.outcomes]
+done = "Hidden done"
+[functions.undo.refusals]
+no_track = "No selected track"
+
+[system]
+moved = "Controls moved to channel {channel}"

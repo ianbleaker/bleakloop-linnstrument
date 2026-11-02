@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import faders, fx, layout, mixer, linnstrument_mode, sequencer, session
+from . import controls, faders, fx, mixer, linnstrument_mode, sequencer, session
 from .model import FaderBound, PadPress, RacksRead, ScenesChanged
 from .modes import Mode
 
@@ -20,7 +20,7 @@ def handle(state, event, snapshot):
         state.device_clip
         and isinstance(event, PadPress)
         and event.pressed
-        and (event.column, event.pad) != layout.DEVICE_CLIP
+        and (event.column, event.pad) not in controls.pads(state, "device_clip")
     ):
         # Any other press during a Device/Clip hold makes it a hold, not a tap.
         state = replace(state, device_clip_used=True)

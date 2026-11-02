@@ -71,51 +71,51 @@ def test_scroll_to_scene_below_window_near_end_is_clamped():
 
 def test_global_column_has_one_pad_per_role():
     roles = [
-        layout.PLAY_STOP,
-        layout.RECORD,
-        layout.CAPTURE,
-        layout.METRONOME,
-        layout.FIXED_LENGTH,
-        layout.UNDO,
-        layout.MODE_PAD,
-        layout.SHIFT,
+        layout.GLOBAL.play_stop,
+        layout.GLOBAL.record,
+        layout.GLOBAL.capture,
+        layout.GLOBAL.metronome,
+        layout.GLOBAL.fixed_length,
+        layout.GLOBAL.undo,
+        layout.GLOBAL.linnstrument_mode,
+        layout.GLOBAL.shift,
     ]
     assert sorted(roles) == [(1, pad) for pad in range(1, 9)]
 
 
 def test_reserved_pads_have_no_normal_role():
     used = {
-        layout.COPY,
-        layout.DELETE,
-        layout.SESSION,
-        layout.MIXER,
-        layout.FX,
-        layout.SEQ,
-        layout.DEVICE_CLIP,
-        layout.UNMUTE_ALL,
-        layout.STOP,
+        layout.NAVIGATION.copy,
+        layout.NAVIGATION.delete,
+        layout.NAVIGATION.session,
+        layout.NAVIGATION.mixer,
+        layout.NAVIGATION.fx,
+        layout.NAVIGATION.seq,
+        layout.NAVIGATION.device_clip,
+        layout.VIEW.unmute_all,
+        layout.VIEW.stop,
     }
-    assert used.isdisjoint(layout.RESERVED)
+    assert used.isdisjoint((layout.NAVIGATION.reserved,))
 
 
 def test_column_16_has_one_pad_per_role():
     roles = [
-        layout.COPY,
-        layout.DELETE,
-        layout.SESSION,
-        layout.MIXER,
-        layout.FX,
-        layout.SEQ,
-        layout.DEVICE_CLIP,
+        layout.NAVIGATION.copy,
+        layout.NAVIGATION.delete,
+        layout.NAVIGATION.session,
+        layout.NAVIGATION.mixer,
+        layout.NAVIGATION.fx,
+        layout.NAVIGATION.seq,
+        layout.NAVIGATION.device_clip,
     ]
-    assert sorted(roles + list(layout.RESERVED)) == [(16, pad) for pad in range(1, 9)]
+    assert sorted(roles + [layout.NAVIGATION.reserved]) == [(16, pad) for pad in range(1, 9)]
 
 
 def test_column_15_holds_scenes_unmute_and_stop():
     assert layout.SCENE_COLUMN == 15
-    assert layout.UNMUTE_ALL == (15, 7)
-    assert layout.STOP == (15, 8)
-    assert all(column == 16 for column, _ in {**layout.WINDOW_MOVES, **layout.TEMPO_STEPS})
+    assert layout.VIEW.unmute_all == (15, 7)
+    assert layout.VIEW.stop == (15, 8)
+    assert all(column == 16 for column, _ in {**layout.NAVIGATION_SHIFT.window, **layout.NAVIGATION_SHIFT.tempo})
 
 
 def test_rows_7_and_8_follow_the_window():
@@ -124,8 +124,8 @@ def test_rows_7_and_8_follow_the_window():
 
 
 def test_fx_slots_are_columns_11_and_12():
-    assert layout.FX_SLOTS[0] == (11, 1)
-    assert layout.FX_SLOTS[7] == (11, 8)
-    assert layout.FX_SLOTS[8] == (12, 1)
-    assert layout.FX_SLOTS[15] == (12, 8)
-    assert len(set(layout.FX_SLOTS)) == 16
+    assert layout.FX.slots[0] == (11, 1)
+    assert layout.FX.slots[7] == (11, 8)
+    assert layout.FX.slots[8] == (12, 1)
+    assert layout.FX.slots[15] == (12, 8)
+    assert len(set(layout.FX.slots)) == 16

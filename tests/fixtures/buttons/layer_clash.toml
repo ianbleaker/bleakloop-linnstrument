@@ -1,0 +1,5 @@
+[global.undo]
+pad = [16, 6]
+
+[navigation.delete]
+pad = [16, 6]

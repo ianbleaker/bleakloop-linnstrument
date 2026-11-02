@@ -193,9 +193,12 @@ flowchart TD
     live_state["live_state"]
   end
   subgraph Core
+    core_buttons["buttons"]
+    core_catalogue["catalogue"]
     core_controls["controls"]
     core_engine["engine"]
     core_faders["faders"]
+    core_functions["functions"]
     core_fx["fx"]
     core_global_column["global_column"]
     core_layout["layout"]
@@ -213,45 +216,61 @@ flowchart TD
     ableton_v3["ableton.v3"]
   end
   __init__ -.->|lazy| surface
+  core_buttons --> core_catalogue
+  core_buttons -.->|lazy| core_layout
+  core_buttons --> core_model
+  core_controls --> core_buttons
   core_controls --> core_faders
+  core_controls --> core_functions
   core_controls --> core_layout
   core_controls --> core_leds
   core_controls --> core_model
   core_controls --> core_modes
   core_controls --> core_values
+  core_engine --> core_controls
   core_engine --> core_faders
   core_engine --> core_fx
-  core_engine --> core_layout
   core_engine --> core_linnstrument_mode
   core_engine --> core_mixer
   core_engine --> core_model
   core_engine --> core_modes
   core_engine --> core_sequencer
   core_engine --> core_session
+  core_faders --> core_buttons
   core_faders --> core_layout
   core_faders --> core_leds
   core_faders --> core_model
   core_faders --> core_modes
   core_faders --> core_values
+  core_functions --> core_catalogue
+  core_functions --> core_leds
+  core_functions --> core_modes
+  core_fx --> core_buttons
   core_fx --> core_faders
+  core_fx --> core_functions
   core_fx --> core_layout
   core_fx --> core_leds
   core_fx --> core_mixer
   core_fx --> core_model
   core_fx --> core_modes
   core_fx --> core_values
+  core_global_column --> core_buttons
+  core_global_column --> core_catalogue
   core_global_column --> core_controls
   core_global_column --> core_faders
+  core_global_column --> core_functions
   core_global_column --> core_fx
   core_global_column --> core_layout
   core_global_column --> core_leds
   core_global_column --> core_mixer
   core_global_column --> core_model
   core_global_column --> core_modes
+  core_layout --> core_buttons
   core_leds --> core_values
   core_linnstrument_mode --> core_global_column
   core_linnstrument_mode --> core_layout
   core_linnstrument_mode --> core_model
+  core_mixer --> core_buttons
   core_mixer --> core_faders
   core_mixer --> core_layout
   core_mixer --> core_model
@@ -260,8 +279,11 @@ flowchart TD
   core_model --> core_leds
   core_modes --> core_layout
   core_modes --> core_values
+  core_sequencer --> core_buttons
+  core_sequencer --> core_catalogue
   core_sequencer --> core_controls
   core_sequencer --> core_faders
+  core_sequencer --> core_functions
   core_sequencer --> core_fx
   core_sequencer --> core_global_column
   core_sequencer --> core_layout
@@ -270,8 +292,11 @@ flowchart TD
   core_sequencer --> core_model
   core_sequencer --> core_modes
   core_sequencer --> core_values
+  core_session --> core_buttons
+  core_session --> core_catalogue
   core_session --> core_controls
   core_session --> core_faders
+  core_session --> core_functions
   core_session --> core_fx
   core_session --> core_global_column
   core_session --> core_layout
@@ -280,10 +305,12 @@ flowchart TD
   core_session --> core_model
   core_session --> core_modes
   core_session --> core_sequencer
+  device --> core_buttons
   device --> core_layout
   device --> core_leds
   device --> core_model
   live_actions --> Live
+  live_actions --> core_buttons
   live_actions --> core_model
   live_actions --> core_modes
   live_actions --> core_values
@@ -293,6 +320,7 @@ flowchart TD
   live_state --> core_values
   surface --> Live
   surface --> ableton_v3
+  surface --> core_buttons
   surface --> core_controls
   surface --> core_engine
   surface --> core_faders

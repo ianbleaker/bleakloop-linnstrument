@@ -2,8 +2,8 @@
 
 from dataclasses import replace
 
-from . import faders, layout
-from .model import BeginUndoStep, EndUndoStep, SetMixer, SetVolume, ShowMessage
+from . import buttons, faders, layout
+from .model import BeginUndoStep, EndUndoStep, SetMixer, SetVolume
 from .modes import Glide, Lift, Touch
 from .values import (
     BLINK_TIMER_MS,
@@ -72,10 +72,10 @@ def toggle(state):
     if not state.mixer:
         # FX and Mixer Mode replace each other.
         state = replace(state, mixer=True, copy_source=None, fx=False, fx_length=None)
-        return state, actions + [SetMixer(True), ShowMessage("Mixer Mode ON")]
+        return state, actions + [SetMixer(True), *buttons.say("mixer", "on")]
     state, more = reset(state)
     state = replace(state, mixer=False, fx_length=None)
-    return state, actions + more + [SetMixer(False), ShowMessage("Mixer Mode OFF")]
+    return state, actions + more + [SetMixer(False), *buttons.say("mixer", "off")]
 
 
 def press(state, event, snapshot):

@@ -6,7 +6,7 @@ and Shift + Play/Stop act on it.
 
 from dataclasses import replace
 
-from . import controls, faders, fx, layout, mixer, modes
+from . import buttons, catalogue, controls, faders, functions, fx, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -32,7 +32,6 @@ from .model import (
     QuantizeClip,
     SetLaunchQuantization,
     ShowClip,
-    ShowMessage,
     StopAllClips,
     StopTrackClips,
     TogglePlay,
@@ -62,101 +61,175 @@ DEFAULT_QUANTIZATION = 4  # 1 Bar
 FIXED_LENGTH_COLOURS = {None: OFF, 1: CYAN, 2: BLUE, 4: MAGENTA, 8: PINK}
 
 
+def layers(state):
+    # The mode's Global column: its normal layer and its Shift layer, each its own buttons.
+    if state.mode is Mode.LINNSTRUMENT:
+        return layout.LINNSTRUMENT, layout.LINNSTRUMENT_SHIFT
+    if state.mode is Mode.SEQUENCER:
+        return layout.SEQUENCER_GLOBAL, layout.SEQUENCER_GLOBAL_SHIFT
+    return layout.GLOBAL, layout.GLOBAL_SHIFT
+
+
 def handle(state, event, snapshot):
     # A Global column PadPress, pressed or released.
     key = (event.column, event.pad)
     if state.scene_page:
         return _scene_page(state, key, event.pressed, snapshot)
-    if key == layout.SHIFT:
-        return replace(state, shift=event.pressed), []
+    normal, shift = layers(state)
+    if key in _shift_pads(normal):
+        return replace(state, shift=event.pressed), shift_message(event)
     if not event.pressed:
         return state, []
-    if state.shift:
-        return _shift(state, key, snapshot)
-    return _normal(state, key, snapshot)
+    # Pads the layer has no button on do nothing.
+    button = (shift if state.shift else normal).at(key)
+    if button is None:
+        return state, []
+    return functions.press(button, state, snapshot)
 
 
-def _normal(state, key, snapshot):
-    linnstrument = state.mode is not Mode.SESSION
-    if key == layout.PLAY_STOP:
-        return state, [TogglePlay()]
-    if key == layout.RECORD:
-        return state, _record_clip(state, snapshot) if linnstrument else controls.record(snapshot)
-    if key == layout.CAPTURE:
-        if linnstrument:
-            return state, _capture_midi(snapshot)
-        return state, [CaptureAndInsertScene(), ShowMessage("Capture and Insert Scene")]
-    if key == layout.METRONOME:
-        return state, controls.metronome(snapshot)
-    if key == layout.FIXED_LENGTH:
-        return _fixed_length(state)
-    if key == layout.UNDO:
-        return state, controls.undo(snapshot)
-    if key == layout.MODE_PAD:
-        if state.mode is Mode.LINNSTRUMENT:
-            return _back(state)
-        if state.mode is Mode.SEQUENCER:
-            # The arm stays: the player plays the track they were sequencing.
-            actions = []
-            if state.seq_undo_open:
-                state = replace(state, seq_undo_open=False)
-                actions.append(EndUndoStep())
-            return (
-                modes.enter(state, Mode.LINNSTRUMENT),
-                actions + [EnterMode(Mode.LINNSTRUMENT)],
-            )
-        state, actions = mixer.reset(state)
-        state, more = faders.reset(state)
-        return (
-            modes.enter(state, Mode.LINNSTRUMENT),
-            actions + more + [EnterMode(Mode.LINNSTRUMENT)],
-        )
-    return state, []
+functions.register_hold(
+    "shift", light=lambda state, snapshot, value: Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
+)
 
 
-def _shift(state, key, snapshot):
-    # Session Shift + Record, Session Shift + Mode and Shift + Fixed Length do nothing.
-    linnstrument = state.mode is not Mode.SESSION
-    if key == layout.PLAY_STOP:
-        if linnstrument:
-            return state, _stop_track(snapshot)
-        return state, [StopAllClips(), ShowMessage("Stop all clips")]
-    if key == layout.RECORD and linnstrument:
-        return state, controls.record(snapshot)
-    if key == layout.QUANTIZE:
-        return state, _quantize(snapshot)
-    if key == layout.LAUNCH_QUANTIZATION:
-        return _launch_quantization(state, snapshot)
-    if key == layout.UNDO:
-        return state, controls.redo(snapshot)
-    if key == layout.SCENE_PAGE and linnstrument:
-        return replace(state, scene_page=True), []
-    return state, []
+def _lit(colour):
+    return lambda state, snapshot, value: Light(colour)
+
+
+@functions.register("play_stop", light=lambda state, snapshot, value: controls.play_light(snapshot))
+def _play_stop(state, snapshot, value):
+    return state, [TogglePlay(), *buttons.say("play_stop", "stop" if snapshot.is_playing else "play")]
+
+
+@functions.register("record", light=lambda state, snapshot, value: controls.record_light(snapshot))
+def _record(state, snapshot, value):
+    return state, controls.record(snapshot) + controls.record_message(snapshot)
+
+
+@functions.register("capture", light=_lit(LIME))
+def _capture(state, snapshot, value):
+    return state, [CaptureAndInsertScene(), *buttons.say("capture")]
+
+
+@functions.register("record_clip", light=_lit(RED))
+def _record_clip_press(state, snapshot, value):
+    return state, _record_clip(state, snapshot)
+
+
+@functions.register("capture_midi", light=_lit(LIME))
+def _capture_midi_press(state, snapshot, value):
+    return state, _capture_midi(snapshot)
+
+
+@functions.register("metronome", light=lambda state, snapshot, value: controls.metronome_light(snapshot))
+def _metronome(state, snapshot, value):
+    return state, controls.metronome(snapshot)
+
+
+@functions.register(
+    "fixed_length", light=lambda state, snapshot, value: Light(FIXED_LENGTH_COLOURS[state.fixed_length])
+)
+def _fixed_length_press(state, snapshot, value):
+    return _fixed_length(state)
+
+
+@functions.register("undo", light=_lit(WHITE))
+def _undo(state, snapshot, value):
+    return state, controls.undo(snapshot)
+
+
+@functions.register("redo", light=_lit(WHITE))
+def _redo(state, snapshot, value):
+    return state, controls.redo(snapshot)
+
+
+@functions.register("back", light=_lit(MAGENTA))
+def _back_press(state, snapshot, value):
+    return _back(state)
+
+
+@functions.register("linnstrument_mode", [catalogue.SEQUENCER], light=_lit(MAGENTA))
+def _linnstrument_from_sequencer(state, snapshot, value):
+    # The arm stays: the player plays the track they were sequencing.
+    actions = []
+    if state.seq_undo_open:
+        state = replace(state, seq_undo_open=False)
+        actions.append(EndUndoStep())
+    actions += [EnterMode(Mode.LINNSTRUMENT), *buttons.say("linnstrument_mode")]
+    return modes.enter(state, Mode.LINNSTRUMENT), actions
+
+
+@functions.register("linnstrument_mode", [catalogue.SESSION], light=_lit(MAGENTA))
+def _linnstrument_from_session(state, snapshot, value):
+    state, actions = mixer.reset(state)
+    state, more = faders.reset(state)
+    entered = [EnterMode(Mode.LINNSTRUMENT), *buttons.say("linnstrument_mode")]
+    return modes.enter(state, Mode.LINNSTRUMENT), actions + more + entered
+
+
+@functions.register("stop_all", light=_lit(RED))
+def _stop_all(state, snapshot, value):
+    return state, [StopAllClips(), *buttons.say("stop_all")]
+
+
+@functions.register("stop_track", light=_lit(RED))
+def _stop_track_press(state, snapshot, value):
+    return state, _stop_track(snapshot)
+
+
+@functions.register("quantize", light=_lit(MAGENTA))
+def _quantize_press(state, snapshot, value):
+    return state, _quantize(snapshot)
+
+
+@functions.register(
+    "launch_quantization",
+    light=lambda state, snapshot, value: Light(GREEN if snapshot.launch_quantization != 0 else RED),
+)
+def _launch_quantization_press(state, snapshot, value):
+    return _launch_quantization(state, snapshot)
+
+
+@functions.register("scene_page", light=_lit(PINK))
+def _scene_page_press(state, snapshot, value):
+    return replace(state, scene_page=True), buttons.say("scene_page")
+
+
+@functions.register("close_scenes", light=_lit(WHITE))
+def _close_scenes(state, snapshot, value):
+    return replace(state, scene_page=False), buttons.say("close_scenes")
 
 
 def _back(state):
     # Back to the layer Linnstrument Mode was entered from, through its own entry path.
     if state.came_from is Origin.SEQUENCER:
-        return modes.enter(state, Mode.SEQUENCER), [EnterMode(Mode.SEQUENCER)]
+        back = buttons.say("back", "sequencer")
+        return modes.enter(state, Mode.SEQUENCER), [EnterMode(Mode.SEQUENCER), *back]
     state = modes.enter(state, Mode.SESSION)
     actions = [EnterMode(Mode.SESSION)]
     if state.came_from is Origin.MIXER:
         state, more = mixer.toggle(state)
+        back = buttons.say("back", "mixer")
     elif state.came_from is Origin.FX:
         state, more = fx.toggle(state)
+        back = buttons.say("back", "fx")
     else:
-        more = []
-    return state, actions + more
+        more, back = [], buttons.say("back", "session")
+    return state, actions + more + back
 
 
 def _scene_page(state, key, pressed, snapshot):
-    # Opened while Shift is held: that hold's release mustn't close it, a new press does.
+    # Opened while Shift is held: that hold's release mustn't close it, Back's press does.
+    shift = _shift_pads(layers(state)[0])
     if not pressed:
-        if key == layout.SHIFT:
+        if key in shift:
             return replace(state, shift=False), []
         return state, []
-    if key == layout.SHIFT:
-        return replace(state, scene_page=False), []
+    button = layout.LINNSTRUMENT_SCENES.at(key)
+    if button is not None:
+        return functions.press(button, state, snapshot)
+    if key[0] != layout.GLOBAL_COLUMN or key in shift:
+        return state, []
     if key[1] > layout.WINDOW_SCENES:
         return state, []  # dark: the page shows the window's scenes only
     scene = state.window.scene + key[1] - 1
@@ -171,26 +244,26 @@ def _fixed_length(state):
     cycle = (None, *layout.FIXED_LENGTHS)
     bars = cycle[(cycle.index(state.fixed_length) + 1) % len(cycle)]
     if bars is None:
-        return replace(state, fixed_length=None), [ShowMessage("Fixed Length OFF")]
-    message = ShowMessage(f"Fixed Length {bars} bar" + ("s" if bars > 1 else ""))
-    return replace(state, fixed_length=bars), [message]
+        return replace(state, fixed_length=None), buttons.say("fixed_length", "off")
+    unit = "bars" if bars > 1 else "bar"
+    return replace(state, fixed_length=bars), buttons.say("fixed_length", bars=bars, unit=unit)
 
 
 def _stop_track(snapshot):
     track = snapshot.selected_track
     if track is None:
-        return [ShowMessage("No selected track")]
-    return [StopTrackClips(track.index), ShowMessage(f"Stop clips: {track.name}")]
+        return buttons.refuse("stop_track", "no_track")
+    return [StopTrackClips(track.index), *buttons.say("stop_track", track=track.name)]
 
 
 def _record_clip(state, snapshot):
     track = snapshot.selected_track
     if track is None:
-        return [ShowMessage("No selected track")]
+        return buttons.refuse("record_clip", "no_track")
     if track.is_foldable:
-        return [ShowMessage("Cannot record on a group track")]
+        return buttons.refuse("record_clip", "group_track")
     if not track.armed:
-        return [ShowMessage("Track not armed")]
+        return buttons.refuse("record_clip", "not_armed")
     length = controls.record_length(state.fixed_length, snapshot)
     # From the highlighted scene down, then wrapping to the top.
     count = snapshot.scene_count
@@ -200,21 +273,21 @@ def _record_clip(state, snapshot):
             return [
                 FireSlot(track.index, scene, legato=False, record_length=length),
                 ShowClip(track.index, scene),
-                ShowMessage("Record Clip"),
+                *buttons.say("record_clip"),
             ]
     # No empty slot: the new scene is added at the end, so it takes the next index.
     return [
         AddScene(),
         FireSlot(track.index, count, legato=False, record_length=length),
         ShowClip(track.index, count),
-        ShowMessage("Record Clip: new scene"),
+        *buttons.say("record_clip", "new_scene"),
     ]
 
 
 def _capture_midi(snapshot):
     if not snapshot.can_capture_midi:
-        return [ShowMessage("Nothing to capture")]
-    return [CaptureMidi(), ShowMessage("Capture MIDI")]
+        return buttons.refuse("capture_midi", "nothing")
+    return [CaptureMidi(), *buttons.say("capture_midi")]
 
 
 def _quantize(snapshot):
@@ -225,57 +298,53 @@ def _quantize(snapshot):
     ]
     found = [(target, clip) for target, clip in candidates if clip is not None]
     if not found:
-        return [ShowMessage("No clip to quantize")]
+        return buttons.refuse("quantize", "no_clip")
     target, clip = found[0]
     if not clip.is_midi:
-        return [ShowMessage("Cannot quantize an audio clip")]
-    return [QuantizeClip(target), ShowMessage("Quantize 1/16")]
+        return buttons.refuse("quantize", "audio")
+    return [QuantizeClip(target), *buttons.say("quantize")]
 
 
 def _launch_quantization(state, snapshot):
     if snapshot.launch_quantization != 0:
         state = replace(state, quantization_memory=snapshot.launch_quantization)
-        return state, [SetLaunchQuantization(0), ShowMessage("Launch Quantization: None")]
+        return state, [SetLaunchQuantization(0), *buttons.say("launch_quantization", name="None")]
     value = state.quantization_memory
     if value is None:
         value = DEFAULT_QUANTIZATION
     return state, [
         SetLaunchQuantization(value),
-        ShowMessage(f"Launch Quantization: {QUANTIZATION_NAMES[value]}"),
+        *buttons.say("launch_quantization", name=QUANTIZATION_NAMES[value]),
     ]
 
 
 def render(state, snapshot):
     # The Global column only. Copy and Delete hide the Shift layer.
+    normal, shift = layers(state)
     shift_held = Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
     if state.scene_page:
-        frame = {
-            (layout.GLOBAL_COLUMN, pad): controls.scene_light(snapshot, state.window.scene, pad - 1, controls.waiting_scene(state))
-            for pad in range(1, layout.WINDOW_SCENES + 1)
-        }
-        frame[layout.MODE_PAD] = Light(OFF)
-        frame[layout.SHIFT] = shift_held
+        frame = {(layout.GLOBAL_COLUMN, pad): Light(OFF) for pad in range(1, layout.ROWS + 1)}
+        for pad in range(1, layout.WINDOW_SCENES + 1):
+            frame[layout.GLOBAL_COLUMN, pad] = controls.scene_light(
+                snapshot, state.window.scene, pad - 1, controls.waiting_scene(state)
+            )
+        for button in layout.LINNSTRUMENT_SCENES.buttons():
+            frame[button[2]] = functions.light(button, state, snapshot)
+        frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
         return frame
-    linnstrument = state.mode is not Mode.SESSION
-    if state.shift and not state.copy and not state.delete:
-        frame = {
-            layout.PLAY_STOP: Light(RED),
-            layout.RECORD: controls.record_light(snapshot) if linnstrument else Light(OFF),
-            layout.QUANTIZE: Light(MAGENTA),
-            layout.LAUNCH_QUANTIZATION: Light(GREEN if snapshot.launch_quantization != 0 else RED),
-            layout.FIXED_LENGTH: Light(OFF),
-            layout.UNDO: Light(WHITE),
-            layout.SCENE_PAGE: Light(PINK if linnstrument else OFF),
-        }
-    else:
-        frame = {
-            layout.PLAY_STOP: controls.play_light(snapshot),
-            layout.RECORD: Light(RED) if linnstrument else controls.record_light(snapshot),
-            layout.CAPTURE: Light(LIME),
-            layout.METRONOME: controls.metronome_light(snapshot),
-            layout.FIXED_LENGTH: Light(FIXED_LENGTH_COLOURS[state.fixed_length]),
-            layout.UNDO: Light(WHITE),
-            layout.MODE_PAD: Light(MAGENTA),
-        }
-    frame[layout.SHIFT] = shift_held
+    # Every pad the column's layers use goes dark, then the live layer lights its own.
+    frame = {button[2]: Light(OFF) for button in normal.buttons() + shift.buttons()}
+    live = shift if state.shift and not state.copy and not state.delete else normal
+    for button in live.buttons():
+        frame[button[2]] = functions.light(button, state, snapshot)
+    frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
     return frame
+
+
+def shift_message(event):
+    return buttons.say("shift") if event.pressed else []
+
+
+def _shift_pads(section):
+    # Shift lights and works on both layers.
+    return {button[2] for button in section.buttons() if button[1] == "shift"}
