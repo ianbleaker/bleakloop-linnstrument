@@ -133,3 +133,17 @@ def test_prune_drops_empty_tables():
     assert userfile.prune({"global": {}, "functions": {"x": {"outcomes": {}}}, "system": {"a": "b"}}) == {
         "system": {"a": "b"}
     }
+
+
+def test_an_added_tempo_button_steps_by_its_value_and_lights(shipped):
+    from BleakLoop.core import session
+    from BleakLoop.core.leds import GREEN, Light
+    from BleakLoop.core.model import PadPress, SetTempo
+    from BleakLoop.core.modes import State
+    from tests.test_session import SNAP
+
+    buttons.reload(buttons.PATH, FIXTURES / "new_tempo.toml")
+    shift = State(shift=True)
+    _, actions = session.handle(shift, PadPress(1, 2, True), SNAP)
+    assert actions[0] == SetTempo(SNAP.tempo + 5)
+    assert session.render(shift, SNAP)[(1, 2)] == Light(GREEN)

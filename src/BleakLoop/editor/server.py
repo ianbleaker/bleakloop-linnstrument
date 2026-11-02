@@ -268,4 +268,5 @@ class Editor:
         problem = self.on_change()
         if problem:
             return _error(400, problem)
-        return _json(200, buttons.describe())
+        # The files as saved, even while the reload waits for a held pad.
+        return _json(200, buttons.describe(buttons.load(self.shipped_path, self.user_path)))

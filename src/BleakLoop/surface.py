@@ -223,8 +223,12 @@ class BleakLoop(ControlSurface):
 
     def _editor_saved(self):
         # The editor wrote or deleted the user file: reload now, without waiting for the poll
-        # (and without the poll reloading it again). A problem goes back to the page.
+        # (and without the poll reloading it again), unless a pad is held: then on its
+        # release, as for any save. A problem goes back to the page.
         self._button_stamps = buttons.stamps()
+        if self._held_pads:
+            self._reload_pending = True
+            return None
         self._reload_pending = False
         return self.reload_buttons()
 
