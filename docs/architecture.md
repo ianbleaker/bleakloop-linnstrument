@@ -273,8 +273,10 @@ flowchart TD
   core_model --> core_leds
   core_modes --> core_layout
   core_modes --> core_values
+  core_sequencer --> core_catalogue
   core_sequencer --> core_controls
   core_sequencer --> core_faders
+  core_sequencer --> core_functions
   core_sequencer --> core_fx
   core_sequencer --> core_global_column
   core_sequencer --> core_layout

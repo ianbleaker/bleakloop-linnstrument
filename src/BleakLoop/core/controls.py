@@ -127,9 +127,11 @@ def sections(state, shift=False):
     if state.mode is Mode.LINNSTRUMENT:
         return (layout.LINNSTRUMENT_SHIFT,) if shift else (layout.LINNSTRUMENT,)
     if state.mode is Mode.SEQUENCER:
+        # Column 15 and the settings work on both layers.
+        own = (layout.SEQUENCER_GRID, *((layout.SEQUENCER_SETTINGS,) if state.seq_settings else ()))
         if shift:
-            return (layout.SEQUENCER_GLOBAL_SHIFT, layout.SEQUENCER_NAV_SHIFT)
-        return (layout.SEQUENCER_GLOBAL, layout.SEQUENCER_NAV)
+            return (layout.SEQUENCER_GLOBAL_SHIFT, layout.SEQUENCER_NAV_SHIFT, *own)
+        return (layout.SEQUENCER_GLOBAL, layout.SEQUENCER_NAV, *own)
     if shift:
         return (layout.GLOBAL_SHIFT, layout.VIEW_SHIFT, layout.NAVIGATION_SHIFT)
     return (layout.GLOBAL, layout.VIEW, layout.NAVIGATION)

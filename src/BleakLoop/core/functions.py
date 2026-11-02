@@ -18,7 +18,8 @@ class Function:
     light: object  # (state, snapshot, value) -> Light
 
 
-# Holds: pressed and released, in an order each mode's handle() keeps itself.
+# Holds: pressed and released, in an order each mode's handle() keeps itself. A mode may run
+# one as a tap instead (Sequencer Mode's Seq leaves it), registering its press.
 HOLDS = frozenset({"shift", "device_clip", "seq", "copy", "delete", "stop"})
 
 
@@ -34,8 +35,8 @@ def register(name, modes=None, light=None):
         raise ValueError(f"{name} doesn't run in {sorted(modes - MODES[name])}")
 
     def add(press):
-        if (press is None) != (name in HOLDS):
-            raise ValueError(f"{name}: a hold registers only its light, a tap its press")
+        if press is None and name not in HOLDS:
+            raise ValueError(f"{name}: only a hold registers without a press")
         for mode in modes:
             if (name, mode) in _FUNCTIONS:
                 raise ValueError(f"{name} is registered twice in {mode}")

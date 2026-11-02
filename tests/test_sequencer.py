@@ -21,6 +21,7 @@ from BleakLoop.core.leds import (
 from BleakLoop.core.model import (
     ToggleDetailView,
     DrumView,
+    CaptureMidi,
     DuplicateLoop,
     EditNotes,
     BeginUndoStep,
@@ -1252,3 +1253,25 @@ def test_unload_restores_the_arms_from_linnstrument_mode():
 
 def test_unload_outside_sequencer_mode_restores_nothing():
     assert sequencer.restore_arms(State(), (True, False)) == []
+
+
+# Buttons moved to free pads
+
+
+def test_a_global_button_works_in_column_2(monkeypatch):
+    # Capture MIDI moves off column 1 in Sequencer Mode only.
+    monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "capture_midi", (2, 1))
+    snapshot = replace(SNAP_IN, can_capture_midi=True)
+    assert handle(SEQ, (2, 1), snapshot)[1] == [CaptureMidi(), ShowMessage("Capture MIDI")]
+    assert sequencer.render(SEQ, snapshot)[(2, 1)] == Light(LIME)
+    assert layout.GLOBAL.capture == (1, 3)
+
+
+def test_column_15_and_settings_buttons_move(monkeypatch):
+    monkeypatch.setattr(layout.SEQUENCER_GRID, "view", (15, 3))
+    monkeypatch.setattr(layout.SEQUENCER_SETTINGS, "triplet", (2, 5))
+    state, _ = handle(SEQ, (15, 3))
+    assert state.seq_settings
+    state, actions = handle(state, (2, 5))
+    assert state.seq_triplet and actions == [ShowMessage("Rate 1/16 triplet")]
+    assert handle(SEQ, (2, 5)) == (SEQ, [])
