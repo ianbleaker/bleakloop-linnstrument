@@ -5,6 +5,7 @@ import pytest
 from BleakLoop.core import controls, engine, layout
 from BleakLoop.core.leds import OFF
 from tools.docs import __main__ as generator
+from tools.docs import buttons as button_docs
 from tools.docs.manual.columns import FIGURES
 from tools.docs.manual import pads, positions
 from tools.docs.manual.pads import DIMMED, blocks, items, labels, section_labels
@@ -136,3 +137,9 @@ def test_an_unknown_kind_or_ref_raises(placeholder):
 
 def test_text_without_a_kind_passes_through():
     assert positions.fill("Type `{bpm}` here.") == "Type `{bpm}` here."
+
+
+def test_a_column_heading_follows_its_buttons(moved):
+    moved(layout.VIEW, "stop", (16, 8))
+    moved(layout.VIEW, "unmute_all", (16, 7))
+    assert "## Column 16: Session, Mixer and FX Mode" in button_docs.text()
