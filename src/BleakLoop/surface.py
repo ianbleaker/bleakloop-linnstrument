@@ -130,6 +130,8 @@ class BleakLoop(ControlSurface):
         self._reload_pending = False
         self._editor = None  # the editor's server, while it runs
         self._editor_problem = None  # why the editor didn't start, shown once started
+        self._editor_settings = None  # the [editor] settings the editor last started with
+        self._editor_restart = False  # a reload changed them: restart once no request is open
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
         logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
@@ -150,6 +152,10 @@ class BleakLoop(ControlSurface):
         super().update_display()
         if self._editor is not None:
             self._editor.poll()
+        if self._editor_restart and (self._editor is None or not self._editor.connections):
+            # After the save's own response has gone out.
+            self._editor_restart = False
+            self._restart_editor()
         if self._started:
             self._watch_buttons()
             self._check_pending_clip()
@@ -206,10 +212,11 @@ class BleakLoop(ControlSurface):
             self._timer.start()
 
     def _start_editor(self):
-        settings = buttons.editor_settings()
+        # The status message for the outcome; a problem is also kept to show once started.
+        settings = self._editor_settings = buttons.editor_settings()
         if not settings["enabled"]:
             logger.info("BleakLoop editor: off")
-            return
+            return "BleakLoop editor: off"
         port = settings["port"]
         editor = server.Editor(port, self._editor_saved)
         try:
@@ -218,8 +225,17 @@ class BleakLoop(ControlSurface):
             message = f"BleakLoop editor: port {port} unavailable ({error.strerror}), editor off"
             logger.warning(message)
             self._editor_problem = message
-            return
+            return message
         logger.info("BleakLoop editor: http://%s:%d", server.HOST, port)
+        return f"BleakLoop editor: http://{server.HOST}:{port}"
+
+    def _restart_editor(self):
+        # The user file's [editor] settings changed: close the server and start it again.
+        if self._editor is not None:
+            self._editor.close()
+            self._editor = None
+        self._editor_problem = None
+        self.show_message(self._start_editor())
 
     def _editor_saved(self):
         # The editor wrote or deleted the user file: reload now, without waiting for the poll
@@ -256,6 +272,8 @@ class BleakLoop(ControlSurface):
             return str(error)
         logger.info("BleakLoop: buttons reloaded")
         self.show_message("BleakLoop: buttons reloaded")
+        if buttons.editor_settings() != self._editor_settings:
+            self._editor_restart = True
         self._refresh()
         return None
 

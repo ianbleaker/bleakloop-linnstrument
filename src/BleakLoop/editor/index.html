@@ -587,6 +587,9 @@ async function load() {
 $("#save").addEventListener("click", async () => {
   try {
     loaded(await call("POST", "/api/save", { overlay }), "Saved: BleakLoop has the new layout");
+    const moved = !L.editor.enabled ? "BleakLoop turns this editor off now"
+      : String(L.editor.port) !== location.port ? `This editor moves to http://${location.hostname}:${L.editor.port} now` : "";
+    if (moved) flash(moved, false);
   } catch (error) {
     showError(error.message);
     flash("Not saved", true);

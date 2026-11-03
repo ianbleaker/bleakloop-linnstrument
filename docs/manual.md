@@ -29,7 +29,7 @@ Your changes are saved in `User Library/BleakLoop/buttons.toml`, beside the Remo
 - A full copy of the shipped file works as a starting point: the `manual` fields it carries are accepted while they match the shipped ones. Changing them does nothing for the device, so it's refused. Everything in a copy overrides the shipped file, so a button a new version moves stays where your copy has it.
 - FX snapshot slots, scene slots, Sequencer pages, Bars, rates, tracks and devices can be moved and relabelled, but not added, removed or given another value. Tempo and window buttons can be added, removed and given any step.
 - A section that falls back to another one, such as Linnstrument Mode's Global column, shows the fallback's buttons where it has none of its own. Removing its own button brings the fallback's back on that pad.
-- To turn the editor off, or move it to another port, add this to your file and restart Live:
+- To turn the editor off, or move it to another port, add this to your file. BleakLoop applies it on the next save, and says so if the port is taken:
 
   ```toml
   [editor]
