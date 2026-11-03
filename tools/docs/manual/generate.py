@@ -6,13 +6,18 @@ from BleakLoop.core import controls, leds
 from BleakLoop.core.leds import Blink
 
 from ..markers import read, replace_between
-from . import columns, draw, pads, surface
+from . import columns, draw, pads, positions, surface
 from .pads import LISTS, ordered
 from .scenes import Layer
 
 ROOT = Path(__file__).resolve().parents[3]
 MANUAL = ROOT / "docs" / "manual.md"
 MAPS = ROOT / "docs" / "manual"
+SOURCE = Path(__file__).parent / "manual.md"
+HEADER = (
+    "<!-- Generated from tools/docs/manual/manual.md by PYTHONPATH=src python3 -m tools.docs. "
+    "Edit that file, not this one. -->"
+)
 
 COLOUR_NAMES = {
     getattr(leds, name): name.lower()
@@ -56,6 +61,19 @@ def manual_text(text):
     )
 
 
+def header(text):
+    # The generated-file note after the source's title line, as docs/buttons.md has it.
+    title, _, rest = text.partition("\n")
+    return f"{title}\n\n{HEADER}\n{rest}"
+
+
+def source():
+    text = read(SOURCE)
+    if text is None:
+        raise FileNotFoundError(f"{SOURCE}: the manual's source is missing")
+    return text
+
+
 def expected():
     files = {}
     for layer in Layer:
@@ -63,7 +81,7 @@ def expected():
     for slug in columns.FIGURES:
         files[MAPS / f"{slug}.svg"] = columns.figure_svg(slug)
     files[MAPS / f"{surface.SLUG}.svg"] = surface.svg()
-    files[MANUAL] = manual_text(read(MANUAL) or "")
+    files[MANUAL] = manual_text(positions.fill(header(source())))
     return files
 
 
