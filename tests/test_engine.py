@@ -4,6 +4,7 @@ import pytest
 
 from BleakLoop.core import engine, layout
 from BleakLoop.core.model import (
+    XAxis,
     EnterMode,
     PadPress,
     SequencerView,
@@ -153,3 +154,9 @@ def test_an_unowned_slide_in_sequencer_mode_releases_the_pad_it_left():
     assert engine.slide(held, slide, STOPPED) == engine.handle(
         held, press((4, 1), False), STOPPED
     )
+
+
+@pytest.mark.parametrize("state", [SESSION, State(Mode.SEQUENCER)])
+def test_a_stray_x_report_nothing_owns_is_dropped(state):
+    # The surface claims X on every row: a report no fader or held step owns does nothing.
+    assert engine.x_axis(state, XAxis(16, 2, 2703)) == (state, [], False)

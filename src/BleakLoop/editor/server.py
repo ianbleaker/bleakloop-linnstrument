@@ -5,6 +5,7 @@ response goes out over the following ticks. Every response closes the connection
 import json
 import logging
 import os
+import shutil
 import socket
 import time
 import tomllib
@@ -219,7 +220,9 @@ class Editor:
             if path == "/":
                 return response(200, "text/html; charset=utf-8", PAGE.read_bytes())
             if path == "/api/layout":
-                return _json(200, buttons.describe())
+                data = buttons.describe()
+                data["user_problem"] = self._user_problem()
+                return _json(200, data)
             return response(404, TEXT, "Not Found")
         if request.method != "POST":
             return response(405, TEXT, "Method Not Allowed")
@@ -251,22 +254,47 @@ class Editor:
             message = str(error) if not isinstance(error, KeyError) else f"missing {error}"
             return _error(400, message)
         try:
+            backup = self._back_up()
             write_atomic(self.user_path, text)
         except OSError as error:
             return _error(400, f"couldn't write {self.user_path}: {error.strerror}")
-        return self._changed()
+        return self._changed(backup)
 
     def _reset(self):
+        backup = None
         if self.user_path is not None:
             try:
+                backup = self._back_up()
                 Path(self.user_path).unlink(missing_ok=True)
             except OSError as error:
                 return _error(400, f"couldn't delete {self.user_path}: {error.strerror}")
-        return self._changed()
+        return self._changed(backup)
 
-    def _changed(self):
+    def _user_problem(self):
+        # Why the user file on disk doesn't load, or None. The editor then shows the layout
+        # BleakLoop fell back to, without the file's changes.
+        if self.user_path is None or not Path(self.user_path).exists():
+            return None
+        try:
+            buttons.load(self.shipped_path, self.user_path)
+        except (ValueError, OSError) as error:
+            return str(error)
+        return None
+
+    def _back_up(self):
+        # A user file that doesn't load isn't in the editor, so a save or reset would lose
+        # it: it's copied to buttons.toml.bak first. Returns the copy's path, or None.
+        if self._user_problem() is None:
+            return None
+        backup = Path(self.user_path).with_name(Path(self.user_path).name + ".bak")
+        shutil.copyfile(self.user_path, backup)
+        return str(backup)
+
+    def _changed(self, backup=None):
         problem = self.on_change()
         if problem:
             return _error(400, problem)
         # The files as saved, even while the reload waits for a held pad.
-        return _json(200, buttons.describe(buttons.load(self.shipped_path, self.user_path)))
+        data = buttons.describe(buttons.load(self.shipped_path, self.user_path))
+        data["user_problem"], data["backup"] = None, backup
+        return _json(200, data)

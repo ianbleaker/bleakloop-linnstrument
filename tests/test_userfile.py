@@ -67,6 +67,23 @@ def test_a_change_outside_the_rules_is_refused_naming_the_user_file(stem, error)
     assert str(raised.value).startswith(f"{path}: ")
 
 
+def test_a_full_copy_of_the_shipped_file_loads_unchanged(tmp_path):
+    copy = tmp_path / "buttons.toml"
+    copy.write_bytes(buttons.PATH.read_bytes())
+    registry = buttons.load(buttons.PATH, copy)
+    assert registry.entries() == buttons.load(buttons.PATH).entries()
+
+
+def test_docs_fields_equal_to_the_shipped_ones_merge_and_changed_ones_dont():
+    shipped = buttons._read(buttons.PATH)
+    name, item = next((name, item) for name, item in shipped["functions"].items() if "manual" in item)
+    same = {"manual_format": shipped["manual_format"], "functions": {name: {"manual": item["manual"]}}}
+    merged, _ = userfile.merge(shipped, same)
+    assert merged == shipped
+    with pytest.raises(ValueError, match="manual_format feeds the repo's manual"):
+        userfile.merge(shipped, {"manual_format": shipped["manual_format"] + "!"})
+
+
 def test_a_broken_user_file_falls_back_to_the_shipped_layout(shipped, monkeypatch):
     monkeypatch.setattr(buttons, "USER_PATH", FIXTURES / "broken.toml")
     monkeypatch.setattr(buttons, "_registry", None)

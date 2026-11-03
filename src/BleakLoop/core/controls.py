@@ -153,14 +153,16 @@ def pads(state, name):
     return {button[2] for section in sections(state) for button in section.buttons() if button[1] == name}
 
 
-def device_clip(state, event):
+def device_clip(state, event, snapshot):
     # A hold pad: held, the Device/Clip layer; a tap with no other press during it flips
-    # Live's Detail view.
+    # Live's Detail view, and names the view it flips to.
     if event.pressed:
         return replace(state, device_clip=True, device_clip_used=False), buttons.say("device_clip")
     tapped = state.device_clip and not state.device_clip_used
     state = replace(state, device_clip=False, device_clip_used=False)
-    return state, [ToggleDetailView(), *buttons.say("device_clip", "tapped")] if tapped else []
+    if not tapped:
+        return state, []
+    return state, [ToggleDetailView(), *buttons.say("device_clip", "device" if snapshot.clip_view else "clip")]
 
 
 def navigation_pads(state):

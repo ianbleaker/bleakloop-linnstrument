@@ -568,9 +568,11 @@ function loaded(data, message) {
   L = data;
   overlay = clone(L.overlay);
   if (view.kind === "section" && !section(view.name)) view = { kind: "section", name: "global" };
-  showError("");
+  showError(L.user_problem
+    ? `Your user file didn't load, so this is the layout without it:\n${L.user_problem}\n\nSave or Reset keeps a copy of it as ${L.user_path}.bak first.`
+    : "");
   render();
-  flash(message, false);
+  flash(L.backup ? `${message}. Your old file is kept as ${L.backup}` : message, false);
 }
 
 async function load() {
@@ -585,6 +587,9 @@ async function load() {
 $("#save").addEventListener("click", async () => {
   try {
     loaded(await call("POST", "/api/save", { overlay }), "Saved: BleakLoop has the new layout");
+    const moved = !L.editor.enabled ? "BleakLoop turns this editor off now"
+      : String(L.editor.port) !== location.port ? `This editor moves to http://${location.hostname}:${L.editor.port} now` : "";
+    if (moved) flash(moved, false);
   } catch (error) {
     showError(error.message);
     flash("Not saved", true);

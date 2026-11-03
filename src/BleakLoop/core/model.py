@@ -120,6 +120,7 @@ class Snapshot:
     tempo: float
     metronome: bool
     session_view: bool
+    clip_view: bool = False  # Live's Detail view shows the clip, not the device chain
     track_count: int = 0
     scene_count: int = 0
     tracks: tuple = ()  # one TrackView per window column that has a track, left first
