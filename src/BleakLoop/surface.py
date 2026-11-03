@@ -40,14 +40,15 @@ class Elements(ElementsBase):
                 self.add_button(
                     column, f"Pad {row} {column}", channel=row, msg_type=MIDI_NOTE_TYPE
                 )
-        # Y-axis values in Mixer Mode: CC 64 + column on the row's channel. Every
+        # Y-axis values, used in Mixer Mode: CC 64 + column on the row's channel. Every
         # column is claimed so stray Y reports outside the faders don't reach Live's tracks.
         for row in range(layout.ROWS):
             for column in range(layout.COLUMNS):
                 self.add_button(
                     Y_AXIS_CC_BASE + column, f"Y {row} {column}", channel=row, msg_type=MIDI_CC_TYPE
                 )
-        # X values and slide transfers, listened while faders show.
+        # X values and slide transfers: listened in Session and Sequencer Mode, used by the
+        # faders and held steps.
         for row in range(layout.ROWS):
             for column in range(1, layout.COLUMNS):
                 if (row, column) == X_ON_NRPN:
@@ -84,7 +85,6 @@ class BleakLoop(ControlSurface):
         self._reader = device.NrpnReader()
         self._slides = device.SlideDecoder()
         self._x_rows = None  # the X and slide rows last sent; None after User Firmware Mode on
-        self._x_listened = False
         self._x_reports = 0  # in the current fader gesture
         self._longest_x_ms = 0.0
         self._saved_split = {}  # the first reply per NRPN: the player's settings
@@ -570,7 +570,9 @@ class BleakLoop(ControlSurface):
             self._seq_notes = None
         if mode is Mode.SESSION:
             self._send(device.user_firmware_mode(True))
-            # The device turns X and slide mode off on entering User Firmware Mode.
+            # Already on, from Sequencer Mode, the device ignores that and keeps each row's X,
+            # Y and slide mode (changeUserFirmwareMode): forget the rows sent, so _sync_x_rows
+            # turns them off again.
             self._x_rows = None
         elif mode is Mode.SEQUENCER:
             # Y and X off too: Mixer Mode's Y and the faders' X may be on, and nothing claims
@@ -629,8 +631,8 @@ class BleakLoop(ControlSurface):
 
     def set_mixer(self, on):
         # One burst, no driver reset; _handle's refresh sends only the changed pads.
+        # Y is listened in Session Mode whether or not the mixer shows.
         self._send(device.y_axis(on))
-        self._listen_for(Mode.SESSION)
         self._sync_x_rows()
 
     def _sync_x_rows(self):
@@ -646,18 +648,11 @@ class BleakLoop(ControlSurface):
         if mode is Mode.SESSION:
             # A Sequencer hold keeps its transfer state: its slide continues on the new row set.
             self._slides.reset()
-        if self._wants_x(mode) != self._x_listened:
-            self._listen_for(mode)
-
-    def _wants_x(self, mode):
-        # Sequencer Mode claims X and transfers on every row, so none reach the armed track.
-        return mode is Mode.SEQUENCER or bool(engine.x_rows(self._state))
 
     def _listen_for(self, mode):
         self._remove_listeners()
         # A release may now reach another listener, or none: a held pad can't block a reload.
         self._held_pads.clear()
-        self._x_listened = False
         if mode in (Mode.SESSION, Mode.SEQUENCER):
             for row in range(layout.ROWS):
                 for column in range(layout.COLUMNS):
@@ -665,15 +660,16 @@ class BleakLoop(ControlSurface):
                     self._add_listener(
                         element, lambda v, c=column, r=row: self._on_pad(c, r, v)
                     )
-            if self._state.mixer:
-                for row in range(layout.ROWS):
-                    for column in range(layout.COLUMNS):
-                        element = getattr(self.elements, f"y_{row}_{column}")
-                        self._add_listener(
-                            element, lambda v, c=column, r=row: self._on_y_axis(c, r, v)
-                        )
-            if self._wants_x(mode):
-                self._listen_for_x()
+            # X, Y and transfers on every row, whichever the device has on: a report sent
+            # around a switch, or after an off the device dropped, is claimed and ignored,
+            # rather than reaching the armed track or Live's log as an unknown message (#87).
+            for row in range(layout.ROWS):
+                for column in range(layout.COLUMNS):
+                    element = getattr(self.elements, f"y_{row}_{column}")
+                    self._add_listener(
+                        element, lambda v, c=column, r=row: self._on_y_axis(c, r, v)
+                    )
+            self._listen_for_x()
         else:
             # All 128 notes, so the Global column never plays Live's tracks whatever Row Offset sends.
             # None while the right split uses the control channel: its notes are the player's.
@@ -686,7 +682,6 @@ class BleakLoop(ControlSurface):
         self.request_rebuild_midi_map()
 
     def _listen_for_x(self):
-        self._x_listened = True
         for row in range(layout.ROWS):
             for column in range(1, layout.COLUMNS):
                 if (row, column) == X_ON_NRPN:
@@ -764,8 +759,8 @@ class BleakLoop(ControlSurface):
 
     def _on_y_axis(self, column, row, value):
         # 50-100 reports a second per finger: no snapshot or refresh, since only the 10 ms
-        # tick moves a volume.
-        if column in layout.GRID_COLUMNS:
+        # tick moves a volume. Outside Mixer Mode, a stray report is claimed and dropped.
+        if self._state.mixer and column in layout.GRID_COLUMNS:
             self._state = engine.y_axis(self._state, YAxis(column, layout.pad_of(row), value))
 
     def _hold(self, key, value):
