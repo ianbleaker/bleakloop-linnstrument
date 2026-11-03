@@ -167,14 +167,16 @@ tools/
       scenes.py        one example Set per manual layer
       pads.py          pad labels and callout items, by manual section; each map joins its sections
       draw.py          one SVG pad map per layer: labels over the example lights
-      generate.py      docs/manual/*.svg and the callout lists in docs/manual.md
+      positions.py     renders the {pad:…} placeholders: registry button positions as prose
+      manual.md        the manual's source: prose, placeholders and marker comments
+      generate.py      docs/manual/*.svg and all of docs/manual.md, from manual.md
     architecture/      this document
       imports.py       the module import graph, from the real imports
       figures.py       the section 5 orientation and colour figures
       generate.py      docs/architecture/*.svg and the import graph in docs/architecture.md
 ```
 
-The manual's pad maps and callout lists are generated from `core/layout.py` and `render()`, and this document's import graph and section 5 figures from the code. `PYTHONPATH=src python3 -m tools.docs` writes them all, and CI and the pre-commit hook fail when the committed output is stale.
+The manual's pad maps, callout lists and the button positions in its prose are generated from `core/layout.py` and `render()`, and this document's import graph and section 5 figures from the code. `PYTHONPATH=src python3 -m tools.docs` writes them all, and CI and the pre-commit hook fail when the committed output is stale.
 
 `__init__.py` imports nothing from `ableton` or `Live` at module level; `create_instance` imports `surface` inside the function. This keeps `BleakLoop.core` importable by pytest outside Live. Tests run on Python 3.11 (`uvx --python 3.11 pytest`) to match Live's runtime.
 
