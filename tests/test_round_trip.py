@@ -4,6 +4,8 @@ import ast
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from BleakLoop.core import buttons, layout, session
 from BleakLoop.core.leds import OFF, WHITE, Light
 from BleakLoop.core.model import PadPress, ShowMessage, Undo
@@ -38,6 +40,46 @@ def test_a_moved_button_works_and_lights_on_its_new_pad(tmp_path, monkeypatch):
     frame = session.render(State(), snapshot)
     assert frame[(1, 5)] == Light(WHITE)
     assert frame[(1, 6)] == Light(OFF)
+
+
+@pytest.fixture
+def shipped():
+    # Puts the shipped layout back after a test reloads another file.
+    yield
+    buttons.reload(buttons.PATH)
+
+
+def _moved_undo(tmp_path):
+    text = buttons.PATH.read_text(encoding="utf-8")
+    text = text.replace("[global.fixed_length]\npad = [1, 5]\n", "")
+    text = text.replace("[global.undo]\npad = [1, 6]", "[global.undo]\npad = [1, 5]")
+    path = tmp_path / "buttons.toml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_a_reload_moves_a_button_everywhere_it_is_held(tmp_path, shipped):
+    buttons.reload(_moved_undo(tmp_path))
+    snapshot = replace(SNAP, can_undo=True)
+    pressed = session.handle(State(), PadPress(1, 5, True), snapshot)
+    assert pressed == (State(), [Undo(), ShowMessage("Undo")])
+    frame = session.render(State(), snapshot)
+    assert frame[(1, 5)] == Light(WHITE)
+    assert frame[(1, 6)] == Light(OFF)
+    # Sequencer Mode's Global column falls back to the same object, so it moves too.
+    assert layout.SEQUENCER_GLOBAL.at((1, 5)) == ("undo", "undo", (1, 5), None)
+    assert layout.SEQUENCER_GLOBAL.at((1, 6)) is None
+
+
+def test_a_failed_reload_keeps_the_current_layout(tmp_path, shipped):
+    text = buttons.PATH.read_text(encoding="utf-8")
+    path = tmp_path / "buttons.toml"
+    path.write_text(text.replace("[global.undo]\npad = [1, 6]", "[global.undo]\npad = [1, 5]"))
+    with pytest.raises(ValueError, match="taken by"):
+        buttons.reload(path)
+    assert layout.GLOBAL.undo == (1, 6)
+    assert layout.GLOBAL.at((1, 5))[1] == "fixed_length"
+    assert isinstance(layout.FX.slots, tuple) and layout.FX.slots[8] == (12, 1)
 
 
 def _keys(node):

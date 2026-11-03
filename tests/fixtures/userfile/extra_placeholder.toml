@@ -1,0 +1,2 @@
+[functions.tempo]
+message = "Tempo: {bpm} at {time}"

@@ -186,6 +186,7 @@ flowchart TD
   subgraph Plumbing
     __init__["__init__"]
     device["device"]
+    editor_server["server"]
     surface["surface"]
   end
   subgraph Adapters
@@ -209,6 +210,7 @@ flowchart TD
     core_modes["modes"]
     core_sequencer["sequencer"]
     core_session["session"]
+    core_userfile["userfile"]
     core_values["values"]
   end
   subgraph External
@@ -219,6 +221,7 @@ flowchart TD
   core_buttons --> core_catalogue
   core_buttons -.->|lazy| core_layout
   core_buttons --> core_model
+  core_buttons --> core_userfile
   core_controls --> core_buttons
   core_controls --> core_faders
   core_controls --> core_functions
@@ -309,6 +312,8 @@ flowchart TD
   device --> core_layout
   device --> core_leds
   device --> core_model
+  editor_server --> core_buttons
+  editor_server --> core_userfile
   live_actions --> Live
   live_actions --> core_buttons
   live_actions --> core_model
@@ -332,6 +337,7 @@ flowchart TD
   surface --> core_sequencer
   surface --> core_values
   surface --> device
+  surface --> editor_server
   surface --> live_actions
   surface --> live_state
 ```
@@ -591,6 +597,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | Off colour value: 7 | `leds` | Device protocol | Confirmed; 0 also dark |
 | `FAST_BLINK_MS = 200`: fast blink, 200 ms on, 200 ms off | `leds` | Tuned | Confirmed on device |
 | Light refresh: Live's display callback, about 100 ms | `surface` | Mechanism | Measured |
+| `BUTTONS_POLL_TICKS = 10`: display ticks between checks of `buttons.toml` and the user's buttons file for a save, by modification time and size | `surface._watch_buttons` | Chosen: a save applies within about a second; a reload waits until no pad is held | Not yet checked on device |
 | X report handling: one `engine.x_axis` and its parameter write per report, no snapshot | `surface._on_x` | Mechanism | Measured: longest 3.8 ms per report, up to 769 reports per gesture |
 | `BLINK_TIMER_MS = 10`: blink clock, `Live.Base.Timer` | `surface` | Mechanism | Confirmed |
 | `TRACK_COLOUR_REFERENCES`: reference RGB per device colour, fitted to Live 12's 70-colour palette (pinned in `tests/test_leds.py`) | `leds` track colour matching | Tuned by eye | Tuned on device; refine if a swatch looks wrong |

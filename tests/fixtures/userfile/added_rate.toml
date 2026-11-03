@@ -1,0 +1,4 @@
+[sequencer_settings.rate_extra]
+pad = [12, 1]
+does = "rates"
+value = 3.0

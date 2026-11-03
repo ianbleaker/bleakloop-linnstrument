@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BleakLoop buttons</title>
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #77756f; --line: #dcd9d2;
+  --button: #2f5d8a; --button-ink: #ffffff; --user: #c2621d; --inherited: #b9c5d1;
+  --locked: #e4e1da; --other: #ece9e3; --error: #b3261e; --ok: #2e7d32; --focus: #f0b429;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --panel: #1f1f1e; --ink: #ecebe7; --muted: #9a978f; --line: #3a3936;
+    --button: #4d82b8; --button-ink: #ffffff; --user: #e07b30; --inherited: #3a4654;
+    --locked: #2a2927; --other: #262524; --error: #ef6b62; --ok: #6cc070; --focus: #f0b429;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, system-ui, sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
+header h1 { font-size: 16px; margin: 0 12px 0 0; }
+header .spacer { flex: 1; }
+button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--button); color: var(--button-ink); border-color: var(--button); }
+button:disabled { opacity: .45; cursor: default; }
+button.danger { color: var(--error); }
+main { display: grid; grid-template-columns: 220px minmax(0, 1fr) 320px; gap: 16px; padding: 16px; }
+@media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+nav h2, aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 16px 0 6px; }
+nav h2:first-child { margin-top: 0; }
+nav button { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
+nav button.current { border-color: var(--button); box-shadow: inset 3px 0 0 var(--button); }
+.layers { display: flex; gap: 6px; margin-bottom: 10px; }
+.layers button.current { background: var(--button); color: var(--button-ink); border-color: var(--button); }
+.note { color: var(--muted); font-size: 12px; margin: 4px 0 10px; }
+.grid { display: grid; grid-template-columns: 24px repeat(16, minmax(44px, 1fr)); gap: 4px; overflow-x: auto; }
+.grid .head { text-align: center; color: var(--muted); font-size: 11px; align-self: end; }
+.pad { height: 52px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); font-size: 11px; line-height: 1.15; padding: 4px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; user-select: none; word-break: break-word; }
+.pad small { display: block; font-size: 9px; opacity: .8; }
+.pad.button { background: var(--button); color: var(--button-ink); border-color: var(--button); cursor: grab; }
+.pad.button.user { box-shadow: inset 0 0 0 3px var(--user); }
+.pad.inherited { background: var(--inherited); color: var(--ink); border-style: dashed; }
+.pad.locked { background: repeating-linear-gradient(45deg, var(--locked), var(--locked) 4px, var(--panel) 4px, var(--panel) 8px); cursor: not-allowed; }
+.pad.other { background: var(--other); color: var(--muted); cursor: not-allowed; }
+.pad.off { background: transparent; border-style: dotted; cursor: not-allowed; opacity: .5; }
+.pad.selected { outline: 3px solid var(--focus); outline-offset: 1px; }
+.pad.drop { outline: 3px dashed var(--focus); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; border: 1px solid var(--line); background: var(--swatch); }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; align-self: start; }
+aside h2:first-child { margin-top: 0; }
+label { display: block; margin: 10px 0 4px; font-weight: 600; font-size: 12px; }
+input[type=text], input[type=number], select, textarea { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+textarea { min-height: 44px; resize: vertical; }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+.count { float: right; font-weight: normal; color: var(--muted); }
+.count.over { color: var(--error); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.chips code { display: inline-block; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin: 2px 2px 0 0; font-size: 11px; }
+#status { font-size: 13px; }
+#status.error { color: var(--error); }
+#status.ok { color: var(--ok); }
+#error { display: none; margin: 0 16px; padding: 10px 12px; border: 1px solid var(--error); color: var(--error); border-radius: 6px; background: var(--panel); white-space: pre-wrap; }
+.list { display: grid; gap: 4px; max-height: 70vh; overflow: auto; }
+.list button { text-align: left; }
+.list button.user { box-shadow: inset 3px 0 0 var(--user); }
+.list button.current { border-color: var(--button); }
+.field { margin-bottom: 12px; }
+.field.user textarea, .field.user input { border-color: var(--user); }
+.panel-wide { grid-column: 2 / 4; }
+@media (max-width: 1100px) { .panel-wide { grid-column: auto; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>BleakLoop buttons</h1>
+  <span id="status">Loading…</span>
+  <span class="spacer"></span>
+  <button id="discard" disabled>Discard changes</button>
+  <button id="save" class="primary" disabled>Save</button>
+  <button id="reset" class="danger">Reset all</button>
+</header>
+<div id="error"></div>
+<main>
+  <nav id="nav"></nav>
+  <section id="centre"></section>
+  <aside id="side"></aside>
+</main>
+<script>
+"use strict";
+let L = null;          // the layout, as the server last described it
+let overlay = {};      // the user's changes, edited here until Save
+let view = { kind: "section", name: "global" };
+let selected = null;   // the selected pad key, "c,p", or a function name
+
+const $ = (sel) => document.querySelector(sel);
+const clone = (x) => JSON.parse(JSON.stringify(x));
+function canonical(x) {
+  if (Array.isArray(x)) return "[" + x.map(canonical).join(",") + "]";
+  if (x && typeof x === "object") return "{" + Object.keys(x).sort().map((k) => JSON.stringify(k) + ":" + canonical(x[k])).join(",") + "}";
+  return JSON.stringify(x);
+}
+const same = (a, b) => canonical(a) === canonical(b);
+const pk = (pad) => pad[0] + "," + pad[1];
+const keyOf = (name) => name.replace(/-/g, "_");
+
+function el(tag, props, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else if (k === "text") node.textContent = v;
+    else if (v !== undefined && v !== null && v !== false) node.setAttribute(k, v === true ? "" : v);
+  }
+  for (const child of children.flat()) {
+    if (child === null || child === undefined || child === false) continue;
+    node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+  return node;
+}
+
+// ---- The layout: shipped buttons with the user's changes over them -------------------
+
+const section = (name) => L.sections.find((s) => s.name === name);
+const shippedOf = (key) => L.shipped.sections[key] || [];
+const isOpen = (fn) => L.open_groups.includes(fn);
+const isFixed = (fn) => L.fixed_groups.includes(fn);
+
+function own(name) {
+  const key = keyOf(name);
+  const out = new Map();
+  for (const e of shippedOf(key)) out.set(e.name, { ...e, source: "shipped" });
+  for (const [n, item] of Object.entries(overlay[key] || {})) {
+    if (item.removed) { out.delete(n); continue; }
+    const base = out.get(n);
+    out.set(n, base ? { ...base, ...item, source: "user" } : { name: n, ...item, source: "user", added: true });
+  }
+  return [...out.values()].map((e) => ({ ...e, fn: e.does || e.name, section: name, key }));
+}
+
+function live(name) {
+  const s = section(name);
+  const mine = own(name);
+  if (!s || !s.fallback) return mine;
+  const taken = new Set(mine.map((e) => pk(e.pad)));
+  const inherited = live(s.fallback)
+    .filter((e) => !taken.has(pk(e.pad)) && s.functions.includes(e.fn))
+    .map((e) => ({ ...e, inherited: true }));
+  return mine.concat(inherited);
+}
+
+function neighbours(name) {
+  const out = new Set();
+  for (const names of Object.values(L.layers)) {
+    if (names.includes(name)) names.forEach((n) => n !== name && section(n) && out.add(n));
+  }
+  return [...out];
+}
+
+function others(name) {
+  const out = new Map();
+  for (const n of neighbours(name)) {
+    for (const e of live(n)) if (!out.has(pk(e.pad))) out.set(pk(e.pad), e);
+  }
+  return out;
+}
+
+function fnLabel(fn) {
+  const user = ((overlay.functions || {})[fn] || {}).label;
+  return user ?? (L.shipped.functions[fn] || {}).label ?? fn;
+}
+const entryLabel = (e) => e.label ?? fnLabel(e.fn);
+
+// ---- Changes ------------------------------------------------------------------------
+
+function changed() { render(); }
+
+function tidyButton(key, name) {
+  const table = overlay[key];
+  if (!table || !table[name]) return;
+  const item = table[name];
+  const shipped = shippedOf(key).find((e) => e.name === name);
+  if (shipped && !item.removed) {
+    for (const field of Object.keys(item)) if (same(item[field], shipped[field])) delete item[field];
+    if (!Object.keys(item).length) delete table[name];
+  }
+  if (!Object.keys(table).length) delete overlay[key];
+}
+
+function setButton(e, field, value) {
+  overlay[e.key] = overlay[e.key] || {};
+  const item = (overlay[e.key][e.name] = overlay[e.key][e.name] || {});
+  if (value === undefined) delete item[field]; else item[field] = value;
+  tidyButton(e.key, e.name);
+}
+
+function move(e, pad) { setButton(e, "pad", pad); }
+
+function removeButton(e) {
+  const shipped = shippedOf(e.key).some((s) => s.name === e.name);
+  overlay[e.key] = overlay[e.key] || {};
+  if (shipped) overlay[e.key][e.name] = { removed: true };
+  else delete overlay[e.key][e.name];
+  tidyButton(e.key, e.name);
+}
+
+function revertButton(e) {
+  if (overlay[e.key]) delete overlay[e.key][e.name];
+  tidyButton(e.key, e.name);
+}
+
+function newName(key, fn) {
+  const names = new Set([...shippedOf(key).map((e) => e.name), ...Object.keys(overlay[key] || {})]);
+  if (!names.has(fn)) return fn;
+  let n = 2;
+  while (names.has(fn + "_" + n)) n += 1;
+  return fn + "_" + n;
+}
+
+function addButton(name, pad, fn) {
+  const key = keyOf(name);
+  const id = newName(key, fn);
+  const item = { pad };
+  if (id !== fn) item.does = fn;
+  if (fn === "tempo") item.value = 1;
+  if (fn === "window") item.value = [0, 1];
+  overlay[key] = overlay[key] || {};
+  overlay[key][id] = item;
+  return id;
+}
+
+function setFunctionField(fn, field, value, sub) {
+  const fns = (overlay.functions = overlay.functions || {});
+  const item = (fns[fn] = fns[fn] || {});
+  const shipped = L.shipped.functions[fn] || {};
+  if (sub) {
+    const table = (item[field] = item[field] || {});
+    if (value === undefined || value === (shipped[field] || {})[sub]) delete table[sub];
+    else table[sub] = value;
+    if (!Object.keys(table).length) delete item[field];
+  } else if (value === undefined || same(value, shipped[field])) {
+    delete item[field];
+  } else {
+    item[field] = value;
+  }
+  if (!Object.keys(item).length) delete fns[fn];
+  if (!Object.keys(fns).length) delete overlay.functions;
+}
+
+function setSystem(k, value) {
+  const sys = (overlay.system = overlay.system || {});
+  if (value === L.shipped.system[k]) delete sys[k]; else sys[k] = value;
+  if (!Object.keys(sys).length) delete overlay.system;
+}
+
+const dirty = () => !same(overlay, L.overlay);
+
+// ---- Where a button may go ----------------------------------------------------------
+
+function padState(name, pad) {
+  const s = section(name);
+  if (s.left_split && pad[0] !== 1) return { kind: "off", why: "Only column 1 reaches BleakLoop in Linnstrument Mode" };
+  if (s.locked.some((p) => same(p, pad))) return { kind: "locked", why: "A fixed region: clip grid, scene pads, faders or steps" };
+  const mine = live(name).find((e) => same(e.pad, pad));
+  if (mine) return { kind: mine.inherited ? "inherited" : "button", entry: mine };
+  const other = others(name).get(pk(pad));
+  if (other) return { kind: "other", entry: other, why: `Taken by ${other.section}.${other.name} in a shared layer` };
+  return { kind: "free" };
+}
+
+function drop(name, dragged, pad) {
+  const target = padState(name, pad);
+  if (target.kind === "button") {
+    if (target.entry.name === dragged.name) return;
+    const from = dragged.pad;
+    move(dragged, pad);
+    move(target.entry, from);
+  } else if (target.kind === "free" || target.kind === "inherited") {
+    move(dragged, pad);
+  } else {
+    flash(target.why, true);
+    return;
+  }
+  selected = pk(pad);
+  changed();
+}
+
+// ---- Rendering ----------------------------------------------------------------------
+
+function flash(text, error) {
+  const status = $("#status");
+  status.textContent = text;
+  status.className = error ? "error" : "ok";
+}
+
+function showError(text) {
+  const box = $("#error");
+  box.textContent = text || "";
+  box.style.display = text ? "block" : "none";
+}
+
+function renderNav() {
+  const nav = $("#nav");
+  nav.replaceChildren();
+  const groups = [
+    ["Session, Mixer and FX Mode", (s) => s.modes.length === 1 && s.modes[0] === "session"],
+    ["Linnstrument Mode", (s) => s.modes.includes("linnstrument")],
+    ["Sequencer Mode", (s) => s.modes.length === 1 && s.modes[0] === "sequencer"],
+    ["Session and Sequencer Mode", (s) => s.modes.length === 2 && s.modes.includes("session") && s.modes.includes("sequencer") && !s.modes.includes("linnstrument")],
+  ];
+  const current = view.kind === "section" ? view.name.replace(/-shift$/, "") : null;
+  for (const [title, test] of groups) {
+    const items = L.sections.filter((s) => test(s) && !s.name.endsWith("-shift"));
+    if (!items.length) continue;
+    nav.append(el("h2", { text: title }));
+    for (const s of items) {
+      const changedHere = overlay[s.key] || overlay[s.key + "_shift"];
+      nav.append(el("button", {
+        class: (s.name === current ? "current" : "") + (changedHere ? " user" : ""),
+        onclick: () => { view = { kind: "section", name: s.name }; selected = null; render(); },
+      }, s.name, changedHere ? " •" : ""));
+    }
+  }
+  nav.append(el("h2", { text: "Messages" }));
+  nav.append(el("button", { class: view.kind === "functions" ? "current" : "", onclick: () => { view = { kind: "functions" }; selected = null; render(); } }, "Functions"));
+  nav.append(el("button", { class: view.kind === "system" ? "current" : "", onclick: () => { view = { kind: "system" }; selected = null; render(); } }, "System messages"));
+}
+
+function renderSection() {
+  const name = view.name;
+  const s = section(name);
+  const centre = $("#centre");
+  centre.replaceChildren();
+  const base = name.replace(/-shift$/, "");
+  const shift = base + "-shift";
+  if (section(shift)) {
+    centre.append(el("div", { class: "layers" },
+      el("button", { class: name === base ? "current" : "", onclick: () => { view = { kind: "section", name: base }; selected = null; render(); } }, "Base"),
+      el("button", { class: name === shift ? "current" : "", onclick: () => { view = { kind: "section", name: shift }; selected = null; render(); } }, "Shift held"),
+    ));
+  }
+  const notes = [];
+  if (s.fallback) notes.push(`Falls back to ${s.fallback}: its buttons show dashed here, unless one of this section's own sits on the pad.`);
+  if (s.left_split) notes.push("Only column 1 reaches BleakLoop in Linnstrument Mode.");
+  notes.push("Drag a button to a free pad to move it, or onto another button to swap them. Click a pad to edit it.");
+  centre.append(el("p", { class: "note", text: notes.join(" ") }));
+
+  const grid = el("div", { class: "grid" });
+  grid.append(el("div"));
+  for (let c = 1; c <= 16; c++) grid.append(el("div", { class: "head", text: c }));
+  for (let p = 1; p <= 8; p++) {
+    grid.append(el("div", { class: "head", text: p }));
+    for (let c = 1; c <= 16; c++) {
+      const pad = [c, p];
+      const st = padState(name, pad);
+      const classes = ["pad", st.kind];
+      if (st.entry && st.entry.source === "user" && !st.entry.inherited && st.kind === "button") classes.push("user");
+      if (selected === pk(pad)) classes.push("selected");
+      let content = [];
+      let title = st.why || "";
+      if (st.kind === "button" || st.kind === "inherited") {
+        content = [entryLabel(st.entry)];
+        if (st.kind === "inherited") content.push(el("small", { text: "from " + st.entry.section }));
+        title = `${st.entry.key}.${st.entry.name}: ${st.entry.fn}` + (st.entry.value !== undefined ? ` ${JSON.stringify(st.entry.value)}` : "");
+      } else if (st.kind === "other") {
+        content = [el("small", { text: entryLabel(st.entry) })];
+      }
+      const cell = el("div", { class: classes.join(" "), title, onclick: () => { selected = pk(pad); render(); } }, ...content);
+      if (st.kind === "button") {
+        cell.draggable = true;
+        cell.addEventListener("dragstart", (ev) => { ev.dataTransfer.setData("text/plain", st.entry.name); ev.dataTransfer.effectAllowed = "move"; });
+      }
+      cell.addEventListener("dragover", (ev) => { ev.preventDefault(); cell.classList.add("drop"); });
+      cell.addEventListener("dragleave", () => cell.classList.remove("drop"));
+      cell.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        cell.classList.remove("drop");
+        const dragged = own(name).find((e) => e.name === ev.dataTransfer.getData("text/plain"));
+        if (dragged) drop(name, dragged, pad);
+      });
+      grid.append(cell);
+    }
+  }
+  centre.append(grid);
+  const removed = Object.entries(overlay[s.key] || {}).filter(([, item]) => item.removed);
+  if (removed.length) {
+    centre.append(el("p", { class: "note" }, "Removed: ", ...removed.map(([n]) =>
+      el("button", { title: "Put it back where it shipped", onclick: () => { revertButton({ key: s.key, name: n }); changed(); } }, "Restore " + n))));
+  }
+  centre.append(el("div", { class: "legend" },
+    el("span", { style: "--swatch: var(--button)", text: "This section's button" }),
+    el("span", { style: "--swatch: var(--user)", text: "Changed by you" }),
+    el("span", { style: "--swatch: var(--inherited)", text: "From the fallback" }),
+    el("span", { style: "--swatch: var(--other)", text: "Another section in the same layer" }),
+    el("span", { style: "--swatch: var(--locked)", text: "Fixed region" }),
+  ));
+  renderPadPanel();
+}
+
+function counter(input, max) {
+  const count = el("span", { class: "count" });
+  const update = () => { count.textContent = `${input.value.length}/${max}`; count.classList.toggle("over", input.value.length > max); };
+  input.addEventListener("input", update);
+  update();
+  return count;
+}
+
+function renderPadPanel() {
+  const side = $("#side");
+  side.replaceChildren();
+  if (!selected) {
+    side.append(el("h2", { text: "Pad" }), el("p", { class: "note", text: "Click a pad to edit it." }));
+    return;
+  }
+  const name = view.name;
+  const s = section(name);
+  const pad = selected.split(",").map(Number);
+  const st = padState(name, pad);
+  side.append(el("h2", { text: `${name}, column ${pad[0]}, pad ${pad[1]}` }));
+
+  if (st.kind === "locked" || st.kind === "off" || st.kind === "other") {
+    side.append(el("p", { class: "note", text: st.why }));
+    return;
+  }
+  if (st.kind === "free" || st.kind === "inherited") {
+    if (st.kind === "inherited") {
+      side.append(el("p", { class: "note", text: `${fnLabel(st.entry.fn)} comes from ${st.entry.section}; edit it there, or put one of this section's own buttons here over it.` }));
+    }
+    const choices = s.functions.filter((fn) => !isFixed(fn));
+    const select = el("select", {}, choices.map((fn) => el("option", { value: fn, text: `${fnLabel(fn)} (${fn})` })));
+    side.append(el("label", { text: "Add a button running" }), select,
+      el("div", { class: "actions" }, el("button", { class: "primary", onclick: () => { addButton(name, pad, select.value); changed(); } }, "Add button")));
+    return;
+  }
+
+  const e = st.entry;
+  side.append(el("p", { class: "note", text: `${e.key}.${e.name}` + (e.source === "user" ? (e.added ? " (added by you)" : " (changed by you)") : "") }));
+
+  const grouped = e.value !== undefined;
+  const fnSelect = el("select", { disabled: grouped }, s.functions.filter((fn) => !isFixed(fn) && !isOpen(fn) || fn === e.fn)
+    .map((fn) => el("option", { value: fn, selected: fn === e.fn, text: `${fnLabel(fn)} (${fn})` })));
+  fnSelect.addEventListener("change", () => { setButton(e, "does", fnSelect.value); changed(); });
+  side.append(el("label", { text: "Function" }), fnSelect);
+  if (grouped) side.append(el("p", { class: "note", text: isFixed(e.fn) ? "This group's buttons can move and be relabelled, but not be added, removed or change value." : "To run another function, remove this button and add a new one." }));
+
+  const label = el("input", { type: "text", value: e.label ?? "", placeholder: fnLabel(e.fn) });
+  const labelRow = el("label", { text: "Label " }, counter(label, L.max_label));
+  label.addEventListener("change", () => {
+    const shipped = shippedOf(e.key).find((x) => x.name === e.name);
+    const value = label.value.trim();
+    setButton(e, "label", value === "" ? (shipped && shipped.label !== undefined ? shipped.label : undefined) : value);
+    changed();
+  });
+  side.append(labelRow, label);
+
+  if (isOpen(e.fn)) {
+    if (e.fn === "tempo") {
+      const input = el("input", { type: "number", step: 1, value: e.value });
+      input.addEventListener("change", () => { setButton(e, "value", parseInt(input.value, 10)); changed(); });
+      side.append(el("label", { text: "BPM step (not 0)" }), input);
+    } else {
+      const a = el("input", { type: "number", step: 1, value: e.value[0] });
+      const b = el("input", { type: "number", step: 1, value: e.value[1] });
+      const set = () => { setButton(e, "value", [parseInt(a.value, 10), parseInt(b.value, 10)]); changed(); };
+      a.addEventListener("change", set); b.addEventListener("change", set);
+      side.append(el("label", { text: "Window step: tracks, scenes" }), el("div", { class: "row" }, a, b));
+    }
+  }
+
+  const actions = el("div", { class: "actions" });
+  if (!isFixed(e.fn)) actions.append(el("button", { class: "danger", onclick: () => { removeButton(e); selected = null; changed(); } }, "Remove"));
+  if (e.source === "user") actions.append(el("button", { onclick: () => { revertButton(e); changed(); } }, e.added ? "Discard new button" : "Revert to shipped"));
+  actions.append(el("button", { onclick: () => { view = { kind: "functions" }; selected = e.fn; render(); } }, "Edit messages"));
+  side.append(actions);
+}
+
+function chips(names) {
+  return el("div", { class: "note chips" }, names.length ? ["May use: ", ...names.map((n) => el("code", { text: "{" + n + "}" }))] : "No placeholders");
+}
+
+function messageField(title, value, shipped, allowed, onchange) {
+  const area = el("textarea", {}, value);
+  area.addEventListener("change", () => onchange(area.value));
+  const box = el("div", { class: "field" + (value !== shipped ? " user" : "") }, el("label", { text: title }), area, chips(allowed));
+  if (value !== shipped) box.append(el("button", { onclick: () => onchange(undefined) }, "Revert"));
+  return box;
+}
+
+function renderFunctions() {
+  const centre = $("#centre");
+  centre.replaceChildren();
+  centre.append(el("p", { class: "note", text: "A function's label shows on its pads unless a button has its own. Its messages show in Live's status bar; refusals always show, show = off hides the rest." }));
+  const list = el("div", { class: "list" });
+  for (const fn of Object.keys(L.shipped.functions).sort()) {
+    const user = (overlay.functions || {})[fn];
+    list.append(el("button", { class: (selected === fn ? "current" : "") + (user ? " user" : ""), onclick: () => { selected = fn; render(); } }, `${fnLabel(fn)} (${fn})`));
+  }
+  centre.append(list);
+  const side = $("#side");
+  side.replaceChildren();
+  if (!selected || !L.shipped.functions[selected]) {
+    side.append(el("h2", { text: "Function" }), el("p", { class: "note", text: "Pick a function to edit." }));
+    return;
+  }
+  const fn = selected;
+  const shipped = L.shipped.functions[fn];
+  const user = (overlay.functions || {})[fn] || {};
+  const allowed = L.shipped.placeholders[fn] || {};
+  side.append(el("h2", { text: fn }));
+  const label = el("input", { type: "text", value: user.label ?? shipped.label ?? "" });
+  label.addEventListener("change", () => { setFunctionField(fn, "label", label.value.trim() || undefined); changed(); });
+  side.append(el("label", { text: "Label " }, counter(label, L.max_label)), label);
+  const show = el("input", { type: "checkbox", checked: (user.show ?? shipped.show ?? true) });
+  show.addEventListener("change", () => { setFunctionField(fn, "show", show.checked); changed(); });
+  side.append(el("label", {}, show, " Show its messages"));
+  if ("message" in shipped) {
+    side.append(messageField("Message", user.message ?? shipped.message, shipped.message, allowed.message || [],
+      (v) => { setFunctionField(fn, "message", v); changed(); }));
+  }
+  for (const table of ["outcomes", "refusals"]) {
+    for (const [k, text] of Object.entries(shipped[table] || {})) {
+      const value = ((user[table] || {})[k]) ?? text;
+      side.append(messageField(`${table === "outcomes" ? "Outcome" : "Refusal"}: ${k}`, value, text, (allowed[table] || {})[k] || [],
+        (v) => { setFunctionField(fn, table, v, k); changed(); }));
+    }
+  }
+}
+
+function renderSystem() {
+  const centre = $("#centre");
+  centre.replaceChildren();
+  $("#side").replaceChildren(el("h2", { text: "System messages" }), el("p", { class: "note", text: "BleakLoop's own messages, outside any button." }));
+  const wrap = el("div", { class: "panel-wide" });
+  for (const [k, text] of Object.entries(L.shipped.system)) {
+    const value = (overlay.system || {})[k] ?? text;
+    wrap.append(messageField(k, value, text, L.shipped.system_placeholders[k] || [], (v) => { setSystem(k, v === undefined ? text : v); changed(); }));
+  }
+  centre.append(wrap);
+}
+
+function render() {
+  renderNav();
+  if (view.kind === "section") renderSection();
+  else if (view.kind === "functions") renderFunctions();
+  else renderSystem();
+  $("#save").disabled = !dirty();
+  $("#discard").disabled = !dirty();
+  if (dirty()) flash("Unsaved changes: Save to send them to BleakLoop", false);
+}
+
+// ---- Server -------------------------------------------------------------------------
+
+async function call(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({ error: `${response.status} ${response.statusText}` }));
+  if (!response.ok) throw new Error(data.error || `${response.status}`);
+  return data;
+}
+
+function loaded(data, message) {
+  L = data;
+  overlay = clone(L.overlay);
+  if (view.kind === "section" && !section(view.name)) view = { kind: "section", name: "global" };
+  showError("");
+  render();
+  flash(message, false);
+}
+
+async function load() {
+  try {
+    loaded(await call("GET", "/api/layout"), "");
+    flash(L.user_path ? `Your changes are saved to ${L.user_path}` : "No user file: BleakLoop isn't in a Remote Scripts folder", !L.user_path);
+  } catch (error) {
+    showError("Couldn't reach BleakLoop: " + error.message);
+  }
+}
+
+$("#save").addEventListener("click", async () => {
+  try {
+    loaded(await call("POST", "/api/save", { overlay }), "Saved: BleakLoop has the new layout");
+  } catch (error) {
+    showError(error.message);
+    flash("Not saved", true);
+  }
+});
+
+$("#discard").addEventListener("click", () => { overlay = clone(L.overlay); showError(""); render(); flash("Changes discarded", false); });
+
+$("#reset").addEventListener("click", async () => {
+  if (!confirm("Delete all your changes and go back to the shipped layout?")) return;
+  try {
+    loaded(await call("POST", "/api/reset", {}), "Reset: back to the shipped layout");
+  } catch (error) {
+    showError(error.message);
+  }
+});
+
+window.addEventListener("beforeunload", (ev) => { if (L && dirty()) { ev.preventDefault(); ev.returnValue = ""; } });
+
+load();
+</script>
+</body>
+</html>

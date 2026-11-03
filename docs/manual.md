@@ -13,7 +13,30 @@ While BleakLoop loads, a rainbow rolls across the pads for about 3 seconds, and 
 
 While Live runs, BleakLoop turns the LinnStrument's split on and makes column 1, the Global column, its control split. When Live closes, or you choose another control surface, it puts your own split settings back.
 
-[Where every button is, and what it says](buttons.md): the button reference. To move a button or change what it says, edit `src/BleakLoop/buttons.toml` and restart Live; check the file first with `PYTHONPATH=src python3 -m tools.check_buttons` from the repo.
+[Where every button is, and what it says](buttons.md): the button reference, for the layout BleakLoop ships with. To move a button or change what it says, see [Changing the buttons](#changing-the-buttons).
+
+### Changing the buttons
+
+While Live runs, open **http://127.0.0.1:47128** in your browser: BleakLoop's button editor. Live's Log.txt has the same address, on the line `BleakLoop editor:`. The page is only reachable from your own computer.
+
+- Pick a section on the left, and Base or Shift held above the grid. Drag a button to a free pad to move it, or onto another button to swap the two. Click a pad to change its function or label, remove it, or put it back as shipped; click a free pad to add a button.
+- Functions and System messages change what the status bar says. Each message lists the placeholders, such as `{bpm}`, it may use.
+- Nothing changes until you press **Save**. BleakLoop checks the whole layout first: if anything clashes, the page says why and nothing is saved. Once saved, the new layout works at once, without restarting Live. If you're holding a pad, it waits until you let go.
+- **Reset all** deletes your changes and goes back to the layout BleakLoop ships with.
+
+Your changes are saved in `User Library/BleakLoop/buttons.toml`, beside the Remote Scripts folder, so installing a new BleakLoop keeps them. The file lists only what you changed: everything else, including buttons and messages a new version adds, comes from the shipped `src/BleakLoop/buttons.toml`. Deleting the file resets everything. You can also edit it in a text editor: BleakLoop applies each save within about a second, or, if the file has a mistake, keeps the current layout and shows the error. The editor rewrites the whole file on each save, so comments you add by hand are lost.
+
+- FX snapshot slots, scene slots, Sequencer pages, Bars, rates, tracks and devices can be moved and relabelled, but not added, removed or given another value. Tempo and window buttons can be added, removed and given any step.
+- A section that falls back to another one, such as Linnstrument Mode's Global column, shows the fallback's buttons where it has none of its own. Removing its own button brings the fallback's back on that pad.
+- To turn the editor off, or move it to another port, add this to your file and restart Live:
+
+  ```toml
+  [editor]
+  enabled = false
+  port = 47128
+  ```
+
+To check a file by hand, from the repo: `PYTHONPATH=src python3 -m tools.check_buttons --user PATH`.
 
 ## 2. Function Reference
 

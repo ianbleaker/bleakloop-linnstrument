@@ -4,10 +4,23 @@ each function's label, manual text and messages."""
 import tomllib
 from pathlib import Path
 
+from . import userfile
 from .catalogue import LINNSTRUMENT, MESSAGE_ONLY, MODES, SEQUENCER, SESSION
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
+
+
+def user_path(script):
+    # The user's buttons file, in the User Library beside Remote Scripts, so an upgrade keeps
+    # it. None unless the script sits in a Remote Scripts folder: a repo checkout never reads
+    # a user's own file. Not resolved, as the developer install is a symlink.
+    if script.parent.name != "Remote Scripts":
+        return None
+    return script.parent.parent / "BleakLoop" / "buttons.toml"
+
+
+USER_PATH = user_path(Path(__file__).parent.parent)
 
 # The manual's section keys (tools/docs/manual/pads.py SECTIONS), plus the held-modifier
 # sections that have combos but no manual section of their own.
@@ -168,6 +181,15 @@ class Section:
         self.__dict__["_does"] = does
         self.__dict__["_base"] = base
         self.__dict__["_modes"] = section_modes(name)
+        self.__dict__["_built"] = frozenset(buttons)
+
+    def _refill(self, buttons, does):
+        # A reload: new buttons in the same object, so whatever holds it (a fallback, a module
+        # attribute) sees them. Name, fallback and modes stay.
+        for key in [key for key in self.__dict__ if not key.startswith("_")]:
+            del self.__dict__[key]
+        self.__dict__.update(buttons)
+        self.__dict__["_does"] = dict(does)
         self.__dict__["_built"] = frozenset(buttons)
 
     def __getattr__(self, attr):
@@ -461,20 +483,213 @@ def _regions():
     }
 
 
-def load(path):
+def _read(path):
     with open(path, "rb") as file:
-        return Registry(tomllib.load(file))
+        return tomllib.load(file)
+
+
+def load(path, user_path=None):
+    # The shipped file, with the user's file over it when there is one.
+    data = _read(path)
+    overlay, editor = {}, dict(userfile.EDITOR)
+    if user_path is not None and Path(user_path).exists():
+        try:
+            try:
+                overlay = _read(user_path)
+            except OSError as error:
+                raise ValueError(f"couldn't read it: {error.strerror}") from None
+            data, editor = userfile.merge(data, overlay, str(user_path))
+            registry = Registry(data)
+        except ValueError as error:
+            text = str(error)
+            raise ValueError(text if text.startswith(str(user_path)) else f"{user_path}: {text}") from None
+    else:
+        registry = Registry(data)
+    registry.overlay, registry.editor = overlay, editor
+    return registry
 
 
 # Loaded on first use: layout's fixed regions must exist before the registry validates.
 _registry = None
+# Why the user's file was left out at startup, for the surface to show; None when it loaded.
+user_error = None
 
 
 def _get():
-    global _registry
+    global _registry, user_error
     if _registry is None:
-        _registry = load(PATH)
+        try:
+            _registry = load(PATH, USER_PATH)
+        except ValueError as error:
+            user_error = str(error)
+            _registry = load(PATH)
     return _registry
+
+
+def stamps(path=None, user_path=None):
+    # Each file's (modification time, size), or None while it's missing: a change in either
+    # means the files changed on disk.
+    def stamp(file):
+        try:
+            info = Path(file).stat()
+        except OSError:
+            return None
+        return info.st_mtime_ns, info.st_size
+
+    user_path = user_path or USER_PATH
+    return stamp(path or PATH), None if user_path is None else stamp(user_path)
+
+
+def reload(path=None, user_path=None):
+    # Loads the files again and refills layout's sections in place. A file that fails its
+    # checks raises and leaves the current layout as it was.
+    global _registry, user_error
+    registry = load(path or PATH, user_path or USER_PATH)
+    _registry, user_error = registry, None
+    from . import layout
+
+    layout.refresh()
+
+
+def _neighbours(section):
+    # The other sections live in a layer with this one.
+    return sorted({other for names in LAYERS.values() if section in names for other in names} - {section})
+
+
+def _pads(regions):
+    return [[column, pad] for columns, pads in regions for column in columns for pad in pads]
+
+
+def describe(registry=None):
+    """The layout as plain data, for the editor: each live section's buttons, where each comes
+    from and its fixed regions, every function's messages, the system messages and the user's
+    changes."""
+    from . import layout
+
+    registry = registry or _get()
+    overlay = getattr(registry, "overlay", {})
+    regions = _regions()
+    sections = []
+    for live in layout.SECTIONS:
+        name = live._name
+        key = name.replace("-", "_")
+        modes = section_modes(name)
+        own = []
+        for id, item in registry.items.items():
+            if item["section"] != name:
+                continue
+            short = id[len(key) + 1 :]
+            entry = {
+                "id": id,
+                "name": short,
+                "function": _does(id, item),
+                "pad": list(item["pad"]),
+                "label": registry.label(_does(id, item), name, _freeze(item.get("value"))),
+                "source": "user" if short in overlay.get(key, {}) else "shipped",
+            }
+            if "label" in item:
+                entry["own_label"] = item["label"]
+            if "value" in item:
+                entry["value"] = item["value"]
+            own.append(entry)
+        taken = {tuple(entry["pad"]) for entry in own}
+        inherited = []
+        if name in FALLBACK:
+            for id, pad in _live(registry.items, FALLBACK[name]):
+                item = registry.items[id]
+                if pad not in taken and MODES[_does(id, item)] & modes:
+                    entry = {
+                        "id": id,
+                        "function": _does(id, item),
+                        "pad": list(pad),
+                        "label": registry.label(_does(id, item), item["section"], _freeze(item.get("value"))),
+                        "source": "inherited",
+                        "from": item["section"],
+                    }
+                    if "value" in item:
+                        entry["value"] = item["value"]
+                    inherited.append(entry)
+        sections.append(
+            {
+                "name": name,
+                "key": key,
+                "modes": sorted(modes),
+                "fallback": FALLBACK.get(name),
+                "left_split": name in LEFT_SPLIT_SECTIONS,
+                "entries": own + inherited,
+                "regions": _pads(regions.get(name, ())),
+                # Fixed or taken in a layer this section shares: a button can't go there.
+                "locked": sorted(
+                    {
+                        tuple(pad)
+                        for other in _neighbours(name)
+                        for pad in _pads(regions.get(other, ()))
+                    }
+                    | {tuple(pad) for pad in _pads(regions.get(name, ()))}
+                ),
+                "others": [
+                    {"id": id, "section": other, "pad": list(pad)}
+                    for other in _neighbours(name)
+                    for id, pad in _live(registry.items, other)
+                    if registry.items[id]["section"] == other
+                ],
+                "functions": sorted(function for function, runs in MODES.items() if runs & modes),
+            }
+        )
+    functions = {}
+    for name in sorted(set(MODES) | set(registry.functions)):
+        item = registry.function(name)
+        described = {key: item[key] for key in userfile.FUNCTION_FIELDS if key in item}
+        described.setdefault("label", name)
+        functions[name] = described
+    system = dict(registry.data.get("system", {}))
+    return {
+        "sections": sections,
+        "layers": {layer: list(names) for layer, names in LAYERS.items()},
+        "functions": functions,
+        "system": system,
+        "fixed_groups": sorted(userfile.FIXED_GROUPS),
+        "open_groups": sorted(userfile.OPEN_GROUPS),
+        "max_label": MAX_LABEL,
+        "overlay": overlay,
+        "shipped": _shipped(),
+        "editor": getattr(registry, "editor", dict(userfile.EDITOR)),
+        "shipped_path": str(PATH),
+        "user_path": None if USER_PATH is None else str(USER_PATH),
+    }
+
+
+def _shipped():
+    # The shipped file alone, by section key, for the editor to lay the user's changes over,
+    # with the placeholders each of its messages may use.
+    data = _read(PATH)
+    sections = {
+        key: [{"name": name, **item} for name, item in table.items()]
+        for key, table in data.items()
+        if key not in TOP_LEVEL
+    }
+    functions, placeholders = {}, {}
+    for name, item in data.get("functions", {}).items():
+        functions[name] = {key: value for key, value in item.items() if key in userfile.FUNCTION_FIELDS}
+        allowed = {}
+        if "message" in item:
+            allowed["message"] = sorted(userfile.placeholders(item["message"]))
+        for table in ("outcomes", "refusals"):
+            if table in item:
+                allowed[table] = {key: sorted(userfile.placeholders(text)) for key, text in item[table].items()}
+        placeholders[name] = allowed
+    system = data.get("system", {})
+    return {
+        "sections": sections,
+        "functions": functions,
+        "placeholders": placeholders,
+        "system": system,
+        "system_placeholders": {key: sorted(userfile.placeholders(text)) for key, text in system.items()},
+    }
+
+
+def editor_settings():
+    return dict(_get().editor)
 
 
 def entry(id):

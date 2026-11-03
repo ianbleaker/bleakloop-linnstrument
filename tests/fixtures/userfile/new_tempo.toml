@@ -1,0 +1,5 @@
+[global_shift.tempo_5]
+pad = [1, 2]
+does = "tempo"
+value = 5
+label = "Tmp+5"

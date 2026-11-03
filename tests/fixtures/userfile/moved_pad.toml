@@ -1,0 +1,6 @@
+# Metronome and Fixed Length swap pads.
+[global.metronome]
+pad = [1, 5]
+
+[global.fixed_length]
+pad = [1, 4]

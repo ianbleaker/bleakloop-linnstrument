@@ -1,8 +1,10 @@
 # Every button: where it sits and the function it runs, and each function's label, manual
 # text and status messages.
 #
-# Edit a pad here and restart Live to move a button; nothing else to build. Check the file
-# first, from the repo: PYTHONPATH=src python3 -m tools.check_buttons
+# This is the shipped layout. Your own changes belong in User Library/BleakLoop/buttons.toml,
+# which the button editor at http://127.0.0.1:47128 writes, so an upgrade keeps them. A save to
+# either file applies within about a second, without restarting Live. Check this file from the
+# repo: PYTHONPATH=src python3 -m tools.check_buttons
 #
 # [<section>.<name>] is a button. Fields:
 #   pad    [column, pad]; column 1 is the Global column, pad 1 the far row

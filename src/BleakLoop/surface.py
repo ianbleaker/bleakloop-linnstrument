@@ -19,6 +19,7 @@ from .core import buttons, controls, engine, faders, fx, layout, sequencer, valu
 from .core.leds import Clock, phase_key
 from .core.model import PadPress, ScenesChanged, SequencerView, SlideMoved, YAxis
 from .core.modes import Mode, State
+from .editor import server
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,12 @@ class BleakLoop(ControlSurface):
         self._translated = {}  # (row, column) -> the audition note a note pad is translated to
         self._forwarding = None  # the pad elements' own script forwarding
         self._held_note_pads = set()  # (row, column) of note pads held now
+        self._held_pads = set()  # every pad held now: a buttons reload waits for none
+        self._ticks = 0
+        self._button_stamps = None  # buttons.stamps() as last read
+        self._reload_pending = False
+        self._editor = None  # the editor's server, while it runs
+        self._editor_problem = None  # why the editor didn't start, shown once started
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
         logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
@@ -141,7 +148,10 @@ class BleakLoop(ControlSurface):
 
     def update_display(self):
         super().update_display()
+        if self._editor is not None:
+            self._editor.poll()
         if self._started:
+            self._watch_buttons()
             self._check_pending_clip()
             self._load_fx()
             self._load_fx_scenes()
@@ -155,6 +165,11 @@ class BleakLoop(ControlSurface):
             self._refresh()
         elif self._setup is None:
             logger.info("BleakLoop loaded")
+            logger.info("BleakLoop user buttons: %s", buttons.USER_PATH or "none")
+            self._button_stamps = buttons.stamps()
+            if buttons.user_error:
+                logger.warning("BleakLoop: user buttons not loaded: %s", buttons.user_error)
+            self._start_editor()
             self._listen_for_nrpn_replies()
             self.request_rebuild_midi_map()
             # Reads first, then the fixed sets: every read reply is in before the computed sets.
@@ -180,11 +195,69 @@ class BleakLoop(ControlSurface):
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
                 self.show_message(self._refusal)
+            if buttons.user_error:
+                self.show_message(f"BleakLoop: user buttons not loaded: {buttons.user_error}")
+            elif self._editor_problem:
+                self.show_message(self._editor_problem)
             # The display tick alone would land tempo blinks up to 100 ms late.
             self._timer = Live.Base.Timer(
                 callback=self._on_blink_timer, interval=values.BLINK_TIMER_MS, repeat=True
             )
             self._timer.start()
+
+    def _start_editor(self):
+        settings = buttons.editor_settings()
+        if not settings["enabled"]:
+            logger.info("BleakLoop editor: off")
+            return
+        port = settings["port"]
+        editor = server.Editor(port, self._editor_saved)
+        try:
+            self._editor = server.Server(port, editor.handle)
+        except OSError as error:
+            message = f"BleakLoop editor: port {port} unavailable ({error.strerror}), editor off"
+            logger.warning(message)
+            self._editor_problem = message
+            return
+        logger.info("BleakLoop editor: http://%s:%d", server.HOST, port)
+
+    def _editor_saved(self):
+        # The editor wrote or deleted the user file: reload now, without waiting for the poll
+        # (and without the poll reloading it again), unless a pad is held: then on its
+        # release, as for any save. A problem goes back to the page.
+        self._button_stamps = buttons.stamps()
+        if self._held_pads:
+            self._reload_pending = True
+            return None
+        self._reload_pending = False
+        return self.reload_buttons()
+
+    def _watch_buttons(self):
+        # About once a second: a save to either buttons file applies, once no pad is held, so
+        # a release reaches the button its press did.
+        self._ticks += 1
+        if self._ticks % values.BUTTONS_POLL_TICKS == 0:
+            stamps = buttons.stamps()
+            if stamps != self._button_stamps:
+                self._button_stamps = stamps
+                self._reload_pending = True
+        if self._reload_pending and not self._held_pads:
+            self._reload_pending = False
+            self.reload_buttons()
+
+    def reload_buttons(self):
+        # A bad file leaves the current layout working, and says why.
+        try:
+            buttons.reload()
+        except (ValueError, OSError) as error:
+            message = f"BleakLoop: buttons not reloaded: {error}"
+            logger.warning(message)
+            self.show_message(message)
+            return str(error)
+        logger.info("BleakLoop: buttons reloaded")
+        self.show_message("BleakLoop: buttons reloaded")
+        self._refresh()
+        return None
 
     def _follow_selected_device(self):
         # Device FX follows the blue hand, which other control surfaces may move. A click on
@@ -267,6 +340,9 @@ class BleakLoop(ControlSurface):
         self._state = replace(self._state, fader_bindings=bindings)
 
     def disconnect(self):
+        if self._editor is not None:
+            self._editor.close()
+            self._editor = None
         if self._timer is not None:
             self._timer.stop()
             self._timer = None
@@ -310,7 +386,7 @@ class BleakLoop(ControlSurface):
     def _compute_settings(self):
         settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
         self._control_channel = channel
-        self._right_split_unread = self._refusal == device.REFUSE_RIGHT_SPLIT
+        self._right_split_unread = self._refusal == buttons.system("refuse_right_split")
         self._sent = {
             device.NRPN_OCTAVE: dict(settings)[device.NRPN_OCTAVE],
             device.NRPN_TRANSPOSE_PITCH: device.TRANSPOSE_ZERO,
@@ -364,14 +440,14 @@ class BleakLoop(ControlSurface):
             return
         self._recheck_channel()
         if self._clash:
-            note_map, refusal = None, device.REFUSE_CHANNELS
+            note_map, refusal = None, buttons.system("refuse_channels")
         self._note_map = note_map
         if player_changed:
-            self.show_message(device.OCTAVE_RESET)
+            self.show_message(buttons.system("octave_reset"))
         if refusal is not None and refusal != self._refusal:
             self.show_message(refusal)
         elif refusal is None and was_refused:
-            self.show_message(device.CONTROLS_ON)
+            self.show_message(buttons.system("controls_on"))
         self._refusal = refusal
 
     def _recheck_channel(self):
@@ -561,6 +637,8 @@ class BleakLoop(ControlSurface):
 
     def _listen_for(self, mode):
         self._remove_listeners()
+        # A release may now reach another listener, or none: a held pad can't block a reload.
+        self._held_pads.clear()
         self._x_listened = False
         if mode in (Mode.SESSION, Mode.SEQUENCER):
             for row in range(layout.ROWS):
@@ -629,6 +707,7 @@ class BleakLoop(ControlSurface):
             self._saved_split.setdefault(parameter, setting)
 
     def _on_pad(self, column, row, value):
+        self._hold(("pad", column, row), value)
         if column in layout.SEQ_NOTE_COLUMNS:
             if value:
                 self._held_note_pads.add((row, column))
@@ -671,7 +750,14 @@ class BleakLoop(ControlSurface):
         if column in layout.GRID_COLUMNS:
             self._state = engine.y_axis(self._state, YAxis(column, layout.pad_of(row), value))
 
+    def _hold(self, key, value):
+        if value:
+            self._held_pads.add(key)
+        else:
+            self._held_pads.discard(key)
+
     def _on_control_note(self, note, value):
+        self._hold(("note", note), value)
         if self._note_map is None:
             if value > 0:
                 self.show_message(self._refusal)
