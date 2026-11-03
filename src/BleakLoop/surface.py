@@ -31,6 +31,31 @@ NRPN_REPLY_CCS = (99, 98, 6, 38, 101, 100)
 X_ON_NRPN = (0, 6)
 
 
+def _elapsed_ms(start):
+    # Milliseconds since start, a time.monotonic() reading.
+    return (time.monotonic() - start) * 1000
+
+
+class _Timing:
+    """A run count and the longest run, for the device-check logs."""
+
+    def __init__(self):
+        self.runs = 0
+        self.longest_ms = 0.0
+
+    def add(self, start):
+        ms = _elapsed_ms(start)
+        self.runs += 1
+        self.longest_ms = max(self.longest_ms, ms)
+        return ms
+
+    def take(self):
+        # (runs, longest ms), then both back to zero.
+        taken = self.runs, self.longest_ms
+        self.runs, self.longest_ms = 0, 0.0
+        return taken
+
+
 class Elements(ElementsBase):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
@@ -85,8 +110,7 @@ class BleakLoop(ControlSurface):
         self._reader = device.NrpnReader()
         self._slides = device.SlideDecoder()
         self._x_rows = None  # the X and slide rows last sent; None after User Firmware Mode on
-        self._x_reports = 0  # in the current fader gesture
-        self._longest_x_ms = 0.0
+        self._x_timing = _Timing()  # X reports in the current fader gesture
         self._saved_split = {}  # the first reply per NRPN: the player's settings
         self._reads = {}  # the latest reply per NRPN
         self._set_numbers = []  # NRPNs BleakLoop set, in setup order
@@ -109,7 +133,7 @@ class BleakLoop(ControlSurface):
         self._started = False
         self._timer = None
         self._phase = None
-        self._longest_tick_ms = 0.0  # of the running morph
+        self._morph_timing = _Timing()  # ticks of the running morph
         self._fx_text = None  # the stored FX snapshots as last read
         self._fx_scenes_text = None  # the stored scene snapshots as last read
         self._scenes = []  # song.scenes at the last display tick
@@ -120,7 +144,7 @@ class BleakLoop(ControlSurface):
         self._selected_device = None  # the selected track's selected device, last tick
         self._seq_view = SequencerView()  # Sequencer Mode's last read target
         self._seq_notes = None  # the note count last logged
-        self._longest_seq_tick_ms = 0.0
+        self._seq_timing = _Timing()  # blink ticks in Sequencer Mode
         self._translated = {}  # (row, column) -> the audition note a note pad is translated to
         self._forwarding = None  # the pad elements' own script forwarding
         self._held_note_pads = set()  # (row, column) of note pads held now
@@ -134,7 +158,7 @@ class BleakLoop(ControlSurface):
         self._editor_restart = False  # a reload changed them: restart once no request is open
         start = time.monotonic()
         super().__init__(*a, specification=Specification, **k)
-        logger.info("BleakLoop elements built in %d ms", (time.monotonic() - start) * 1000)
+        logger.info("BleakLoop elements built in %d ms", _elapsed_ms(start))
 
     @staticmethod
     def _should_include_element_in_background(_):
@@ -513,8 +537,7 @@ class BleakLoop(ControlSurface):
         except Exception:
             logger.exception("blink timer failed")
         if self._state.mode is Mode.SEQUENCER:
-            tick_ms = (time.monotonic() - start) * 1000
-            self._longest_seq_tick_ms = max(self._longest_seq_tick_ms, tick_ms)
+            self._seq_timing.add(start)
 
     def _playhead(self):
         # Only the play position: notes are read when a frame is drawn.
@@ -548,14 +571,14 @@ class BleakLoop(ControlSurface):
             live_actions.apply(action, self.song, self)
         if redraw:
             self._refresh()
-        self._longest_tick_ms = max(self._longest_tick_ms, (time.monotonic() - start) * 1000)
+        self._morph_timing.add(start)
         if state.morph is None:
             if morph.wrapped:
                 started = morph.launch and morph.triggered and triggered is False
                 how = "as the scene started" if started else "on its end"
                 logger.info("FX: morph landed after a loop wrap, %s", how)
-            logger.info("FX: morph landed, longest tick %.1f ms", self._longest_tick_ms)
-            self._longest_tick_ms = 0.0
+            _, longest_ms = self._morph_timing.take()
+            logger.info("FX: morph landed, longest tick %.1f ms", longest_ms)
 
     # Modes
 
@@ -563,9 +586,9 @@ class BleakLoop(ControlSurface):
         self._poll, self._pending_sets, self._poll_wait = [], [], False
         if mode is Mode.LINNSTRUMENT:
             self._poll_due = 0  # re-check at once
-        if mode is not Mode.SEQUENCER and self._longest_seq_tick_ms:
-            logger.info("SEQ: longest tick %.1f ms", self._longest_seq_tick_ms)
-            self._longest_seq_tick_ms = 0.0
+        if mode is not Mode.SEQUENCER and self._seq_timing.longest_ms:
+            _, longest_ms = self._seq_timing.take()
+            logger.info("SEQ: longest tick %.1f ms", longest_ms)
         if mode is Mode.SEQUENCER:
             self._seq_notes = None
         if mode is Mode.SESSION:
@@ -746,16 +769,12 @@ class BleakLoop(ControlSurface):
         if redraw:
             self._refresh()
         if self._state.fader_touches:
-            self._x_reports += 1
-            self._longest_x_ms = max(self._longest_x_ms, (time.monotonic() - start) * 1000)
+            self._x_timing.add(start)
 
     def _log_fader_gesture(self):
         # Once the last touch ends: the gesture's X load, for the device check.
-        if self._x_reports and not self._state.fader_touches:
-            logger.info(
-                "FADERS: %d reports, longest %.1f ms", self._x_reports, self._longest_x_ms
-            )
-            self._x_reports, self._longest_x_ms = 0, 0.0
+        if self._x_timing.runs and not self._state.fader_touches:
+            logger.info("FADERS: %d reports, longest %.1f ms", *self._x_timing.take())
 
     def _on_y_axis(self, column, row, value):
         # 50-100 reports a second per finger: no snapshot or refresh, since only the 10 ms
@@ -853,8 +872,7 @@ class BleakLoop(ControlSurface):
         count = len(self._seq_view.notes)
         if count != self._seq_notes:
             self._seq_notes = count
-            ms = (time.monotonic() - start) * 1000
-            logger.info("SEQ: read %d notes in %.1f ms", count, ms)
+            logger.info("SEQ: read %d notes in %.1f ms", count, _elapsed_ms(start))
         return self._seq_view
 
     def _update_ring(self, force=False):
