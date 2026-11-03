@@ -277,7 +277,7 @@ def handle(state, event, snapshot):
         # A held step ends on its cell's release, wherever the finger slid to.
         return _release_step(state, event, view, snapshot)
     normal = controls.at(controls.sections(state), key)
-    held = normal[1] if normal is not None else None
+    held = normal.function if normal is not None else None
     if held == "shift":
         return global_column.handle(state, event, snapshot)
     # Under Shift, a hold's press gives way to the Shift layer's button on its pad.
@@ -324,7 +324,7 @@ def handle(state, event, snapshot):
 
 
 def _page_release(state, button):
-    if button[1] == "pages" and button[3] - 1 == state.seq_page_held:
+    if button.function == "pages" and button.value - 1 == state.seq_page_held:
         return replace(state, seq_page_held=None)
     return state
 
@@ -832,6 +832,6 @@ def _render_buttons(frame, state, snapshot):
     navigation = layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV
     for section in (*own, navigation):
         for button in section.buttons():
-            frame[button[2]] = functions.light(button, state, snapshot)
+            frame[button.key] = functions.light(button, state, snapshot)
     if state.device_clip:
         controls.render_device_clip_layer(frame, state, snapshot)

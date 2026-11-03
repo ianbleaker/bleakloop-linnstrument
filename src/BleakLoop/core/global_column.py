@@ -329,14 +329,14 @@ def render(state, snapshot):
                 snapshot, state.window.scene, pad - 1, controls.waiting_scene(state)
             )
         for button in layout.LINNSTRUMENT_SCENES.buttons():
-            frame[button[2]] = functions.light(button, state, snapshot)
+            frame[button.key] = functions.light(button, state, snapshot)
         frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
         return frame
     # Every pad the column's layers use goes dark, then the live layer lights its own.
-    frame = {button[2]: Light(OFF) for button in normal.buttons() + shift.buttons()}
+    frame = {button.key: Light(OFF) for button in normal.buttons() + shift.buttons()}
     live = shift if state.shift and not state.copy and not state.delete else normal
     for button in live.buttons():
-        frame[button[2]] = functions.light(button, state, snapshot)
+        frame[button.key] = functions.light(button, state, snapshot)
     frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
     return frame
 
@@ -347,4 +347,4 @@ def shift_message(event):
 
 def _shift_pads(section):
     # Shift lights and works on both layers.
-    return {button[2] for button in section.buttons() if button[1] == "shift"}
+    return {button.key for button in section.buttons() if button.function == "shift"}

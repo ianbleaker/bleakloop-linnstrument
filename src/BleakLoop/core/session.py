@@ -58,7 +58,7 @@ def handle(state, event, snapshot):
         return faders.press(state, event, snapshot)
     key = (event.column, event.pad)
     normal = controls.at(controls.sections(state), key)
-    held = normal[1] if normal is not None else None
+    held = normal.function if normal is not None else None
     if state.seq_held and event.pressed and held != "seq":
         return _seq_press(state, event, snapshot)
     if held == "shift":
@@ -495,15 +495,15 @@ def render(state, snapshot):
     live = controls.sections(state, shift=True) if shift_layer else controls.sections(state)
     for section in live[1:]:
         for button in section.buttons():
-            frame[button[2]] = functions.light(button, state, snapshot)
+            frame[button.key] = functions.light(button, state, snapshot)
     if state.device_clip:
         controls.render_device_clip_layer(frame, state, snapshot)
     if shift_layer and state.stop:
         # A held Stop stays lit over the Shift layer.
         for section in controls.sections(state)[1:]:
             for button in section.buttons():
-                if button[1] == "stop":
-                    frame[button[2]] = functions.light(button, state, snapshot)
+                if button.function == "stop":
+                    frame[button.key] = functions.light(button, state, snapshot)
     frame.update(global_column.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame

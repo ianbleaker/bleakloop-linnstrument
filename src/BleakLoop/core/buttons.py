@@ -3,6 +3,7 @@ each function's label, manual text and messages."""
 
 import tomllib
 from pathlib import Path
+from typing import NamedTuple
 
 from . import userfile
 from .catalogue import LINNSTRUMENT, MESSAGE_ONLY, MODES, SEQUENCER, SESSION
@@ -223,7 +224,7 @@ class Section:
         return {key for _, _, key, _ in _expand(self._own(), self._does)}
 
     def buttons(self):
-        # (name, function, (column, pad), value) for every button live in this section.
+        # A Button for every button live in this section.
         mine = list(_expand(self._own(), self._does))
         taken = {key for _, _, key, _ in mine}
         inherited = []
@@ -231,25 +232,34 @@ class Section:
             inherited = [
                 button
                 for button in self._base.buttons()
-                if button[2] not in taken and MODES[button[1]] & self._modes
+                if button.key not in taken and MODES[button.function] & self._modes
             ]
         return mine + inherited
 
     def at(self, key):
         # The button live on a pad, or None.
-        return next((button for button in self.buttons() if button[2] == key), None)
+        return next((button for button in self.buttons() if button.key == key), None)
+
+
+class Button(NamedTuple):
+    """One live button, as a section lists it."""
+
+    name: str
+    function: str
+    key: tuple  # (column, pad)
+    value: object  # the step value, or None
 
 
 def _expand(own, does):
     for name, value in own.items():
         if isinstance(value, dict):
             for key, step in value.items():
-                yield name, name, key, step
+                yield Button(name, name, key, step)
         elif isinstance(value, tuple) and value and isinstance(value[0], tuple):
             for index, key in enumerate(value):
-                yield name, name, key, index + 1
+                yield Button(name, name, key, index + 1)
         else:
-            yield name, does[name], value, None
+            yield Button(name, does[name], value, None)
 
 
 class Registry:

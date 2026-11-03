@@ -59,18 +59,18 @@ def get(name, state):
 
 
 def press(button, state, snapshot):
-    # A button is (name, function, (column, pad), value), as buttons.Section lists it.
-    function = get(button[1], state)
+    # A button is a buttons.Button, as buttons.Section lists it.
+    function = get(button.function, state)
     if function is None or function.press is None:
         return state, []
-    return function.press(state, snapshot, button[3])
+    return function.press(state, snapshot, button.value)
 
 
 def light(button, state, snapshot):
-    function = get(button[1], state)
+    function = get(button.function, state)
     if function is None:
         return Light(OFF)
-    return function.light(state, snapshot, button[3])
+    return function.light(state, snapshot, button.value)
 
 
 def registered():

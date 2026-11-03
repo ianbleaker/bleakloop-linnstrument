@@ -227,9 +227,9 @@ def press(state, event, snapshot):
     button = layout.FX.at((event.column, event.pad))
     if button is None:
         return state, []
-    if button[1] == "bars":
+    if button.function == "bars":
         # A hold: a timed recall or launch waits on it.
-        bars = button[3]
+        bars = button.value
         if event.pressed:
             return replace(state, fx_length=bars), buttons.say("bars", bars=_count(bars, "bar"))
         if state.fx_length == bars:
@@ -309,7 +309,7 @@ def render(state, snapshot):
     if state.shift and not state.copy and not state.delete:
         return frame
     for button in layout.FX.buttons():
-        frame[button[2]] = functions.light(button, state, snapshot)
+        frame[button.key] = functions.light(button, state, snapshot)
     return frame
 
 
