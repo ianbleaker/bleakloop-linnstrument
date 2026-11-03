@@ -644,7 +644,7 @@ def test_tempo_clamps_at_20():
 
 DEVICE_CLIP = State(device_clip=True)
 DEVICE_CLIP_HELD = ShowMessage("Device/Clip: tracks and devices")
-TAPPED = [ToggleDetailView(), ShowMessage("Device/Clip view")]
+TAPPED = [ToggleDetailView(), ShowMessage("Clip view")]
 TRACK_PREV, TRACK_NEXT = (pad_for(layout.DEVICE_CLIP.tracks, step) for step in (-1, 1))
 DEVICE_PREV, DEVICE_NEXT = (pad_for(layout.DEVICE_CLIP.devices, step) for step in (-1, 1))
 
@@ -672,6 +672,14 @@ def test_device_clip_tap_flips_the_detail_view():
     state, actions = engine_presses(SESSION, (layout.NAVIGATION.device_clip, DOWN), (layout.NAVIGATION.device_clip, UP))
     assert actions == [DEVICE_CLIP_HELD, *TAPPED]
     assert not state.device_clip and not state.device_clip_used
+
+
+def test_device_clip_tap_names_the_view_it_flips_to():
+    clip = replace(SNAP, clip_view=True)
+    _, actions = engine_presses(
+        SESSION, (layout.NAVIGATION.device_clip, DOWN), (layout.NAVIGATION.device_clip, UP), snapshot=clip
+    )
+    assert actions == [DEVICE_CLIP_HELD, ToggleDetailView(), ShowMessage("Device view")]
 
 
 @pytest.mark.parametrize("key", [TRACK_NEXT, layout.GLOBAL.shift, (3, 1), (1, 4)])

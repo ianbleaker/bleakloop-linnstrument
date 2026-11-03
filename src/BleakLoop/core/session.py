@@ -67,7 +67,7 @@ def handle(state, event, snapshot):
     shift_layer = state.shift and not state.copy and not state.delete
     shifted = shift_layer and event.pressed and controls.at(controls.sections(state, shift=True), key) is not None
     if held == "device_clip" and not shifted:
-        return controls.device_clip(state, event)
+        return controls.device_clip(state, event, snapshot)
     if state.device_clip and event.pressed and key in controls.navigation_pads(state):
         # Device/Clip's layer replaces the Navigation column's normal and Shift layers.
         return controls.device_clip_layer(state, key)

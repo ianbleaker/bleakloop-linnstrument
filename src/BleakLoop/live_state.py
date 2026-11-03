@@ -29,6 +29,7 @@ def read_transport(song, application):
         tempo=song.tempo,
         metronome=song.metronome,
         session_view=application.view.is_view_visible("Session"),
+        clip_view=application.view.is_view_visible("Detail/Clip"),
         loop=song.loop,
         loop_start=song.loop_start,
         loop_length=song.loop_length,

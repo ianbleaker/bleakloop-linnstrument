@@ -343,7 +343,7 @@ def test_device_clip_tap_flips_the_detail_view():
         ENTERED, (layout.NAVIGATION.device_clip, True), (layout.NAVIGATION.device_clip, False)
     )
     held = ShowMessage("Device/Clip: tracks and devices")
-    assert actions == [held, ToggleDetailView(), ShowMessage("Device/Clip view")] and state == ENTERED
+    assert actions == [held, ToggleDetailView(), ShowMessage("Clip view")] and state == ENTERED
 
 
 @pytest.mark.parametrize("key", [TRACK_NEXT, layout.GLOBAL.shift])

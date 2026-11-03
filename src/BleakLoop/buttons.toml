@@ -780,7 +780,8 @@ label = "DevClip"
 message = "Device/Clip: tracks and devices"
 manual = "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices."
 [functions.device_clip.outcomes]
-tapped = "Device/Clip view"
+device = "Device view"
+clip = "Clip view"
 
 [functions.tracks]
 manual = "Select the previous or next track, through the returns and master, and give its first rack the blue hand."
