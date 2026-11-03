@@ -614,6 +614,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | `FX_DATA_KEY = "BleakLoop.fx"`: the `song.set_data` key holding the FX snapshots | `live_state`, `live_actions` | Chosen | Confirmed on device: survives save and reload, per Set |
 | `FX_SCENES_DATA_KEY = "BleakLoop.fx.scenes"`: the `song.set_data` key holding the scene snapshots | `live_state`, `live_actions` | Chosen | Confirmed on device: survives save and reload, per Set |
 | `FX_TOUCH_TOLERANCE = 0.005`: during a morph, a macro further than 0.5 % of its range from BleakLoop's last write was turned by hand and drops out | `fx` | Chosen | Fine on device: a hand-turned macro drops out, and BleakLoop's own writes never trip it |
+| `BEAT_EPSILON = 1e-6`: float tolerance on note, step and launch times | `sequencer`, `fx.timed_launch` | Chosen: below any step or launch length by six orders of magnitude | Mechanism |
 | `X_COLUMN_WIDTH = 170.625`: X units per column; column c's centre is `X_COLUMN_WIDTH × (c − 0.5)` | `faders` | From firmware (`FXD_CALX_FULL_UNIT` = 4095 / 24) | Confirmed on device: column starts within 6 units, centres within 26 (section 5) |
 | `FADERS_DATA_KEY = "BleakLoop.faders"`: the `song.set_data` key holding the Mapped FX bindings | `live_state`, `live_actions` | Chosen | Unchecked until stage 3's device check |
 | `SEQ_BASE_NOTE = 48`: Sequencer Mode's melodic note pads start here, at the bottom left (C2 in Live's naming, C3 = 60) | `sequencer` | Chosen (#53 issue) | Confirmed on device (stage 1 check) |

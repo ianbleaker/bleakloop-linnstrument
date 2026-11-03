@@ -18,7 +18,7 @@ from .model import (
     StoreFxSnapshot,
 )
 from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
-from .values import FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
+from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
 
 # Launch quantization values (global_column.QUANTIZATION_NAMES) to their length: bars, then beats.
 LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
@@ -478,7 +478,7 @@ def timed_launch(state, scene, snapshot):
     else:
         # Any time in the last step before it starts it there: the earliest is clearest of
         # a late tick.
-        start = math.ceil(start / step - 1e-9) * step
+        start = math.ceil(start / step - BEAT_EPSILON) * step
         fire = start - step
     actions = []
     if scene_snapshot(state, scene) is not None:

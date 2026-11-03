@@ -43,8 +43,6 @@ from .modes import Mode, StepHold
 STEP_COLUMNS = len(layout.SEQ_STEP_COLUMNS)
 STEPS = STEP_COLUMNS * layout.ROWS  # per page
 NOTE_COLUMNS = len(layout.SEQ_NOTE_COLUMNS)
-# Float error in note times and the play position: a time this close to a boundary is past it.
-EPSILON = 1e-6
 RATE_NAMES = {1.0: "1/4", 0.5: "1/8", 0.25: "1/16", 0.125: "1/32"}
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 NATURALS = {0, 2, 4, 5, 7, 9, 11}
@@ -74,7 +72,7 @@ def step_of(key):
 def step_of_time(start, length):
     # The global step a note starting at start belongs to: a note past a step's midpoint
     # belongs to the next step.
-    return math.floor(start / length + 0.5 + EPSILON)
+    return math.floor(start / length + 0.5 + values.BEAT_EPSILON)
 
 
 def page_span(state):
@@ -108,7 +106,7 @@ def playhead(state, view):
     # The global step of the play position, or None while the clip isn't playing.
     if not view.is_playing:
         return None
-    return math.floor(view.position / step_length(state) + EPSILON)
+    return math.floor(view.position / step_length(state) + values.BEAT_EPSILON)
 
 
 def selected_pitch(state, view):
@@ -123,7 +121,7 @@ def _inert(state, view, g, snapshot):
     if view.track is None or not view.is_midi:
         return True
     end = view.loop_end if view.has_clip else _create_length(state, snapshot)
-    return g * step_length(state) >= end - EPSILON
+    return g * step_length(state) >= end - values.BEAT_EPSILON
 
 
 def _create_length(state, snapshot):
@@ -430,7 +428,7 @@ def _halve(state, snapshot, value):
     if not view.has_clip or not view.is_midi:
         return state, buttons.refuse("halve", "no_clip")
     half = (view.loop_end - view.loop_start) / 2
-    if half < step_length(state) - EPSILON:
+    if half < step_length(state) - values.BEAT_EPSILON:
         return state, buttons.refuse("halve", "too_short")
     loop = SetLoop(view.track, view.scene, view.loop_start, view.loop_start + half)
     return _write(state, [loop, *buttons.say("halve")])
@@ -458,7 +456,7 @@ def _page_light(state, snapshot, value):
     playing = playhead(state, view)
     if page == view_page(state, view):
         colour = BLUE
-    elif view.has_clip and page * page_span(state) < view.loop_end - EPSILON:
+    elif view.has_clip and page * page_span(state) < view.loop_end - values.BEAT_EPSILON:
         colour = CYAN
     else:
         return Light(OFF)
@@ -717,7 +715,7 @@ def _page(state, page, view):
         return _write(state, [SetLoop(view.track, view.scene, start, end), *loop])
     state = replace(state, seq_page_held=page)
     shown = buttons.say("pages", page=page + 1)
-    if page * span >= view.loop_end - EPSILON:
+    if page * span >= view.loop_end - values.BEAT_EPSILON:
         # Past the end: the loop extends to it.
         state = replace(state, seq_follow=False, seq_page=page)
         loop = SetLoop(view.track, view.scene, view.loop_start, (page + 1) * span)
@@ -795,7 +793,7 @@ def _render_note_pads(frame, state, view):
         sounding = {
             note.pitch
             for note in view.notes
-            if note.start - EPSILON <= view.position < note.start + note.duration
+            if note.start - values.BEAT_EPSILON <= view.position < note.start + note.duration
         }
     selected = selected_pitch(state, view)
     for column in layout.SEQ_NOTE_COLUMNS:
