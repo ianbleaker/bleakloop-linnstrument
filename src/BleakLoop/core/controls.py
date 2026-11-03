@@ -220,7 +220,7 @@ def record_length(bars, snapshot):
     # A bar is the current time signature's bar, in beats (quarter notes).
     if bars is None:
         return None
-    return bars * snapshot.signature_numerator * 4 / snapshot.signature_denominator
+    return bars * snapshot.bar_beats
 
 
 def record(snapshot):

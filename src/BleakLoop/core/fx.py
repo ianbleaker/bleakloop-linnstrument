@@ -434,7 +434,7 @@ def advance(transport, last):
 
 def end_beats(snapshot, bars):
     # The Nth bar line after now.
-    bar = snapshot.signature_numerator * 4 / snapshot.signature_denominator
+    bar = snapshot.bar_beats
     return math.floor(snapshot.song_beats / bar) * bar + bars * bar
 
 
@@ -442,7 +442,7 @@ def launch_step(snapshot):
     # Launch quantization's length in beats, None when launches are unquantized.
     q = snapshot.launch_quantization
     if q in LAUNCH_BARS:
-        return LAUNCH_BARS[q] * snapshot.signature_numerator * 4 / snapshot.signature_denominator
+        return LAUNCH_BARS[q] * snapshot.bar_beats
     return LAUNCH_BEATS.get(q)
 
 
