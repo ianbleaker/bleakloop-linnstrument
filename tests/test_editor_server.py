@@ -127,6 +127,34 @@ def test_reset_deletes_the_user_file(editor):
     assert layout.GLOBAL.metronome == (1, 4)
 
 
+def test_a_save_over_a_user_file_that_doesnt_load_keeps_a_backup(editor):
+    editor.user.parent.mkdir(parents=True)
+    editor.user.write_text('[global.metronome]\npad = [1, 1]\n', encoding="utf-8")
+    status, _, body = _request(editor, "GET", "/api/layout")
+    assert "taken by" in json.loads(body)["user_problem"]
+    overlay = {"global": {"metronome": {"pad": [1, 5]}, "fixed_length": {"pad": [1, 4]}}}
+    status, _, body = _save(editor, overlay)
+    backup = editor.user.with_name("buttons.toml.bak")
+    assert status == 200 and json.loads(body)["backup"] == str(backup)
+    assert backup.read_text(encoding="utf-8") == '[global.metronome]\npad = [1, 1]\n'
+    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == overlay
+
+
+def test_a_save_over_a_user_file_that_loads_makes_no_backup(editor):
+    _save(editor, {"global": {"metronome": {"pad": [1, 5]}, "fixed_length": {"pad": [1, 4]}}})
+    status, _, body = _save(editor, {})
+    assert status == 200 and json.loads(body)["backup"] is None
+    assert not editor.user.with_name("buttons.toml.bak").exists()
+
+
+def test_a_reset_of_a_user_file_that_doesnt_load_keeps_a_backup(editor):
+    editor.user.parent.mkdir(parents=True)
+    editor.user.write_text("not toml [", encoding="utf-8")
+    status, _, _ = _request(editor, "POST", "/api/reset", b"{}", Content_Type="application/json")
+    assert status == 200 and not editor.user.exists()
+    assert editor.user.with_name("buttons.toml.bak").read_text(encoding="utf-8") == "not toml ["
+
+
 def test_a_response_bigger_than_one_send_arrives_whole(tmp_path):
     big = b"y" * (4 * 1024 * 1024)
     instance = server.Server(0, lambda request: server.response(200, "text/plain", big))
