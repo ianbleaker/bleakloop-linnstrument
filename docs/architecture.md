@@ -235,6 +235,7 @@ flowchart TD
   core_engine --> core_controls
   core_engine --> core_faders
   core_engine --> core_fx
+  core_engine --> core_layout
   core_engine --> core_linnstrument_mode
   core_engine --> core_mixer
   core_engine --> core_model

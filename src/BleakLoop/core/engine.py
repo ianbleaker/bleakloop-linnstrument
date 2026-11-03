@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import controls, faders, fx, mixer, linnstrument_mode, sequencer, session
+from . import controls, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
 from .model import FaderBound, PadPress, RacksRead, ScenesChanged
 from .modes import Mode
 
@@ -43,7 +43,7 @@ def x_rows(state):
     # Sequencer Mode the rows holding a step.
     if state.mode is Mode.SEQUENCER:
         return sequencer.x_rows(state)
-    return tuple(range(8)) if faders.visible(state) else ()
+    return tuple(range(layout.ROWS)) if faders.visible(state) else ()
 
 
 def x_axis(state, event):

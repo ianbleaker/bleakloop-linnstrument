@@ -4,7 +4,7 @@ import enum
 from dataclasses import dataclass, replace
 
 from . import values
-from .layout import FX_SLOTS, Window
+from .layout import FX_SLOTS, ROWS, Window
 
 
 class Mode(enum.Enum):
@@ -196,7 +196,7 @@ class State:
     mixer_split: bool = False  # Mixer Mode's split view
     split_snapshots: bool = False  # the split views show the snapshots, not the faders
     pending_launch: PendingLaunch | None = None  # fires in every mode, as a morph runs
-    fader_bindings: tuple = (None,) * 8  # Mapped FX: FaderBinding or None per row
+    fader_bindings: tuple = (None,) * ROWS  # Mapped FX: FaderBinding or None per row
     seq_held: bool = False  # Seq is held in Session Mode
     seq_used: bool = False  # the Seq hold entered on a slot: its release does nothing
     # Sequencer Mode's arm: per song.tracks, the arm before entry and what BleakLoop set.

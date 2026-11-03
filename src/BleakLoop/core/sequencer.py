@@ -40,7 +40,8 @@ from .model import (
 )
 from .modes import Mode, StepHold
 
-STEPS = len(layout.SEQ_STEP_COLUMNS) * layout.ROWS  # per page
+STEP_COLUMNS = len(layout.SEQ_STEP_COLUMNS)
+STEPS = STEP_COLUMNS * layout.ROWS  # per page
 NOTE_COLUMNS = len(layout.SEQ_NOTE_COLUMNS)
 # Float error in note times and the play position: a time this close to a boundary is past it.
 EPSILON = 1e-6
@@ -61,13 +62,13 @@ def step_length(state):
 
 def step_key(s):
     # The (column, pad) of step s of the page in view, 0-63.
-    return layout.SEQ_STEP_COLUMNS[0] + s % 8, 1 + s // 8
+    return layout.SEQ_STEP_COLUMNS[0] + s % STEP_COLUMNS, 1 + s // STEP_COLUMNS
 
 
 def step_of(key):
     # The step of the page in view at (column, pad).
     column, pad = key
-    return (pad - 1) * 8 + column - layout.SEQ_STEP_COLUMNS[0]
+    return (pad - 1) * STEP_COLUMNS + column - layout.SEQ_STEP_COLUMNS[0]
 
 
 def step_of_time(start, length):
@@ -98,7 +99,7 @@ def pad_note(state, view, column, pad):
     # the settings show, off a MIDI track, and above 127.
     if state.seq_settings or not view.is_midi or column not in layout.SEQ_NOTE_COLUMNS:
         return None
-    base = 4 * view.drum.scroll if view.drum is not None else state.seq_base
+    base = NOTE_COLUMNS * view.drum.scroll if view.drum is not None else state.seq_base
     note = base + (layout.ROWS - pad) * NOTE_COLUMNS + column - layout.SEQ_NOTE_COLUMNS[0]
     return note if 0 <= note <= 127 else None
 
@@ -695,7 +696,7 @@ def _scroll(state, view, step):
     scroll = min(MAX_SCROLL, max(0, view.drum.scroll + step))
     if scroll == view.drum.scroll:
         return state, []
-    message = buttons.say(_direction(step), "pads", note=note_name(4 * scroll))
+    message = buttons.say(_direction(step), "pads", note=note_name(NOTE_COLUMNS * scroll))
     return state, [SetDrumScroll(view.track, scroll), *message]
 
 

@@ -167,11 +167,11 @@ def x_rows(rows):
 def row_notes(reads):
     # Rows nearest first, at Octave and Transpose 0. None when Row Offset can't be read.
     setting = reads.get(NRPN_ROW_OFFSET)
-    rows = range(8)
+    rows = range(layout.ROWS)
     if setting in ROW_OFFSET_INTERVALS:
         return tuple(30 + r * setting for r in rows)
     if setting == ROW_OFFSET_ZERO:
-        return (30,) * 8
+        return (30,) * layout.ROWS
     if setting == ROW_OFFSET_NO_OVERLAP:  # the offset is the split's width
         return tuple(30 + r * (SPLIT_POINT - 1) for r in rows)
     if setting == ROW_OFFSET_CUSTOM:
@@ -234,7 +234,7 @@ def right_split_channels(reads):
         lowest = reads.get(NRPN_RIGHT_PER_ROW_LOWEST)
         if lowest is None:
             return None
-        used |= {(lowest - 1 + row) % 16 + 1 for row in range(8)}
+        used |= {(lowest - 1 + row) % 16 + 1 for row in range(layout.ROWS)}
     return used
 
 
