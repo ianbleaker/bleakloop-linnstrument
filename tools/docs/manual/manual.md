@@ -111,7 +111,7 @@ With **Shift** held:
 
 <img src="manual/columns-navigation.svg" alt="Navigation column" align="right">
 
-Column 16, the outer edge, holds the mode pads, then Delete and Copy. **Device/Clip** ({row:navigation.device_clip}) flips Live between Device and Clip view when tapped, or shows the Device/Clip layer of tracks and devices while held.
+The outer edge, {column:navigation.session,navigation.mixer,navigation.fx,navigation.reserved,navigation.seq,navigation.delete,navigation.copy,navigation.device_clip}, holds the mode pads, then Delete and Copy. **Device/Clip** ({row:navigation.device_clip}) flips Live between Device and Clip view when tapped, or shows the Device/Clip layer of tracks and devices while held.
 
 <!-- callouts:navigation -->
 - **Session**: Session Mode. In Session Mode, toggles the split view.
@@ -344,7 +344,7 @@ The reserved pad, {row:navigation.reserved}, is dark and does nothing: it's kept
 **Device/Clip** ({pad:navigation.device_clip}, orange):
 
 - A tap flips Live's Detail view: to Clip view if it shows anything else or is hidden, and to Device view if it shows Clip view. It follows what you last clicked in Live. A press counts as a tap only if you press nothing else while holding it.
-- Held, like Shift, its pad blinks fast and column 16 shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual.
+- Held, like Shift, its pad blinks fast and {column:device_clip.tracks,device_clip.devices} shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual.
 - It works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
 - Tracks steps through every track, then the returns and master. Devices are the ones directly on the track; with a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
 - The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.

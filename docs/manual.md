@@ -113,7 +113,7 @@ With **Shift** held:
 
 <img src="manual/columns-navigation.svg" alt="Navigation column" align="right">
 
-Column 16, the outer edge, holds the mode pads, then Delete and Copy. **Device/Clip** (pad 8) flips Live between Device and Clip view when tapped, or shows the Device/Clip layer of tracks and devices while held.
+The outer edge, column 16, holds the mode pads, then Delete and Copy. **Device/Clip** (pad 8) flips Live between Device and Clip view when tapped, or shows the Device/Clip layer of tracks and devices while held.
 
 <!-- callouts:navigation -->
 - **Session**: Session Mode. In Session Mode, toggles the split view.
