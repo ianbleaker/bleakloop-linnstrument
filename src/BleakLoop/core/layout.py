@@ -24,6 +24,8 @@ SELECT_ROW = 8
 
 # FX Mode: one horizontal fader per pad row.
 FX_FADER_COLUMNS = range(2, 11)
+# The FX snapshot slot count: buttons.toml lists this many slots buttons.
+FX_SLOTS = 16
 
 # Session split view: an 8-track window, then one horizontal fader per pad row.
 SPLIT_TRACKS = 8

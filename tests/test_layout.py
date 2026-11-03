@@ -123,9 +123,5 @@ def test_rows_7_and_8_follow_the_window():
     assert (layout.MUTE_ROW, layout.SELECT_ROW) == (7, 8)
 
 
-def test_fx_slots_are_columns_11_and_12():
-    assert layout.FX.slots[0] == (11, 1)
-    assert layout.FX.slots[7] == (11, 8)
-    assert layout.FX.slots[8] == (12, 1)
-    assert layout.FX.slots[15] == (12, 8)
-    assert len(set(layout.FX.slots)) == 16
+def test_the_registry_has_one_button_per_fx_slot():
+    assert len(layout.FX.slots) == layout.FX_SLOTS

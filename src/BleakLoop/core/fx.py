@@ -20,8 +20,6 @@ from .model import (
 from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
 from .values import FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
 
-SLOTS = 16
-
 # Launch quantization values (global_column.QUANTIZATION_NAMES) to their length: bars, then beats.
 LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
 LAUNCH_BEATS = {5: 2, 6: 4 / 3, 7: 1, 8: 2 / 3, 9: 1 / 2, 10: 1 / 3, 11: 1 / 4, 12: 1 / 6, 13: 1 / 8}
@@ -52,10 +50,10 @@ def dump(slots):
 
 def parse(text):
     # Anything unreadable gives empty slots: a bad store never stops the script loading.
-    empty = (None,) * SLOTS
+    empty = (None,) * layout.FX_SLOTS
     try:
         data = json.loads(text)
-        if data.get("v") != 1 or len(data["slots"]) != SLOTS:
+        if data.get("v") != 1 or len(data["slots"]) != layout.FX_SLOTS:
             return empty
         return tuple(_decode(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):

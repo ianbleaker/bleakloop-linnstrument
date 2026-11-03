@@ -4,7 +4,7 @@ import enum
 from dataclasses import dataclass, replace
 
 from . import values
-from .layout import Window
+from .layout import FX_SLOTS, Window
 
 
 class Mode(enum.Enum):
@@ -181,7 +181,7 @@ class State:
     came_from: Origin = Origin.SESSION  # where Linnstrument Mode's Back returns to
     fx: bool = False
     fx_length: int | None = None  # bars of the held FX length pad
-    fx_slots: tuple = (None,) * 16  # tuple of FxRack per stored slot, None when empty
+    fx_slots: tuple = (None,) * FX_SLOTS  # tuple of FxRack per stored slot, None when empty
     morph: Morph | None = None  # runs in every mode
     fx_undo_open: bool = False  # a recall's undo step is open in Live
     fx_landed: int | None = None  # the slot of the last recall that landed
