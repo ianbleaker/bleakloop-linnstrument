@@ -19,6 +19,14 @@ from .core.model import PadPress, SlideMoved, XAxis
 CC_STATUS = 0xB0
 
 # Device protocol numbers.
+# NRPN framing: number MSB/LSB, then value MSB/LSB, then a null RPN to reset.
+CC_NRPN_MSB = 99
+CC_NRPN_LSB = 98
+CC_DATA_MSB = 6
+CC_DATA_LSB = 38
+CC_RPN_MSB = 101
+CC_RPN_LSB = 100
+RPN_NULL = 127  # both RPN CCs at this value end every NRPN
 NRPN_USER_FIRMWARE_MODE = 245
 NRPN_QUERY = 299
 CC_SLIDE_MODE = 9
@@ -27,33 +35,55 @@ CC_Y_AXIS = 11
 CC_LIGHT_COLUMN = 20
 CC_LIGHT_ROW = 21
 CC_LIGHT_COLOUR = 22
+NRPN_LEFT_MIDI_MODE = 0  # left split MIDI mode
 NRPN_LEFT_MAIN_CHANNEL = 1  # left split main channel: the control channel
+NRPN_LEFT_SEND_X = 20  # left split Send X
+NRPN_LEFT_SEND_Y = 24  # left split Send Y
+NRPN_LEFT_SEND_Z = 27  # left split Send Z
+NRPN_LEFT_PLAYED_COLOUR = 32  # left split Played colour
+NRPN_LEFT_LOWROW = 34  # left split LowRow mode
+NRPN_LEFT_SPECIAL = 35  # left split special mode
+NRPN_SPLIT_ACTIVE = 200  # split on or off
+NRPN_SPLIT_POINT = 202  # the right split's first column
 NRPN_ROW_OFFSET = 227  # global Row Offset
 NRPN_CUSTOM_ROW_OFFSET = 253  # Row Offset when 227 = 12: offset + 16
 NRPN_GUITAR_TUNING = tuple(range(263, 271))  # Guitar Row Offset: each row's note, nearest first
 NRPN_OCTAVE = 36  # left split Octave
 NRPN_TRANSPOSE_PITCH = 37  # left split Transpose Pitch
 NRPN_TRANSPOSE_LIGHTS = 38  # left split Transpose Lights
-NRPN_RIGHT_MIDI_MODE = 100  # right split MIDI mode: 0 one channel, 1 per note, 2 per row
+NRPN_RIGHT_MIDI_MODE = 100  # right split MIDI mode
 NRPN_RIGHT_MAIN_CHANNEL = 101  # right split main channel
 NRPN_RIGHT_PER_NOTE = tuple(range(102, 118))  # right split per-note channel c on: 101 + c
 NRPN_RIGHT_PER_ROW_LOWEST = 118  # right split per-row lowest channel
 OCTAVE_ZERO = 5  # Octave value for no shift
+# MIDI mode values (NRPNs 0 and 100).
+MIDI_MODE_ONE_CHANNEL = 0
+MIDI_MODE_PER_NOTE = 1
+MIDI_MODE_PER_ROW = 2
+# Row Offset values (NRPN 227).
+ROW_OFFSET_NO_OVERLAP = 0
+ROW_OFFSET_INTERVALS = (3, 4, 5, 6, 7)  # that many semitones per row
+ROW_OFFSET_CUSTOM = 12  # Octave, or the custom offset in 253
+ROW_OFFSET_GUITAR = 13
+ROW_OFFSET_ZERO = 127
+# Custom Row Offset values (NRPN 253 = offset + 16).
+CUSTOM_OFFSET_ZERO = 16  # no offset
+CUSTOM_INVERTED_GUITAR = 33
 TRANSPOSE_ZERO = 7  # Transpose value for no shift
 # The right split's first column: the left split is the Global column alone.
 SPLIT_POINT = layout.GLOBAL_COLUMN + 1
 
 # The left split, in setup order. Each is queried first, for the restore.
 FIXED_SETTINGS = [
-    (200, 1),  # split on
-    (202, SPLIT_POINT),  # left split is the Global column
-    (0, 0),  # left split MIDI mode: one channel
-    (20, 0),  # left split Send X off
-    (24, 0),  # left split Send Y off
-    (27, 0),  # left split Send Z off
-    (32, 0),  # left split Played colour off: the Global column keeps BleakLoop's lights
-    (34, 0),  # left split LowRow off: pad 8 stays a pad
-    (35, 0),  # left split special mode off: a note split
+    (NRPN_SPLIT_ACTIVE, 1),  # split on
+    (NRPN_SPLIT_POINT, SPLIT_POINT),  # left split is the Global column
+    (NRPN_LEFT_MIDI_MODE, MIDI_MODE_ONE_CHANNEL),
+    (NRPN_LEFT_SEND_X, 0),  # left split Send X off
+    (NRPN_LEFT_SEND_Y, 0),  # left split Send Y off
+    (NRPN_LEFT_SEND_Z, 0),  # left split Send Z off
+    (NRPN_LEFT_PLAYED_COLOUR, 0),  # off: the Global column keeps BleakLoop's lights
+    (NRPN_LEFT_LOWROW, 0),  # left split LowRow off: pad 8 stays a pad
+    (NRPN_LEFT_SPECIAL, 0),  # left split special mode off: a note split
     (NRPN_TRANSPOSE_PITCH, TRANSPOSE_ZERO),
     (NRPN_TRANSPOSE_LIGHTS, TRANSPOSE_ZERO),
 ]
@@ -76,12 +106,12 @@ def cc(channel, number, value):
 
 def nrpn(number, value):
     return [
-        (CC_STATUS, 99, number >> 7),
-        (CC_STATUS, 98, number & 127),
-        (CC_STATUS, 6, value >> 7),
-        (CC_STATUS, 38, value & 127),
-        (CC_STATUS, 101, 127),
-        (CC_STATUS, 100, 127),
+        (CC_STATUS, CC_NRPN_MSB, number >> 7),
+        (CC_STATUS, CC_NRPN_LSB, number & 127),
+        (CC_STATUS, CC_DATA_MSB, value >> 7),
+        (CC_STATUS, CC_DATA_LSB, value & 127),
+        (CC_STATUS, CC_RPN_MSB, RPN_NULL),
+        (CC_STATUS, CC_RPN_LSB, RPN_NULL),
     ]
 
 
@@ -138,19 +168,19 @@ def row_notes(reads):
     # Rows nearest first, at Octave and Transpose 0. None when Row Offset can't be read.
     setting = reads.get(NRPN_ROW_OFFSET)
     rows = range(8)
-    if setting in (3, 4, 5, 6, 7):
+    if setting in ROW_OFFSET_INTERVALS:
         return tuple(30 + r * setting for r in rows)
-    if setting == 127:  # zero offset
+    if setting == ROW_OFFSET_ZERO:
         return (30,) * 8
-    if setting == 0:  # No Overlap: the offset is the split's width
+    if setting == ROW_OFFSET_NO_OVERLAP:  # the offset is the split's width
         return tuple(30 + r * (SPLIT_POINT - 1) for r in rows)
-    if setting == 12:
+    if setting == ROW_OFFSET_CUSTOM:
         custom = reads.get(NRPN_CUSTOM_ROW_OFFSET)
         if custom is None:
             return None
-        if custom == 33:  # inverted guitar: rows 0 and 1 one lower
+        if custom == CUSTOM_INVERTED_GUITAR:  # rows 0 and 1 one lower
             return tuple(65 - 5 * r - (r <= 1) for r in rows)
-        offset = custom - 16
+        offset = custom - CUSTOM_OFFSET_ZERO
         if offset >= 12:
             start = 18
         elif offset <= -12:
@@ -160,7 +190,7 @@ def row_notes(reads):
         else:
             start = 30
         return tuple(start + r * offset for r in rows)
-    if setting == 13:  # Guitar
+    if setting == ROW_OFFSET_GUITAR:
         tuning = tuple(reads.get(number) for number in NRPN_GUITAR_TUNING)
         return None if None in tuning else tuning
     return None
@@ -195,12 +225,12 @@ def right_split_channels(reads):
     if mode is None or main is None:
         return None
     used = {main}
-    if mode == 1:
+    if mode == MIDI_MODE_PER_NOTE:
         per_note = [reads.get(number) for number in NRPN_RIGHT_PER_NOTE]
         if None in per_note:
             return None
         used |= {channel for channel, on in enumerate(per_note, 1) if on}
-    elif mode == 2:
+    elif mode == MIDI_MODE_PER_ROW:
         lowest = reads.get(NRPN_RIGHT_PER_ROW_LOWEST)
         if lowest is None:
             return None
@@ -276,9 +306,9 @@ def poll_numbers(reads, channel, rescan):
     # move onto the 0-based control channel. Every per-note channel only on a rescan,
     # to pick a free channel: all 16 each poll would slow the Row Offset re-check.
     numbers = [NRPN_ROW_OFFSET, NRPN_OCTAVE, NRPN_TRANSPOSE_PITCH, NRPN_TRANSPOSE_LIGHTS]
-    if reads.get(NRPN_ROW_OFFSET) == 12:
+    if reads.get(NRPN_ROW_OFFSET) == ROW_OFFSET_CUSTOM:
         numbers.append(NRPN_CUSTOM_ROW_OFFSET)
-    elif reads.get(NRPN_ROW_OFFSET) == 13:
+    elif reads.get(NRPN_ROW_OFFSET) == ROW_OFFSET_GUITAR:
         numbers += NRPN_GUITAR_TUNING
     numbers += [NRPN_RIGHT_MIDI_MODE, NRPN_RIGHT_MAIN_CHANNEL, NRPN_RIGHT_PER_ROW_LOWEST]
     numbers += NRPN_RIGHT_PER_NOTE if rescan else [NRPN_RIGHT_PER_NOTE[channel]]
@@ -320,13 +350,14 @@ class NrpnReader:
         self._seen = {}
 
     def feed(self, number, value):
-        if number in (101, 100) and value == 127:
+        if number in (CC_RPN_MSB, CC_RPN_LSB) and value == RPN_NULL:
             self._seen = {}
-        elif number in (99, 98, 6):
+        elif number in (CC_NRPN_MSB, CC_NRPN_LSB, CC_DATA_MSB):
             self._seen[number] = value
-        elif number == 38 and len(self._seen) == 3:
+        elif number == CC_DATA_LSB and len(self._seen) == 3:
             seen = self._seen
-            return (seen[99] << 7) | seen[98], (seen[6] << 7) | value
+            nrpn_number = (seen[CC_NRPN_MSB] << 7) | seen[CC_NRPN_LSB]
+            return nrpn_number, (seen[CC_DATA_MSB] << 7) | value
         return None
 
 
