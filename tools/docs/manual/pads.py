@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 
 from BleakLoop.core import buttons, layout
 
+from . import positions
 from .scenes import Layer
 
 
@@ -252,7 +253,7 @@ _FX = (
         "Snapshots",
         range(layout.FX.slots[0][0], layout.FX.slots[-1][0] + 1),
         ALL_PADS,
-        "Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. "
+        f"Sixteen snapshots of every rack's macros: slots {positions.runs('fx.slots')}. "
         "Press an empty slot to store, a stored one to recall.",
     ),
     _group("Scene snapshots", "fx", "scene_slots"),
@@ -352,8 +353,8 @@ _SEQUENCER_SETTINGS = (
         "Pages",
         range(layout.SEQUENCER_SETTINGS.pages[0][0], layout.SEQUENCER_SETTINGS.pages[-1][0] + 1),
         ALL_PADS,
-        "Pages 1–16 of 64 steps: 1–8 in column 12, 9–16 in column 13. Press one to show it, "
-        "or hold one and press another to loop both.",
+        f"Pages 1–16 of 64 steps: {positions.runs('sequencer_settings.pages')}. Press one to "
+        "show it, or hold one and press another to loop both.",
     ),
 )
 
