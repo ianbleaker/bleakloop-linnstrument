@@ -1,5 +1,7 @@
 # BleakLoop player's manual
 
+<!-- Generated from tools/docs/manual/manual.md by PYTHONPATH=src python3 -m tools.docs. Edit that file, not this one. -->
+
 BleakLoop turns a LinnStrument 128 into a clip launcher, mixer and transport for Ableton Live 12. One pad hands the surface back to you as an instrument.
 
 > **Heads-up:** for more information, look at Live's status bar. Every press says what it did, such as "Metronome: ON", and holding Shift, Copy, Delete, Stop, Seq, Device/Clip or a Bars pad says what it opens. When a press can't work, the status bar says why.
@@ -55,8 +57,8 @@ How to read the surface:
 
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
 - Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it in every mode, so you can always see which scenes the scene pads launch. Pads 7 and 8 of each column mute and arm that track. The split view narrows the window to 8 tracks.
-- Shift + column 16 pads 5–8 move the window in every mode but Linnstrument Mode.
-- Shift, Copy, Delete, Stop and Device/Clip work while held. Shift (Global column, pad 8, nearest you) works in every mode: each list is followed by what its pads do with Shift held, and each mode has a map with Shift held. Unlit pads do nothing.
+- Shift + column 16, pads 5–8 move the window in every mode but Linnstrument Mode.
+- Shift, Copy, Delete, Stop and Device/Clip work while held. Shift (column 1, pad 8) works in every mode: each list is followed by what its pads do with Shift held, and each mode has a map with Shift held. Unlit pads do nothing.
 - Each map shows the pads' names over their colours in an example Set. A dashed ring blinks with the beat; a dotted ring blinks fast.
 
 ### Columns
@@ -111,7 +113,7 @@ With **Shift** held:
 
 <img src="manual/columns-navigation.svg" alt="Navigation column" align="right">
 
-Column 16, the outer edge, holds the mode pads, then Delete and Copy. Its last pad is **Device/Clip**: tap it to flip Live between Device and Clip view, or hold it for the Device/Clip layer of tracks and devices.
+The outer edge, column 16, holds the mode pads, then Delete and Copy. **Device/Clip** (pad 8) flips Live between Device and Clip view when tapped, or shows the Device/Clip layer of tracks and devices while held.
 
 <!-- callouts:navigation -->
 - **Session**: Session Mode. In Session Mode, toggles the split view.
@@ -264,8 +266,8 @@ With **Shift** held:
 - Tap Seq to sequence Live's highlighted clip slot.
 - In Session Mode, hold Seq and press a slot to highlight the clip and open the sequencer.
 - The track is armed alone while you sequence it; Device/Clip + Track (+/-) steps to another. Leaving puts every arm back.
-- The Global column works as in Linnstrument Mode: Record Clip, Capture MIDI, and with Shift held, Stop track, Session Record and the scene page on pad 7. Pad 7 switches to Linnstrument Mode keeping the arm, and its Back returns here.
-- **View** toggle (col. 15, pad 8) switches columns 11–14 between the note pads tab and the sequence pages/settings tab.
+- The Global column works as in Linnstrument Mode: Record Clip, Capture MIDI, and with Shift held, Stop track, Session Record and the scene page on pad 7. Without Shift, pad 7 switches to Linnstrument Mode keeping the arm, and its Back returns here.
+- **View** toggle (column 15, pad 8) switches columns 11–14 between the note pads tab and the sequence pages/settings tab.
 
 ![Sequencer Mode](manual/sequencer.svg)
 
@@ -339,7 +341,7 @@ On the scene page:
 
 **Session, Mixer and FX** (column 16, pads 1–3) pick the mode. The current one is blue, the others cyan. Press another mode's pad to switch straight to it. In FX Mode, FX goes back to Session Mode. In Session Mode, Session toggles the split view, and in Mixer Mode, Mixer toggles Mixer's; each is pink while its split view is on.
 
-Pad 4 of column 16 is dark and does nothing: it's kept for a Chord mode still to come. Pad 5 is **Seq**, which opens Sequencer Mode, pads 6 and 7 are **Delete** and **Copy**, and pad 8 is **Device/Clip**.
+The reserved pad, pad 4, is dark and does nothing: it's kept for a Chord mode still to come. **Seq** (pad 5) opens Sequencer Mode, then come **Delete** (pad 6), **Copy** (pad 7) and **Device/Clip** (pad 8).
 
 **Device/Clip** (column 16, pad 8, orange):
 
@@ -446,7 +448,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - While the transport is stopped, a recall always happens at once.
 - Hold Delete and press a stored slot to clear it.
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
-- Snapshots 1–8 are in column 11 and 9–16 in column 12.
+- Snapshots 1–8 in column 11, 9–16 in column 12.
 
 **Scene snapshots** (column 13, pads 1–6):
 
@@ -490,7 +492,7 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 - On an audio or group track, Seq says "Sequencer needs a MIDI track".
 - In Sequencer Mode, Seq or Session goes back to Session Mode, and Mixer or FX to that mode.
 
-**The arm.** Opening Sequencer Mode arms the track alone, so the note pads play it. Selecting another MIDI track, with Device/Clip + Tracks or by clicking it in Live, moves the arm with it. Leaving for Session, Mixer or FX puts every track's arm back as it was, except a track you armed or disarmed yourself in the meantime, and so does closing the Set or Live while in Sequencer Mode. Linnstrument Mode (Global column, pad 7) keeps the arm, so you play the track you were sequencing, and its Back returns to Sequencer Mode. Selecting an audio track, a return or master leaves the arm where it is, and the steps and note pads go dark.
+**The arm.** Opening Sequencer Mode arms the track alone, so the note pads play it. Selecting another MIDI track, with Device/Clip + Tracks or by clicking it in Live, moves the arm with it. Leaving for Session, Mixer or FX puts every track's arm back as it was, except a track you armed or disarmed yourself in the meantime, and so does closing the Set or Live while in Sequencer Mode. Linnstrument Mode (column 1, pad 7) keeps the arm, so you play the track you were sequencing, and its Back returns to Sequencer Mode. Selecting an audio track, a return or master leaves the arm where it is, and the steps and note pads go dark.
 
 **An empty slot** gets a new MIDI clip when you add its first note, Fixed Length long, or 1 bar while Fixed Length is off.
 
@@ -531,7 +533,7 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 - Hold Copy and press a step: it blinks red. Then press other steps to paste it. A paste replaces what the step holds with the copied notes, each with its pitch, velocity, length and position in the step. Keep holding Copy to paste again, on any page. An empty step can't be copied.
 - Hold Delete and press a step to clear it, or a note pad to remove that note from the whole clip.
 
-**Settings.** Column 15, pad 8 switches columns 11–14 between the note pads and the settings. It's blue while the settings show. Up and Down, just above it, move the note pads an octave in either view.
+**Settings.** View (column 15, pad 8) switches columns 11–14 between the note pads and the settings. It's blue while the settings show. Up (pad 6) and Down (pad 7) move the note pads an octave in either view.
 
 - A new rate changes how long a step is, not the notes: they stay where they are, and the steps redraw. The rate and Triplet stay while Live runs.
 - Each page is 64 steps. The page in view is blue, pages starting before the loop end are cyan, and pages past it are dark. The page that's playing blinks with the beat.
@@ -541,7 +543,7 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 
 ### Linnstrument Mode
 
-The LinnStrument is your instrument again. The Global column keeps the controls it has in Session Mode, so the pads are where you know them. You're playing the selected track, so Record records a new clip on it, Capture captures MIDI to it, and Shift + Play stops its clips. The Global column always opens on the controls page. Pad 7 is **Back**: it returns to the mode you came from, Session, Mixer, FX or Sequencer.
+The LinnStrument is your instrument again. The Global column keeps the controls it has in Session Mode, so the pads are where you know them. You're playing the selected track, so Record records a new clip on it, Capture captures MIDI to it, and Shift + Play stops its clips. The Global column always opens on the controls page. **Back** (pad 7) returns to the mode you came from: Session, Mixer, FX or Sequencer.
 
 > **Careful:** in Linnstrument Mode the LinnStrument's own panel buttons work again. Changing a setting there (Octave, Volume, Per-Split, Split and the like) saves BleakLoop's control split as your own, along with any MPE channel it borrowed. To undo that, close Live and set your split up again on the device. If you change the left split's Octave or Transpose, BleakLoop puts them back, so select the right split first. BleakLoop follows a Row Offset change within about a second, or two for a custom offset or a guitar tuning, while the Global column ignores presses. A Row Offset that repeats notes in the Global column (zero offset, or a guitar tuning with repeated strings) turns its controls off, with a message. If you move the right split onto the Global column's channel, BleakLoop moves the Global column to a free channel, with a message. If the right split uses every channel, the Global column's controls go off until one is free again.
 

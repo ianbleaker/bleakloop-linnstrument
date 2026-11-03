@@ -7,15 +7,18 @@ from pathlib import Path
 
 from BleakLoop.core import buttons, catalogue, layout
 
+from .manual import positions
+
 ROOT = Path(__file__).resolve().parents[2]
 PATH = ROOT / "docs" / "buttons.md"
 
-# (section, heading), in the order a player meets them.
+# (section, heading), in the order a player meets them. {column} is the column all the section's
+# buttons are in.
 SECTIONS = (
     ("global", "Global column: Session, Mixer and FX Mode"),
     ("global-shift", "Global column with Shift: Session, Mixer and FX Mode"),
-    ("view", "Column 15: Session, Mixer and FX Mode"),
-    ("view-shift", "Column 15 with Shift"),
+    ("view", "{column}: Session, Mixer and FX Mode"),
+    ("view-shift", "{column} with Shift"),
     ("navigation", "Navigation column: Session, Mixer and FX Mode"),
     ("navigation-shift", "Navigation column with Shift"),
     ("device-clip", "Device/Clip held"),
@@ -27,7 +30,7 @@ SECTIONS = (
     ("sequencer-global-shift", "Global column with Shift: Sequencer Mode"),
     ("sequencer-nav", "Navigation column: Sequencer Mode"),
     ("sequencer-nav-shift", "Navigation column with Shift: Sequencer Mode"),
-    ("sequencer-grid", "Column 15: Sequencer Mode"),
+    ("sequencer-grid", "{column}: Sequencer Mode"),
     ("sequencer-settings", "Settings view: Sequencer Mode"),
 )
 
@@ -93,6 +96,8 @@ def _section(section, heading):
             )
             + " |"
         )
+    if "{column}" in heading:
+        heading = heading.format(column=positions.section_column(namespace))
     return f"## {heading}\n\n`{section}`\n\n" + "\n".join(rows) + "\n"
 
 
