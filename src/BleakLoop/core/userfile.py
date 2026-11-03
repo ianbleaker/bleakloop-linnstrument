@@ -13,6 +13,8 @@ OPEN_GROUPS = frozenset({"tempo", "window"})
 
 BUTTON_FIELDS = frozenset({"pad", "does", "value", "label", "removed"})
 FUNCTION_FIELDS = frozenset({"label", "message", "show", "outcomes", "refusals"})
+# Fields that only feed the repo's generated docs: a user file may repeat them unchanged.
+DOCS_FIELDS = frozenset({"manual", "manual_in"})
 EDITOR = {"enabled": True, "port": 47128}
 
 
@@ -111,16 +113,17 @@ def _merge_functions(merged, shipped, user):
         where = f"functions.{name}"
         if not isinstance(item, dict):
             raise ValueError(f"{where}: not a table")
-        unknown = set(item) - FUNCTION_FIELDS
-        if unknown:
-            field = sorted(unknown)[0]
-            if field in ("manual", "manual_in"):
-                raise ValueError(f"{where}: {field} feeds the repo's manual and can't be changed here")
-            raise ValueError(f"{where}: unknown field {field!r}")
         old = shipped.get(name, {})
+        unknown = set(item) - FUNCTION_FIELDS - DOCS_FIELDS
+        if unknown:
+            raise ValueError(f"{where}: unknown field {sorted(unknown)[0]!r}")
         new = merged.setdefault(name, {})
         for field, value in item.items():
-            if field == "message":
+            if field in DOCS_FIELDS:
+                # A copy of the shipped file carries them unchanged; a change would do nothing.
+                if field not in old or value != old[field]:
+                    raise ValueError(f"{where}: {field} feeds the repo's manual and can't be changed here")
+            elif field == "message":
                 if "message" not in old:
                     raise ValueError(f"{where}: has no message to change")
                 _check_template(f"{where}.message", value, old["message"])
@@ -175,10 +178,13 @@ def merge(shipped, user, name="user buttons file"):
             elif key == "system":
                 _merge_system(merged.setdefault("system", {}), shipped.get("system", {}), value)
             elif key == "manual_format":
-                raise ValueError("manual_format feeds the repo's manual and can't be changed here")
+                if value != shipped.get("manual_format"):
+                    raise ValueError("manual_format feeds the repo's manual and can't be changed here")
             elif not isinstance(value, dict):
                 raise ValueError(f"{key}: not allowed in the user file")
-        sections = {key: value for key, value in user.items() if key not in ("editor", "functions", "system")}
+        sections = {
+            key: value for key, value in user.items() if key not in ("editor", "functions", "system", "manual_format")
+        }
         shipped_sections = {
             key: value for key, value in shipped.items() if key not in ("manual_format", "functions", "system")
         }
