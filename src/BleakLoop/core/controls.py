@@ -211,8 +211,7 @@ def toggle_fader_source(state):
 def render_device_clip_layer(frame, state, snapshot=None):
     # Over either layer: the Navigation pads go dark, then the layer's own light.
     frame.update(dict.fromkeys(navigation_pads(state), Light(OFF)))
-    for button in layout.DEVICE_CLIP.buttons():
-        frame[button.key] = functions.light(button, state, snapshot)
+    functions.paint(frame, layout.DEVICE_CLIP.buttons(), state, snapshot)
     frame.update(dict.fromkeys(pads(state, "device_clip"), Light(ORANGE, Blink.FAST)))
 
 

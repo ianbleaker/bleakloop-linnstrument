@@ -328,15 +328,13 @@ def render(state, snapshot):
             frame[layout.GLOBAL_COLUMN, pad] = controls.scene_light(
                 snapshot, state.window.scene, pad - 1, controls.waiting_scene(state)
             )
-        for button in layout.LINNSTRUMENT_SCENES.buttons():
-            frame[button.key] = functions.light(button, state, snapshot)
+        functions.paint(frame, layout.LINNSTRUMENT_SCENES.buttons(), state, snapshot)
         frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
         return frame
     # Every pad the column's layers use goes dark, then the live layer lights its own.
     frame = {button.key: Light(OFF) for button in normal.buttons() + shift.buttons()}
     live = shift if state.shift and not state.copy and not state.delete else normal
-    for button in live.buttons():
-        frame[button.key] = functions.light(button, state, snapshot)
+    functions.paint(frame, live.buttons(), state, snapshot)
     frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
     return frame
 

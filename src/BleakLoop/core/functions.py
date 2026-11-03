@@ -73,5 +73,11 @@ def light(button, state, snapshot):
     return function.light(state, snapshot, button.value)
 
 
+def paint(frame, buttons, state, snapshot):
+    # Lights each button's pad into frame, in place.
+    for button in buttons:
+        frame[button.key] = light(button, state, snapshot)
+
+
 def registered():
     return set(_FUNCTIONS)

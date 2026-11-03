@@ -493,17 +493,15 @@ def render(state, snapshot):
         )
     # The live layer's buttons. Global's are global_column's, drawn last.
     live = controls.sections(state, shift=True) if shift_layer else controls.sections(state)
-    for section in live[1:]:
-        for button in section.buttons():
-            frame[button.key] = functions.light(button, state, snapshot)
+    functions.paint(frame, (b for section in live[1:] for b in section.buttons()), state, snapshot)
     if state.device_clip:
         controls.render_device_clip_layer(frame, state, snapshot)
     if shift_layer and state.stop:
         # A held Stop stays lit over the Shift layer.
-        for section in controls.sections(state)[1:]:
-            for button in section.buttons():
-                if button.function == "stop":
-                    frame[button.key] = functions.light(button, state, snapshot)
+        stops = (
+            b for s in controls.sections(state)[1:] for b in s.buttons() if b.function == "stop"
+        )
+        functions.paint(frame, stops, state, snapshot)
     frame.update(global_column.render(state, snapshot))
     _render_copy_source(frame, state)
     return frame

@@ -830,8 +830,7 @@ def _render_buttons(frame, state, snapshot):
     shift_layer = state.shift and not state.copy and not state.delete
     own = controls.sections(state)[2:]
     navigation = layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV
-    for section in (*own, navigation):
-        for button in section.buttons():
-            frame[button.key] = functions.light(button, state, snapshot)
+    buttons = (button for section in (*own, navigation) for button in section.buttons())
+    functions.paint(frame, buttons, state, snapshot)
     if state.device_clip:
         controls.render_device_clip_layer(frame, state, snapshot)

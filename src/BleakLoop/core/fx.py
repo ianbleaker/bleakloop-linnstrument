@@ -308,8 +308,7 @@ def render(state, snapshot):
     }
     if state.shift and not state.copy and not state.delete:
         return frame
-    for button in layout.FX.buttons():
-        frame[button.key] = functions.light(button, state, snapshot)
+    functions.paint(frame, layout.FX.buttons(), state, snapshot)
     return frame
 
 
