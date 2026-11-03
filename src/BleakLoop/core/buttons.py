@@ -124,8 +124,6 @@ def section_modes(section):
 
 
 MAX_LABEL = 7
-COLUMNS = range(1, 17)
-PADS = range(1, 9)
 
 
 def _is_int(value):
@@ -364,6 +362,9 @@ def _walk(table):
 
 
 def _validate(data, items):
+    # Imported here: layout reads its positions from this module.
+    from . import layout
+
     for key, kind in TOP_LEVEL.items():
         if key in data and not isinstance(data[key], kind):
             raise ValueError(f"{key}: wrong type")
@@ -406,9 +407,9 @@ def _validate(data, items):
         if len(item.get("label", "")) > MAX_LABEL:
             raise ValueError(f"{id}: label longer than {MAX_LABEL} characters")
         column, pad = item["pad"]
-        if column not in COLUMNS or pad not in PADS:
+        if column not in range(1, layout.COLUMNS) or pad not in range(1, layout.ROWS + 1):
             raise ValueError(f"{id}: pad {item['pad']} is off the surface")
-        if section in LEFT_SPLIT_SECTIONS and column != 1:
+        if section in LEFT_SPLIT_SECTIONS and column != layout.GLOBAL_COLUMN:
             raise ValueError(f"{id}: in Linnstrument Mode only column 1 reaches BleakLoop")
         if (section, column, pad) in seen:
             raise ValueError(f"{id}: pad {item['pad']} is taken by {seen[section, column, pad]}")
