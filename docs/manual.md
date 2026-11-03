@@ -57,7 +57,7 @@ How to read the surface:
 
 - Columns are numbered 1–16 from the left, pads 1–8 from the far edge.
 - Columns 2–14, pads 1–6, show a 13-track by 6-scene window onto Live's session. Live draws a ring around it in every mode, so you can always see which scenes the scene pads launch. Pads 7 and 8 of each column mute and arm that track. The split view narrows the window to 8 tracks.
-- Shift + column 16 pads 5–8 move the window in every mode but Linnstrument Mode.
+- Shift + column 16, pads 5–8 move the window in every mode but Linnstrument Mode.
 - Shift, Copy, Delete, Stop and Device/Clip work while held. Shift (Global column, pad 8, nearest you) works in every mode: each list is followed by what its pads do with Shift held, and each mode has a map with Shift held. Unlit pads do nothing.
 - Each map shows the pads' names over their colours in an example Set. A dashed ring blinks with the beat; a dotted ring blinks fast.
 
@@ -266,8 +266,8 @@ With **Shift** held:
 - Tap Seq to sequence Live's highlighted clip slot.
 - In Session Mode, hold Seq and press a slot to highlight the clip and open the sequencer.
 - The track is armed alone while you sequence it; Device/Clip + Track (+/-) steps to another. Leaving puts every arm back.
-- The Global column works as in Linnstrument Mode: Record Clip, Capture MIDI, and with Shift held, Stop track, Session Record and the scene page on pad 7. Pad 7 switches to Linnstrument Mode keeping the arm, and its Back returns here.
-- **View** toggle (col. 15, pad 8) switches columns 11–14 between the note pads tab and the sequence pages/settings tab.
+- The Global column works as in Linnstrument Mode: Record Clip, Capture MIDI, and with Shift held, Stop track, Session Record and the scene page on pad 7. Without Shift, pad 7 switches to Linnstrument Mode keeping the arm, and its Back returns here.
+- **View** toggle (column 15, pad 8) switches columns 11–14 between the note pads tab and the sequence pages/settings tab.
 
 ![Sequencer Mode](manual/sequencer.svg)
 
@@ -448,7 +448,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - While the transport is stopped, a recall always happens at once.
 - Hold Delete and press a stored slot to clear it.
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
-- Snapshots 1–8 are in column 11 and 9–16 in column 12.
+- Snapshots 1–8 in column 11, 9–16 in column 12.
 
 **Scene snapshots** (column 13, pads 1–6):
 
@@ -492,7 +492,7 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 - On an audio or group track, Seq says "Sequencer needs a MIDI track".
 - In Sequencer Mode, Seq or Session goes back to Session Mode, and Mixer or FX to that mode.
 
-**The arm.** Opening Sequencer Mode arms the track alone, so the note pads play it. Selecting another MIDI track, with Device/Clip + Tracks or by clicking it in Live, moves the arm with it. Leaving for Session, Mixer or FX puts every track's arm back as it was, except a track you armed or disarmed yourself in the meantime, and so does closing the Set or Live while in Sequencer Mode. Linnstrument Mode (Global column, pad 7) keeps the arm, so you play the track you were sequencing, and its Back returns to Sequencer Mode. Selecting an audio track, a return or master leaves the arm where it is, and the steps and note pads go dark.
+**The arm.** Opening Sequencer Mode arms the track alone, so the note pads play it. Selecting another MIDI track, with Device/Clip + Tracks or by clicking it in Live, moves the arm with it. Leaving for Session, Mixer or FX puts every track's arm back as it was, except a track you armed or disarmed yourself in the meantime, and so does closing the Set or Live while in Sequencer Mode. Linnstrument Mode (column 1, pad 7) keeps the arm, so you play the track you were sequencing, and its Back returns to Sequencer Mode. Selecting an audio track, a return or master leaves the arm where it is, and the steps and note pads go dark.
 
 **An empty slot** gets a new MIDI clip when you add its first note, Fixed Length long, or 1 bar while Fixed Length is off.
 
