@@ -26,9 +26,16 @@ logger = logging.getLogger(__name__)
 Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column
 X_LSB_CC_BASE = 32  # X: MSB on CC column, LSB on CC 32 + column
 CC_SLIDE_TRANSFER = 119  # value = the column a finger slid from
-NRPN_REPLY_CCS = (99, 98, 6, 38, 101, 100)
+NRPN_REPLY_CCS = (
+    device.CC_NRPN_MSB,
+    device.CC_NRPN_LSB,
+    device.CC_DATA_MSB,
+    device.CC_DATA_LSB,
+    device.CC_RPN_MSB,
+    device.CC_RPN_LSB,
+)
 # X for device row 0, column 6 is CC 6 / 38 on channel 1: the NRPN reply elements carry it.
-X_ON_NRPN = (0, 6)
+X_ON_NRPN = (0, device.CC_DATA_MSB)
 
 
 def _elapsed_ms(start):
