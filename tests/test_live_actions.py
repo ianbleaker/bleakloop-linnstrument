@@ -40,46 +40,7 @@ from BleakLoop.core.model import (  # noqa: E402
     UnmuteAll,
     UnsoloAll,
 )
-
-
-class FakeSlot:
-    def __init__(self, has_clip=False):
-        self.has_clip = has_clip
-        self.copied_to = None
-
-    def duplicate_clip_to(self, target):
-        self.copied_to = target
-
-    def delete_clip(self):
-        self.has_clip = False
-
-
-def fake_track(arm=False, mute=False, solo=False, clips=(), is_foldable=False, group=None):
-    # clips: the scenes that have a clip; group: the group track this one sits in.
-    return SimpleNamespace(
-        can_be_armed=True,
-        arm=arm,
-        mute=mute,
-        solo=solo,
-        clip_slots=[FakeSlot(scene in clips) for scene in range(4)],
-        is_foldable=is_foldable,
-        is_grouped=group is not None,
-        group_track=group,
-    )
-
-
-def fake_song(tracks, returns=(), exclusive_solo=False, visible=None):
-    # undo: the undo-step calls, in order.
-    undo = []
-    return SimpleNamespace(
-        tracks=list(tracks),
-        visible_tracks=list(tracks if visible is None else visible),
-        return_tracks=list(returns),
-        exclusive_solo=exclusive_solo,
-        undo=undo,
-        begin_undo_step=lambda: undo.append("begin"),
-        end_undo_step=lambda: undo.append("end"),
-    )
+from tests.support import FakeSlot, fake_song, fake_track  # noqa: E402
 
 
 def apply(action, song):

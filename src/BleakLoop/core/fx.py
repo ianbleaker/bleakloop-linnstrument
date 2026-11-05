@@ -18,9 +18,7 @@ from .model import (
     StoreFxSnapshot,
 )
 from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
-from .values import FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
-
-SLOTS = 16
+from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
 
 # Launch quantization values (global_column.QUANTIZATION_NAMES) to their length: bars, then beats.
 LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
@@ -52,10 +50,10 @@ def dump(slots):
 
 def parse(text):
     # Anything unreadable gives empty slots: a bad store never stops the script loading.
-    empty = (None,) * SLOTS
+    empty = (None,) * layout.FX_SLOTS
     try:
         data = json.loads(text)
-        if data.get("v") != 1 or len(data["slots"]) != SLOTS:
+        if data.get("v") != 1 or len(data["slots"]) != layout.FX_SLOTS:
             return empty
         return tuple(_decode(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):
@@ -229,9 +227,9 @@ def press(state, event, snapshot):
     button = layout.FX.at((event.column, event.pad))
     if button is None:
         return state, []
-    if button[1] == "bars":
+    if button.function == "bars":
         # A hold: a timed recall or launch waits on it.
-        bars = button[3]
+        bars = button.value
         if event.pressed:
             return replace(state, fx_length=bars), buttons.say("bars", bars=_count(bars, "bar"))
         if state.fx_length == bars:
@@ -310,8 +308,7 @@ def render(state, snapshot):
     }
     if state.shift and not state.copy and not state.delete:
         return frame
-    for button in layout.FX.buttons():
-        frame[button[2]] = functions.light(button, state, snapshot)
+    functions.paint(frame, layout.FX.buttons(), state, snapshot)
     return frame
 
 
@@ -436,7 +433,7 @@ def advance(transport, last):
 
 def end_beats(snapshot, bars):
     # The Nth bar line after now.
-    bar = snapshot.signature_numerator * 4 / snapshot.signature_denominator
+    bar = snapshot.bar_beats
     return math.floor(snapshot.song_beats / bar) * bar + bars * bar
 
 
@@ -444,7 +441,7 @@ def launch_step(snapshot):
     # Launch quantization's length in beats, None when launches are unquantized.
     q = snapshot.launch_quantization
     if q in LAUNCH_BARS:
-        return LAUNCH_BARS[q] * snapshot.signature_numerator * 4 / snapshot.signature_denominator
+        return LAUNCH_BARS[q] * snapshot.bar_beats
     return LAUNCH_BEATS.get(q)
 
 
@@ -480,7 +477,7 @@ def timed_launch(state, scene, snapshot):
     else:
         # Any time in the last step before it starts it there: the earliest is clearest of
         # a late tick.
-        start = math.ceil(start / step - 1e-9) * step
+        start = math.ceil(start / step - BEAT_EPSILON) * step
         fire = start - step
     actions = []
     if scene_snapshot(state, scene) is not None:

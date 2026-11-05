@@ -161,6 +161,11 @@ class Snapshot:
     loop_start: float = 0.0
     loop_length: float = 0.0
 
+    @property
+    def bar_beats(self):
+        # A bar of the current time signature, in beats (quarter notes).
+        return self.signature_numerator * 4 / self.signature_denominator
+
 
 @dataclass(frozen=True)
 class MacroView:

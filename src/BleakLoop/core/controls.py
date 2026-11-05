@@ -150,7 +150,7 @@ def at(sections, key):
 
 def pads(state, name):
     # The pads of a function's buttons on the mode's normal layer.
-    return {button[2] for section in sections(state) for button in section.buttons() if button[1] == name}
+    return {button.key for section in sections(state) for button in section.buttons() if button.function == name}
 
 
 def device_clip(state, event, snapshot):
@@ -171,7 +171,7 @@ def navigation_pads(state):
         sections = (layout.SEQUENCER_NAV, layout.SEQUENCER_NAV_SHIFT, layout.DEVICE_CLIP)
     else:
         sections = (layout.NAVIGATION, layout.NAVIGATION_SHIFT, layout.DEVICE_CLIP)
-    return {button[2] for section in sections for button in section.buttons()}
+    return {button.key for section in sections for button in section.buttons()}
 
 
 def device_clip_layer(state, key):
@@ -211,8 +211,7 @@ def toggle_fader_source(state):
 def render_device_clip_layer(frame, state, snapshot=None):
     # Over either layer: the Navigation pads go dark, then the layer's own light.
     frame.update(dict.fromkeys(navigation_pads(state), Light(OFF)))
-    for button in layout.DEVICE_CLIP.buttons():
-        frame[button[2]] = functions.light(button, state, snapshot)
+    functions.paint(frame, layout.DEVICE_CLIP.buttons(), state, snapshot)
     frame.update(dict.fromkeys(pads(state, "device_clip"), Light(ORANGE, Blink.FAST)))
 
 
@@ -220,7 +219,7 @@ def record_length(bars, snapshot):
     # A bar is the current time signature's bar, in beats (quarter notes).
     if bars is None:
         return None
-    return bars * snapshot.signature_numerator * 4 / snapshot.signature_denominator
+    return bars * snapshot.bar_beats
 
 
 def record(snapshot):
