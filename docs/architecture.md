@@ -156,7 +156,7 @@ src/BleakLoop/
     values.py          every value in section 8, by name
     engine.py          handle() and render(), composing the modules above
 tests/                 pytest: the core, the docs generators and the layering
-  test_manual.py       every lit pad in the manual's example Sets is labelled; generated docs are current
+  test_manual.py       every lit pad in the manual's example Sets is labelled
   test_architecture.py core imports only core; adapters import no plumbing
 tools/
   docs/                generated docs (standard library only)
