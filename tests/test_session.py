@@ -59,7 +59,6 @@ from BleakLoop.core.model import (
     StepDevice,
     StepTrack,
     SlotView,
-    Snapshot,
     StopAllClips,
     StopTrackClips,
     ToggleMetronome,
@@ -73,29 +72,9 @@ from BleakLoop.core.model import (
     UnsoloAll,
 )
 from BleakLoop.core.modes import ClipSource, FxRack, GroupSource, Mode, SceneSource, State
+from tests.support import SNAP, session_snapshot
 
 
-def session_snapshot(track_count=20, scene_count=10, window=Window(), **k):
-    visible = range(window.track, min(window.track + 13, track_count))
-    rows = range(window.scene, min(window.scene + layout.WINDOW_SCENES, scene_count))
-    tracks = tuple(
-        TrackView(index=i, name=f"T{i + 1}", slots=tuple(SlotView() for _ in rows))
-        for i in visible
-    )
-    return Snapshot(
-        is_playing=False,
-        song_beats=0.0,
-        tempo=120.0,
-        metronome=False,
-        session_view=True,
-        track_count=track_count,
-        scene_count=scene_count,
-        tracks=tracks,
-        **k,
-    )
-
-
-SNAP = session_snapshot()
 SESSION = State()
 SHIFT = State(shift=True)
 

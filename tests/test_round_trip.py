@@ -10,7 +10,7 @@ from BleakLoop.core import buttons, layout, session
 from BleakLoop.core.leds import OFF, WHITE, Light
 from BleakLoop.core.model import PadPress, ShowMessage, Undo
 from BleakLoop.core.modes import State
-from tests.test_session import SNAP
+from tests.support import SNAP
 
 SRC = Path(__file__).parents[1] / "src" / "BleakLoop"
 

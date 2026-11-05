@@ -157,7 +157,7 @@ def test_an_added_tempo_button_steps_by_its_value_and_lights(shipped):
     from BleakLoop.core.leds import GREEN, Light
     from BleakLoop.core.model import PadPress, SetTempo
     from BleakLoop.core.modes import State
-    from tests.test_session import SNAP
+    from tests.support import SNAP
 
     buttons.reload(buttons.PATH, FIXTURES / "new_tempo.toml")
     shift = State(shift=True)
