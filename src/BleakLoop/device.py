@@ -372,6 +372,55 @@ class NrpnReader:
         return None
 
 
+class PressCheck:
+    """Holds column-1 presses until a Row Offset reply confirms the note map (#44)."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self._wanted = set()
+        self._replies = {}
+        self._notes = []
+        self.started_ms = None
+
+    @property
+    def pending(self):
+        return bool(self._wanted)
+
+    def press(self, note, offset, now_ms):
+        # Queries to send: only the press that starts a check sends any.
+        self._notes.append(note)
+        if self.pending:
+            return []
+        numbers = [NRPN_ROW_OFFSET]
+        if offset[0] == ROW_OFFSET_CUSTOM:
+            numbers.append(NRPN_CUSTOM_ROW_OFFSET)
+        self._wanted = set(numbers)
+        self.started_ms = now_ms
+        return [m for number in numbers for m in query(number)]
+
+    def release(self, note):
+        if note in self._notes:
+            self._notes.remove(note)
+            return True
+        return False
+
+    def reply(self, number, value):
+        # (offset, held notes in arrival order, started_ms) once every wanted number replied.
+        if number not in self._wanted:
+            return None
+        self._wanted.discard(number)
+        self._replies[number] = value
+        if self._wanted:
+            return None
+        offset = self._replies[NRPN_ROW_OFFSET]
+        custom = self._replies.get(NRPN_CUSTOM_ROW_OFFSET) if offset == ROW_OFFSET_CUSTOM else None
+        result = (offset, custom), self._notes, self.started_ms
+        self.reset()
+        return result
+
+
 class SlideDecoder:
     """Turns X CCs, slide transfers (CC 119) and pad notes into core events."""
 
