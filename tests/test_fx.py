@@ -2962,3 +2962,10 @@ def test_a_punch_redraws_when_its_fill_changes():
     assert not redraw
     state, _, redraw = punch_x(state, -1.2)
     assert redraw
+
+
+def test_a_reset_lands_a_running_return_inside_its_step():
+    from BleakLoop.core import faders
+
+    state, actions = faders.reset(returning())
+    assert actions == LANDED and state.fx_returns == () and not state.fx_slide_undo_open

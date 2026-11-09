@@ -128,10 +128,14 @@ def slide(state, event):
 
 def reset(state):
     # The faders stop showing, or the layer under a held snapshot slot changes: drop the
-    # touches and the slot holds, and close their undo steps. A slide's values stay.
+    # touches and the slot holds, and close their undo steps. A slide's values stay; a punch
+    # still returning lands at once.
     actions = []
     if state.fader_undo_open:
         actions.append(EndUndoStep())
+    if state.fx_returns:
+        writes = tuple((m.key, m.target) for back in state.fx_returns for m in back.macros)
+        actions.append(SetMacros(writes))
     if state.fx_slide_undo_open:
         actions.append(EndUndoStep())
     state = replace(
