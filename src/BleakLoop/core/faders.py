@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from . import layout
 from .leds import BLUE, MAGENTA, OFF, Light
-from .model import BeginUndoStep, BindFaderRow, EndUndoStep, SetFaderParameter
+from .model import BeginUndoStep, BindFaderRow, EndUndoStep, SetFaderParameter, SetMacros
 from .modes import FaderTouch, Mode
 from .values import X_COLUMN_WIDTH
 
@@ -76,6 +76,7 @@ def press(state, event, snapshot):
     view = _view(snapshot, event.pad)
     if state.device_clip or state.delete or touch is not None or view is None:
         return state, []
+    state, landed = land_returns(state)
     span = columns(state)
     touch = FaderTouch(
         event.pad,
@@ -88,7 +89,7 @@ def press(state, event, snapshot):
         view.is_quantized,
         view.macro,
     )
-    return replace(state, fader_touches=state.fader_touches + (touch,)), []
+    return replace(state, fader_touches=state.fader_touches + (touch,)), landed
 
 
 def x_axis(state, event):
@@ -175,6 +176,23 @@ def leave_slides(state, keys):
     holds = tuple(replace(h, dropped=h.dropped | keys) for h in state.fx_holds)
     params = tuple(p for p in state.fx_slide_params if p.key not in keys)
     return replace(state, fx_holds=holds, fx_slide_params=params)
+
+
+def land_returns(state):
+    # A new write lands the punches still returning at once, and closes their undo step unless
+    # a slide is held: what follows is its own step.
+    if not state.fx_returns:
+        return state, []
+    writes = tuple((m.key, m.target) for back in state.fx_returns for m in back.macros)
+    return close_slides(replace(state, fx_returns=()), [SetMacros(writes)])
+
+
+def close_slides(state, actions):
+    # The slides' undo step closes once no slide is held and no punch is returning.
+    if state.fx_slide_undo_open and not state.fx_returns and not any(h.slid for h in state.fx_holds):
+        state = replace(state, fx_slide_undo_open=False)
+        actions = actions + [EndUndoStep()]
+    return state, actions
 
 
 def _leave_morph(state, macro):

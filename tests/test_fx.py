@@ -2891,3 +2891,41 @@ def test_a_held_slide_keeps_the_step_open_after_a_return_lands():
     state, _ = engine.return_tick(state, 0.0)
     state, actions = engine.return_tick(state, 50.0)
     assert EndUndoStep() not in actions and state.fx_slide_undo_open
+
+
+LANDED = [SetMacros(tuple((key, 0.0) for key, _ in AB_TARGETS)), EndUndoStep()]
+
+
+def test_a_new_hold_lands_running_returns_before_its_read():
+    state, actions = handle(replace(returning(), device_clip=False), SLOT_3)
+    assert actions == LANDED + [RecallFxSnapshot(2, None, hold=True)]
+    assert state.fx_returns == () and not state.fx_slide_undo_open
+
+
+def test_a_recall_lands_running_returns_first():
+    state, actions = racks_read(returning(), 2, NOW_AB, recall=True)
+    assert actions[:2] == LANDED
+    assert actions[2:5] == [BeginUndoStep(), SetMacros(AB_TARGETS), EndUndoStep()]
+
+
+def test_a_morph_lands_running_returns_first():
+    state, actions = racks_read(returning(), 2, NOW_AB, recall=True, bars=4, snapshot=playing(3.0))
+    assert actions[:2] == LANDED and actions[2] == BeginUndoStep()
+    assert state.morph is not None and state.fx_returns == ()
+
+
+def test_a_fader_touch_lands_running_returns():
+    state, actions = session.handle(replace(returning(), device_clip=False), PadPress(5, 2, True), ROW_VIEWS)
+    assert actions == LANDED and len(state.fader_touches) == 1
+
+
+def test_landing_keeps_the_step_open_while_a_slide_is_held():
+    state = with_slot(returning(), 0, A_ONLY)
+    state, _ = handle(replace(state, device_clip=False), OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _, _ = x(state, 11, 0, pad=ROW_1)
+    state, _, _ = x(state, 11, at(2), pad=ROW_1)
+    state = replace(state, fx_returns=returning().fx_returns)
+    state, actions = racks_read(state, 2, NOW_AB, recall=True)
+    assert actions[0] == SetMacros(tuple((key, 0.0) for key, _ in AB_TARGETS))
+    assert EndUndoStep() not in actions and state.fx_slide_undo_open

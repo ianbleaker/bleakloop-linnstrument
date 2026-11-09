@@ -571,13 +571,15 @@ def _hold(state, event, slot, punch=False):
     # One hold per row. The read is taken now, so a slide's origins are the press's values.
     if _held(state, event.pad) is not None:
         return state, []
+    # Punches still returning land first, so the read sees their press values.
+    state, landed = faders.land_returns(state)
     stored = state.fx_slots[slot]
     bound = is_bound(stored)
     hold = SlotHold(event.pad, event.column, slot, bound=bound, punch=punch)
     locators = stored.params if bound else ()
     values = _values(stored) if bound else ()
     read = RecallFxSnapshot(slot, None, hold=True, locators=locators, values=values)
-    return replace(state, fx_holds=state.fx_holds + (hold,)), [read]
+    return replace(state, fx_holds=state.fx_holds + (hold,)), landed + [read]
 
 
 def _drop_hold(state, pad):
@@ -812,7 +814,14 @@ def _named(label, read):
 
 def _recall_now(state, macros):
     # A recall that writes at once. With slides held it takes their shared parameters and joins
-    # their undo step; otherwise it is its own step, closing a fader's or a morph's.
+    # their undo step; otherwise it is its own step, closing a fader's or a morph's. Punches
+    # still returning land first.
+    state, landed = faders.land_returns(state)
+    state, actions = _recall_writes(state, macros)
+    return state, landed + actions
+
+
+def _recall_writes(state, macros):
     writes = tuple((m.key, m.target) for m in macros)
     if any(h.slid for h in state.fx_holds):
         state = faders.leave_slides(state, {m.key for m in macros})
@@ -955,7 +964,7 @@ def _end_punch(state, hold):
     if ramps:
         state = replace(state, fx_returns=state.fx_returns + (PunchReturn(tuple(ramps)),))
     state = _rebase(state)
-    return _close_slides(state, actions)
+    return faders.close_slides(state, actions)
 
 
 def return_tick(state, now_ms):
@@ -977,15 +986,7 @@ def return_tick(state, now_ms):
             running.append(replace(back, macros=tuple(macros), started_at=started))
     state = replace(state, fx_returns=tuple(running))
     actions = [SetMacros(tuple(writes))] if writes else []
-    return _close_slides(state, actions)
-
-
-def _close_slides(state, actions):
-    # The slides' undo step closes once no slide is held and no punch is returning.
-    if state.fx_slide_undo_open and not state.fx_returns and not any(h.slid for h in state.fx_holds):
-        state = replace(state, fx_slide_undo_open=False)
-        actions = actions + [EndUndoStep()]
-    return state, actions
+    return faders.close_slides(state, actions)
 
 
 def _slid_value(entry, origin, f):
@@ -1164,6 +1165,13 @@ def racks_read(state, event, snapshot):
         state, actions = _recall_now(state, macros)
         state = _landed(state, event.slot, event.scene)
         return state, actions + buttons.say(owner, "recalled", name=name, note=note)
+    state, landed = faders.land_returns(state)
+    state, actions = _start_morph(state, event, snapshot, macros, note, launch)
+    return state, landed + actions
+
+
+def _start_morph(state, event, snapshot, macros, note, launch):
+    name, owner = _name(event.slot, event.scene), _owner(event.scene)
     start = snapshot.song_beats
     end = event.end_beats if launch else end_beats(snapshot, event.bars)
     morph = Morph(event.slot, start, end, start, macros, scene=event.scene, launch=launch)
