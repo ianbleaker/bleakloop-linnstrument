@@ -1650,6 +1650,21 @@ def test_the_undo_pad_rebinds_a_removal():
     assert actions[-1] == ShowMessage("Bound Auto Filter Frequency to Snapshot 3 again")
 
 
+def test_the_undo_pad_restores_a_removed_parameters_value():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, _ = bound_answer(state)
+    state, actions = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert state.fx_slots[2] == BoundSlot((EQ, FREQ), (0.2, 0.6))
+    assert fx.parse(actions[0].text)[2] == state.fx_slots[2]
+
+
+def test_the_undo_pad_removes_a_bind_and_its_value():
+    state = with_slot(FX, 2, BoundSlot((EQ,), (0.2,)))
+    state, _ = bound_answer(state, value=0.6, text="1.20 kHz")
+    state, _ = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert state.fx_slots[2] == BoundSlot((EQ,), (0.2,))
+
+
 def test_several_undos_pop_newest_first_each_restarting_the_window():
     state, _ = bound_answer(bound_freq(), binding=EQ)
     state = engine.bind_tick(state, 0.0)
