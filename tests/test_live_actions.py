@@ -656,6 +656,14 @@ def test_a_bound_slots_read_resolves_its_locators_not_the_racks():
     assert [p.name for p in event.params] == ["Frequency"]
 
 
+def test_a_bound_slots_read_carries_its_punch_in_values():
+    from tests.test_live_state import target_song
+
+    frequency = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    event = apply(RecallFxSnapshot(4, None, hold=True, locators=(frequency,), values=(90.0,)), target_song())
+    assert event.params[0].target == 90.0
+
+
 def test_a_bound_slots_store_reads_its_locators_not_the_racks():
     from tests.test_live_state import target_song
 

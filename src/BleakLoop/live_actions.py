@@ -418,7 +418,7 @@ def apply(action, song, surface):
             param = song.visible_tracks[action.track].mixer_device.volume
             param.value = min(max(action.value, param.min), param.max)
     elif isinstance(action, RecallFxSnapshot) and action.locators:
-        params = live_state.read_bound(song, action.locators)
+        params = live_state.read_bound(song, action.locators, action.values)
         return RacksRead(action.slot, (), True, hold=action.hold, params=params)
     elif isinstance(action, StoreFxSnapshot) and action.locators:
         return RacksRead(action.slot, (), False, params=live_state.read_bound(song, action.locators))

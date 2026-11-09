@@ -515,7 +515,8 @@ def _hold(state, event, slot):
     bound = is_bound(stored)
     hold = SlotHold(event.pad, event.column, slot, bound=bound)
     locators = stored.params if bound else ()
-    read = RecallFxSnapshot(slot, None, hold=True, locators=locators)
+    values = _values(stored) if bound else ()
+    read = RecallFxSnapshot(slot, None, hold=True, locators=locators, values=values)
     return replace(state, fx_holds=state.fx_holds + (hold,)), [read]
 
 
@@ -671,15 +672,24 @@ def _tap(state, hold):
     if not hold.read:
         return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
     if hold.bound:
-        # Nothing to recall: the tap names the parameters and their values.
+        # Nothing to recall: the tap names the parameters, their values and their punch-in
+        # values.
         names = labels([(p.owner, p.name) for p in hold.read])
-        items = [f"{label} {p.text or _number(p.start)}" for label, p in zip(names, hold.read)]
+        items = [_named(label, p) for label, p in zip(names, hold.read)]
         return state, listed(
             items, lambda text: buttons.say("slots", "named", name=name, params=text, note=hold.note)
         )
     state, actions = _recall_now(state, hold.read)
     state = _landed(state, hold.slot, False)
     return state, actions + buttons.say("slots", "recalled", name=name, note=hold.note)
+
+
+def _named(label, read):
+    # "Frequency 1.20 kHz → 3.40 kHz", or without a punch-in value "Frequency 1.20 kHz".
+    item = f"{label} {read.text or _number(read.start)}"
+    if read.target is None:
+        return item
+    return f"{item} → {read.target_text or _number(read.target)}"
 
 
 def _recall_now(state, macros):

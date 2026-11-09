@@ -436,15 +436,18 @@ def read_macro_values(song, morph):
     return tuple(None if parameter is None else parameter.value for parameter in targets)
 
 
-def read_bound(song, locators):
+def read_bound(song, locators, values=()):
     # A bound slot's parameters as they are now: BoundRead, or None when one can't be found.
+    # values holds each one's punch-in value, None where there's none.
     result = []
-    for locator in locators:
+    values = tuple(values) + (None,) * (len(locators) - len(values))
+    for locator, value in zip(locators, values):
         found = _bound(song, locator)
         if found is None:
             result.append(None)
             continue
         parameter, macro = found
+        target = None if value is None else min(max(value, parameter.min), parameter.max)
         result.append(
             BoundRead(
                 locator if macro is None else macro,
@@ -455,15 +458,17 @@ def read_bound(song, locators):
                 parameter.is_quantized,
                 display(parameter),
                 locator.device or locator.track,
+                target,
+                "" if target is None else display(parameter, target),
             )
         )
     return tuple(result)
 
 
-def display(parameter):
-    # Live's text for the value, or "" when it has none.
+def display(parameter, value=None):
+    # Live's text for the value, or for the one given, or "" when it has none.
     try:
-        return str(parameter.str_for_value(parameter.value))
+        return str(parameter.str_for_value(parameter.value if value is None else value))
     except Exception:
         return ""
 

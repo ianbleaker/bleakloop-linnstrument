@@ -1375,8 +1375,15 @@ def bound_sliding(params=(FREQ_READ, SWITCH_READ)):
 
 def test_a_bound_slot_press_reads_its_locators():
     state, actions = handle(BOUND_AB, SLOT_3)
-    assert actions == [RecallFxSnapshot(2, None, hold=True, locators=BOUND_AB.fx_slots[2].params)]
+    expected = RecallFxSnapshot(2, None, hold=True, locators=BOUND_AB.fx_slots[2].params, values=(None, None))
+    assert actions == [expected]
     assert state.fx_holds[0].bound
+
+
+def test_a_bound_slot_press_reads_its_punch_in_values():
+    state = with_slot(FX, 2, replace(BOUND_AB.fx_slots[2], values=(90.0,)))
+    _, actions = handle(state, SLOT_3)
+    assert actions[0].values == (90.0, None)
 
 
 def test_bars_and_a_bound_slot_does_nothing():
@@ -1769,6 +1776,22 @@ def test_a_bound_tap_shows_lives_text_for_the_value():
     state, _ = bound_read(state, (replace(FREQ_READ, text="1.20 kHz"),))
     _, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz")]
+
+
+def test_a_bound_tap_shows_the_punch_in_value_where_there_is_one():
+    freq = replace(FREQ_READ, text="1.20 kHz", target=90.0, target_text="3.40 kHz")
+    macro = replace(SWITCH_READ, start=0.5, quantized=False)
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, (freq, macro))
+    _, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, On 0.5")]
+
+
+def test_a_bound_tap_shows_a_punch_in_value_without_text_as_a_number():
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, (replace(FREQ_READ, target=90.25),))
+    _, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: Frequency 100 → 90.25")]
 
 
 def test_a_bound_tap_and_lift_name_the_device_where_two_share_a_name():

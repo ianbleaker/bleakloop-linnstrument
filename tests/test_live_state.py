@@ -523,3 +523,29 @@ def test_read_bound_carries_lives_text_for_the_value():
     frequency.str_for_value = lambda value: f"{value:.0f} Hz"
     (found,) = live_state.read_bound(song, (FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),))
     assert found.text == "40 Hz"
+
+
+def test_read_bound_gives_the_punch_in_values_clamped_with_their_text():
+    song = target_song()
+    frequency = song.tracks[0].devices[1].parameters[1]
+    frequency.str_for_value = lambda value: f"{value:.0f} Hz"
+    locator = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    (inside,) = live_state.read_bound(song, (locator,), (90.0,))
+    assert (inside.target, inside.target_text, inside.text) == (90.0, "90 Hz", "40 Hz")
+    (above,) = live_state.read_bound(song, (locator,), (500.0,))
+    assert (above.target, above.target_text) == (127.0, "127 Hz")
+    (none,) = live_state.read_bound(song, (locator,))
+    assert (none.target, none.target_text) == (None, "")
+
+
+def test_read_bound_gives_no_target_text_when_live_has_none():
+    song = target_song()
+    frequency = song.tracks[0].devices[1].parameters[1]
+
+    def fails(value):
+        raise RuntimeError
+
+    frequency.str_for_value = fails
+    locator = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    (found,) = live_state.read_bound(song, (locator, locator), (90.0,))[:1]
+    assert (found.target, found.target_text) == (90.0, "")
