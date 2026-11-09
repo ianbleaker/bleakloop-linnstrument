@@ -1541,7 +1541,7 @@ def test_a_second_bind_adds_and_names_both():
     state, _ = bound_answer(FX)
     state, actions = bound_answer(state, binding=EQ)
     assert state.fx_slots[2] == BoundSlot((FREQ, EQ))
-    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency, EQ Frequency")
+    assert actions[-1] == ShowMessage("Snapshot 3: EQ Frequency, Auto Filter Frequency")
 
 
 def test_binding_a_held_parameter_removes_it_and_the_last_empties_the_slot():
@@ -1563,14 +1563,14 @@ def test_a_second_bind_saves_its_value_and_leaves_the_firsts():
     state, _ = bound_answer(FX, value=0.6, text="1.20 kHz")
     state, actions = bound_answer(state, binding=EQ, value=0.2, text="300 Hz")
     assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, 0.2))
-    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency, EQ Frequency 300 Hz")
+    assert actions[-1] == ShowMessage("Snapshot 3: EQ Frequency 300 Hz, Auto Filter Frequency")
 
 
 def test_a_bind_without_a_value_keeps_the_others():
     state = with_slot(FX, 2, BoundSlot((FREQ,), (0.6,)))
     state, actions = bound_answer(state, binding=EQ)
     assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, None))
-    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency, EQ Frequency")
+    assert actions[-1] == ShowMessage("Snapshot 3: EQ Frequency, Auto Filter Frequency")
 
 
 def test_a_removal_drops_its_value():
@@ -1709,7 +1709,14 @@ def test_a_bind_message_shortens():
     state = with_slot(FX, 2, BoundSlot(params[:11]))
     _, actions = bound_answer(state, binding=params[11])
     text = actions[-1].text
-    assert text.startswith("Snapshot 3: Device 0 Frequency") and text.endswith(", +5") and len(text) <= STATUS_MAX
+    assert text.startswith("Snapshot 3: Device 11 Frequency, Device 0 Frequency") and text.endswith(", +5") and len(text) <= STATUS_MAX
+
+
+def test_a_long_bind_message_still_shows_the_new_parameters_value():
+    params = tuple(FaderBinding("Bass", 0, f"Device {i}", 0, 1, "Frequency") for i in range(12))
+    state = with_slot(FX, 2, BoundSlot(params[:11]))
+    _, actions = bound_answer(state, binding=params[11], value=0.5, text="1.20 kHz")
+    assert actions[-1].text.startswith("Snapshot 3: Device 11 Frequency 1.20 kHz, Device 0 Frequency")
 
 
 def test_labels_name_the_owner_only_where_two_share_a_name():

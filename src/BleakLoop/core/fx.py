@@ -464,9 +464,9 @@ def bind(state, slot, locator, value=None, text=""):
     bound_slot = _bound_slot(params + (locator,), values + (value,))
     state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
     items = labels([(p.device or p.track, p.name) for p in bound_slot.params])
-    if text:
-        # The new parameter, last, with its value.
-        items[-1] = f"{describe(locator)} {text}"
+    # The new parameter first, with its value: a long list's "+N" never hides it.
+    new = items.pop()
+    items.insert(0, f"{describe(locator)} {text}" if text else new)
     return state, [save, *listed(items, lambda text: buttons.say("slots", "bound", name=name, params=text))]
 
 
