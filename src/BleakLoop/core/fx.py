@@ -668,11 +668,10 @@ def _param(state, key):
 
 def _blend(state, hold, keys=None):
     # The hold's parameters it owns (or just keys) written at its f: continuous ones in
-    # proportion, quantized ones at the slot's value from switch_at on. The first actual write
+    # proportion, quantized ones at the nearest step to that. The first actual write
     # opens the slides' undo step, closing a fader's or a morph's, and cancels a running morph.
     if not hold.read:
         return state, []
-    switch_at = buttons.switch_at()
     later = [
         _keys(h) for h in state.fx_holds if h.slid and h is not hold and h.order > hold.order
     ]
@@ -687,7 +686,7 @@ def _blend(state, hold, keys=None):
         param = params.get(key)
         if param is None:
             param = params[key] = SlideParam(key, macro.start, macro.start, macro.span)
-        value = _slid_value(macro, param.origin, hold.f, switch_at)
+        value = _slid_value(macro, param.origin, hold.f)
         if value != param.written:
             writes.append((key, value))
             params[key] = replace(param, written=value)
@@ -743,17 +742,23 @@ def _end_slide(state, hold):
     return state, actions + message
 
 
-def _slid_value(entry, origin, f, switch_at):
+def _slid_value(entry, origin, f):
     # A Set-wide slot's macro blends towards its snapshot value. A bound slot's parameter moves
-    # from its origin by f of its range either way, stopping at its ends; quantized ones
-    # switch to an end from switch_at.
+    # from its origin by f of its range either way, stopping at its ends. An on/off or chooser
+    # takes the nearest step, halves away from its origin; where it switches otherwise is set
+    # by a macro's range in Live.
     if isinstance(entry, BoundRead):
+        move = f * entry.span
         if entry.quantized:
-            return entry.high if f >= switch_at else entry.low if f <= -switch_at else origin
-        return min(max(origin + f * entry.span, entry.low), entry.high)
-    if entry.quantized:
-        return entry.target if f >= switch_at else origin
-    return origin + f * (entry.target - origin)
+            move = _nearest(move)
+        return min(max(origin + move, entry.low), entry.high)
+    move = f * (entry.target - origin)
+    return origin + (_nearest(move) if entry.quantized else move)
+
+
+def _nearest(move):
+    # A whole number of steps, halves away from zero: round() would take halves to even.
+    return math.copysign(math.floor(abs(move) + 0.5), move)
 
 
 def _number(value):

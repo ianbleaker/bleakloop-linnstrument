@@ -560,11 +560,6 @@ pad = [13, 8]
 does = "pages"
 value = 16
 
-# Snapshot slides. switch_at: how far through a slide (above 0, up to 1) an on/off or chooser
-# parameter switches to the slot's value; continuous ones blend all the way.
-[morph]
-switch_at = 0.5
-
 # Messages not tied to a button: the device setup, and the track and device names Device/Clip's
 # steps show.
 [system]

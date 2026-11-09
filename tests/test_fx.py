@@ -1092,23 +1092,24 @@ def test_moving_back_left_lowers_the_blend():
     assert actions == [SetMacros(tuple((key, target * at(1) / X_COLUMN_WIDTH / 4) for key, target in AB_TARGETS))]
 
 
-def test_a_quantized_parameter_flips_exactly_at_switch_at_both_ways(monkeypatch):
+def test_a_quantized_macro_takes_the_nearest_step_both_ways():
     switch = rack("A", "R", 0.0, path=P0)
     switch = replace(switch, macros=(MacroView(0.0, 0.0, 1.0, is_quantized=True),))
     state = with_slot(FX, 2, (FxRack("A", "R", 0, (1.0,)),))
-    edge = at(2)
-    monkeypatch.setattr(fx.buttons, "switch_at", lambda: edge / X_COLUMN_WIDTH / 4)
     state, _ = handle(state, SLOT_3)
     state, _ = hold_read(state, racks=(switch,))
     state, _, _ = x(state, 11, 0)
-    state, actions, _ = x(state, 11, edge - 1)
+    state, actions, _ = x(state, 11, at(1.9))
     assert SetMacros((((P0, "R", 0), 1.0),)) not in actions
-    state, actions, _ = x(state, 11, edge)
+    state, actions, _ = x(state, 11, at(2.1))
     assert actions[-1] == SetMacros((((P0, "R", 0), 1.0),))
-    state, actions, _ = x(state, 11, edge - 1)
+    state, actions, _ = x(state, 11, at(1.9))
     assert actions == [SetMacros((((P0, "R", 0), 0.0),))]
-    state, actions, _ = x(state, 11, edge)
-    assert actions == [SetMacros((((P0, "R", 0), 1.0),))]
+
+
+@pytest.mark.parametrize("move, steps", [(0.5, 1), (-0.5, -1), (1.5, 2), (2.5, 3), (-2.5, -3), (0.49, 0), (0.0, 0)])
+def test_a_half_step_rounds_away_from_zero(move, steps):
+    assert fx._nearest(move) == steps
 
 
 def test_the_lift_keeps_the_values_and_closes_the_step():
@@ -1339,13 +1340,25 @@ def test_back_travel_returns_exactly_to_the_start():
     assert actions == [SetMacros(((FREQ, 100.0), (MACRO_KEY, 0.0)))]
 
 
-def test_a_quantized_bound_parameter_switches_to_either_end_from_switch_at():
+def test_a_quantized_bound_on_off_flips_halfway_either_way():
     state, actions, _ = x(bound_sliding((SWITCH_READ,)), 11, -at(2.2))
     assert actions == []  # already at its min
     state, actions, _ = x(state, 11, at(2.2))
     assert actions[-1] == SetMacros(((MACRO_KEY, 1.0),))
     state, actions, _ = x(state, 11, at(1.8))
     assert actions == [SetMacros(((MACRO_KEY, 0.0),))]
+
+
+def test_a_quantized_bound_chooser_steps_a_pad_at_a_time_and_returns_to_its_start():
+    chooser = replace(SWITCH_READ, name="Mode", start=1.0, high=4.0)
+    state, actions, _ = x(bound_sliding((chooser,)), 11, at(1.4))
+    assert actions[-1] == SetMacros(((MACRO_KEY, 2.0),))
+    state, actions, _ = x(state, 11, at(2.6))
+    assert actions == [SetMacros(((MACRO_KEY, 4.0),))]
+    state, actions, _ = x(state, 11, -at(1.6))
+    assert actions == [SetMacros(((MACRO_KEY, 0.0),))]
+    state, actions, _ = x(state, 11, 0)
+    assert actions == [SetMacros(((MACRO_KEY, 1.0),))]
 
 
 def test_a_bound_lift_names_its_parameters_with_a_signed_percent():
