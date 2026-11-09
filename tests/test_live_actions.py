@@ -342,7 +342,10 @@ def test_step_device_stops_at_the_end():
 
 class Param:
     def __init__(self, name, parent=None):
-        self.name, self.canonical_parent = name, parent
+        self.name, self.canonical_parent, self.value = name, parent, 0.25
+
+    def str_for_value(self, value):
+        return f"{value * 100:.0f}%"
 
 
 def bind_song(selected_parameter):
@@ -658,7 +661,7 @@ def test_a_bound_slots_read_resolves_its_locators_not_the_racks():
     [
         (
             BIND_TRACKS[0].devices[1].parameters[1],
-            ParameterBound(5, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Frequency", None),
+            ParameterBound(5, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Frequency", None, 0.25, "25%"),
         ),
         (None, ParameterBound(5, None, None, "select")),
         (BIND_MASTER.mixer_device.crossfader, ParameterBound(5, None, "Crossfader", "refused")),
@@ -675,5 +678,5 @@ def test_bind_a_device_fx_rows_parameter_to_a_slot(monkeypatch):
     surface = SimpleNamespace(core_state=None)
     song = bind_song(None)
     event = live_actions.apply(BindFaderRow(5, 1), song, surface)
-    assert event == ParameterBound(5, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Frequency", None)
+    assert event == ParameterBound(5, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Frequency", None, 0.25, "25%")
     assert live_actions.apply(BindFaderRow(5, 3), song, surface) is None

@@ -453,14 +453,14 @@ def read_bound(song, locators):
                 parameter.min,
                 parameter.max,
                 parameter.is_quantized,
-                _display(parameter),
+                display(parameter),
                 locator.device or locator.track,
             )
         )
     return tuple(result)
 
 
-def _display(parameter):
+def display(parameter):
     # Live's text for the value, or "" when it has none.
     try:
         return str(parameter.str_for_value(parameter.value))

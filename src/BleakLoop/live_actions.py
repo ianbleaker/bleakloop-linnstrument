@@ -191,6 +191,14 @@ def _locate(song, parameter=None):
     return binding, owner.name, parameter.name, None
 
 
+def _bind(slot, song, parameter):
+    # The answer to a bind: the parameter's locator with its value now, or why it can't be bound.
+    binding, _, name, refusal = _locate(song, parameter)
+    if binding is None:
+        return ParameterBound(slot, None, name, refusal)
+    return ParameterBound(slot, binding, name, refusal, parameter.value, live_state.display(parameter))
+
+
 def _on_a_track(item, tracks):
     # Whether item sits somewhere under one of the tracks: a chain, a nested device. Racks
     # nest a few levels at most; the limit only guards against an unexpected parent loop.
@@ -437,14 +445,12 @@ def apply(action, song, surface):
         else:
             parameter.value = min(max(action.value, parameter.min), parameter.max)
     elif isinstance(action, BindSelectedParameter):
-        binding, _, name, refusal = _locate(song)
-        return ParameterBound(action.slot, binding, name, refusal)
+        return _bind(action.slot, song, song.view.selected_parameter)
     elif isinstance(action, BindFaderRow):
         (target,) = live_state.fader_targets(song, surface.core_state, [action.row])
         if target is None:
             return None
-        binding, _, name, refusal = _locate(song, target[0])
-        return ParameterBound(action.slot, binding, name, refusal)
+        return _bind(action.slot, song, target[0])
     elif isinstance(action, StepTrack):
         surface.show_message(_step_track(song, action.step))
     elif isinstance(action, StepDevice):

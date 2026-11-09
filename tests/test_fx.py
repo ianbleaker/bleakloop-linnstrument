@@ -1455,8 +1455,8 @@ def test_the_value_meter_follows_the_slide_and_redraws():
 EQ = FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency")
 
 
-def bound_answer(state, slot=2, binding=FREQ, parameter="Frequency", refusal=None):
-    return engine.handle(state, ParameterBound(slot, binding, parameter, refusal), SNAP)
+def bound_answer(state, slot=2, binding=FREQ, parameter="Frequency", refusal=None, value=None, text=""):
+    return engine.handle(state, ParameterBound(slot, binding, parameter, refusal, value, text), SNAP)
 
 
 @pytest.mark.parametrize("layer", ["FX", "PANEL", "MIXER_PANEL"])
@@ -1500,6 +1500,36 @@ def test_binding_a_held_parameter_removes_it_and_the_last_empties_the_slot():
     state, actions = bound_answer(state, binding=EQ)
     assert state.fx_slots[2] is None
     assert actions[-1] == ShowMessage("Removed EQ Frequency from Snapshot 3")
+
+
+def test_a_bind_saves_the_parameters_value_and_names_it():
+    state, actions = bound_answer(FX, value=0.6, text="1.20 kHz")
+    assert state.fx_slots[2] == BoundSlot((FREQ,), (0.6,))
+    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency 1.20 kHz")
+    assert fx.parse(actions[0].text)[2] == state.fx_slots[2]
+
+
+def test_a_second_bind_saves_its_value_and_leaves_the_firsts():
+    state, _ = bound_answer(FX, value=0.6, text="1.20 kHz")
+    state, actions = bound_answer(state, binding=EQ, value=0.2, text="300 Hz")
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, 0.2))
+    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency, EQ Frequency 300 Hz")
+
+
+def test_a_bind_without_a_value_keeps_the_others():
+    state = with_slot(FX, 2, BoundSlot((FREQ,), (0.6,)))
+    state, actions = bound_answer(state, binding=EQ)
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, None))
+    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency, EQ Frequency")
+
+
+def test_a_removal_drops_its_value():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, _ = bound_answer(state)
+    assert state.fx_slots[2] == BoundSlot((EQ,), (0.2,))
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (None, 0.2)))
+    state, _ = bound_answer(state, binding=EQ)
+    assert state.fx_slots[2] == BoundSlot((FREQ,))
 
 
 def test_a_renamed_macro_still_toggles_off():

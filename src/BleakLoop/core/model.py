@@ -238,6 +238,8 @@ class ParameterBound:
     binding: object  # FaderBinding, or None
     parameter: str | None  # the selected parameter's name, for a refusal
     refusal: str | None  # None, "select", "macro" or "refused"
+    value: float | None = None  # the parameter's value when bound: its punch-in value
+    text: str = ""  # Live's display of that value
 
 
 @dataclass(frozen=True)

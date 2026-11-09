@@ -391,26 +391,32 @@ def parameter_bound(state, event):
         return state, buttons.refuse("slots", "no_parameter")
     if event.refusal is not None:
         return state, buttons.refuse("slots", "cannot_hold", name=name, parameter=event.parameter)
-    return bind(state, event.slot, event.binding)
+    return bind(state, event.slot, event.binding, event.value, event.text)
 
 
-def bind(state, slot, locator):
-    # Toggle: a parameter the slot holds is removed, any other added. A Set-wide slot refuses.
+def bind(state, slot, locator, value=None, text=""):
+    # Toggle: a parameter the slot holds is removed with its punch-in value, any other added
+    # with its value now as its punch-in value. A Set-wide slot refuses.
     stored = state.fx_slots[slot]
     name = _name(slot, False)
     if stored is not None and not is_bound(stored):
         return state, buttons.refuse("slots", "set_wide", name=name)
     params = stored.params if stored is not None else ()
+    values = _values(stored) if stored is not None else ()
     same = [p for p in params if _same(p, locator)]
     if same:
-        kept = tuple(p for p in params if not _same(p, locator))
-        state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(kept) if kept else None))
+        kept = [(p, v) for p, v in zip(params, values) if not _same(p, locator)]
+        bound_slot = _bound_slot([p for p, _ in kept], [v for _, v in kept])
+        state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
         state = _remember(state, slot, same[0], False)
         return state, [save, *buttons.say("slots", "removed", name=name, param=describe(same[0]))]
     state = _remember(state, slot, locator, True)
-    bound_slot = BoundSlot(params + (locator,))
+    bound_slot = _bound_slot(params + (locator,), values + (value,))
     state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
     items = labels([(p.device or p.track, p.name) for p in bound_slot.params])
+    if text:
+        # The new parameter, last, with its value.
+        items[-1] = f"{describe(locator)} {text}"
     return state, [save, *listed(items, lambda text: buttons.say("slots", "bound", name=name, params=text))]
 
 
