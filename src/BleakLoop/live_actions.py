@@ -424,6 +424,11 @@ def apply(action, song, surface):
     elif isinstance(action, SetMacros):
         # The Set can change mid-morph: a parameter that has moved or gone is skipped.
         targets = live_state.target_parameters(song, (key for key, _ in action.writes))
+        logger.info(
+            "SLIDE-DEBUG write %d: %s",
+            len(action.writes),
+            [(key, round(value, 2), None if p is None else round(p.value, 2)) for (key, value), p in zip(action.writes, targets)][:4],
+        )
         for (key, value), parameter in zip(action.writes, targets):
             if parameter is None:
                 logger.info("FX: skipped %r", key)

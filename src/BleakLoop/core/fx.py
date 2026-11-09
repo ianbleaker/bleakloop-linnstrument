@@ -409,6 +409,14 @@ def _hold_read(state, event, snapshot):
         return state, []
     macros, missing = _match(stored, event.racks)
     note = f", {_count(missing, 'rack')} not found" if missing else ""
+    import logging
+
+    logging.getLogger("BleakLoop").info(
+        "SLIDE-DEBUG read slot %d scoped=%s: %d macros, missing %d, stored %s, macros %s",
+        event.slot, event.slot in state.fx_scoped, len(macros), missing,
+        [(i.track, i.rack, i.n) for i in stored],
+        [(m.key, round(m.start, 2), round(m.target, 2)) for m in macros][:8],
+    )
     read = replace(hold, read=macros, note=note)
     state = _put_hold(state, hold, read)
     if not read.lifted:
