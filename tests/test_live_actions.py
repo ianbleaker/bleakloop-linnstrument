@@ -16,6 +16,7 @@ from BleakLoop.core.model import (  # noqa: E402
     DeleteGroupClips,
     DuplicateLoop,
     EditNotes,
+    FireSlot,
     FaderBound,
     HighlightSlot,
     RacksRead,
@@ -45,6 +46,19 @@ from tests.support import FakeSlot, fake_song, fake_track  # noqa: E402
 
 def apply(action, song):
     return live_actions.apply(action, song, surface=None)
+
+
+class FiredSlot(FakeSlot):
+    def fire(self, **options):
+        self.fired = options
+
+
+@pytest.mark.parametrize("has_clip, options", [(True, {"force_legato": True}), (False, {})])
+def test_legato_fire_only_on_a_clip(has_clip, options):
+    track = fake_track()
+    track.clip_slots[0] = FiredSlot(has_clip)
+    apply(FireSlot(0, 0, legato=True, record_length=None), fake_song([track]))
+    assert track.clip_slots[0].fired == options
 
 
 @pytest.mark.parametrize("arm", [True, False])
