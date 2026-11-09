@@ -241,14 +241,6 @@ class ParameterBound:
 
 
 @dataclass(frozen=True)
-class FaderBound:
-    # Fed back by the adapter after BindFader.
-    row: int  # 0-7, pad 1 first
-    binding: object  # FaderBinding, or None when the parameter can't be bound
-    message: str
-
-
-@dataclass(frozen=True)
 class SceneSelected:
     # Fed back by the adapter after Capture.
     scene: int
@@ -532,16 +524,6 @@ class BindSelectedParameter:
 class BindFaderRow:
     slot: int  # the global slot: add this Device FX row's parameter, or remove it if there
     row: int  # 0-7, pad 1 first
-
-
-@dataclass(frozen=True)
-class BindFader:
-    row: int  # 0-7: bind Live's selected parameter to this row
-
-
-@dataclass(frozen=True)
-class SaveFaderBindings:
-    text: str
 
 
 @dataclass(frozen=True)

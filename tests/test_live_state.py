@@ -170,7 +170,7 @@ def fader_song(device, tracks=()):
     return song
 
 
-DEVICE_FX = SimpleNamespace(fader_source="device")
+DEVICE_FX = SimpleNamespace()
 
 
 def test_faders_of_a_rack_are_its_macros_with_their_identity():
@@ -199,14 +199,11 @@ def test_faders_of_a_device_skip_device_on_and_dark_past_its_parameters():
     assert views[1].is_quantized and views[0].macro is None
 
 
-def test_no_selected_device_or_mapped_fx_gives_dark_faders():
+def test_no_selected_device_gives_dark_faders():
     assert live_state.read_faders(fader_song(None), DEVICE_FX) == (None,) * 8
-    device = fake_device("EQ", [fake_parameter("P1")])
-    mapped = SimpleNamespace(fader_source="mapped", fader_bindings=(None,) * 8)
-    assert live_state.read_faders(fader_song(device), mapped) == (None,) * 8
 
 
-# Mapped FX
+# Locators: bound snapshot slots' parameters
 
 
 def mapped_track(name, devices=(), sends=("A-Reverb",)):
@@ -223,81 +220,6 @@ def mapped_song(tracks, returns=()):
     song = fake_song(tracks, returns)
     song.master_track = mapped_track("Main", sends=())
     return song
-
-
-def mapped(*bindings):
-    return SimpleNamespace(
-        fader_source="mapped", fader_bindings=bindings + (None,) * (8 - len(bindings))
-    )
-
-
-def test_mapped_faders_resolve_device_and_mixer_parameters():
-    filter_ = fake_device("Auto Filter", [fake_parameter("Frequency", 40.0)])
-    bass = mapped_track("Bass", [filter_])
-    reverb = mapped_track("A Reverb", sends=())
-    song = mapped_song([bass], [reverb])
-    views = live_state.read_faders(
-        song,
-        mapped(
-            FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),
-            FaderBinding("A Reverb", 0, None, 0, 0, "Track Volume"),
-            FaderBinding("Bass", 0, None, 0, 1, "Track Panning"),
-            FaderBinding("Bass", 0, None, 0, 2, "A-Reverb"),
-            FaderBinding("Main", 0, None, 0, 0, "Track Volume"),
-        ),
-    )
-    assert [view and view.name for view in views[:6]] == [
-        "Frequency", "Track Volume", "Track Panning", "A-Reverb", "Track Volume", None,
-    ]
-    assert views[0].value == 40.0 and views[0].macro is None
-
-
-def test_mapped_faders_tell_same_named_tracks_and_devices_apart():
-    first = mapped_track("Synth", [fake_device("EQ", [fake_parameter("Gain", 1.0)])])
-    second = mapped_track(
-        "Synth",
-        [
-            fake_device("EQ", [fake_parameter("Gain", 2.0)]),
-            fake_device("EQ", [fake_parameter("Gain", 3.0)]),
-        ],
-    )
-    song = mapped_song([first, second])
-    views = live_state.read_faders(
-        song,
-        mapped(
-            FaderBinding("Synth", 0, "EQ", 0, 1, "Gain"),
-            FaderBinding("Synth", 1, "EQ", 1, 1, "Gain"),
-            FaderBinding("Synth", 2, "EQ", 0, 1, "Gain"),
-        ),
-    )
-    assert [view and view.value for view in views[:3]] == [1.0, 3.0, None]
-
-
-def test_a_renamed_or_missing_parameter_resolves_to_nothing():
-    song = mapped_song([mapped_track("Bass", [fake_device("EQ", [fake_parameter("Gain")])])])
-    views = live_state.read_faders(
-        song,
-        mapped(
-            FaderBinding("Bass", 0, "EQ", 0, 1, "Frequency"),
-            FaderBinding("Bass", 0, "EQ", 0, 9, "Gain"),
-            FaderBinding("Bass", 0, "Comp", 0, 1, "Gain"),
-            FaderBinding("Drums", 0, "EQ", 0, 1, "Gain"),
-        ),
-    )
-    assert views == (None,) * 8
-
-
-def test_a_mapped_rack_macro_carries_its_identity():
-    track = mapped_track("Bass")
-    rack = fake_device(
-        "FX", [fake_parameter(f"Macro {i}") for i in range(1, 9)], rack=True, macros=8,
-        parent=track,
-    )
-    track.devices = [rack]
-    views = live_state.read_faders(
-        mapped_song([track]), mapped(FaderBinding("Bass", 0, "FX", 0, 3, "Macro 3"))
-    )
-    assert views[0].macro == (("track", 0, 0), "FX", 2)
 
 
 def test_the_split_view_reads_8_tracks():

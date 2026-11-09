@@ -1,4 +1,3 @@
-import json
 from dataclasses import replace
 
 import pytest
@@ -7,15 +6,12 @@ from BleakLoop.core import engine, faders, fx, global_column, layout, mixer, ses
 from BleakLoop.core.leds import BLUE, MAGENTA, OFF, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
-    BindFader,
     EndUndoStep,
-    FaderBound,
     FaderView,
     MacroView,
     PadPress,
     RacksRead,
     RackView,
-    SaveFaderBindings,
     SetFaderParameter,
     SetMacros,
     ShowMessage,
@@ -24,7 +20,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     XAxis,
 )
-from BleakLoop.core.modes import FaderBinding, FxRack, Morph, MorphMacro, State
+from BleakLoop.core.modes import FxRack, Morph, MorphMacro, State
 from BleakLoop.core.values import X_COLUMN_WIDTH
 
 RACK = ("track", 0, 0)
@@ -376,112 +372,3 @@ def test_render_dark_rows():
 
 def test_render_under_shift_is_unchanged():
     assert faders.render(replace(FX_ON, shift=True), SNAP) == faders.render(FX_ON, SNAP)
-
-
-# Mapped FX: bindings
-
-
-MAPPED = replace(FX_ON, fader_source="mapped")
-BINDING = FaderBinding("Bass", 0, "Auto Filter", 1, 5, "Frequency")
-MIXER_BINDING = FaderBinding("A Reverb", 0, None, 0, 0, "Track Volume")
-
-
-def test_bindings_round_trip():
-    bindings = (BINDING, None, MIXER_BINDING) + (None,) * 5
-    text = faders.dump(bindings)
-    assert json.loads(text)["v"] == 1
-    assert faders.parse(text) == bindings
-
-
-def test_binding_format():
-    assert json.loads(faders.dump((BINDING,) + (None,) * 7)) == {
-        "v": 1,
-        "rows": [
-            {
-                "track": "Bass",
-                "tn": 0,
-                "device": "Auto Filter",
-                "dn": 1,
-                "param": 5,
-                "name": "Frequency",
-            }
-        ]
-        + [None] * 7,
-    }
-
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "",
-        "not json",
-        "[]",
-        '{"v": 2, "rows": [null, null, null, null, null, null, null, null]}',
-        '{"v": 1, "rows": [null]}',
-        '{"v": 1, "rows": 5}',
-        '{"v": 1}',
-        '{"v": 1, "rows": [{"track": "A"}, null, null, null, null, null, null, null]}',
-        '{"v": 1, "rows": [{"track": "A", "tn": "x", "device": null, "dn": 0, "param": 0, '
-        '"name": "V"}, null, null, null, null, null, null, null]}',
-        '{"v": 1, "rows": [7, null, null, null, null, null, null, null]}',
-    ],
-)
-def test_bad_binding_text_gives_empty_rows(text):
-    assert faders.parse(text) == (None,) * 8
-
-
-def test_device_clip_and_a_row_binds_in_mapped_fx():
-    state = replace(MAPPED, device_clip=True)
-    assert press(5, 3, state=state) == (state, [BindFader(2)])
-
-
-def test_device_clip_and_a_row_in_device_fx_points_to_mapped_fx():
-    state = replace(FX_ON, device_clip=True)
-    assert press(5, 3, state=state) == (state, [ShowMessage("Shift + FX for Mapped FX")])
-
-
-def test_a_bound_row_stores_and_saves():
-    bound = FaderBound(2, BINDING, "Fader 3: Auto Filter Frequency")
-    state, actions = engine.handle(MAPPED, bound, SNAP)
-    assert state.fader_bindings[2] == BINDING
-    assert actions == [
-        SaveFaderBindings(faders.dump(state.fader_bindings)),
-        ShowMessage("Fader 3: Auto Filter Frequency"),
-    ]
-
-
-def test_a_refused_bind_only_shows_its_message():
-    state, actions = engine.handle(MAPPED, FaderBound(2, None, "Map it to a macro instead"), SNAP)
-    assert state == MAPPED
-    assert actions == [ShowMessage("Map it to a macro instead")]
-
-
-def test_delete_and_a_bound_row_unbinds():
-    bindings = (None, None, BINDING) + (None,) * 5
-    state = replace(MAPPED, delete=True, fader_bindings=bindings)
-    state, actions = press(5, 3, state=state)
-    assert state.fader_bindings == (None,) * 8
-    assert actions == [
-        SaveFaderBindings(faders.dump((None,) * 8)),
-        ShowMessage("Fader 3 unbound"),
-    ]
-
-
-def test_delete_and_an_unbound_row_does_nothing():
-    state = replace(MAPPED, delete=True)
-    assert press(5, 3, state=state) == (state, [])
-
-
-def test_delete_in_device_fx_does_nothing():
-    state = replace(FX_ON, delete=True)
-    assert press(5, 3, state=state) == (state, [])
-
-
-def test_a_bound_row_whose_parameter_is_gone():
-    state = replace(MAPPED, fader_bindings=(None, None, BINDING) + (None,) * 5)
-    snapshot = replace(SNAP, faders=(None,) * 8)
-    assert press(5, 3, state=state, snapshot=snapshot) == (
-        state,
-        [ShowMessage("Fader 3: parameter not found")],
-    )
-    assert press(5, 4, state=state, snapshot=snapshot) == (state, [])

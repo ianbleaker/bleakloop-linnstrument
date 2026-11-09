@@ -565,8 +565,8 @@ value = 16
 [morph]
 switch_at = 0.5
 
-# Messages not tied to a button: the device setup, the track and device names Device/Clip's
-# steps show, and Mapped FX's binding.
+# Messages not tied to a button: the device setup, and the track and device names Device/Clip's
+# steps show.
 [system]
 refuse_duplicates = "Row Offset repeats notes in the Global column: controls off"
 refuse_row_offset = "Couldn't read Row Offset: controls off"
@@ -579,10 +579,6 @@ track = "{track}"
 no_more_tracks = "No more tracks"
 device = "{device}"
 no_more_devices = "No more devices"
-bound = "Fader {fader}: {owner} {parameter}"
-bind_select = "Click a parameter in Live first"
-bind_macro = "Map it to a macro instead"
-bind_refused = "Can't bind this parameter"
 
 
 # Functions: each one's label, at most 7 characters, its message, and its outcomes and
@@ -709,11 +705,10 @@ message = "Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_sce
 manual = "Move the Ableton session ring in the selected direction."
 
 [functions.fader_source]
-label = "Source"
-manual = "Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode. In Session and Mixer Mode, the split view's snapshots come third."
+label = "Panel"
+manual = "Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX Mode."
 [functions.fader_source.outcomes]
 device = "Faders: Device FX"
-mapped = "Faders: Mapped FX"
 snapshots = "Faders: FX snapshots"
 
 [functions.session]
@@ -942,13 +937,6 @@ nothing = "{name}: nothing to recall{note}"
 [functions.bars]
 message = "Bars: {bars}, press a snapshot or scene"
 manual = "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line."
-
-[functions.faders]
-[functions.faders.outcomes]
-unbound = "Fader {fader} unbound"
-[functions.faders.refusals]
-needs_mapped = "Shift + FX for Mapped FX"
-not_found = "Fader {fader}: parameter not found"
 
 [functions.scenes]
 [functions.scenes.outcomes]

@@ -196,7 +196,6 @@ SCENES = {
         State(
             split=True,
             split_snapshots=True,
-            fader_source="mapped",
             fx_slots=FX_SLOTS,
                     fx_scenes=FX_SCENES,
             fx_landed_scene=2,

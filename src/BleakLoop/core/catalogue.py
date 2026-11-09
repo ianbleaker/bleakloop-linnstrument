@@ -70,4 +70,4 @@ MODES = {
 
 # Messages with no button behind them: [functions.<name>] holds their wording, but no button
 # can name them with does.
-MESSAGE_ONLY = frozenset({"faders", "scenes"})
+MESSAGE_ONLY = frozenset({"scenes"})

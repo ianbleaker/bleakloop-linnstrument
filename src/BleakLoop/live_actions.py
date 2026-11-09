@@ -13,7 +13,6 @@ from .core.model import (
     AddScene,
     ArmExclusive,
     BeginUndoStep,
-    BindFader,
     BindFaderRow,
     BindSelectedParameter,
     CaptureAndInsertScene,
@@ -29,7 +28,6 @@ from .core.model import (
     EditNotes,
     EndUndoStep,
     EnterMode,
-    FaderBound,
     ParameterBound,
     FireScene,
     FireSlot,
@@ -40,7 +38,6 @@ from .core.model import (
     RecallFxSnapshot,
     Redo,
     RemovePitch,
-    SaveFaderBindings,
     SaveFxScenes,
     SaveFxSnapshots,
     SceneSelected,
@@ -161,18 +158,6 @@ def _undo_step(song):
 def _mixable(song):
     # Every track that has mute and solo: the tracks and return tracks, not master.
     return list(song.tracks) + list(song.return_tracks)
-
-
-def _binding(song, row):
-    # (FaderBinding, message) for Live's selected parameter, or (None, the refusal).
-    binding, owner, name, refusal = _locate(song)
-    if refusal == "select":
-        return None, buttons.system("bind_select")
-    if refusal == "macro":
-        return None, buttons.system("bind_macro")
-    if refusal is not None:
-        return None, buttons.system("bind_refused")
-    return binding, buttons.system("bound", fader=row + 1, owner=owner, parameter=name)
 
 
 def _locate(song, parameter=None):
@@ -460,11 +445,6 @@ def apply(action, song, surface):
             return None
         binding, _, name, refusal = _locate(song, target[0])
         return ParameterBound(action.slot, binding, name, refusal)
-    elif isinstance(action, BindFader):
-        binding, message = _binding(song, action.row)
-        return FaderBound(action.row, binding, message)
-    elif isinstance(action, SaveFaderBindings):
-        song.set_data(values.FADERS_DATA_KEY, action.text)
     elif isinstance(action, StepTrack):
         surface.show_message(_step_track(song, action.step))
     elif isinstance(action, StepDevice):

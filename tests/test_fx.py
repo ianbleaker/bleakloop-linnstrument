@@ -288,11 +288,9 @@ def test_mixer_turns_fx_off():
     assert actions == [SetMixer(True), ShowMessage("Mixer Mode: ON")]
 
 
-def test_shift_fx_pad_toggles_the_fader_source():
+def test_shift_fx_pad_does_nothing_in_fx_mode():
     state = replace(FX, shift=True)
-    assert handle(state, layout.NAVIGATION.fx) == (
-        replace(state, fader_source="mapped"), [ShowMessage("Faders: Mapped FX")]
-    )
+    assert handle(state, layout.NAVIGATION.fx) == (state, [])
 
 
 @pytest.mark.parametrize("key, bars", list(layout.FX.bars.items()))

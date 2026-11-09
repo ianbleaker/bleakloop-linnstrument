@@ -148,7 +148,6 @@ class BleakLoop(ControlSurface):
         self._fx_text = None  # the stored FX snapshots as last read
         self._fx_scenes_text = None  # the stored scene snapshots as last read
         self._scenes = []  # song.scenes at the last display tick
-        self._faders_text = None  # the stored Mapped FX bindings as last read
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
         self._pending_fresh = False
@@ -197,7 +196,6 @@ class BleakLoop(ControlSurface):
             self._load_fx()
             self._load_fx_scenes()
             self._follow_scenes()
-            self._load_faders()
             self._follow_selected_device()
             if self._state.mode is Mode.LINNSTRUMENT:
                 self._poll_tick()
@@ -232,7 +230,6 @@ class BleakLoop(ControlSurface):
             self._load_fx()
             self._load_fx_scenes()
             self._scenes = list(self.song.scenes)
-            self._load_faders()
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
                 self.show_message(self._refusal)
@@ -380,17 +377,6 @@ class BleakLoop(ControlSurface):
             [i for i, snapshot in enumerate(before) if snapshot is not None],
             [i for i, snapshot in enumerate(self._state.fx_scenes) if snapshot is not None],
         )
-
-    def _load_faders(self):
-        # As _load_fx, for the fader bindings.
-        text = live_state.read_fader_store(self.song)
-        if text == self._faders_text:
-            return
-        self._faders_text = text
-        bindings = faders.parse(text)
-        if text and faders.dump(bindings) != text:
-            logger.warning("FADERS: stored bindings unreadable, starting empty")
-        self._state = replace(self._state, fader_bindings=bindings)
 
     def disconnect(self):
         if self._editor is not None:

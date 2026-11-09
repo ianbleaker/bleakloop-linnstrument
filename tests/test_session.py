@@ -20,7 +20,6 @@ from BleakLoop.core.leds import (
     Light,
 )
 from BleakLoop.core.model import (
-    BindFader,
     ToggleDetailView,
     ArmExclusive,
     CaptureAndInsertScene,
@@ -558,30 +557,24 @@ def test_shift_column_16_keeps_window_moves_and_tempo(state):
     assert handle(state, layout.NAVIGATION.mixer, snapshot)[1][0] == SetTempo(119.0)
 
 
-def test_shift_fx_in_fx_mode_toggles_the_fader_source():
+def test_shift_fx_in_fx_mode_does_nothing():
     state = replace(FX_ON, shift=True)
-    mapped, actions = handle(state, layout.NAVIGATION_SHIFT.fader_source)
-    assert mapped == replace(state, fader_source="mapped")
-    assert actions == [ShowMessage("Faders: Mapped FX")]
-    assert handle(mapped, layout.NAVIGATION_SHIFT.fader_source) == (state, [ShowMessage("Faders: Device FX")])
+    assert handle(state, layout.NAVIGATION_SHIFT.fader_source) == (state, [])
 
 
 @pytest.mark.parametrize(
     "state", [SHIFT, replace(SHIFT, split=True), replace(MIXING, shift=True, mixer_split=True)]
 )
-def test_shift_fx_in_session_or_mixer_cycles_through_the_snapshots(state):
-    mapped, actions = handle(state, layout.NAVIGATION_SHIFT.fader_source)
-    assert mapped == replace(state, fader_source="mapped")
-    assert actions == [ShowMessage("Faders: Mapped FX")]
-    snapshots, actions = handle(mapped, layout.NAVIGATION_SHIFT.fader_source)
-    assert snapshots == replace(mapped, split_snapshots=True)
+def test_shift_fx_in_session_or_mixer_toggles_the_panel(state):
+    snapshots, actions = handle(state, layout.NAVIGATION_SHIFT.fader_source)
+    assert snapshots == replace(state, split_snapshots=True)
     assert actions == [ShowMessage("Faders: FX snapshots")]
     held = replace(snapshots, fx_length=4)
     assert handle(held, layout.NAVIGATION_SHIFT.fader_source) == (state, [ShowMessage("Faders: Device FX")])
 
 
-def test_cycling_to_the_snapshots_ends_a_fader_touch():
-    state = replace(SHIFT, split=True, fader_source="mapped", fader_undo_open=True)
+def test_toggling_to_the_snapshots_ends_a_fader_touch():
+    state = replace(SHIFT, split=True, fader_undo_open=True)
     state, actions = handle(state, layout.NAVIGATION_SHIFT.fader_source)
     assert not state.fader_undo_open
     assert actions == [EndUndoStep(), ShowMessage("Faders: FX snapshots")]
@@ -670,12 +663,11 @@ def test_device_clip_with_another_press_does_not_flip(key):
     assert not state.device_clip and not state.device_clip_used
 
 
-def test_device_clip_and_a_mapped_fx_row_binds_without_flipping():
-    mapped = replace(FX_ON, fader_source="mapped")
-    _, actions = engine_presses(
-        mapped, (layout.NAVIGATION.device_clip, DOWN), ((5, 3), DOWN), ((5, 3), UP), (layout.NAVIGATION.device_clip, UP)
+def test_device_clip_and_a_fader_row_does_nothing_and_doesnt_flip():
+    state, actions = engine_presses(
+        FX_ON, (layout.NAVIGATION.device_clip, DOWN), ((5, 3), DOWN), ((5, 3), UP), (layout.NAVIGATION.device_clip, UP)
     )
-    assert actions == [DEVICE_CLIP_HELD, BindFader(2)]
+    assert actions == [DEVICE_CLIP_HELD] and state.fader_touches == ()
 
 
 def test_device_clip_on_shifts_layer_never_flips():

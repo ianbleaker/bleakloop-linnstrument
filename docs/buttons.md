@@ -74,7 +74,7 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 |---|---|---|---|---|---|---|
 | 16/1 | Tempo+ | `tempo` 1 | Tempo: {bpm:.1f} BPM |  |  | yes |
 | 16/2 | Tempo- | `tempo` -1 | Tempo: {bpm:.1f} BPM |  |  | yes |
-| 16/3 | Source | `fader_source` |  | device: Faders: Device FX<br>mapped: Faders: Mapped FX<br>snapshots: Faders: FX snapshots |  | yes |
+| 16/3 | Panel | `fader_source` |  | device: Faders: Device FX<br>snapshots: Faders: FX snapshots |  | yes |
 | 16/5 | Up | `window` (0, -1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
 | 16/6 | Down | `window` (0, 1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
 | 16/7 | Right | `window` (1, 0) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
@@ -219,7 +219,7 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 |---|---|---|---|---|---|---|
 | 16/1 (from navigation-shift) | Tempo+ | `tempo` 1 | Tempo: {bpm:.1f} BPM |  |  | yes |
 | 16/2 (from navigation-shift) | Tempo- | `tempo` -1 | Tempo: {bpm:.1f} BPM |  |  | yes |
-| 16/3 (from navigation-shift) | Source | `fader_source` |  | device: Faders: Device FX<br>mapped: Faders: Mapped FX<br>snapshots: Faders: FX snapshots |  | yes |
+| 16/3 (from navigation-shift) | Panel | `fader_source` |  | device: Faders: Device FX<br>snapshots: Faders: FX snapshots |  | yes |
 | 16/5 (from navigation-shift) | Up | `window` (0, -1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
 | 16/6 (from navigation-shift) | Down | `window` (0, 1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
 | 16/7 (from navigation-shift) | Right | `window` (1, 0) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
@@ -272,7 +272,6 @@ The faders' and timed scene launches' wording.
 
 | Function | Outcomes | Refusals | Shown |
 |---|---|---|---|
-| `faders` | unbound: Fader {fader} unbound | needs_mapped: Shift + FX for Mapped FX<br>not_found: Fader {fader}: parameter not found | yes |
 | `scenes` | timed: Scene {scene} in {bars}<br>cancelled: Scene {scene} launch cancelled |  | yes |
 
 ## System messages
@@ -292,7 +291,3 @@ The device setup, Device/Clip's track and device names and Mapped FX's binding. 
 | `no_more_tracks` | No more tracks |
 | `device` | {device} |
 | `no_more_devices` | No more devices |
-| `bound` | Fader {fader}: {owner} {parameter} |
-| `bind_select` | Click a parameter in Live first |
-| `bind_macro` | Map it to a macro instead |
-| `bind_refused` | Can't bind this parameter |

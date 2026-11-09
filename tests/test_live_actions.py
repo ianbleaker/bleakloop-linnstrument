@@ -11,7 +11,6 @@ from BleakLoop.core.modes import FaderBinding  # noqa: E402
 from BleakLoop.core.model import (  # noqa: E402
     SetMacros,
     ShowMessage,
-    BindFader,
     BindFaderRow,
     BindSelectedParameter,
     ParameterBound,
@@ -21,7 +20,6 @@ from BleakLoop.core.model import (  # noqa: E402
     DuplicateLoop,
     EditNotes,
     FireSlot,
-    FaderBound,
     HighlightSlot,
     RacksRead,
     RecallFxSnapshot,
@@ -29,7 +27,6 @@ from BleakLoop.core.model import (  # noqa: E402
     RemovePitch,
     SelectDrumPad,
     SelectTrack,
-    SaveFaderBindings,
     SaveFxScenes,
     SetArm,
     SetArms,
@@ -182,7 +179,7 @@ def fader_song(parameters):
     return SimpleNamespace(appointed_device=device)
 
 
-FADER_SURFACE = SimpleNamespace(core_state=SimpleNamespace(fader_source="device"))
+FADER_SURFACE = SimpleNamespace(core_state=SimpleNamespace())
 
 
 def test_set_fader_parameter_writes_clamped():
@@ -375,61 +372,6 @@ def bind_track(name, devices=(), sends=1):
 BIND_TRACKS = [bind_track("Bass", ["EQ", "EQ"]), bind_track("Bass", ["Comp"])]
 BIND_RETURN = bind_track("A Reverb")
 BIND_MASTER = bind_track("Main", sends=0)
-
-
-def bind(parameter, row=2):
-    return apply(BindFader(row), bind_song(parameter))
-
-
-def test_bind_a_top_level_device_parameter():
-    parameter = BIND_TRACKS[0].devices[1].parameters[1]
-    assert bind(parameter) == FaderBound(
-        2, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Fader 3: EQ Frequency"
-    )
-
-
-def test_bind_on_the_second_same_named_track():
-    parameter = BIND_TRACKS[1].devices[0].parameters[1]
-    assert bind(parameter).binding == FaderBinding("Bass", 1, "Comp", 0, 1, "Frequency")
-
-
-@pytest.mark.parametrize(
-    "track, attribute, index",
-    [(BIND_RETURN, "volume", 0), (BIND_TRACKS[0], "panning", 1), (BIND_MASTER, "volume", 0)],
-)
-def test_bind_mixer_volume_and_pan(track, attribute, index):
-    parameter = getattr(track.mixer_device, attribute)
-    event = bind(parameter)
-    assert event.binding.device is None and event.binding.param == index
-    assert event.message == f"Fader 3: {track.name} {parameter.name}"
-
-
-def test_bind_a_send():
-    event = bind(BIND_RETURN.mixer_device.sends[0])
-    assert event.binding == FaderBinding("A Reverb", 0, None, 0, 2, "Send 0")
-
-
-def test_bind_refuses_other_mixer_parameters():
-    event = bind(BIND_MASTER.mixer_device.crossfader)
-    assert event == FaderBound(2, None, "Can't bind this parameter")
-
-
-def test_bind_refuses_a_nested_device():
-    chain = SimpleNamespace(canonical_parent=BIND_TRACKS[0].devices[0])
-    nested = SimpleNamespace(name="Inner", canonical_parent=chain)
-    event = bind(Param("Frequency", nested))
-    assert event == FaderBound(2, None, "Map it to a macro instead")
-
-
-def test_bind_with_nothing_selected():
-    assert bind(None) == FaderBound(2, None, "Click a parameter in Live first")
-
-
-def test_save_fader_bindings():
-    stored = {}
-    song = SimpleNamespace(set_data=lambda key, text: stored.update({key: text}))
-    apply(SaveFaderBindings("{}"), song)
-    assert stored == {"BleakLoop.faders": "{}"}
 
 
 # FX snapshots

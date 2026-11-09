@@ -134,7 +134,7 @@ The outer edge, column 16, holds the mode pads, then Delete and Copy. **Device/C
 With **Shift** held:
 
 - **Tempo**: Tempo +1 or -1 BPM.
-- **Fader source**: Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode. In Session and Mixer Mode, the split view's snapshots come third.
+- **Fader source**: Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX Mode.
 - **Window directions**: Move the Ableton session ring in the selected direction.
 <!-- /callouts:navigation -->
 

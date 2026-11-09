@@ -43,7 +43,6 @@ BEAT_EPSILON = 1e-6
 
 # Firmware FXD_CALX_FULL_UNIT (4095 / 24): column c's centre is X_COLUMN_WIDTH * (c - 0.5).
 X_COLUMN_WIDTH = 170.625
-FADERS_DATA_KEY = "BleakLoop.faders"  # song.set_data key for the Mapped FX bindings
 
 SEQ_BASE_NOTE = 48  # Sequencer note pads' bottom left: C2 in Live's naming (C3 = 60)
 SEQ_DEFAULT_RATE = 0.25  # beats per step: 1/16

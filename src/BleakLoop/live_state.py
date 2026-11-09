@@ -251,10 +251,8 @@ def fader_parameter(song, state, row):
 
 
 def fader_targets(song, state, rows):
-    # (parameter, macro identity or None), or None, per row asked for.
-    if state.fader_source == "mapped":
-        return [_bound(song, state.fader_bindings[row]) for row in rows]
-    # Device FX: the device with Live's blue hand.
+    # (parameter, macro identity or None), or None, per row asked for: Device FX, the device
+    # with Live's blue hand.
     device = song.appointed_device
     if device is None:
         return [None for _ in rows]
@@ -274,7 +272,7 @@ def fader_targets(song, state, rows):
 
 
 def _bound(song, binding):
-    # A Mapped FX binding's parameter, found again by names; None if it's gone or renamed.
+    # A bound snapshot slot's parameter, found again by names; None if it's gone or renamed.
     if binding is None:
         return None
     found = nth_named(fx_tracks(song), binding.track, binding.tn, lambda item: item[2].name)
@@ -317,10 +315,6 @@ def nth_named(items, name, n, name_of):
                 return item
             count += 1
     return None
-
-
-def read_fader_store(song):
-    return song.get_data(values.FADERS_DATA_KEY, "")
 
 
 def _rack_path(song, device):

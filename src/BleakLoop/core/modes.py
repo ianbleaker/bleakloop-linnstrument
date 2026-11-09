@@ -4,7 +4,7 @@ import enum
 from dataclasses import dataclass, replace
 
 from . import values
-from .layout import FX_SNAPSHOTS, ROWS, Window
+from .layout import FX_SNAPSHOTS, Window
 
 
 class Mode(enum.Enum):
@@ -89,7 +89,7 @@ class FaderTouch:
 
 @dataclass(frozen=True)
 class FaderBinding:
-    # A Mapped FX row's parameter, found again by names: the LOM has no stable IDs.
+    # A bound snapshot slot's parameter, found again by names: the LOM has no stable IDs.
     track: str
     tn: int  # the count of earlier tracks with this name, tracks then returns then master
     device: str | None  # a top-level device's name; None for the track's mixer
@@ -264,14 +264,12 @@ class State:
     fx_landed_scene: int | None = None  # the scene of the last recall that landed
     fader_touches: tuple = ()  # FaderTouch per touched fader row
     fader_undo_open: bool = False  # a fader gesture's undo step is open in Live
-    fader_source: str = "device"  # "device" or "mapped"
     device_clip: bool = False  # Device/Clip is held
     device_clip_used: bool = False  # a press during the hold: its release doesn't flip the view
     split: bool = False  # Session Mode's split view
     mixer_split: bool = False  # Mixer Mode's split view
     split_snapshots: bool = False  # the split views show the snapshots, not the faders
     pending_launch: PendingLaunch | None = None  # fires in every mode, as a morph runs
-    fader_bindings: tuple = (None,) * ROWS  # Mapped FX: FaderBinding or None per row
     seq_held: bool = False  # Seq is held in Session Mode
     seq_used: bool = False  # the Seq hold entered on a slot: its release does nothing
     # Sequencer Mode's arm: per song.tracks, the arm before entry and what BleakLoop set.

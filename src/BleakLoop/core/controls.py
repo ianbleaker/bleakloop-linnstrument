@@ -193,21 +193,16 @@ def _device_step(state, snapshot, step):
 
 
 def toggle_fader_source(state):
-    # Shift + FX: Device FX <-> Mapped FX. Session and Mixer Mode's split panel adds the
-    # snapshots: Device FX -> Mapped FX -> FX snapshots -> Device FX.
-    panel = state.mode is Mode.SESSION and not state.fx
-    if state.split_snapshots and panel:
-        # The snapshots stop showing: a held slot lets go.
-        state, actions = faders.reset(state)
-        state = replace(state, split_snapshots=False, fader_source="device", fx_length=None)
+    # Shift + FX: the Session and Mixer split views' panel, Device FX <-> the snapshots. FX Mode
+    # has no panel.
+    if state.fx:
+        return state, []
+    # The layer under a held fader or slot changes: it lets go.
+    state, actions = faders.reset(state)
+    if state.split_snapshots:
+        state = replace(state, split_snapshots=False, fx_length=None)
         return state, actions + buttons.say("fader_source", "device")
-    if state.fader_source == "mapped" and panel:
-        # The faders stop showing.
-        state, actions = faders.reset(state)
-        return replace(state, split_snapshots=True), actions + buttons.say("fader_source", "snapshots")
-    mapped = state.fader_source == "device"
-    state = replace(state, fader_source="mapped" if mapped else "device")
-    return state, buttons.say("fader_source", "mapped" if mapped else "device")
+    return replace(state, split_snapshots=True), actions + buttons.say("fader_source", "snapshots")
 
 
 def render_device_clip_layer(frame, state, snapshot=None):

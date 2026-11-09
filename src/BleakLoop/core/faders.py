@@ -1,26 +1,15 @@
 """Horizontal FX faders: one per pad row, in FX Mode and the Session and Mixer split views."""
 
-import json
 from dataclasses import replace
 
-from . import buttons, layout
-from .leds import BLUE, MAGENTA, OFF, ORANGE, YELLOW, Light
-from .model import (
-    BeginUndoStep,
-    BindFader,
-    BindFaderRow,
-    EndUndoStep,
-    SaveFaderBindings,
-    SetFaderParameter,
-    ShowMessage,
-)
-from .modes import FaderBinding, FaderTouch, Mode
+from . import layout
+from .leds import BLUE, MAGENTA, OFF, Light
+from .model import BeginUndoStep, BindFaderRow, EndUndoStep, SetFaderParameter
+from .modes import FaderTouch, Mode
 from .values import X_COLUMN_WIDTH
 
-ROWS = 8
-
-# (odd pad rows, even pad rows) per source: alternating rows can be counted at a glance.
-COLOURS = {"device": (MAGENTA, BLUE), "mapped": (ORANGE, YELLOW)}
+# Odd pad rows, even pad rows: alternating rows can be counted at a glance.
+COLOURS = (MAGENTA, BLUE)
 
 
 def visible(state):
@@ -84,20 +73,8 @@ def press(state, event, snapshot):
             return state, []
         state = replace(state, fx_bind_hold=replace(hold, used=True))
         return state, [BindFaderRow(hold.slot, event.pad - 1)]
-    mapped = state.fader_source == "mapped"
-    row = event.pad - 1
-    if state.device_clip:
-        if not mapped:
-            return state, buttons.refuse("faders", "needs_mapped")
-        return state, [BindFader(row)]
-    if state.delete:
-        return _unbind(state, row) if mapped else (state, [])
     view = _view(snapshot, event.pad)
-    if touch is not None:
-        return state, []
-    if view is None:
-        if mapped and state.fader_bindings[row] is not None:
-            return state, buttons.refuse("faders", "not_found", fader=event.pad)
+    if state.device_clip or state.delete or touch is not None or view is None:
         return state, []
     span = columns(state)
     touch = FaderTouch(
@@ -112,66 +89,6 @@ def press(state, event, snapshot):
         view.macro,
     )
     return replace(state, fader_touches=state.fader_touches + (touch,)), []
-
-
-def bound(state, event):
-    # The adapter's answer to BindFader: a binding to store and save, or a refusal.
-    if event.binding is None:
-        return state, [ShowMessage(event.message)]
-    bindings = _put_row(state.fader_bindings, event.row, event.binding)
-    state = replace(state, fader_bindings=bindings)
-    return state, [SaveFaderBindings(dump(bindings)), ShowMessage(event.message)]
-
-
-def dump(bindings):
-    def row(binding):
-        return {
-            "track": binding.track,
-            "tn": binding.tn,
-            "device": binding.device,
-            "dn": binding.dn,
-            "param": binding.param,
-            "name": binding.name,
-        }
-
-    data = [None if binding is None else row(binding) for binding in bindings]
-    return json.dumps({"v": 1, "rows": data}, separators=(",", ":"))
-
-
-def parse(text):
-    # Anything unreadable gives empty rows: a bad store never stops the script loading.
-    empty = (None,) * ROWS
-    try:
-        data = json.loads(text)
-        if data.get("v") != 1 or len(data["rows"]) != ROWS:
-            return empty
-        return tuple(
-            None
-            if item is None
-            else FaderBinding(
-                str(item["track"]),
-                int(item["tn"]),
-                None if item["device"] is None else str(item["device"]),
-                int(item["dn"]),
-                int(item["param"]),
-                str(item["name"]),
-            )
-            for item in data["rows"]
-        )
-    except (ValueError, TypeError, KeyError, AttributeError):
-        return empty
-
-
-def _unbind(state, row):
-    if state.fader_bindings[row] is None:
-        return state, []
-    bindings = _put_row(state.fader_bindings, row, None)
-    state = replace(state, fader_bindings=bindings)
-    return state, [SaveFaderBindings(dump(bindings)), *buttons.say("faders", "unbound", fader=row + 1)]
-
-
-def _put_row(rows, row, value):
-    return rows[:row] + (value,) + rows[row + 1 :]
 
 
 def x_axis(state, event):
@@ -233,7 +150,7 @@ def render(state, snapshot):
     # while a row is touched.
     span = columns(state)
     frame = {(column, pad): Light(OFF) for column in span for pad in range(1, layout.ROWS + 1)}
-    odd, even = COLOURS[state.fader_source]
+    odd, even = COLOURS
     for pad in range(1, layout.ROWS + 1):
         touch = _find(state.fader_touches, pad)
         view = _view(snapshot, pad)
