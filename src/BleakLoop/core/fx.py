@@ -17,7 +17,7 @@ from .model import (
     SetMixer,
     StoreFxSnapshot,
 )
-from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
+from .modes import BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
 from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, X_COLUMN_WIDTH
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
@@ -51,20 +51,17 @@ def capture(racks):
 STORE_SLOTS = {1: layout.FX_SLOTS, 2: layout.FX_SNAPSHOTS}
 
 
-def dump(slots, scoped):
-    # v2: every bank's slots by global index. The scoped slots go in their own key, only when
-    # there are any.
-    data = {"v": 2, "slots": [_encode(slot) for slot in slots]}
-    if scoped:
-        data["scoped"] = sorted(scoped)
+def dump(slots):
+    # v2: every bank's slots by global index; a bound slot as {"bound": [locator, ...]}.
+    data = {"v": 2, "slots": [_encode_slot(slot) for slot in slots]}
     return json.dumps(data, separators=(",", ":"))
 
 
 def parse(text):
-    # (slots, scoped). Anything unreadable gives empty slots: a bad store never stops the
-    # script loading. A bad "scoped" entry is dropped, leaving its slot Set-wide. A v1 store
-    # loads as bank 1, with banks 2-8 empty.
-    return _parse(text) or ((None,) * layout.FX_SNAPSHOTS, frozenset())
+    # The slots. Anything unreadable gives empty slots: a bad store never stops the script
+    # loading. A v1 store loads as bank 1, with banks 2-8 empty. #104's "scoped" slots, one
+    # rack's macros with values, become bound slots of those macros, without the values.
+    return _parse(text) or (None,) * layout.FX_SNAPSHOTS
 
 
 def readable(text):
@@ -78,18 +75,60 @@ def _parse(text):
         count = STORE_SLOTS.get(data.get("v"))
         if count is None or len(data["slots"]) != count:
             return None
-        slots = tuple(_decode(slot) for slot in data["slots"])
+        slots = list(_decode_slot(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):
         return None
-    slots += (None,) * (layout.FX_SNAPSHOTS - count)
     scoped = data.get("scoped")
-    if not isinstance(scoped, list):
-        return slots, frozenset()
-    return slots, frozenset(
-        i
-        for i in scoped
-        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < count and slots[i] is not None
+    for i in scoped if isinstance(scoped, list) else ():
+        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < count:
+            if isinstance(slots[i], tuple):
+                slots[i] = bind_racks(slots[i])
+    return tuple(slots) + (None,) * (layout.FX_SNAPSHOTS - count)
+
+
+def bind_racks(racks):
+    # A bound slot of every macro of these racks, matched by index: #104's scoped snapshot.
+    params = tuple(
+        FaderBinding(rack.track, 0, rack.rack, rack.n, index + 1, f"Macro {index + 1}")
+        for rack in racks
+        for index in range(len(rack.values))
     )
+    return BoundSlot(params) if params else None
+
+
+LOCATOR_FIELDS = ("track", "tn", "device", "dn", "param", "name")
+
+
+def _encode_slot(slot):
+    if isinstance(slot, BoundSlot):
+        return {"bound": [{field: getattr(p, field) for field in LOCATOR_FIELDS} for p in slot.params]}
+    return _encode(slot)
+
+
+def _decode_slot(slot):
+    # A bound slot's bad entries are dropped; with none left, the slot is empty.
+    if isinstance(slot, dict):
+        params = tuple(p for p in (_locator(item) for item in slot["bound"]) if p is not None)
+        return BoundSlot(params) if params else None
+    return _decode(slot)
+
+
+def _locator(item):
+    if not isinstance(item, dict):
+        return None
+    track, tn, device, dn, param, name = (item.get(field) for field in LOCATOR_FIELDS)
+    counts = (tn, dn, param)
+    if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in counts):
+        return None
+    if not isinstance(track, str) or not isinstance(name, str):
+        return None
+    if device is not None and not isinstance(device, str):
+        return None
+    return FaderBinding(track, tn, device, dn, param, name)
+
+
+def is_bound(slot):
+    return isinstance(slot, BoundSlot)
 
 
 def dump_scenes(scenes):
@@ -213,13 +252,11 @@ def _set(state, slot, scene, value, scene_count):
         padded = state.fx_scenes + (None,) * (slot + 1 - len(state.fx_scenes))
         scenes = _fit(_put(padded, slot, value), scene_count)
         return replace(state, fx_scenes=scenes), SaveFxScenes(dump_scenes(scenes))
-    # A Set-wide store or a clear leaves the slot unscoped.
-    return _save_slots(state, _put(state.fx_slots, slot, value), state.fx_scoped - {slot})
+    return _save_slots(state, _put(state.fx_slots, slot, value))
 
 
-def _save_slots(state, slots, scoped):
-    state = replace(state, fx_slots=slots, fx_scoped=frozenset(scoped))
-    return state, SaveFxSnapshots(dump(slots, state.fx_scoped))
+def _save_slots(state, slots):
+    return replace(state, fx_slots=slots), SaveFxSnapshots(dump(slots))
 
 
 def _owner(scene):
@@ -238,7 +275,7 @@ def _name(slot, scene):
 def _landed(state, slot, scene):
     # Only the last Set-wide snapshot to land blinks, global or scene. A scoped one moves a
     # single rack, so it leaves the blink where it was.
-    if not scene and slot in state.fx_scoped:
+    if not scene and is_bound(state.fx_slots[slot]):
         return state
     if scene:
         return replace(state, fx_landed=None, fx_landed_scene=slot)
@@ -377,7 +414,7 @@ def render_meters(state):
     for hold in state.fx_holds:
         if not hold.slid:
             continue
-        colour = PINK if hold.slot in state.fx_scoped else CYAN
+        colour = PINK if is_bound(state.fx_slots[hold.slot]) else CYAN
         column = layout.FX.slots[hold.slot % layout.FX_SLOTS][0]
         lit = meter(hold.f)
         for k in range(1, SLIDE_COLUMNS + 1):
@@ -596,7 +633,7 @@ functions.register_hold(
 
 def _slot_light(state, slot):
     # Pink for one rack's snapshot, cyan for the Set's.
-    colour = PINK if slot in state.fx_scoped else CYAN
+    colour = PINK if is_bound(state.fx_slots[slot]) else CYAN
     if any(h.slot == slot and h.slid for h in state.fx_holds):
         return Light(colour, Blink.FAST)
     morph = state.morph
@@ -704,8 +741,7 @@ def _store_scoped(state, event, name):
     )
     if not stored:
         return state, buttons.refuse("slots", "no_rack", name=name)
-    slots = _put(state.fx_slots, event.slot, stored)
-    state, save = _save_slots(state, slots, state.fx_scoped | {event.slot})
+    state, save = _save_slots(state, _put(state.fx_slots, event.slot, bind_racks(stored)))
     return state, [save, *buttons.say("slots", "stored_scoped", name=name, rack=stored[0].rack)]
 
 
@@ -860,6 +896,8 @@ def launch_tick(state, transport):
 
 def _match(stored, racks):
     # MorphMacro per macro both the snapshot and the Set's rack have, and the missing count.
+    if is_bound(stored):
+        return (), 0
     current = dict(zip(keys(racks), racks))
     macros, missing = [], 0
     for item in stored:

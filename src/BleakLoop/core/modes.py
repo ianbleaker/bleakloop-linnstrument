@@ -99,6 +99,14 @@ class FaderBinding:
 
 
 @dataclass(frozen=True)
+class BoundSlot:
+    # A snapshot slot bound to parameters, without values: a slide moves them from wherever
+    # they are. params holds a FaderBinding locator per parameter; a rack macro's is matched by
+    # its index alone.
+    params: tuple
+
+
+@dataclass(frozen=True)
 class FxRack:
     # One rack's macros in a stored snapshot, keyed as fx.keys gives them.
     track: str
@@ -207,9 +215,9 @@ class State:
     came_from: Origin = Origin.SESSION  # where Linnstrument Mode's Back returns to
     fx: bool = False
     fx_length: int | None = None  # bars of the held FX length pad
-    # Per global slot (bank * FX_SLOTS + slot): tuple of FxRack, None when empty.
+    # Per global slot (bank * FX_SLOTS + slot): a Set-wide tuple of FxRack, a BoundSlot, or
+    # None when empty.
     fx_slots: tuple = (None,) * FX_SNAPSHOTS
-    fx_scoped: frozenset = frozenset()  # the global slots holding one rack's snapshot, not the Set's
     fx_bank: int = 0  # the snapshot bank the slot pads show, 0-based; never saved
     morph: Morph | None = None  # runs in every mode
     fx_holds: tuple = ()  # SlotHold per row holding a stored slot

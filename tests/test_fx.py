@@ -28,7 +28,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     TrackView,
 )
-from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
+from BleakLoop.core.modes import BoundSlot, FaderBinding, FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
 from BleakLoop.core.values import FX_TOUCH_TOLERANCE, X_COLUMN_WIDTH
 
 
@@ -70,62 +70,93 @@ def _v1(slots, **more):
     return json.dumps({"v": 1, "slots": slots, **more})
 
 
+BOUND = BoundSlot(
+    (
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),
+        FaderBinding("Main", 0, None, 0, 0, "Track Volume"),
+    )
+)
+BOUND_JSON = {
+    "bound": [
+        {"track": "Bass", "tn": 0, "device": "Auto Filter", "dn": 0, "param": 1, "name": "Frequency"},
+        {"track": "Main", "tn": 0, "device": None, "dn": 0, "param": 0, "name": "Track Volume"},
+    ]
+}
+
+
 def test_dump_parse_round_trip():
     slots = (None,) * 2 + ((FxRack("A", "R", 0, (0.5, 1.0)), FxRack("A", "R", 1, ())),)
-    slots += (None,) * 100 + (ONE,) + (None,) * 24
-    text = fx.dump(slots, frozenset())
+    slots += (None,) * 100 + (ONE,) + (BOUND,) + (None,) * 23
+    text = fx.dump(slots)
     assert json.loads(text)["v"] == 2
-    assert fx.parse(text) == (slots, frozenset())
+    assert json.loads(text)["slots"][104] == BOUND_JSON
+    assert fx.parse(text) == slots
     assert fx.readable(text)
-
-
-def test_scoped_round_trip():
-    slots = (ONE, None, ONE) + (None,) * 120 + (ONE,) + (None,) * 4
-    text = fx.dump(slots, frozenset({2, 123}))
-    assert json.loads(text)["scoped"] == [2, 123]
-    assert fx.parse(text) == (slots, frozenset({2, 123}))
 
 
 def test_a_v1_store_loads_as_bank_1():
     text = _v1([V1_RACK] + [None] * 14 + [V1_RACK])
-    assert fx.parse(text) == ((ONE,) + (None,) * 14 + (ONE,) + (None,) * 112, frozenset())
+    assert fx.parse(text) == (ONE,) + (None,) * 14 + (ONE,) + (None,) * 112
     assert fx.readable(text)
 
 
-def test_a_v1_store_keeps_its_scoped_slots():
-    text = _v1([None, V1_RACK] + [None] * 14, scoped=[1])
-    assert fx.parse(text)[1] == frozenset({1})
+def test_a_scoped_slot_converts_to_a_bound_slot_of_its_racks_macros():
+    rack = [{"track": "Drums", "rack": "FX", "n": 1, "macros": [0.5, 0.25]}]
+    text = _v1([None, rack] + [None] * 14, scoped=[1])
+    expected = BoundSlot(
+        (
+            FaderBinding("Drums", 0, "FX", 1, 1, "Macro 1"),
+            FaderBinding("Drums", 0, "FX", 1, 2, "Macro 2"),
+        )
+    )
+    assert fx.parse(text)[1] == expected
+    assert json.loads(fx.dump(fx.parse(text)))["slots"][1]["bound"][1]["param"] == 2
 
 
-def test_a_v1_store_saves_as_v2():
-    slots, scoped = fx.parse(_v1([V1_RACK] + [None] * 15))
-    data = json.loads(fx.dump(slots, scoped))
-    assert data["v"] == 2 and len(data["slots"]) == 128 and data["slots"][0] == V1_RACK
+def test_a_v1_store_saves_as_v2_without_scoped():
+    slots = fx.parse(_v1([V1_RACK] + [None] * 15, scoped=[0]))
+    data = json.loads(fx.dump(slots))
+    assert data["v"] == 2 and len(data["slots"]) == 128 and "scoped" not in data
+    assert "bound" in data["slots"][0]
+
+
+@pytest.mark.parametrize("scoped", ['"x"', "null", "{}", '[1, "0", true, -1, 128, 0.0]', "[3]"])
+def test_bad_scoped_entries_are_ignored(scoped):
+    slots = "[" + json.dumps(V1_RACK) + ",null" * 127 + "]"
+    assert fx.parse(f'{{"v": 2, "slots": {slots}, "scoped": {scoped}}}')[0] == ONE
+
+
+def test_a_v1_scoped_entry_past_bank_1_is_ignored():
+    text = _v1([V1_RACK] + [None] * 15, scoped=[16])
+    assert fx.parse(text)[0] == ONE
 
 
 @pytest.mark.parametrize(
-    "scoped", ['"x"', "null", "{}", '[1, "0", true, -1, 128, 0.0, 0]', "[3]"]
+    "entry",
+    [
+        "x",
+        {"track": "A", "tn": 0, "device": "D", "dn": 0, "param": 1},
+        {"track": 1, "tn": 0, "device": "D", "dn": 0, "param": 1, "name": "P"},
+        {"track": "A", "tn": -1, "device": "D", "dn": 0, "param": 1, "name": "P"},
+        {"track": "A", "tn": 0, "device": 3, "dn": 0, "param": 1, "name": "P"},
+        {"track": "A", "tn": 0, "device": "D", "dn": True, "param": 1, "name": "P"},
+    ],
 )
-def test_bad_scoped_entries_are_dropped(scoped):
-    # Only 0 is a stored slot: anything else, or a non-list, leaves every slot Set-wide.
-    slots = "[" + json.dumps(V1_RACK) + ",null" * 127 + "]"
-    expected = frozenset({0}) if scoped.endswith(", 0]") else frozenset()
-    assert fx.parse(f'{{"v": 2, "slots": {slots}, "scoped": {scoped}}}')[1] == expected
-
-
-def test_a_v1_scoped_entry_past_bank_1_is_dropped():
-    text = _v1([V1_RACK] + [None] * 15, scoped=[0, 16])
-    assert fx.parse(text)[1] == frozenset({0})
+def test_bad_bound_entries_are_dropped(entry):
+    good = BOUND_JSON["bound"][0]
+    text = json.dumps({"v": 2, "slots": [{"bound": [entry, good]}, {"bound": [entry]}] + [None] * 126})
+    slots = fx.parse(text)
+    assert slots[0] == BoundSlot((BOUND.params[0],)) and slots[1] is None
 
 
 def test_an_all_empty_store_round_trips():
-    text = fx.dump(EMPTY_SLOTS, frozenset())
-    assert fx.dump(*fx.parse(text)) == text
+    text = fx.dump(EMPTY_SLOTS)
+    assert fx.dump(fx.parse(text)) == text
 
 
 def test_dump_format():
     slots = (ONE,) + (None,) * 127
-    assert json.loads(fx.dump(slots, frozenset())) == {"v": 2, "slots": [V1_RACK] + [None] * 127}
+    assert json.loads(fx.dump(slots)) == {"v": 2, "slots": [V1_RACK] + [None] * 127}
 
 
 @pytest.mark.parametrize(
@@ -148,7 +179,7 @@ def test_dump_format():
     ],
 )
 def test_invalid_store_gives_empty_slots(text):
-    assert fx.parse(text) == (EMPTY_SLOTS, frozenset())
+    assert fx.parse(text) == EMPTY_SLOTS
     assert not fx.readable(text)
 
 
@@ -305,20 +336,7 @@ def test_delete_clears_a_full_slot():
     state = with_slot(replace(FX, delete=True), 2)
     state, actions = handle(state, SLOT_3)
     assert state.fx_slots == EMPTY_SLOTS
-    assert actions == [SaveFxSnapshots(fx.dump(EMPTY_SLOTS, frozenset())), ShowMessage("Snapshot 3 cleared")]
-
-
-def test_delete_unscopes_a_scoped_slot():
-    state = replace(with_slot(replace(FX, delete=True), 2), fx_scoped=frozenset({2, 5}))
-    state, actions = handle(state, SLOT_3)
-    assert state.fx_scoped == frozenset({5})
-    assert actions[0] == SaveFxSnapshots(fx.dump(EMPTY_SLOTS, frozenset({5})))
-
-
-def test_a_set_wide_store_unscopes_the_slot():
-    state = replace(with_slot(FX, 2), fx_scoped=frozenset({2}))
-    state, _ = racks_read(state, 2, (rack("A", "R", 1.0, path=P0),))
-    assert state.fx_scoped == frozenset()
+    assert actions == [SaveFxSnapshots(fx.dump(EMPTY_SLOTS)), ShowMessage("Snapshot 3 cleared")]
 
 
 def test_delete_on_an_empty_slot_does_nothing():
@@ -401,7 +419,7 @@ def test_store(state):
     state, actions = racks_read(state, 2, racks)
     slots = (None, None, fx.capture(racks)) + (None,) * 125
     assert state.fx_slots == slots
-    assert actions == [SaveFxSnapshots(fx.dump(slots, frozenset())), ShowMessage("Snapshot 3 stored (2 racks)")]
+    assert actions == [SaveFxSnapshots(fx.dump(slots)), ShowMessage("Snapshot 3 stored (2 racks)")]
 
 
 STORED_AB = (FxRack("A", "R", 0, (10.0, 20.0)), FxRack("B", "R", 0, (30.0,)))
@@ -500,58 +518,15 @@ def test_recall_jumps_while_stopped_with_a_length():
     assert state.fx_landed == 4
 
 
-# Scoped snapshots: stored as one rack, they act on that rack alone.
-
-SCOPED_B = (FxRack("B", "R", 0, (30.0,)),)
-
-
-def scoped(state):
-    return replace(with_slot(state, 4, SCOPED_B), fx_scoped=frozenset({4}))
+def test_delete_clears_a_bound_slot():
+    state, actions = handle(replace(with_slot(FX, 4, BOUND), delete=True), layout.FX.slots[4])
+    assert state.fx_slots[4] is None
+    assert actions == [SaveFxSnapshots(fx.dump(EMPTY_SLOTS)), ShowMessage("Snapshot 5 cleared")]
 
 
-def test_a_scoped_recall_writes_its_rack_only():
-    _, actions = racks_read(scoped(FX), 4, NOW_AB, recall=True)
-    assert actions[1] == SetMacros((((P1, "R", 0), 30.0),))
-    assert actions[-1] == ShowMessage("Snapshot 5 recalled")
-
-
-def test_a_scoped_recall_leaves_the_last_landed_blink():
-    state = replace(scoped(FX), fx_landed=1)
-    state, _ = racks_read(state, 4, NOW_AB, recall=True)
-    assert state.fx_landed == 1
-    assert fx.render(state, SNAP)[layout.FX.slots[4]] == Light(PINK)
-
-
-def test_a_scoped_morph_landing_leaves_the_last_landed_blink():
-    state = replace(scoped(FX), fx_landed_scene=2)
-    state, _ = racks_read(state, 4, NOW_AB, recall=True, bars=1, snapshot=playing(1.0))
-    assert state.morph is not None
-    state, _, _ = tick(state, 8.0, (0.0,))
-    assert state.morph is None
-    assert (state.fx_landed, state.fx_landed_scene) == (None, 2)
-
-
-def test_a_scoped_morph_moves_its_rack_only():
-    state, _ = racks_read(scoped(FX), 4, NOW_AB, recall=True, bars=4, snapshot=playing(1.0))
-    assert [(m.key[0], m.key[2]) for m in state.morph.macros] == [(P1, 0)]
-
-
-def test_a_scoped_recall_with_its_rack_gone():
-    racks = (rack("A", "R", 0.0, 0.0, path=P0),)
-    state = scoped(FX)
-    assert racks_read(state, 4, racks, recall=True) == (
-        state,
-        [ShowMessage("Snapshot 5: nothing to recall, 1 rack not found")],
-    )
-
-
-def test_delete_clears_a_scoped_slot():
-    state, actions = handle(replace(scoped(FX), delete=True), layout.FX.slots[4])
-    assert state.fx_slots[4] is None and state.fx_scoped == frozenset()
-    assert actions == [
-        SaveFxSnapshots(fx.dump(EMPTY_SLOTS, frozenset())),
-        ShowMessage("Snapshot 5 cleared"),
-    ]
+def test_a_set_wide_store_over_a_bound_slot_replaces_it():
+    state, _ = racks_read(with_slot(FX, 2, BOUND), 2, (rack("A", "R", 1.0, path=P0),))
+    assert state.fx_slots[2] == (FxRack("A", "R", 0, (1.0,)),)
 
 
 def test_recall_clamps_targets():
@@ -1334,7 +1309,8 @@ def test_a_held_slot_before_it_slides_shows_no_meter():
 
 
 def test_a_scoped_slots_meter_is_pink():
-    state = held(replace(holding_read(), fx_scoped=frozenset({2})), x0=0, slid=True, f=0.3, order=1)
+    state = held(holding_read(), x0=0, slid=True, f=0.3, order=1)
+    state = with_slot(state, 2, BOUND)
     assert fx.render_meters(state)[(12, ROW)] == Light(PINK)
 
 
@@ -1372,8 +1348,8 @@ def test_render_slots_and_lengths():
 
 
 def test_render_scoped_slots_pink():
-    state = with_slot(with_slot(with_slot(FX, 0), 9), 5)
-    state = replace(state, fx_scoped=frozenset({0, 5, 9}), fx_landed=9, morph=Morph(5, 0.0, 16.0, 0.0))
+    state = with_slot(with_slot(with_slot(FX, 0, BOUND), 9, BOUND), 5, BOUND)
+    state = replace(state, fx_landed=9, morph=Morph(5, 0.0, 16.0, 0.0))
     frame = fx.render(state, SNAP)
     assert frame[layout.FX.slots[0]] == Light(PINK)
     assert frame[layout.FX.slots[9]] == Light(PINK, Blink.TEMPO)
@@ -1975,7 +1951,7 @@ def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
     assert handle(copying, SLOT_3)[1] == [StoreFxSnapshot(2)]
     deleting, _ = handle(state, layout.NAVIGATION.delete)
     assert handle(deleting, SLOT_3)[1] == [
-        SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None), frozenset())),
+        SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None))),
         ShowMessage("Snapshot 3 cleared"),
     ]
 
@@ -2014,12 +1990,12 @@ def test_a_scoped_store_holds_the_selected_rack_only():
     racks = (rack("A", "R", 1.0, path=P0), rack("A", "R", 2.0, path=P1), rack("B", "S", 3.0))
     state, actions = scoped_read(FX, 2, racks, P1)
     # Keyed over every rack: the second "A"/"R" is n = 1.
-    stored = (FxRack("A", "R", 1, (2.0,)),)
+    stored = fx.bind_racks((FxRack("A", "R", 1, (2.0,)),))
+    assert stored == BoundSlot((FaderBinding("A", 0, "R", 1, 1, "Macro 1"),))
     assert state.fx_slots[2] == stored
-    assert state.fx_scoped == frozenset({2})
     slots = fx._put(FX.fx_slots, 2, stored)
     assert actions == [
-        SaveFxSnapshots(fx.dump(slots, frozenset({2}))),
+        SaveFxSnapshots(fx.dump(slots)),
         ShowMessage("Snapshot 3 stored (R)"),
     ]
 
