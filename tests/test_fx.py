@@ -32,7 +32,7 @@ from BleakLoop.core.model import (
     TrackView,
 )
 from BleakLoop.core.modes import BindHold, BoundRead, BoundSlot, FaderBinding, FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
-from BleakLoop.core.values import FX_TOUCH_TOLERANCE, X_COLUMN_WIDTH
+from BleakLoop.core.values import FX_TOUCH_TOLERANCE, STATUS_MAX, X_COLUMN_WIDTH
 
 
 def rack(track, name, *values, path=("track", 0, 0)):
@@ -1496,6 +1496,40 @@ def test_rows_answer_with_the_same_toggle():
     state, _ = bound_answer(bind_holding())
     state, actions = bound_answer(state)
     assert state.fx_slots[2] is None
+
+
+# Messages: long parameter lists (C5)
+
+
+def say_as_is(text):
+    return [ShowMessage(text)]
+
+
+def test_a_list_that_fits_is_whole():
+    assert fx.listed(["a", "b"], say_as_is) == [ShowMessage("a, b")]
+
+
+def test_a_list_past_the_limit_ends_with_the_count_left():
+    items = ["x" * 30, "y" * 30, "z" * 30]
+    assert fx.listed(items, say_as_is) == [ShowMessage("x" * 30 + ", " + "y" * 30 + ", +1")]
+
+
+def test_a_message_exactly_at_the_limit_is_whole():
+    items = ["x" * 39, "y" * 39]
+    assert len("x" * 39 + ", " + "y" * 39) == STATUS_MAX
+    assert fx.listed(items, say_as_is) == [ShowMessage("x" * 39 + ", " + "y" * 39)]
+
+
+def test_one_item_too_long_still_shows():
+    assert fx.listed(["x" * 100, "y"], say_as_is) == [ShowMessage("x" * 100 + ", +1")]
+
+
+def test_a_bind_message_shortens():
+    params = tuple(FaderBinding("Bass", 0, f"Device {i}", 0, 1, "Frequency") for i in range(6))
+    state = with_slot(FX, 2, BoundSlot(params[:5]))
+    _, actions = bound_answer(state, binding=params[5])
+    text = actions[-1].text
+    assert text.startswith("Snapshot 3: Device 0 Frequency") and text.endswith(", +3") and len(text) <= STATUS_MAX
 
 
 # Held slots: the meter (B7)

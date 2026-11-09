@@ -19,7 +19,7 @@ from .model import (
     StoreFxSnapshot,
 )
 from .modes import BindHold, BoundRead, BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
-from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, X_COLUMN_WIDTH
+from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, STATUS_MAX, X_COLUMN_WIDTH
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
 SLIDE_COLUMNS = 4
@@ -376,8 +376,18 @@ def bind(state, slot, locator):
         return state, [save, *buttons.say("slots", "removed", name=name, param=describe(same[0]))]
     bound_slot = BoundSlot(params + (locator,))
     state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
-    listed = ", ".join(describe(p) for p in bound_slot.params)
-    return state, [save, *buttons.say("slots", "bound", name=name, params=listed)]
+    items = [describe(p) for p in bound_slot.params]
+    return state, [save, *listed(items, lambda text: buttons.say("slots", "bound", name=name, params=text))]
+
+
+def listed(items, say):
+    # say(text) with as many items as fit in STATUS_MAX characters, then "+N" for the rest.
+    for keep in range(len(items), 0, -1):
+        text = ", ".join(items[:keep]) + (f", +{len(items) - keep}" if keep < len(items) else "")
+        message = say(text)
+        if not message or len(message[0].text) <= STATUS_MAX:
+            return message
+    return message
 
 
 def _same(a, b):
@@ -564,8 +574,10 @@ def _tap(state, hold):
         return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
     if hold.bound:
         # Nothing to recall: the tap names the parameters and their values.
-        params = ", ".join(f"{p.name} {_number(p.start)}" for p in hold.read)
-        return state, buttons.say("slots", "named", name=name, params=params, note=hold.note)
+        items = [f"{p.name} {_number(p.start)}" for p in hold.read]
+        return state, listed(
+            items, lambda text: buttons.say("slots", "named", name=name, params=text, note=hold.note)
+        )
     state, actions = _recall_now(state, hold.read)
     state = _landed(state, hold.slot, False)
     return state, actions + buttons.say("slots", "recalled", name=name, note=hold.note)
@@ -679,9 +691,11 @@ def _end_slide(state, hold):
     percent = round(hold.f * 100)
     name = _name(hold.slot, False)
     if hold.bound:
-        params = ", ".join(p.name for p in hold.read or ())
-        message = buttons.say(
-            "slots", "slid_bound", name=name, percent=percent, params=params, note=hold.note
+        message = listed(
+            [p.name for p in hold.read or ()],
+            lambda text: buttons.say(
+                "slots", "slid_bound", name=name, percent=percent, params=text, note=hold.note
+            ),
         )
     else:
         message = buttons.say("slots", "slid", name=name, percent=percent, note=hold.note)
