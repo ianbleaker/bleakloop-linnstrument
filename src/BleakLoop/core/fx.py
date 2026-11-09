@@ -378,8 +378,14 @@ def bind(state, slot, locator):
     state = _remember(state, slot, locator, True)
     bound_slot = BoundSlot(params + (locator,))
     state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
-    items = [describe(p) for p in bound_slot.params]
+    items = labels([(p.device or p.track, p.name) for p in bound_slot.params])
     return state, [save, *listed(items, lambda text: buttons.say("slots", "bound", name=name, params=text))]
+
+
+def labels(params):
+    # Each (owner, name) as the parameter's name, or "Owner Name" where two share a name.
+    names = [name for _, name in params]
+    return [f"{owner} {name}" if names.count(name) > 1 else name for owner, name in params]
 
 
 def listed(items, say):
@@ -615,7 +621,8 @@ def _tap(state, hold):
         return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
     if hold.bound:
         # Nothing to recall: the tap names the parameters and their values.
-        items = [f"{p.name} {p.text or _number(p.start)}" for p in hold.read]
+        names = labels([(p.owner, p.name) for p in hold.read])
+        items = [f"{label} {p.text or _number(p.start)}" for label, p in zip(names, hold.read)]
         return state, listed(
             items, lambda text: buttons.say("slots", "named", name=name, params=text, note=hold.note)
         )
@@ -732,7 +739,7 @@ def _end_slide(state, hold):
     name = _name(hold.slot, False)
     if hold.bound:
         message = listed(
-            [p.name for p in hold.read or ()],
+            labels([(p.owner, p.name) for p in hold.read or ()]),
             lambda text: buttons.say(
                 "slots", "slid_bound", name=name, percent=percent, params=text, note=hold.note
             ),

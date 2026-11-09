@@ -1436,7 +1436,7 @@ def test_shift_and_a_stored_slot_never_recalls_or_slides():
 def test_a_bind_adds_to_an_empty_slot_and_names_it():
     state, actions = bound_answer(FX)
     assert state.fx_slots[2] == BoundSlot((FREQ,))
-    assert actions == [SaveFxSnapshots(fx.dump(state.fx_slots)), ShowMessage("Snapshot 3: Auto Filter Frequency")]
+    assert actions == [SaveFxSnapshots(fx.dump(state.fx_slots)), ShowMessage("Snapshot 3: Frequency")]
 
 
 def test_a_second_bind_adds_and_names_both():
@@ -1520,26 +1520,31 @@ def test_a_list_that_fits_is_whole():
 
 
 def test_a_list_past_the_limit_ends_with_the_count_left():
-    items = ["x" * 30, "y" * 30, "z" * 30]
-    assert fx.listed(items, say_as_is) == [ShowMessage("x" * 30 + ", " + "y" * 30 + ", +1")]
+    items = ["x" * 70, "y" * 70, "z" * 70]
+    assert fx.listed(items, say_as_is) == [ShowMessage("x" * 70 + ", " + "y" * 70 + ", +1")]
 
 
 def test_a_message_exactly_at_the_limit_is_whole():
-    items = ["x" * 39, "y" * 39]
-    assert len("x" * 39 + ", " + "y" * 39) == STATUS_MAX
-    assert fx.listed(items, say_as_is) == [ShowMessage("x" * 39 + ", " + "y" * 39)]
+    items = ["x" * 79, "y" * 79]
+    assert len("x" * 79 + ", " + "y" * 79) == STATUS_MAX
+    assert fx.listed(items, say_as_is) == [ShowMessage("x" * 79 + ", " + "y" * 79)]
 
 
 def test_one_item_too_long_still_shows():
-    assert fx.listed(["x" * 100, "y"], say_as_is) == [ShowMessage("x" * 100 + ", +1")]
+    assert fx.listed(["x" * 200, "y"], say_as_is) == [ShowMessage("x" * 200 + ", +1")]
 
 
 def test_a_bind_message_shortens():
-    params = tuple(FaderBinding("Bass", 0, f"Device {i}", 0, 1, "Frequency") for i in range(6))
-    state = with_slot(FX, 2, BoundSlot(params[:5]))
-    _, actions = bound_answer(state, binding=params[5])
+    params = tuple(FaderBinding("Bass", 0, f"Device {i}", 0, 1, "Frequency") for i in range(12))
+    state = with_slot(FX, 2, BoundSlot(params[:11]))
+    _, actions = bound_answer(state, binding=params[11])
     text = actions[-1].text
-    assert text.startswith("Snapshot 3: Device 0 Frequency") and text.endswith(", +3") and len(text) <= STATUS_MAX
+    assert text.startswith("Snapshot 3: Device 0 Frequency") and text.endswith(", +5") and len(text) <= STATUS_MAX
+
+
+def test_labels_name_the_owner_only_where_two_share_a_name():
+    params = [("Auto Filter", "Frequency"), ("Bass", "Volume"), ("EQ", "Frequency")]
+    assert fx.labels(params) == ["Auto Filter Frequency", "Volume", "EQ Frequency"]
 
 
 # Binding: the Undo pad (C6)
@@ -1627,6 +1632,18 @@ def test_a_bound_tap_shows_lives_text_for_the_value():
     state, _ = bound_read(state, (replace(FREQ_READ, text="1.20 kHz"),))
     _, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz")]
+
+
+def test_a_bound_tap_and_lift_name_the_device_where_two_share_a_name():
+    eq = replace(FREQ_READ, key=FaderBinding("Bass", 0, "EQ", 0, 1, "Frequency"), owner="EQ")
+    reads = (replace(FREQ_READ, owner="Auto Filter"), eq, replace(SWITCH_READ, owner="R"))
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, reads)
+    _, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: Auto Filter Frequency 100, EQ Frequency 100, On 0")]
+    state, _, _ = x(bound_sliding(reads), 11, at(2))
+    _, actions = lift(state, (11, ROW))
+    assert actions[-1] == ShowMessage("Snapshot 3 at 50%: Auto Filter Frequency, EQ Frequency, On")
 
 
 # Held slots: the meter (B7)

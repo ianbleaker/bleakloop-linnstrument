@@ -117,6 +117,7 @@ class BoundRead:
     high: float
     quantized: bool
     text: str = ""  # Live's display of the value at the press, such as "1.20 kHz"
+    owner: str = ""  # its device's name, or its track's for a mixer parameter
 
     @property
     def span(self):
