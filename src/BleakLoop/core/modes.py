@@ -267,6 +267,7 @@ class State:
     fx_landed: int | None = None  # the global slot of the last recall that landed
     fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty
     fx_landed_scene: int | None = None  # the scene of the last recall that landed
+    fx_copy_source: tuple | None = None  # (slot, scene) of the snapshot Copy picked
     fader_touches: tuple = ()  # FaderTouch per touched fader row
     fader_undo_open: bool = False  # a fader gesture's undo step is open in Live
     device_clip: bool = False  # Device/Clip is held
@@ -321,6 +322,7 @@ def enter(state, mode):
         copy=False,
         delete=False,
         copy_source=None,
+        fx_copy_source=None,
         stop=False,
         touches=(),
         lifts=(),

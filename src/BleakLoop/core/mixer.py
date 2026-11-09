@@ -71,7 +71,7 @@ def toggle(state):
     state, actions = faders.reset(state)
     if not state.mixer:
         # FX and Mixer Mode replace each other.
-        state = replace(state, mixer=True, copy_source=None, fx=False, fx_length=None)
+        state = replace(state, mixer=True, copy_source=None, fx_copy_source=None, fx=False, fx_length=None)
         return state, actions + [SetMixer(True), *buttons.say("mixer", "on")]
     state, more = reset(state)
     state = replace(state, mixer=False, fx_length=None)

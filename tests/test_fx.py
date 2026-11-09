@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, RED, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
     Undo,
     BindFaderRow,
@@ -362,56 +362,55 @@ def test_a_stored_slot_press_holds_it_and_reads_at_once():
     assert actions == [RecallFxSnapshot(2, None, hold=True)]
 
 
-@pytest.mark.parametrize("stored", [False, True])
-def test_copy_stores_into_any_slot(stored):
+SLOT_5 = layout.FX.slots[4]
+
+
+def test_copy_picks_a_stored_slot_as_the_source():
+    state = with_slot(replace(FX, copy=True), 2)
+    state, actions = handle(state, SLOT_3)
+    assert state.fx_copy_source == (2, False)
+    assert actions == [ShowMessage("Copy: pick an empty slot")]
+    assert session.render(state, SNAP)[SLOT_3] == Light(RED, Blink.FAST)
+
+
+def test_copy_on_an_empty_slot_without_a_source_refuses():
     state = replace(FX, copy=True)
-    if stored:
-        state = with_slot(state, 2)
-    assert handle(state, SLOT_3) == (state, [StoreFxSnapshot(2)])
+    assert handle(state, SLOT_3) == (state, [ShowMessage("Copy: pick a snapshot")])
 
 
-RESAVE_FREQ = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
-RESAVE_EQ = FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency")
-RESAVE_SLOT = BoundSlot((RESAVE_FREQ, RESAVE_EQ), (0.6, 0.2))
-
-
-def resave_read(state, params):
-    return engine.handle(state, RacksRead(2, (), False, params=params), SNAP)
-
-
-def test_copy_on_a_bound_slot_reads_its_parameters():
-    state = with_slot(replace(FX, copy=True), 2, RESAVE_SLOT)
-    assert handle(state, SLOT_3) == (state, [StoreFxSnapshot(2, locators=RESAVE_SLOT.params)])
-
-
-def test_a_resave_keeps_the_slot_bound_with_new_values():
-    state = with_slot(FX, 2, RESAVE_SLOT)
-    reads = (
-        BoundRead(RESAVE_FREQ, "Frequency", 90.0, 0.0, 127.0, False, "3.40 kHz", "Auto Filter"),
-        BoundRead(RESAVE_EQ, "Frequency", 10.0, 0.0, 127.0, False, "", "EQ"),
-    )
-    state, actions = resave_read(state, reads)
-    assert state.fx_slots[2] == BoundSlot(RESAVE_SLOT.params, (90.0, 10.0))
+@pytest.mark.parametrize("value", [STORED, BoundSlot((FaderBinding("A", 0, "D", 0, 1, "P"),), (0.5,))])
+def test_copy_pastes_the_source_onto_an_empty_slot(value):
+    state, _ = handle(with_slot(replace(FX, copy=True), 2, value), SLOT_3)
+    state, actions = handle(state, SLOT_5)
+    assert state.fx_slots[4] == value and state.fx_slots[2] == value
+    assert state.fx_copy_source is None
     assert actions == [
         SaveFxSnapshots(fx.dump(state.fx_slots)),
-        ShowMessage("Snapshot 3 punch values: Auto Filter Frequency 3.40 kHz, EQ Frequency 10"),
+        ShowMessage("Snapshot 3 copied to Snapshot 5"),
     ]
 
 
-def test_a_resave_keeps_a_missing_parameters_old_value():
-    state = with_slot(FX, 2, RESAVE_SLOT)
-    read = BoundRead(RESAVE_EQ, "Frequency", 10.0, 0.0, 127.0, False, "", "EQ")
-    state, actions = resave_read(state, (None, read))
-    assert state.fx_slots[2] == BoundSlot(RESAVE_SLOT.params, (0.6, 10.0))
-    assert actions[-1] == ShowMessage("Snapshot 3 punch values: Frequency 10, 1 parameter not found")
+def test_copy_refuses_a_stored_target_and_drops_the_source():
+    state = with_slot(with_slot(replace(FX, copy=True), 2), 4, BoundSlot((FaderBinding("A", 0, "D", 0, 1, "P"),)))
+    state, _ = handle(state, SLOT_3)
+    before = state.fx_slots
+    state, actions = handle(state, SLOT_5)
+    assert actions == [ShowMessage("Target not empty")]
+    assert state.fx_slots == before and state.fx_copy_source is None
 
 
-def test_a_resave_with_nothing_found_refuses():
-    state = with_slot(FX, 2, RESAVE_SLOT)
-    assert resave_read(state, (None, None)) == (
-        state,
-        [ShowMessage("Snapshot 3: nothing to recall, 2 parameters not found")],
-    )
+def test_copy_pastes_across_banks():
+    state, _ = handle(with_slot(replace(FX, copy=True), 2), SLOT_3)
+    state, _ = handle(state, (13, 2))
+    state, actions = handle(state, SLOT_3)
+    assert state.fx_slots[18] == STORED
+    assert actions[-1] == ShowMessage("Snapshot 3 copied to Snapshot 3, bank 2")
+
+
+def test_letting_go_of_copy_drops_the_source():
+    state, _ = handle(with_slot(replace(FX, copy=True), 2), SLOT_3)
+    state, _ = handle(state, layout.NAVIGATION.copy, pressed=False)
+    assert state.fx_copy_source is None and not state.copy
 
 
 def test_delete_clears_a_full_slot():
@@ -462,7 +461,7 @@ def test_slot_release_does_nothing():
 def test_copy_message_in_fx():
     state, actions = handle(FX, layout.NAVIGATION.copy)
     assert state.copy
-    assert actions == [ShowMessage("Copy: press a slot to overwrite")]
+    assert actions == [ShowMessage("Copy: pick a snapshot")]
 
 
 def test_delete_message_in_fx():
@@ -1992,12 +1991,49 @@ def test_stored_scene_pad_recalls_with_held_length():
     )
 
 
-@pytest.mark.parametrize("stored", [False, True])
-def test_copy_stores_over_a_scene_snapshot(stored):
-    state = replace(FX, copy=True)
-    if stored:
-        state = with_scene(state, 1)
-    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [StoreFxSnapshot(1, scene=True)])
+def test_copy_pastes_a_scene_snapshot_onto_an_empty_scene():
+    state, actions = handle(with_scene(replace(FX, copy=True), 1), SCENE_2, snapshot=SCENES)
+    assert state.fx_copy_source == (1, True) and actions == [ShowMessage("Copy: pick an empty slot")]
+    assert session.render(state, SCENES)[SCENE_2] == Light(RED, Blink.FAST)
+    state, actions = handle(state, layout.FX.scene_slots[3], snapshot=SCENES)
+    assert state.fx_scenes[3] == STORED
+    assert actions == [
+        SaveFxScenes(fx.dump_scenes(state.fx_scenes)),
+        ShowMessage("Scene 2 snapshot copied to Scene 4 snapshot"),
+    ]
+
+
+def test_copy_refuses_a_stored_scene_target():
+    state = with_scene(with_scene(replace(FX, copy=True), 1), 3)
+    state, _ = handle(state, SCENE_2, snapshot=SCENES)
+    state, actions = handle(state, layout.FX.scene_slots[3], snapshot=SCENES)
+    assert actions == [ShowMessage("Target not empty")]
+
+
+def test_copy_between_slots_and_scene_snapshots():
+    state, _ = handle(with_slot(replace(FX, copy=True), 2), SLOT_3, snapshot=SCENES)
+    state, _ = handle(state, SCENE_2, snapshot=SCENES)
+    assert state.fx_scenes[1] == STORED
+    state, _ = handle(state, SCENE_2, snapshot=SCENES)
+    state, actions = handle(state, SLOT_5, snapshot=SCENES)
+    assert state.fx_slots[4] == STORED
+    assert actions[-1] == ShowMessage("Scene 2 snapshot copied to Snapshot 5")
+
+
+def test_a_bound_slot_cant_be_pasted_onto_a_scene_snapshot():
+    bound = BoundSlot((FaderBinding("A", 0, "D", 0, 1, "P"),))
+    state, _ = handle(with_slot(replace(FX, copy=True), 2, bound), SLOT_3, snapshot=SCENES)
+    state, actions = handle(state, SCENE_2, snapshot=SCENES)
+    assert actions == [ShowMessage("Scene snapshots can't be bound")]
+    assert state.fx_scenes[1:2] in ((), (None,)) and state.fx_copy_source is None
+
+
+def test_a_picked_scene_snapshot_follows_its_scene():
+    state, _ = handle(with_scene(replace(FX, copy=True), 1), SCENE_2, snapshot=SCENES)
+    moved, _ = fx.scenes_changed(state, ScenesChanged((None, 0, 1), (None, None, None)))
+    assert moved.fx_copy_source == (2, True)
+    gone, _ = fx.scenes_changed(state, ScenesChanged((0,), (None,)))
+    assert gone.fx_copy_source is None
 
 
 def test_delete_clears_a_scene_snapshot():
@@ -2513,11 +2549,12 @@ def test_the_panel_is_fx_modes_columns_10_to_14(state):
 
 
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
-def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
+def test_the_panel_copies_and_clears_with_copy_and_delete(state):
     state = with_slot(state, 2)
     copying, _ = handle(state, layout.NAVIGATION.copy)
     assert copying.copy
-    assert handle(copying, SLOT_3)[1] == [StoreFxSnapshot(2)]
+    picked, _ = handle(copying, SLOT_3)
+    assert handle(picked, SLOT_5)[0].fx_slots[4] == STORED
     deleting, _ = handle(state, layout.NAVIGATION.delete)
     assert handle(deleting, SLOT_3)[1] == [
         SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None))),
@@ -2528,8 +2565,11 @@ def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
 @pytest.mark.parametrize("held", ["copy", "delete"])
 def test_copy_and_delete_come_before_shift(held):
     state = replace(with_slot(FX, 2), shift=True, **{held: True})
-    action = handle(state, SLOT_3)[1][0]
-    assert action == StoreFxSnapshot(2) if held == "copy" else isinstance(action, SaveFxSnapshots)
+    new, actions = handle(state, SLOT_3)
+    if held == "copy":
+        assert new.fx_copy_source == (2, False) and new.fx_bind_hold is None
+    else:
+        assert isinstance(actions[0], SaveFxSnapshots)
 
 
 def test_stop_leaves_the_panel_alone():
@@ -2541,7 +2581,7 @@ def test_mixer_copy_and_delete_only_hold_for_the_panel():
     state = State(mixer=True, mixer_split=True)
     assert handle(state, layout.NAVIGATION.copy) == (state, [])
     copying, actions = handle(MIXER_PANEL, layout.NAVIGATION.copy)
-    assert actions == [ShowMessage("Copy: press a slot to overwrite")]
+    assert actions == [ShowMessage("Copy: pick a snapshot")]
     copying = replace(MIXER_PANEL, copy=True)
     assert handle(copying, (2, layout.MUTE_ROW)) == (copying, [])
 

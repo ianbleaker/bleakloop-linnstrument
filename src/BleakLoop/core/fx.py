@@ -5,7 +5,7 @@ import math
 from dataclasses import replace
 
 from . import buttons, faders, functions, layout, mixer
-from .leds import CYAN, LIME, OFF, ORANGE, PINK, WHITE, Blink, Light
+from .leds import CYAN, LIME, OFF, ORANGE, PINK, RED, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
     BindSelectedParameter,
@@ -227,9 +227,19 @@ def scenes_changed(state, event):
     if pending is not None:
         scene = moved.get(pending.scene)
         pending = None if scene is None else replace(pending, scene=scene)
+    # Copy's picked scene snapshot follows its scene, and goes with it.
+    source = state.fx_copy_source
+    if source is not None and source[1]:
+        scene = moved.get(source[0])
+        source = None if scene is None else (scene, True)
     changed = scenes != _fit(state.fx_scenes, len(scenes))
     state = replace(
-        state, fx_scenes=scenes, morph=morph, fx_landed_scene=landed, pending_launch=pending
+        state,
+        fx_scenes=scenes,
+        morph=morph,
+        fx_landed_scene=landed,
+        pending_launch=pending,
+        fx_copy_source=source,
     )
     return state, [SaveFxScenes(dump_scenes(scenes))] if changed else []
 
@@ -332,7 +342,7 @@ def toggle(state):
         actions += more
         state = replace(state, mixer=False)
         actions.append(SetMixer(False))
-    state = replace(state, fx=True, copy_source=None)
+    state = replace(state, fx=True, copy_source=None, fx_copy_source=None)
     return state, actions + buttons.say("fx", "on")
 
 
@@ -896,7 +906,9 @@ functions.register_hold(
 
 
 def _slot_light(state, slot):
-    # Pink for one rack's snapshot, cyan for the Set's.
+    # Pink for one rack's snapshot, cyan for the Set's; Copy's source blinks red.
+    if state.fx_copy_source == (slot, False):
+        return Light(RED, Blink.FAST)
     colour = PINK if is_bound(state.fx_slots[slot]) else CYAN
     if any(h.slot == slot and h.slid for h in state.fx_holds):
         return Light(colour, Blink.FAST)
@@ -912,6 +924,8 @@ def _scene_slot_light(state, snapshot, row):
     scene = state.window.scene + row
     if scene >= snapshot.scene_count:
         return Light(OFF)
+    if state.fx_copy_source == (scene, True):
+        return Light(RED, Blink.FAST)
     morph = state.morph
     if morph is not None and morph.scene and morph.slot == scene:
         return Light(LIME, Blink.FAST)
@@ -921,12 +935,11 @@ def _scene_slot_light(state, snapshot, row):
 
 
 def _slot_press(state, slot, scene, snapshot):
-    value = _stored(state, slot, scene)
-    stored = value is not None
-    # Copy over Delete, as in Session Mode. Copy on a bound slot re-saves its punch-in values.
-    if state.copy and not scene and is_bound(value):
-        return state, [StoreFxSnapshot(slot, locators=value.params)]
-    if state.copy or (not state.delete and not stored):
+    # Copy over Delete, as in Session Mode.
+    if state.copy:
+        return _copy(state, slot, scene, snapshot)
+    stored = _stored(state, slot, scene) is not None
+    if not state.delete and not stored:
         return state, [StoreFxSnapshot(slot, scene=scene)]
     if state.delete:
         if not stored:
@@ -934,6 +947,29 @@ def _slot_press(state, slot, scene, snapshot):
         state, save = _set(state, slot, scene, None, snapshot.scene_count)
         return state, [save, *buttons.say(_owner(scene), "cleared", name=_name(slot, scene))]
     return state, [RecallFxSnapshot(slot, state.fx_length, scene=scene)]
+
+
+def _copy(state, slot, scene, snapshot):
+    # Copy, as in Session Mode: a stored snapshot is the source, then an empty slot or scene
+    # snapshot the target. Slots and scene snapshots copy both ways, but a scene snapshot can't
+    # be bound.
+    source = state.fx_copy_source
+    value = _stored(state, slot, scene)
+    if source is None:
+        if value is None:
+            return state, buttons.refuse("copy", "empty_snapshot")
+        return replace(state, fx_copy_source=(slot, scene)), buttons.say("copy", "picked_snapshot")
+    dropped = replace(state, fx_copy_source=None)
+    if value is not None:
+        return dropped, buttons.refuse("copy", "target_full")
+    copied = _stored(state, *source)
+    if copied is None:
+        return dropped, []
+    if scene and is_bound(copied):
+        return dropped, buttons.refuse("copy", "bound_scene")
+    dropped, save = _set(dropped, slot, scene, copied, snapshot.scene_count)
+    message = buttons.say("copy", "snapshot_copied", source=_name(*source), target=_name(slot, scene))
+    return dropped, [save, *message]
 
 
 def render(state, snapshot):
@@ -954,8 +990,6 @@ def racks_read(state, event, snapshot):
     if event.hold:
         return _hold_read(state, event, snapshot)
     name, owner = _name(event.slot, event.scene), _owner(event.scene)
-    if not event.recall and event.params:
-        return _resave(state, event)
     if not event.recall:
         if not event.racks:
             return state, buttons.refuse(owner, "no_racks")
@@ -997,30 +1031,6 @@ def racks_read(state, event, snapshot):
     state, actions = _close_steps(state)
     state = replace(state, morph=morph, fx_undo_open=True)
     return state, actions + [BeginUndoStep(), *message]
-
-
-def _resave(state, event):
-    # Copy on a bound slot: each found parameter's value now is its new punch-in value; one not
-    # found keeps its old one. The slot stays bound.
-    stored = state.fx_slots[event.slot]
-    if not is_bound(stored) or len(event.params) != len(stored.params):
-        return state, []
-    name = _name(event.slot, False)
-    found = [p for p in event.params if p is not None]
-    missing = len(event.params) - len(found)
-    note = f", {_count(missing, 'parameter')} not found" if missing else ""
-    if not found:
-        return state, buttons.refuse("slots", "nothing", name=name, note=note)
-    values = tuple(
-        old if read is None else read.start for read, old in zip(event.params, _values(stored))
-    )
-    state, save = _save_slots(state, _put(state.fx_slots, event.slot, _bound_slot(stored.params, values)))
-    names = labels([(p.owner, p.name) for p in found])
-    items = [f"{label} {p.text or _number(p.start)}" for label, p in zip(names, found)]
-    return state, [
-        save,
-        *listed(items, lambda text: buttons.say("slots", "saved", name=name, params=text, note=note)),
-    ]
 
 
 def tick(state, transport, values, triggered=None):

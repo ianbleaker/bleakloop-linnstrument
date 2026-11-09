@@ -437,7 +437,8 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 **Snapshots:**
 
 - A snapshot holds the visible macros of every rack on the Set's tracks, groups, returns and master. Racks inside other racks aren't included.
-- Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it, except a bound (pink) one: that re-saves its punch-in values (see Bound snapshots).
+- Press an empty (dark) slot to store a snapshot. To store over a stored slot, clear it with Delete first.
+- To copy a snapshot, hold Copy, press it (it blinks red), then press an empty slot, in any bank. A stored target refuses with "Target not empty", and Copy + an empty slot with nothing picked says "Copy: pick a snapshot". Slots and scene snapshots copy to each other.
 - Tap a stored (cyan) slot to recall it at once. The recall happens as you lift your finger: until then the slot can't tell a tap from a slide.
 - Hold a Bars pad, then press a stored slot to morph to it. This one starts on the press. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
 - While the transport is stopped, a recall always happens at once.
@@ -479,15 +480,15 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 - A tap changes nothing: the status bar names the slot's parameters, their values now and their punch-in values, such as "Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, Macro 2 0.5" (Macro 2 has no punch-in value). A Bars pad doesn't morph a bound slot. Lists of a slot's parameters give their names only, adding the device's or track's name where two share a name, such as "Auto Filter Frequency, EQ Frequency, Volume". When a list is too long for the status bar it ends with "+N" for the rest.
 - A rack macro is found again by its rack and its number, so renaming or mapping the macro doesn't lose it. Anything else is found by the track's, device's and parameter's names, counting same-named tracks and devices in order; one that can't be found is skipped, with a message.
 - Delete + a bound slot clears it; press the empty slot to store a Set-wide snapshot there.
-- Copy + a bound slot saves its parameters' values now as their punch-in values, and the slot stays bound, such as "Snapshot 3 punch values: Frequency 3.40 kHz". A parameter that can't be found keeps its old value.
+- Copy copies a bound slot to an empty slot, punch-in values included. It can't be pasted onto a scene snapshot.
 - **Undo:** within 10 seconds of a bind, a removal or an update, with nothing else pressed since, the Undo pad (column 1, pad 6) reverses it, newest first, saying "Unbound …" or "Bound … again"; a parameter bound again gets its punch-in value back, and an updated one its old value. Each reversal gives you another 10 seconds. After that, or once you've pressed anything else, the pad is Live's Undo again. Live's own Undo (Cmd-Z) never touches binds. Shift doesn't end the window, but let go of it first: Shift + Undo is Redo.
-- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values. They, and slots bound before punch-in values existed, have no punch-in values until you Copy onto them.
+- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values. They, and slots bound before punch-in values existed, have no punch-in values until you bind each parameter again.
 - Scene snapshots can't be bound.
 
 **Scene snapshots** (column 14, pads 1–6):
 
 - Each scene can hold one snapshot. Pad N is the snapshot of the scene on column 15's pad N, so the column scrolls with the window. Pads past the last scene, and pads 7 and 8, are dark.
-- Store, recall, morph with a Bars pad, store over with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
+- Store, recall, morph with a Bars pad, copy with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
 - A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not. A bound slot never does.
 - Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. With a Bars pad held, it lands as the timed launch below starts the scene.
 - Shift + a scene (legato) doesn't fire the snapshot, and neither do launches from Live's mouse or another controller. A scene without a snapshot leaves the macros, and any running morph, alone.
