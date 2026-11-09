@@ -116,6 +116,7 @@ class BoundRead:
     low: float
     high: float
     quantized: bool
+    text: str = ""  # Live's display of the value at the press, such as "1.20 kHz"
 
     @property
     def span(self):

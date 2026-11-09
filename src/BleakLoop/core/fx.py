@@ -616,7 +616,7 @@ def _tap(state, hold):
         return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
     if hold.bound:
         # Nothing to recall: the tap names the parameters and their values.
-        items = [f"{p.name} {_number(p.start)}" for p in hold.read]
+        items = [f"{p.name} {p.text or _number(p.start)}" for p in hold.read]
         return state, listed(
             items, lambda text: buttons.say("slots", "named", name=name, params=text, note=hold.note)
         )

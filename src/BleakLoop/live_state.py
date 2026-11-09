@@ -459,9 +459,18 @@ def read_bound(song, locators):
                 parameter.min,
                 parameter.max,
                 parameter.is_quantized,
+                _display(parameter),
             )
         )
     return tuple(result)
+
+
+def _display(parameter):
+    # Live's text for the value, or "" when it has none.
+    try:
+        return str(parameter.str_for_value(parameter.value))
+    except Exception:
+        return ""
 
 
 def read_slide_values(song, params):
