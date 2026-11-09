@@ -232,7 +232,8 @@ value = 1
 label = "Device+"
 
 
-# FX Mode: value is the snapshot slot, the scene in the window, or the morph length in bars.
+# FX Mode: value is the snapshot slot, the bank, the scene in the window, or the morph length
+# in bars.
 
 [fx.slot_1]
 pad = [11, 1]
@@ -314,68 +315,116 @@ pad = [12, 8]
 does = "slots"
 value = 16
 
-[fx.scene_slot_1]
+[fx.bank_1]
 pad = [13, 1]
+does = "banks"
+value = 1
+label = "Bank 1"
+
+[fx.bank_2]
+pad = [13, 2]
+does = "banks"
+value = 2
+label = "Bank 2"
+
+[fx.bank_3]
+pad = [13, 3]
+does = "banks"
+value = 3
+label = "Bank 3"
+
+[fx.bank_4]
+pad = [13, 4]
+does = "banks"
+value = 4
+label = "Bank 4"
+
+[fx.bank_5]
+pad = [13, 5]
+does = "banks"
+value = 5
+label = "Bank 5"
+
+[fx.bank_6]
+pad = [13, 6]
+does = "banks"
+value = 6
+label = "Bank 6"
+
+[fx.bank_7]
+pad = [13, 7]
+does = "banks"
+value = 7
+label = "Bank 7"
+
+[fx.bank_8]
+pad = [13, 8]
+does = "banks"
+value = 8
+label = "Bank 8"
+
+[fx.scene_slot_1]
+pad = [14, 1]
 does = "scene_slots"
 value = 1
 label = "Scene 1"
 
 [fx.scene_slot_2]
-pad = [13, 2]
+pad = [14, 2]
 does = "scene_slots"
 value = 2
 label = "Scene 2"
 
 [fx.scene_slot_3]
-pad = [13, 3]
+pad = [14, 3]
 does = "scene_slots"
 value = 3
 label = "Scene 3"
 
 [fx.scene_slot_4]
-pad = [13, 4]
+pad = [14, 4]
 does = "scene_slots"
 value = 4
 label = "Scene 4"
 
 [fx.scene_slot_5]
-pad = [13, 5]
+pad = [14, 5]
 does = "scene_slots"
 value = 5
 label = "Scene 5"
 
 [fx.scene_slot_6]
-pad = [13, 6]
+pad = [14, 6]
 does = "scene_slots"
 value = 6
 label = "Scene 6"
 
 [fx.bars_1]
-pad = [14, 1]
+pad = [10, 1]
 does = "bars"
 value = 1
 label = "1 bar"
 
 [fx.bars_2]
-pad = [14, 2]
+pad = [10, 2]
 does = "bars"
 value = 2
 label = "2 bars"
 
 [fx.bars_4]
-pad = [14, 3]
+pad = [10, 3]
 does = "bars"
 value = 4
 label = "4 bars"
 
 [fx.bars_8]
-pad = [14, 4]
+pad = [10, 4]
 does = "bars"
 value = 8
 label = "8 bars"
 
 [fx.bars_16]
-pad = [14, 5]
+pad = [10, 5]
 does = "bars"
 value = 16
 label = "16 bars"
@@ -511,8 +560,13 @@ pad = [13, 8]
 does = "pages"
 value = 16
 
-# Messages not tied to a button: the device setup, the track and device names Device/Clip's
-# steps show, and Mapped FX's binding.
+# Snapshot slides. switch_at: how far through a slide (above 0, up to 1) an on/off or chooser
+# parameter switches to the slot's value; continuous ones blend all the way.
+[morph]
+switch_at = 0.5
+
+# Messages not tied to a button: the device setup, and the track and device names Device/Clip's
+# steps show.
 [system]
 refuse_duplicates = "Row Offset repeats notes in the Global column: controls off"
 refuse_row_offset = "Couldn't read Row Offset: controls off"
@@ -525,10 +579,6 @@ track = "{track}"
 no_more_tracks = "No more tracks"
 device = "{device}"
 no_more_devices = "No more devices"
-bound = "Fader {fader}: {owner} {parameter}"
-bind_select = "Click a parameter in Live first"
-bind_macro = "Map it to a macro instead"
-bind_refused = "Can't bind this parameter"
 
 
 # Functions: each one's label, at most 7 characters, its message, and its outcomes and
@@ -655,11 +705,10 @@ message = "Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_sce
 manual = "Move the Ableton session ring in the selected direction."
 
 [functions.fader_source]
-label = "Source"
-manual = "Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode. In Session and Mixer Mode, the split view's snapshots come third."
+label = "Panel"
+manual = "Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX or Sequencer Mode."
 [functions.fader_source.outcomes]
 device = "Faders: Device FX"
-mapped = "Faders: Mapped FX"
 snapshots = "Faders: FX snapshots"
 
 [functions.session]
@@ -855,11 +904,24 @@ cleared = "{name} cleared"
 stored = "{name} stored ({racks})"
 recalled = "{name} recalled{note}"
 morphing = "{name} {timing}{note}"
-stored_scoped = "{name} stored ({rack})"
+bound = "{name}: {params}"
+removed = "Removed {param} from {name}"
+unbound = "Unbound {param} from {name}"
+rebound = "Bound {param} to {name} again"
+slid = "{name} at {percent}%{note}"
+slid_bound = "{name} at {percent}%: {params}{note}"
+named = "{name}: {params}{note}"
 [functions.slots.refusals]
 no_racks = "No racks to store"
-no_rack = "Select a rack to store {name}"
+no_parameter = "Click a parameter in Live first"
+set_wide = "Delete {name} to bind to it"
+cannot_hold = "{name} can't hold {parameter}"
 nothing = "{name}: nothing to recall{note}"
+
+[functions.banks]
+manual = "Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1."
+[functions.banks.outcomes]
+selected = "Bank {bank}"
 
 [functions.scene_slots]
 manual = "A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it."
@@ -875,13 +937,6 @@ nothing = "{name}: nothing to recall{note}"
 [functions.bars]
 message = "Bars: {bars}, press a snapshot or scene"
 manual = "Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line."
-
-[functions.faders]
-[functions.faders.outcomes]
-unbound = "Fader {fader} unbound"
-[functions.faders.refusals]
-needs_mapped = "Shift + FX for Mapped FX"
-not_found = "Fader {fader}: parameter not found"
 
 [functions.scenes]
 [functions.scenes.outcomes]

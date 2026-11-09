@@ -23,9 +23,12 @@ MUTE_ROW = 7
 SELECT_ROW = 8
 
 # FX Mode: one horizontal fader per pad row.
-FX_FADER_COLUMNS = range(2, 11)
-# The FX snapshot slot count: buttons.toml lists this many slots buttons.
+FX_FADER_COLUMNS = range(2, 10)
+# The FX snapshot slot count per bank: buttons.toml lists this many slots buttons, and as many
+# banks buttons as FX_BANKS. A slot's global index is bank * FX_SLOTS + slot, both 0-based.
 FX_SLOTS = 16
+FX_BANKS = 8
+FX_SNAPSHOTS = FX_SLOTS * FX_BANKS
 
 # Session split view: an 8-track window, then one horizontal fader per pad row.
 SPLIT_TRACKS = 8

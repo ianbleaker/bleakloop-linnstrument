@@ -4,7 +4,7 @@ import enum
 from dataclasses import dataclass, replace
 
 from . import values
-from .layout import FX_SLOTS, ROWS, Window
+from .layout import FX_SNAPSHOTS, Window
 
 
 class Mode(enum.Enum):
@@ -89,13 +89,38 @@ class FaderTouch:
 
 @dataclass(frozen=True)
 class FaderBinding:
-    # A Mapped FX row's parameter, found again by names: the LOM has no stable IDs.
+    # A bound snapshot slot's parameter, found again by names: the LOM has no stable IDs.
     track: str
     tn: int  # the count of earlier tracks with this name, tracks then returns then master
     device: str | None  # a top-level device's name; None for the track's mixer
     dn: int  # the count of earlier devices with this name on the track
     param: int  # index into device.parameters, or into [volume, panning, *sends]
     name: str  # the parameter's name: a renamed or moved parameter isn't found
+
+
+@dataclass(frozen=True)
+class BoundSlot:
+    # A snapshot slot bound to parameters, without values: a slide moves them from wherever
+    # they are. params holds a FaderBinding locator per parameter; a rack macro's is matched by
+    # its index alone.
+    params: tuple
+
+
+@dataclass(frozen=True)
+class BoundRead:
+    # A bound slot's parameter as the press found it. key is its rack macro identity when it is
+    # one, as Set-wide slides and faders use, else its locator.
+    key: object
+    name: str
+    start: float
+    low: float
+    high: float
+    quantized: bool
+    text: str = ""  # Live's display of the value at the press, such as "1.20 kHz"
+
+    @property
+    def span(self):
+        return self.high - self.low
 
 
 @dataclass(frozen=True)
@@ -109,14 +134,51 @@ class FxRack:
 
 @dataclass(frozen=True)
 class MorphMacro:
-    path: tuple
-    rack_name: str
-    index: int  # macro index, 0 for Macro 1
+    # key: a rack macro as (path, rack name, macro index from 0), or a parameter locator
+    # (a FaderBinding), as live_state.target_parameters resolves either.
+    key: object
     start: float
     target: float
     quantized: bool
     written: float  # BleakLoop's last write, or the start value
     span: float  # max - min
+
+
+@dataclass(frozen=True)
+class SlotHold:
+    # A finger on a stored snapshot slot: a tap recalls on the lift, a slide right blends.
+    pad: int  # the row's pad, 1-8
+    column: int  # the column the finger is on now
+    slot: int  # the global slot
+    x0: int | None = None  # the first X report, the slide's zero
+    slid: bool = False  # moved a quarter column: the lift won't recall
+    f: float = 0.0  # the blend, 0 to 1
+    read: tuple | None = None  # MorphMacro per parameter, as the press found it; None until read
+    note: str = ""  # the read's "N racks not found" note
+    lifted: bool = False  # released before the read landed
+    order: int = 0  # when the slide started: the latest owns the parameters it shares
+    wrote: bool = False  # the slide has written: a running morph is cancelled
+    dropped: frozenset = frozenset()  # keys taken out of this slide
+    bound: bool = False  # a bound slot: BoundRead per parameter, and a slide both ways
+
+
+@dataclass(frozen=True)
+class BindHold:
+    # Shift + a snapshot slot, held: its lift binds Live's selected parameter, unless a Device
+    # FX row was tapped during the hold, which bound that row's instead.
+    pad: int
+    column: int
+    slot: int  # the global slot
+    used: bool = False
+
+
+@dataclass(frozen=True)
+class SlideParam:
+    # A parameter a held slide has taken: one origin for every slide holding it.
+    key: object
+    origin: float
+    written: float
+    span: float
 
 
 @dataclass(frozen=True)
@@ -181,23 +243,33 @@ class State:
     came_from: Origin = Origin.SESSION  # where Linnstrument Mode's Back returns to
     fx: bool = False
     fx_length: int | None = None  # bars of the held FX length pad
-    fx_slots: tuple = (None,) * FX_SLOTS  # tuple of FxRack per stored slot, None when empty
-    fx_scoped: frozenset = frozenset()  # the slots holding one rack's snapshot, not the Set's
+    # Per global slot (bank * FX_SLOTS + slot): a Set-wide tuple of FxRack, a BoundSlot, or
+    # None when empty.
+    fx_slots: tuple = (None,) * FX_SNAPSHOTS
+    fx_bank: int = 0  # the snapshot bank the slot pads show, 0-based; never saved
     morph: Morph | None = None  # runs in every mode
+    fx_holds: tuple = ()  # SlotHold per row holding a stored slot
+    fx_slide_params: tuple = ()  # SlideParam per parameter a held slide has written
+    fx_slide_undo_open: bool = False  # held slides' shared undo step is open in Live
+    fx_slide_count: int = 0  # counts slides as they start, for SlotHold.order
+    fx_bind_hold: BindHold | None = None  # Shift + a slot, held
+    # The Undo pad's bind history: (slot, locator, added) per bind or removal, newest last;
+    # the time of the last one, None until the next 10 ms tick stamps it; the last tick's time.
+    bind_undo: tuple = ()
+    bind_undo_at: float | None = None
+    bind_undo_now: float | None = None
     fx_undo_open: bool = False  # a recall's undo step is open in Live
-    fx_landed: int | None = None  # the slot of the last recall that landed
+    fx_landed: int | None = None  # the global slot of the last recall that landed
     fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty
     fx_landed_scene: int | None = None  # the scene of the last recall that landed
     fader_touches: tuple = ()  # FaderTouch per touched fader row
     fader_undo_open: bool = False  # a fader gesture's undo step is open in Live
-    fader_source: str = "device"  # "device" or "mapped"
     device_clip: bool = False  # Device/Clip is held
     device_clip_used: bool = False  # a press during the hold: its release doesn't flip the view
     split: bool = False  # Session Mode's split view
     mixer_split: bool = False  # Mixer Mode's split view
     split_snapshots: bool = False  # the split views show the snapshots, not the faders
     pending_launch: PendingLaunch | None = None  # fires in every mode, as a morph runs
-    fader_bindings: tuple = (None,) * ROWS  # Mapped FX: FaderBinding or None per row
     seq_held: bool = False  # Seq is held in Session Mode
     seq_used: bool = False  # the Seq hold entered on a slot: its release does nothing
     # Sequencer Mode's arm: per song.tracks, the arm before entry and what BleakLoop set.

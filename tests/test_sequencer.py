@@ -383,12 +383,9 @@ def test_shift_tempo_steps():
     assert handle(SHIFTED, TEMPO_DOWN)[1][0] == SetTempo(119.0)
 
 
-def test_shift_fx_toggles_the_fader_source():
-    # With no faders on screen too: the source is kept for when they show.
-    mapped, actions = handle(SHIFTED, layout.NAVIGATION_SHIFT.fader_source)
-    assert mapped == replace(SHIFTED, fader_source="mapped")
-    assert actions == [ShowMessage("Faders: Mapped FX")]
-    assert handle(mapped, layout.NAVIGATION_SHIFT.fader_source) == (SHIFTED, [ShowMessage("Faders: Device FX")])
+def test_shift_fx_does_nothing():
+    # No panel on screen.
+    assert handle(SHIFTED, layout.NAVIGATION_SHIFT.fader_source) == (SHIFTED, [])
 
 
 def test_shift_moves_the_window():

@@ -117,6 +117,6 @@ def _system():
     for key, message in buttons.systems().items():
         rows.append(f"| `{key}` | {_cell(message)} |")
     return (
-        "## System messages\n\nThe device setup, Device/Clip's track and device names and Mapped "
-        "FX's binding. These always show.\n\n" + "\n".join(rows) + "\n"
+        "## System messages\n\nThe device setup, and Device/Clip's track and device names. These "
+        "always show.\n\n" + "\n".join(rows) + "\n"
     )

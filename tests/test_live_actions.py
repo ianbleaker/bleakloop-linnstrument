@@ -9,15 +9,17 @@ sys.modules.setdefault("Live", ModuleType("Live"))
 from BleakLoop import live_actions  # noqa: E402
 from BleakLoop.core.modes import FaderBinding  # noqa: E402
 from BleakLoop.core.model import (  # noqa: E402
+    SetMacros,
     ShowMessage,
-    BindFader,
+    BindFaderRow,
+    BindSelectedParameter,
+    ParameterBound,
     CopyGroupClips,
     CopyScene,
     DeleteGroupClips,
     DuplicateLoop,
     EditNotes,
     FireSlot,
-    FaderBound,
     HighlightSlot,
     RacksRead,
     RecallFxSnapshot,
@@ -25,7 +27,6 @@ from BleakLoop.core.model import (  # noqa: E402
     RemovePitch,
     SelectDrumPad,
     SelectTrack,
-    SaveFaderBindings,
     SaveFxScenes,
     SetArm,
     SetArms,
@@ -178,7 +179,7 @@ def fader_song(parameters):
     return SimpleNamespace(appointed_device=device)
 
 
-FADER_SURFACE = SimpleNamespace(core_state=SimpleNamespace(fader_source="device"))
+FADER_SURFACE = SimpleNamespace(core_state=SimpleNamespace())
 
 
 def test_set_fader_parameter_writes_clamped():
@@ -373,61 +374,6 @@ BIND_RETURN = bind_track("A Reverb")
 BIND_MASTER = bind_track("Main", sends=0)
 
 
-def bind(parameter, row=2):
-    return apply(BindFader(row), bind_song(parameter))
-
-
-def test_bind_a_top_level_device_parameter():
-    parameter = BIND_TRACKS[0].devices[1].parameters[1]
-    assert bind(parameter) == FaderBound(
-        2, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Fader 3: EQ Frequency"
-    )
-
-
-def test_bind_on_the_second_same_named_track():
-    parameter = BIND_TRACKS[1].devices[0].parameters[1]
-    assert bind(parameter).binding == FaderBinding("Bass", 1, "Comp", 0, 1, "Frequency")
-
-
-@pytest.mark.parametrize(
-    "track, attribute, index",
-    [(BIND_RETURN, "volume", 0), (BIND_TRACKS[0], "panning", 1), (BIND_MASTER, "volume", 0)],
-)
-def test_bind_mixer_volume_and_pan(track, attribute, index):
-    parameter = getattr(track.mixer_device, attribute)
-    event = bind(parameter)
-    assert event.binding.device is None and event.binding.param == index
-    assert event.message == f"Fader 3: {track.name} {parameter.name}"
-
-
-def test_bind_a_send():
-    event = bind(BIND_RETURN.mixer_device.sends[0])
-    assert event.binding == FaderBinding("A Reverb", 0, None, 0, 2, "Send 0")
-
-
-def test_bind_refuses_other_mixer_parameters():
-    event = bind(BIND_MASTER.mixer_device.crossfader)
-    assert event == FaderBound(2, None, "Can't bind this parameter")
-
-
-def test_bind_refuses_a_nested_device():
-    chain = SimpleNamespace(canonical_parent=BIND_TRACKS[0].devices[0])
-    nested = SimpleNamespace(name="Inner", canonical_parent=chain)
-    event = bind(Param("Frequency", nested))
-    assert event == FaderBound(2, None, "Map it to a macro instead")
-
-
-def test_bind_with_nothing_selected():
-    assert bind(None) == FaderBound(2, None, "Click a parameter in Live first")
-
-
-def test_save_fader_bindings():
-    stored = {}
-    song = SimpleNamespace(set_data=lambda key, text: stored.update({key: text}))
-    apply(SaveFaderBindings("{}"), song)
-    assert stored == {"BleakLoop.faders": "{}"}
-
-
 # FX snapshots
 
 
@@ -457,12 +403,6 @@ def no_racks(monkeypatch):
 )
 def test_fx_snapshot_reads_pass_scene_and_end_through(no_racks, action, event):
     assert apply(action, SimpleNamespace()) == event
-
-
-def test_a_scoped_store_reads_the_selected_rack(no_racks, monkeypatch):
-    monkeypatch.setattr(live_actions.live_state, "read_selected_rack", lambda song: ("track", 1, 0))
-    event = apply(StoreFxSnapshot(3, scoped=True), SimpleNamespace())
-    assert event == RacksRead(3, (), False, scoped=True, selected=("track", 1, 0))
 
 
 # Sequencer Mode actions
@@ -687,3 +627,53 @@ def test_show_message_logs_its_problem_and_shows_the_text(caplog):
     live_actions.apply(ShowMessage("Tempo {bpm}", "nav.tempo_up: no bpm"), None, surface)
     assert surface.shown == ["Tempo {bpm}"]
     assert "nav.tempo_up: no bpm" in caplog.text
+
+
+def test_set_macros_writes_macros_and_locators_and_skips_the_missing():
+    from tests.test_live_state import target_song
+
+    song = target_song()
+    rack, filter_ = song.tracks[0].devices
+    keys = (
+        (("track", 0, 0), "FX", 1),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Gone"),
+    )
+    apply(SetMacros(tuple(zip(keys, (64.0, 200.0, 5.0)))), song)
+    assert rack.parameters[2].value == 64.0
+    assert filter_.parameters[1].value == 127.0  # clamped to the parameter's range
+
+
+def test_a_bound_slots_read_resolves_its_locators_not_the_racks():
+    from tests.test_live_state import target_song
+
+    frequency = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    event = apply(RecallFxSnapshot(4, None, hold=True, locators=(frequency,)), target_song())
+    assert event.racks == () and event.hold and event.slot == 4
+    assert [p.name for p in event.params] == ["Frequency"]
+
+
+@pytest.mark.parametrize(
+    "parameter, expected",
+    [
+        (
+            BIND_TRACKS[0].devices[1].parameters[1],
+            ParameterBound(5, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Frequency", None),
+        ),
+        (None, ParameterBound(5, None, None, "select")),
+        (BIND_MASTER.mixer_device.crossfader, ParameterBound(5, None, "Crossfader", "refused")),
+    ],
+)
+def test_bind_the_selected_parameter_to_a_slot(parameter, expected):
+    assert apply(BindSelectedParameter(5), bind_song(parameter)) == expected
+
+
+def test_bind_a_device_fx_rows_parameter_to_a_slot(monkeypatch):
+    parameter = BIND_TRACKS[0].devices[1].parameters[1]
+    targets = {1: (parameter, None)}
+    monkeypatch.setattr(live_actions.live_state, "fader_targets", lambda song, state, rows: [targets.get(r) for r in rows])
+    surface = SimpleNamespace(core_state=None)
+    song = bind_song(None)
+    event = live_actions.apply(BindFaderRow(5, 1), song, surface)
+    assert event == ParameterBound(5, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Frequency", None)
+    assert live_actions.apply(BindFaderRow(5, 3), song, surface) is None

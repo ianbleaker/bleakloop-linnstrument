@@ -232,11 +232,12 @@ class SlideMoved:
 
 
 @dataclass(frozen=True)
-class FaderBound:
-    # Fed back by the adapter after BindFader.
-    row: int  # 0-7, pad 1 first
-    binding: object  # FaderBinding, or None when the parameter can't be bound
-    message: str
+class ParameterBound:
+    # Fed back by the adapter after BindSelectedParameter.
+    slot: int  # the global slot
+    binding: object  # FaderBinding, or None
+    parameter: str | None  # the selected parameter's name, for a refusal
+    refusal: str | None  # None, "select", "macro" or "refused"
 
 
 @dataclass(frozen=True)
@@ -261,8 +262,8 @@ class RacksRead:
     bars: int | None = None  # the morph length; None for a jump
     scene: bool = False
     end_beats: float | None = None  # a scene launch's landing time, decided at the press
-    scoped: bool = False  # a store of the selected rack only
-    selected: tuple | None = None  # the selected top-level rack's path, for a scoped store
+    hold: bool = False  # a held slot's read: a tap or a slide decides on the lift
+    params: tuple = ()  # a bound slot's read: BoundRead or None per locator
 
 
 # Actions
@@ -480,7 +481,6 @@ class EndUndoStep:
 class StoreFxSnapshot:
     slot: int  # 0-15, or the scene index of a scene snapshot
     scene: bool = False
-    scoped: bool = False  # the selected rack only, not every rack in the Set
 
 
 @dataclass(frozen=True)
@@ -489,11 +489,13 @@ class RecallFxSnapshot:
     bars: int | None  # None for a jump
     scene: bool = False
     end_beats: float | None = None  # a scene launch's landing time, decided at the press
+    hold: bool = False  # a held slot: read now, recall or slide later
+    locators: tuple = ()  # a bound slot's parameters, read instead of the racks
 
 
 @dataclass(frozen=True)
 class SetMacros:
-    writes: tuple  # (path, rack name, macro index, value) per macro
+    writes: tuple  # (MorphMacro key, value) per parameter
 
 
 @dataclass(frozen=True)
@@ -514,13 +516,14 @@ class SetFaderParameter:
 
 
 @dataclass(frozen=True)
-class BindFader:
-    row: int  # 0-7: bind Live's selected parameter to this row
+class BindSelectedParameter:
+    slot: int  # the global slot: add Live's selected parameter to it, or remove it if there
 
 
 @dataclass(frozen=True)
-class SaveFaderBindings:
-    text: str
+class BindFaderRow:
+    slot: int  # the global slot: add this Device FX row's parameter, or remove it if there
+    row: int  # 0-7, pad 1 first
 
 
 @dataclass(frozen=True)

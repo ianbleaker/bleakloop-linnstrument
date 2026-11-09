@@ -131,7 +131,7 @@ def _navigation_shift(section):
     return (
         _group("Window directions", section, "window"),
         _group("Tempo", section, "tempo"),
-        _one("Fader source", section, "fader_source"),
+        _one("Panel", section, "fader_source"),
     )
 
 
@@ -213,8 +213,8 @@ _SPLIT = (
         "Faders",
         layout.SPLIT_FADER_COLUMNS,
         ALL_PADS,
-        "One fader per row, as in FX Mode, from the source Shift + FX picks. Its third "
-        "choice shows the snapshots instead.",
+        "One Device FX fader per row, as in FX Mode. Shift + FX shows the snapshots "
+        "instead.",
     ),
 )
 
@@ -253,15 +253,17 @@ _FX = (
         "Snapshots",
         range(layout.FX.slots[0][0], layout.FX.slots[-1][0] + 1),
         ALL_PADS,
-        f"Sixteen snapshots of every rack's macros: slots {positions.runs('fx.slots')}. "
-        "Press an empty slot to store, a stored one to recall. Shift + an empty slot stores "
-        "the selected rack alone, in pink.",
+        f"Sixteen snapshots per bank of every rack's macros: slots {positions.runs('fx.slots')}. "
+        "Press an empty slot to store. Tap a stored one to recall it, or slide right from it "
+        "to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in "
+        "pink.",
     ),
+    _group("Banks", "fx", "banks"),
     _group("Scene snapshots", "fx", "scene_slots"),
     _group("Bars", "fx", "bars"),
 )
 
-# The split views' snapshot panel: FX Mode's columns 11-14, column 10 dark.
+# The split views' snapshot panel: FX Mode's columns 10-14.
 _SNAPSHOT_PANEL = _FX[1:]
 
 _SPLIT_SNAPSHOTS = (

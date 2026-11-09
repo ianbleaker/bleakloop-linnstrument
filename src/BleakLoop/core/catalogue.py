@@ -61,6 +61,7 @@ MODES = {
     "pages": frozenset({SEQUENCER}),
     # FX Mode and the split views' snapshot panel.
     "slots": frozenset({SESSION}),
+    "banks": frozenset({SESSION}),
     "scene_slots": frozenset({SESSION}),
     "bars": frozenset({SESSION}),
     # Unlit and unused until Chord is built.
@@ -69,4 +70,4 @@ MODES = {
 
 # Messages with no button behind them: [functions.<name>] holds their wording, but no button
 # can name them with does.
-MESSAGE_ONLY = frozenset({"faders", "scenes"})
+MESSAGE_ONLY = frozenset({"scenes"})

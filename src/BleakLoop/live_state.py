@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from .core import layout, values
+from .core.modes import BoundRead, FaderBinding
 from .core.model import (
     ClipTarget,
     ClipView,
@@ -250,10 +251,8 @@ def fader_parameter(song, state, row):
 
 
 def fader_targets(song, state, rows):
-    # (parameter, macro identity or None), or None, per row asked for.
-    if state.fader_source == "mapped":
-        return [_bound(song, state.fader_bindings[row]) for row in rows]
-    # Device FX: the device with Live's blue hand.
+    # (parameter, macro identity or None), or None, per row asked for: Device FX, the device
+    # with Live's blue hand.
     device = song.appointed_device
     if device is None:
         return [None for _ in rows]
@@ -273,7 +272,7 @@ def fader_targets(song, state, rows):
 
 
 def _bound(song, binding):
-    # A Mapped FX binding's parameter, found again by names; None if it's gone or renamed.
+    # A bound snapshot slot's parameter, found again by names; None if it's gone or renamed.
     if binding is None:
         return None
     found = nth_named(fx_tracks(song), binding.track, binding.tn, lambda item: item[2].name)
@@ -295,7 +294,8 @@ def _bound(song, binding):
     if binding.param >= len(parameters):
         return None
     parameter = parameters[binding.param]
-    if parameter.name != binding.name:
+    # A rack macro is found by its index: its name changes as it's mapped or renamed.
+    if macro is None and parameter.name != binding.name:
         return None
     return parameter, macro
 
@@ -315,10 +315,6 @@ def nth_named(items, name, n, name_of):
                 return item
             count += 1
     return None
-
-
-def read_fader_store(song):
-    return song.get_data(values.FADERS_DATA_KEY, "")
 
 
 def _rack_path(song, device):
@@ -434,18 +430,46 @@ def read_racks(song):
     return tuple(racks)
 
 
-def read_selected_rack(song):
-    # The path of the device selected in Live when it's a rack directly on a track, return or
-    # master, as read_racks lists them; else None.
-    device = song.view.selected_track.view.selected_device
-    if device is None or not device.can_have_chains:
-        return None
-    return _rack_path(song, device)
-
-
 def read_macro_values(song, morph):
     # The live value per morphing macro, or None when its rack has moved or gone.
-    targets = macro_parameters(song, ((m.path, m.rack_name, m.index) for m in morph.macros))
+    targets = target_parameters(song, (m.key for m in morph.macros))
+    return tuple(None if parameter is None else parameter.value for parameter in targets)
+
+
+def read_bound(song, locators):
+    # A bound slot's parameters as they are now: BoundRead, or None when one can't be found.
+    result = []
+    for locator in locators:
+        found = _bound(song, locator)
+        if found is None:
+            result.append(None)
+            continue
+        parameter, macro = found
+        result.append(
+            BoundRead(
+                locator if macro is None else macro,
+                parameter.name,
+                parameter.value,
+                parameter.min,
+                parameter.max,
+                parameter.is_quantized,
+                _display(parameter),
+            )
+        )
+    return tuple(result)
+
+
+def _display(parameter):
+    # Live's text for the value, or "" when it has none.
+    try:
+        return str(parameter.str_for_value(parameter.value))
+    except Exception:
+        return ""
+
+
+def read_slide_values(song, params):
+    # The live value per held slide's parameter, or None when it has moved or gone.
+    targets = target_parameters(song, (p.key for p in params))
     return tuple(None if parameter is None else parameter.value for parameter in targets)
 
 
@@ -461,12 +485,17 @@ def read_launch_triggered(song, morph):
     return None if any(scene.is_triggered for scene in scenes) else False
 
 
-def macro_parameters(song, macros_wanted):
-    # The parameter per (path, rack name, index), or None; each rack resolved once per call,
-    # since a morph tick touches every macro of every rack.
+def target_parameters(song, keys):
+    # The parameter per MorphMacro key, or None. A rack macro's rack is resolved once per call,
+    # since a morph tick touches every macro of every rack; a locator by its names.
     racks = {}
     result = []
-    for path, rack_name, index in macros_wanted:
+    for key in keys:
+        if isinstance(key, FaderBinding):
+            found = _bound(song, key)
+            result.append(None if found is None else found[0])
+            continue
+        path, rack_name, index = key
         if (path, rack_name) not in racks:
             device = rack_at(song, path, rack_name)
             racks[path, rack_name] = macros(device) if device is not None else []

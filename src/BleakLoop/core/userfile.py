@@ -7,7 +7,7 @@ import string
 
 # A group's buttons are read by index or hold fixed settings: they may move and be relabelled,
 # never be added, removed or given another value.
-FIXED_GROUPS = frozenset({"slots", "scene_slots", "pages", "bars", "rates", "tracks", "devices"})
+FIXED_GROUPS = frozenset({"slots", "banks", "scene_slots", "pages", "bars", "rates", "tracks", "devices"})
 # A group the user may add to, remove from and give new values.
 OPEN_GROUPS = frozenset({"tempo", "window"})
 
@@ -16,6 +16,9 @@ FUNCTION_FIELDS = frozenset({"label", "message", "show", "outcomes", "refusals"}
 # Fields that only feed the repo's generated docs: a user file may repeat them unchanged.
 DOCS_FIELDS = frozenset({"manual", "manual_in"})
 EDITOR = {"enabled": True, "port": 47128}
+MORPH_FIELDS = frozenset({"switch_at"})
+# Top-level tables that aren't button sections.
+RESERVED = ("editor", "functions", "system", "morph", "manual_format")
 
 
 def _is_int(value):
@@ -164,6 +167,17 @@ def _editor(table):
     return {**EDITOR, **table}
 
 
+def check_morph(table):
+    # The [morph] settings, shipped or the user's: raises ValueError naming the bad one.
+    if not isinstance(table, dict):
+        raise ValueError("morph: not a table")
+    for key, value in table.items():
+        if key not in MORPH_FIELDS:
+            raise ValueError(f"morph: no such setting {key!r}")
+        if not (isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value <= 1):
+            raise ValueError("morph: switch_at is a number above 0, up to 1")
+
+
 def merge(shipped, user, name="user buttons file"):
     """(merged, editor settings): the shipped file's data with the user's changes over it.
     Raises ValueError naming the user file. Registry checks the result as for the shipped file."""
@@ -177,17 +191,16 @@ def merge(shipped, user, name="user buttons file"):
                 _merge_functions(merged.setdefault("functions", {}), shipped.get("functions", {}), value)
             elif key == "system":
                 _merge_system(merged.setdefault("system", {}), shipped.get("system", {}), value)
+            elif key == "morph":
+                check_morph(value)
+                merged["morph"] = {**shipped.get("morph", {}), **value}
             elif key == "manual_format":
                 if value != shipped.get("manual_format"):
                     raise ValueError("manual_format feeds the repo's manual and can't be changed here")
             elif not isinstance(value, dict):
                 raise ValueError(f"{key}: not allowed in the user file")
-        sections = {
-            key: value for key, value in user.items() if key not in ("editor", "functions", "system", "manual_format")
-        }
-        shipped_sections = {
-            key: value for key, value in shipped.items() if key not in ("manual_format", "functions", "system")
-        }
+        sections = {key: value for key, value in user.items() if key not in RESERVED}
+        shipped_sections = {key: value for key, value in shipped.items() if key not in RESERVED}
         _merge_buttons(merged, shipped_sections, sections)
     except ValueError as error:
         raise ValueError(f"{name}: {error}") from None
@@ -268,15 +281,15 @@ def prune(value):
 
 
 def to_toml(overlay):
-    """The user file's text for an overlay: editor, system, functions, then the buttons."""
+    """The user file's text for an overlay: editor, morph, system, functions, then the buttons."""
     lines = [HEADER.rstrip("\n")]
-    order = [key for key in ("editor", "system", "functions") if key in overlay]
-    order += [key for key in overlay if key not in ("editor", "system", "functions")]
+    order = [key for key in ("editor", "morph", "system", "functions") if key in overlay]
+    order += [key for key in overlay if key not in ("editor", "morph", "system", "functions")]
     for key in order:
         value = overlay[key]
         if not isinstance(value, dict):
             raise ValueError(f"{key}: not allowed in the user file")
-        if key in ("editor", "system"):
+        if key in ("editor", "morph", "system"):
             lines.append("")
             _table(lines, _key(key), value)
             continue

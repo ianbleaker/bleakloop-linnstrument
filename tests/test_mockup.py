@@ -52,9 +52,9 @@ def test_a_layout_override_moves_a_pad_and_its_label(tmp_path):
 
 
 def test_a_layout_override_leaves_the_shift_function_put(tmp_path):
-    # Source, FX's Shift function, stays on pad 3 when FX moves to pad 4.
+    # Panel, FX's Shift function, stays on pad 3 when FX moves to pad 4.
     spec = {"panels": [{"layer": "session-shift", "columns": [16]}]}
-    source = '<text x="36" y="{}" font-size="9" fill="#ffffff" text-anchor="middle">Source</text>'
+    source = '<text x="36" y="{}" font-size="9" fill="#ffffff" text-anchor="middle">Panel</text>'
     _, after = run(tmp_path, {**spec, "layout": {"NAVIGATION.fx": "16,4"}})
     assert source.format(63 + 2 * 46) in after
     assert layout.NAVIGATION_SHIFT.fader_source == layout.NAVIGATION.fx == (16, 3)

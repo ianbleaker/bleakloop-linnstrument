@@ -36,3 +36,14 @@ def test_release_on_another_column_after_a_transfer_is_not_swallowed():
     decoder.transfer(1, 6)
     assert decoder.pad(1, 9, 0) == PadPress(9, 7, False, 0)
     assert decoder.pad(1, 7, 80) == SlideMoved(7, 6, 7)
+
+
+def test_a_reset_of_some_rows_keeps_the_others_slides():
+    decoder = SlideDecoder()
+    decoder.transfer(0, 11)
+    decoder.transfer(3, 4)
+    assert decoder.pad(3, 5, 70) == SlideMoved(5, 4, 5)
+    decoder.reset({0})
+    # Row 0's transfer is gone; row 3's swallowed release still is.
+    assert decoder.pad(0, 12, 90) == PadPress(12, 8, True, 90)
+    assert decoder.pad(3, 4, 5) is None

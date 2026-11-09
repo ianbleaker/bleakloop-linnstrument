@@ -4,7 +4,7 @@ import pytest
 
 from BleakLoop import live_state
 from BleakLoop.core.layout import Window
-from BleakLoop.core.modes import FaderBinding, Morph
+from BleakLoop.core.modes import BoundRead, FaderBinding, Morph, MorphMacro
 from tests.support import fake_song, fake_track
 
 APPLICATION = SimpleNamespace(view=SimpleNamespace(is_view_visible=lambda name: True))
@@ -170,7 +170,7 @@ def fader_song(device, tracks=()):
     return song
 
 
-DEVICE_FX = SimpleNamespace(fader_source="device")
+DEVICE_FX = SimpleNamespace()
 
 
 def test_faders_of_a_rack_are_its_macros_with_their_identity():
@@ -199,40 +199,14 @@ def test_faders_of_a_device_skip_device_on_and_dark_past_its_parameters():
     assert views[1].is_quantized and views[0].macro is None
 
 
-def selected_song(device, track):
-    song = fader_song(None, [fake_track("a"), track])
-    track.view = SimpleNamespace(selected_device=device)
-    song.view = SimpleNamespace(selected_track=track)
-    return song
-
-
-def test_the_selected_rack_is_its_path():
-    track = SimpleNamespace(devices=[])
-    rack = fake_device("FX", [], rack=True, parent=track)
-    track.devices = [fake_device("Synth", []), rack]
-    assert live_state.read_selected_rack(selected_song(rack, track)) == ("track", 1, 1)
-
-
-def test_no_selected_rack():
-    track = SimpleNamespace(devices=[])
-    synth = fake_device("Synth", [], parent=track)
-    nested = fake_device("Inner", [], rack=True, parent=object())
-    track.devices = [synth]
-    for device in (None, synth, nested):
-        assert live_state.read_selected_rack(selected_song(device, track)) is None
-
-
-def test_no_selected_device_or_mapped_fx_gives_dark_faders():
+def test_no_selected_device_gives_dark_faders():
     assert live_state.read_faders(fader_song(None), DEVICE_FX) == (None,) * 8
-    device = fake_device("EQ", [fake_parameter("P1")])
-    mapped = SimpleNamespace(fader_source="mapped", fader_bindings=(None,) * 8)
-    assert live_state.read_faders(fader_song(device), mapped) == (None,) * 8
 
 
-# Mapped FX
+# Locators: bound snapshot slots' parameters
 
 
-def mapped_track(name, devices=(), sends=("A-Reverb",)):
+def located_track(name, devices=(), sends=("A-Reverb",)):
     track = SimpleNamespace(name=name, devices=list(devices))
     track.mixer_device = SimpleNamespace(
         volume=fake_parameter("Track Volume", 0.85),
@@ -242,85 +216,10 @@ def mapped_track(name, devices=(), sends=("A-Reverb",)):
     return track
 
 
-def mapped_song(tracks, returns=()):
+def located_song(tracks, returns=()):
     song = fake_song(tracks, returns)
-    song.master_track = mapped_track("Main", sends=())
+    song.master_track = located_track("Main", sends=())
     return song
-
-
-def mapped(*bindings):
-    return SimpleNamespace(
-        fader_source="mapped", fader_bindings=bindings + (None,) * (8 - len(bindings))
-    )
-
-
-def test_mapped_faders_resolve_device_and_mixer_parameters():
-    filter_ = fake_device("Auto Filter", [fake_parameter("Frequency", 40.0)])
-    bass = mapped_track("Bass", [filter_])
-    reverb = mapped_track("A Reverb", sends=())
-    song = mapped_song([bass], [reverb])
-    views = live_state.read_faders(
-        song,
-        mapped(
-            FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),
-            FaderBinding("A Reverb", 0, None, 0, 0, "Track Volume"),
-            FaderBinding("Bass", 0, None, 0, 1, "Track Panning"),
-            FaderBinding("Bass", 0, None, 0, 2, "A-Reverb"),
-            FaderBinding("Main", 0, None, 0, 0, "Track Volume"),
-        ),
-    )
-    assert [view and view.name for view in views[:6]] == [
-        "Frequency", "Track Volume", "Track Panning", "A-Reverb", "Track Volume", None,
-    ]
-    assert views[0].value == 40.0 and views[0].macro is None
-
-
-def test_mapped_faders_tell_same_named_tracks_and_devices_apart():
-    first = mapped_track("Synth", [fake_device("EQ", [fake_parameter("Gain", 1.0)])])
-    second = mapped_track(
-        "Synth",
-        [
-            fake_device("EQ", [fake_parameter("Gain", 2.0)]),
-            fake_device("EQ", [fake_parameter("Gain", 3.0)]),
-        ],
-    )
-    song = mapped_song([first, second])
-    views = live_state.read_faders(
-        song,
-        mapped(
-            FaderBinding("Synth", 0, "EQ", 0, 1, "Gain"),
-            FaderBinding("Synth", 1, "EQ", 1, 1, "Gain"),
-            FaderBinding("Synth", 2, "EQ", 0, 1, "Gain"),
-        ),
-    )
-    assert [view and view.value for view in views[:3]] == [1.0, 3.0, None]
-
-
-def test_a_renamed_or_missing_parameter_resolves_to_nothing():
-    song = mapped_song([mapped_track("Bass", [fake_device("EQ", [fake_parameter("Gain")])])])
-    views = live_state.read_faders(
-        song,
-        mapped(
-            FaderBinding("Bass", 0, "EQ", 0, 1, "Frequency"),
-            FaderBinding("Bass", 0, "EQ", 0, 9, "Gain"),
-            FaderBinding("Bass", 0, "Comp", 0, 1, "Gain"),
-            FaderBinding("Drums", 0, "EQ", 0, 1, "Gain"),
-        ),
-    )
-    assert views == (None,) * 8
-
-
-def test_a_mapped_rack_macro_carries_its_identity():
-    track = mapped_track("Bass")
-    rack = fake_device(
-        "FX", [fake_parameter(f"Macro {i}") for i in range(1, 9)], rack=True, macros=8,
-        parent=track,
-    )
-    track.devices = [rack]
-    views = live_state.read_faders(
-        mapped_song([track]), mapped(FaderBinding("Bass", 0, "FX", 0, 3, "Macro 3"))
-    )
-    assert views[0].macro == (("track", 0, 0), "FX", 2)
 
 
 def test_the_split_view_reads_8_tracks():
@@ -571,3 +470,56 @@ def test_read_launch_triggered(triggered, slot, expected):
 def test_read_launch_triggered_ignores_other_morphs():
     morph = Morph(0, 0.0, 8.0, 0.0, scene=True)
     assert live_state.read_launch_triggered(_launch_song(True), morph) is None
+
+
+# Morph targets: a rack macro or a parameter locator
+
+
+def target_song():
+    rack = fake_device("FX", [fake_parameter(f"Macro {i}", float(i)) for i in range(1, 9)], rack=True)
+    filter_ = fake_device("Auto Filter", [fake_parameter("Frequency", 40.0)])
+    return located_song([located_track("Bass", [rack, filter_])])
+
+
+def test_target_parameters_resolve_macros_and_locators():
+    song = target_song()
+    keys = (
+        (("track", 0, 0), "FX", 2),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),
+        FaderBinding("Bass", 0, None, 0, 0, "Track Volume"),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Resonance"),
+        (("track", 0, 1), "FX", 0),
+    )
+    found = live_state.target_parameters(song, keys)
+    assert [p and (p.name, p.value) for p in found] == [
+        ("Macro 3", 3.0), ("Frequency", 40.0), ("Track Volume", 0.85), None, None,
+    ]
+
+
+def test_read_macro_values_reads_locators_too():
+    keys = ((("track", 0, 0), "FX", 0), FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"))
+    morph = Morph(0, 0.0, 4.0, 0.0, tuple(MorphMacro(key, 0.0, 1.0, False, 0.0, 1.0) for key in keys))
+    assert live_state.read_macro_values(target_song(), morph) == (1.0, 40.0)
+
+
+def test_a_renamed_macro_is_still_found_by_its_index():
+    song = target_song()
+    rack = song.tracks[0].devices[0]
+    rack.parameters[2].name = "Cutoff"
+    (found,) = live_state.read_bound(song, (FaderBinding("Bass", 0, "FX", 0, 2, "Macro 2"),))
+    assert found.name == "Cutoff" and found.key == (("track", 0, 0), "FX", 1)
+
+
+def test_read_bound_gives_locator_keys_for_other_parameters_and_none_when_missing():
+    song = target_song()
+    frequency = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    found = live_state.read_bound(song, (frequency, FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Q")))
+    assert found == (BoundRead(frequency, "Frequency", 40.0, 0.0, 127.0, False), None)
+
+
+def test_read_bound_carries_lives_text_for_the_value():
+    song = target_song()
+    frequency = song.tracks[0].devices[1].parameters[1]
+    frequency.str_for_value = lambda value: f"{value:.0f} Hz"
+    (found,) = live_state.read_bound(song, (FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),))
+    assert found.text == "40 Hz"

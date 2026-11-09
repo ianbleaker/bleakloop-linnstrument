@@ -104,7 +104,7 @@ def moved():
         ("{pad:navigation_shift.window}", "column 16, pads 5–8"),
         ("{row:linnstrument.back}", "pad 7"),
         ("{row:navigation_shift.window}", "pads 5–8"),
-        ("{column:fx.bars}", "column 14"),
+        ("{column:fx.bars}", "column 10"),
         ("{runs:fx.slots}", "1–8 in column 11, 9–16 in column 12"),
         ("{runs:sequencer_settings.pages}", "1–8 in column 12, 9–16 in column 13"),
     ],

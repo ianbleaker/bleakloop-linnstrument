@@ -5,9 +5,10 @@ import math
 from dataclasses import replace
 
 from . import buttons, faders, functions, layout, mixer
-from .leds import CYAN, LIME, OFF, PINK, WHITE, Blink, Light
+from .leds import CYAN, LIME, OFF, ORANGE, PINK, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
+    BindSelectedParameter,
     EndUndoStep,
     FireScene,
     RecallFxSnapshot,
@@ -17,8 +18,11 @@ from .model import (
     SetMixer,
     StoreFxSnapshot,
 )
-from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
-from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
+from .modes import BindHold, BoundRead, BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
+from .values import BEAT_EPSILON, BIND_UNDO_MS, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, STATUS_MAX, X_COLUMN_WIDTH
+
+# A slide's travel to 100%, in columns: four pads to the right of its slot.
+SLIDE_COLUMNS = 4
 
 # Launch quantization values (global_column.QUANTIZATION_NAMES) to their length: bars, then beats.
 LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
@@ -44,34 +48,88 @@ def capture(racks):
     )
 
 
-def dump(slots, scoped):
-    # The scoped slots go in their own key, only when there are any: older builds ignore it,
-    # and a store without scoped slots keeps the v1 text it always had.
-    data = {"v": 1, "slots": [_encode(slot) for slot in slots]}
-    if scoped:
-        data["scoped"] = sorted(scoped)
+# The slot count each store version holds: v1 is bank 1 alone, from before banks.
+STORE_SLOTS = {1: layout.FX_SLOTS, 2: layout.FX_SNAPSHOTS}
+
+
+def dump(slots):
+    # v2: every bank's slots by global index; a bound slot as {"bound": [locator, ...]}.
+    data = {"v": 2, "slots": [_encode_slot(slot) for slot in slots]}
     return json.dumps(data, separators=(",", ":"))
 
 
 def parse(text):
-    # (slots, scoped). Anything unreadable gives empty slots: a bad store never stops the
-    # script loading. A bad "scoped" entry is dropped, leaving its slot Set-wide.
-    empty = (None,) * layout.FX_SLOTS, frozenset()
+    # The slots. Anything unreadable gives empty slots: a bad store never stops the script
+    # loading. A v1 store loads as bank 1, with banks 2-8 empty. #104's "scoped" slots, one
+    # rack's macros with values, become bound slots of those macros, without the values.
+    return _parse(text) or (None,) * layout.FX_SNAPSHOTS
+
+
+def readable(text):
+    # The store parses as a whole: v1 or v2, with every slot decoding.
+    return _parse(text) is not None
+
+
+def _parse(text):
     try:
         data = json.loads(text)
-        if data.get("v") != 1 or len(data["slots"]) != layout.FX_SLOTS:
-            return empty
-        slots = tuple(_decode(slot) for slot in data["slots"])
+        count = STORE_SLOTS.get(data.get("v"))
+        if count is None or len(data["slots"]) != count:
+            return None
+        slots = list(_decode_slot(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):
-        return empty
+        return None
     scoped = data.get("scoped")
-    if not isinstance(scoped, list):
-        return slots, frozenset()
-    return slots, frozenset(
-        i
-        for i in scoped
-        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < layout.FX_SLOTS and slots[i] is not None
+    for i in scoped if isinstance(scoped, list) else ():
+        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < count:
+            if isinstance(slots[i], tuple):
+                slots[i] = bind_racks(slots[i])
+    return tuple(slots) + (None,) * (layout.FX_SNAPSHOTS - count)
+
+
+def bind_racks(racks):
+    # A bound slot of every macro of these racks, matched by index: #104's scoped snapshot.
+    params = tuple(
+        FaderBinding(rack.track, 0, rack.rack, rack.n, index + 1, f"Macro {index + 1}")
+        for rack in racks
+        for index in range(len(rack.values))
     )
+    return BoundSlot(params) if params else None
+
+
+LOCATOR_FIELDS = ("track", "tn", "device", "dn", "param", "name")
+
+
+def _encode_slot(slot):
+    if isinstance(slot, BoundSlot):
+        return {"bound": [{field: getattr(p, field) for field in LOCATOR_FIELDS} for p in slot.params]}
+    return _encode(slot)
+
+
+def _decode_slot(slot):
+    # A bound slot's bad entries are dropped; with none left, the slot is empty.
+    if isinstance(slot, dict):
+        params = tuple(p for p in (_locator(item) for item in slot["bound"]) if p is not None)
+        return BoundSlot(params) if params else None
+    return _decode(slot)
+
+
+def _locator(item):
+    if not isinstance(item, dict):
+        return None
+    track, tn, device, dn, param, name = (item.get(field) for field in LOCATOR_FIELDS)
+    counts = (tn, dn, param)
+    if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in counts):
+        return None
+    if not isinstance(track, str) or not isinstance(name, str):
+        return None
+    if device is not None and not isinstance(device, str):
+        return None
+    return FaderBinding(track, tn, device, dn, param, name)
+
+
+def is_bound(slot):
+    return isinstance(slot, BoundSlot)
 
 
 def dump_scenes(scenes):
@@ -195,13 +253,11 @@ def _set(state, slot, scene, value, scene_count):
         padded = state.fx_scenes + (None,) * (slot + 1 - len(state.fx_scenes))
         scenes = _fit(_put(padded, slot, value), scene_count)
         return replace(state, fx_scenes=scenes), SaveFxScenes(dump_scenes(scenes))
-    # A Set-wide store or a clear leaves the slot unscoped.
-    return _save_slots(state, _put(state.fx_slots, slot, value), state.fx_scoped - {slot})
+    return _save_slots(state, _put(state.fx_slots, slot, value))
 
 
-def _save_slots(state, slots, scoped):
-    state = replace(state, fx_slots=slots, fx_scoped=frozenset(scoped))
-    return state, SaveFxSnapshots(dump(slots, state.fx_scoped))
+def _save_slots(state, slots):
+    return replace(state, fx_slots=slots), SaveFxSnapshots(dump(slots))
 
 
 def _owner(scene):
@@ -210,13 +266,17 @@ def _owner(scene):
 
 
 def _name(slot, scene):
-    return f"Scene {slot + 1} snapshot" if scene else f"Snapshot {slot + 1}"
+    # slot is the global slot: its number within its bank, and the bank past bank 1.
+    if scene:
+        return f"Scene {slot + 1} snapshot"
+    bank, n = divmod(slot, layout.FX_SLOTS)
+    return f"Snapshot {n + 1}" if bank == 0 else f"Snapshot {n + 1}, bank {bank + 1}"
 
 
 def _landed(state, slot, scene):
     # Only the last Set-wide snapshot to land blinks, global or scene. A scoped one moves a
     # single rack, so it leaves the blink where it was.
-    if not scene and slot in state.fx_scoped:
+    if not scene and is_bound(state.fx_slots[slot]):
         return state
     if scene:
         return replace(state, fx_landed=None, fx_landed_scene=slot)
@@ -224,7 +284,7 @@ def _landed(state, slot, scene):
 
 
 def panel_visible(state):
-    # Session or Mixer Mode's split view shows the snapshots in columns 11-14.
+    # Session or Mixer Mode's split view shows the snapshots in columns 10-14.
     return state.mode is Mode.SESSION and faders.split_view(state) and state.split_snapshots
 
 
@@ -259,25 +319,484 @@ def press(state, event, snapshot):
         return state, []
     if not event.pressed:
         return state, []
-    # The Shift layer (Copy and Delete come first): an empty slot stores the selected rack
-    # alone. Scene snapshots stay Set-wide, and the other pads do nothing.
+    # The Shift layer (Copy and Delete come first): a slot's hold binds a parameter to it.
+    # Scene snapshots and the other pads do nothing.
     if state.shift and not state.copy and not state.delete:
-        if button.function == "slots" and state.fx_slots[button.value - 1] is None:
-            return state, [StoreFxSnapshot(button.value - 1, scoped=True)]
+        if button.function == "slots" and state.fx_bind_hold is None:
+            hold = BindHold(event.pad, event.column, _global(state, button.value))
+            return replace(state, fx_bind_hold=hold), []
         return state, []
+    if button.function == "slots" and not (state.copy or state.delete):
+        slot = _global(state, button.value)
+        if state.fx_length and is_bound(state.fx_slots[slot]):
+            # A bound slot holds no values to morph to.
+            return state, []
+        if not state.fx_length and state.fx_slots[slot] is not None:
+            return _hold(state, event, slot)
     return functions.press(button, state, snapshot)
 
 
-@functions.register("slots", light=lambda state, snapshot, slot: _slot_light(state, slot - 1))
+# Binding: Shift + a slot adds Live's selected parameter to it, or removes it if it's there.
+
+
+def binding(state, event):
+    hold = state.fx_bind_hold
+    return hold is not None and (hold.pad, hold.column) == (event.pad, event.column)
+
+
+def bind_release(state):
+    hold = state.fx_bind_hold
+    state = replace(state, fx_bind_hold=None)
+    if hold.used:
+        return state, []
+    return state, [BindSelectedParameter(hold.slot)]
+
+
+def parameter_bound(state, event):
+    # The adapter's answer: the selected parameter, or why it can't be bound.
+    name = _name(event.slot, False)
+    if event.refusal == "select":
+        return state, buttons.refuse("slots", "no_parameter")
+    if event.refusal is not None:
+        return state, buttons.refuse("slots", "cannot_hold", name=name, parameter=event.parameter)
+    return bind(state, event.slot, event.binding)
+
+
+def bind(state, slot, locator):
+    # Toggle: a parameter the slot holds is removed, any other added. A Set-wide slot refuses.
+    stored = state.fx_slots[slot]
+    name = _name(slot, False)
+    if stored is not None and not is_bound(stored):
+        return state, buttons.refuse("slots", "set_wide", name=name)
+    params = stored.params if stored is not None else ()
+    same = [p for p in params if _same(p, locator)]
+    if same:
+        kept = tuple(p for p in params if not _same(p, locator))
+        state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(kept) if kept else None))
+        state = _remember(state, slot, same[0], False)
+        return state, [save, *buttons.say("slots", "removed", name=name, param=describe(same[0]))]
+    state = _remember(state, slot, locator, True)
+    bound_slot = BoundSlot(params + (locator,))
+    state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
+    items = [describe(p) for p in bound_slot.params]
+    return state, [save, *listed(items, lambda text: buttons.say("slots", "bound", name=name, params=text))]
+
+
+def listed(items, say):
+    # say(text) with as many items as fit in STATUS_MAX characters, then "+N" for the rest.
+    for keep in range(len(items), 0, -1):
+        text = ", ".join(items[:keep]) + (f", +{len(items) - keep}" if keep < len(items) else "")
+        message = say(text)
+        if not message or len(message[0].text) <= STATUS_MAX:
+            return message
+    return message
+
+
+def _remember(state, slot, locator, added):
+    # For the Undo pad: the window starts again at the next tick.
+    return replace(state, bind_undo=state.bind_undo + ((slot, locator, added),), bind_undo_at=None)
+
+
+def bind_undo_open(state):
+    # The Undo pad would reverse a bind: one is remembered and its window hasn't run out.
+    if not state.bind_undo:
+        return False
+    at, now = state.bind_undo_at, state.bind_undo_now
+    return at is None or now is None or now - at < BIND_UNDO_MS
+
+
+def unbind_last(state):
+    # The Undo pad: the newest bind or removal reversed, without Live's Undo. Its window
+    # starts again for the next.
+    (slot, locator, added), rest = state.bind_undo[-1], state.bind_undo[:-1]
+    state = replace(state, bind_undo=rest, bind_undo_at=None)
+    stored = state.fx_slots[slot]
+    params = stored.params if is_bound(stored) else ()
+    name, param = _name(slot, False), describe(locator)
+    if added:
+        kept = tuple(p for p in params if not _same(p, locator))
+        state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(kept) if kept else None))
+        return state, [save, *buttons.say("slots", "unbound", name=name, param=param)]
+    if stored is not None and not is_bound(stored):
+        return state, []
+    state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(params + (locator,))))
+    return state, [save, *buttons.say("slots", "rebound", name=name, param=param)]
+
+
+def bind_tick(state, now_ms):
+    # On the 10 ms timer while a bind is remembered: stamp it, and forget it once its window
+    # has run out.
+    at = now_ms if state.bind_undo_at is None else state.bind_undo_at
+    if now_ms - at >= BIND_UNDO_MS:
+        return replace(state, bind_undo=(), bind_undo_at=None, bind_undo_now=None)
+    return replace(state, bind_undo_at=at, bind_undo_now=now_ms)
+
+
+def _same(a, b):
+    # The same parameter: a rack macro's name may have changed since it was bound.
+    return (a.track, a.tn, a.device, a.dn, a.param) == (b.track, b.tn, b.device, b.dn, b.param)
+
+
+def describe(locator):
+    # "Auto Filter Frequency", or a mixer parameter's "Bass Track Volume".
+    return f"{locator.device or locator.track} {locator.name}"
+
+
+# Held slots: a tap recalls on the lift, a slide right blends towards the slot.
+
+
+def holding(state, event):
+    # The release ends a slot hold: on its row, at the column its finger is on now.
+    return _held(state, event.pad, event.column) is not None
+
+
+def _held(state, pad, column=None):
+    return next(
+        (h for h in state.fx_holds if h.pad == pad and (column is None or h.column == column)),
+        None,
+    )
+
+
+def _hold(state, event, slot):
+    # One hold per row. The read is taken now, so a slide's origins are the press's values.
+    if _held(state, event.pad) is not None:
+        return state, []
+    stored = state.fx_slots[slot]
+    bound = is_bound(stored)
+    hold = SlotHold(event.pad, event.column, slot, bound=bound)
+    locators = stored.params if bound else ()
+    read = RecallFxSnapshot(slot, None, hold=True, locators=locators)
+    return replace(state, fx_holds=state.fx_holds + (hold,)), [read]
+
+
+def _drop_hold(state, pad):
+    return replace(state, fx_holds=tuple(h for h in state.fx_holds if h.pad != pad))
+
+
+def _put_hold(state, old, new):
+    return replace(state, fx_holds=tuple(new if h is old else h for h in state.fx_holds))
+
+
+def release(state, event, snapshot):
+    # A held slot's lift: a tap recalls, a slide keeps where it got to.
+    hold = _held(state, event.pad, event.column)
+    if hold.read is None:
+        # The read hasn't landed: it decides.
+        return _put_hold(state, hold, replace(hold, lifted=True)), []
+    state = _drop_hold(state, hold.pad)
+    if hold.slid:
+        return _end_slide(state, hold)
+    return _tap(state, hold)
+
+
+def slide(state, event):
+    # The hold follows its finger into any column; whether a hold owns the slide.
+    hold = _held(state, event.pad, event.from_column)
+    if hold is None:
+        return state, False
+    return _put_hold(state, hold, replace(hold, column=event.to_column)), True
+
+
+def x_axis(state, event):
+    # An X report on a held slot's finger: the first sets the zero, a quarter column either way
+    # makes it a slide, and a slide blends by how far right it is, 4 columns to 100%.
+    hold = _held(state, event.pad, event.column)
+    if hold.x0 is None:
+        return _put_hold(state, hold, replace(hold, x0=event.value)), [], False
+    columns = (event.value - hold.x0) / X_COLUMN_WIDTH
+    new = hold
+    if not hold.slid:
+        if abs(columns) < SLIDE_START:
+            return state, [], False
+        count = state.fx_slide_count + 1
+        state = replace(state, fx_slide_count=count)
+        new = replace(new, slid=True, order=count)
+    # A bound slot slides both ways; a Set-wide one only towards its snapshot.
+    low = -1.0 if hold.bound else 0.0
+    new = replace(new, f=min(max(columns / SLIDE_COLUMNS, low), 1.0))
+    if new == hold:
+        return state, [], False
+    state = _put_hold(state, hold, new)
+    redraw = not hold.slid or meter(hold.f) != meter(new.f)
+    if new.read is None or (hold.slid and new.f == hold.f):
+        return state, [], redraw
+    before = value_meter(state, new) if new.bound else None
+    state, actions = _blend(state, new)
+    if new.bound:
+        redraw = redraw or value_meter(state, _held(state, new.pad)) != before
+    return state, actions, redraw
+
+
+def render_meters(state):
+    # Each slide's fill: the pads right of its slot to its 100% pad, in the slot's colour, one
+    # per 25%. Until the lift, they hide whatever those pads show.
+    frame = {}
+    for hold in state.fx_holds:
+        column = layout.FX.slots[hold.slot % layout.FX_SLOTS][0]
+        if hold.bound:
+            frame.update(_value_meter(state, hold, column))
+            continue
+        if not hold.slid:
+            continue
+        colour = PINK if is_bound(state.fx_slots[hold.slot]) else CYAN
+        lit = meter(hold.f)
+        for k in range(1, SLIDE_COLUMNS + 1):
+            if column + k < layout.COLUMNS:
+                frame[(column + k, hold.pad)] = Light(colour if k <= lit else OFF)
+    return frame
+
+
+def _value_meter(state, hold, column):
+    # A bound slot, held: the 4 pads right of it show where its first parameter sits between
+    # its min (none lit) and max (all 4), in the slot's pink.
+    if not hold.read:
+        return {}
+    lit = value_meter(state, hold)
+    return {
+        (column + k, hold.pad): Light(PINK if k <= lit else OFF)
+        for k in range(1, SLIDE_COLUMNS + 1)
+        if column + k < layout.COLUMNS
+    }
+
+
+def value_meter(state, hold):
+    first = hold.read[0]
+    param = _param(state, first.key)
+    value = param.written if param is not None else first.start
+    position = (value - first.low) / first.span if first.span else 0.0
+    return round(min(max(position, 0.0), 1.0) * SLIDE_COLUMNS)
+
+
+def meter(f):
+    # The meter's lit pads past the slot: one per 25%, the first as soon as f is above 0.
+    return sum(f > k / SLIDE_COLUMNS for k in range(SLIDE_COLUMNS))
+
+
+def slide_tick(state, values):
+    # On the 10 ms timer: values holds each slide parameter's live value, None if unreadable.
+    # One turned by hand, or gone, leaves every slide and keeps its value.
+    gone = {
+        p.key
+        for p, value in zip(state.fx_slide_params, values)
+        if value is None or abs(value - p.written) > FX_TOUCH_TOLERANCE * p.span
+    }
+    return faders.leave_slides(state, gone) if gone else state
+
+
+def _hold_read(state, event, snapshot):
+    hold = next((h for h in state.fx_holds if h.slot == event.slot and h.read is None), None)
+    stored = state.fx_slots[event.slot]
+    if hold is None or stored is None:
+        return state, []
+    if hold.bound:
+        macros = tuple(p for p in event.params if p is not None)
+        missing = len(event.params) - len(macros)
+        note = f", {_count(missing, 'parameter')} not found" if missing else ""
+    else:
+        macros, missing = _match(stored, event.racks)
+        note = f", {_count(missing, 'rack')} not found" if missing else ""
+    read = replace(hold, read=macros, note=note)
+    state = _put_hold(state, hold, read)
+    if not read.lifted:
+        return _blend(state, read) if read.slid else (state, [])
+    if not read.slid:
+        return _tap(_drop_hold(state, read.pad), read)
+    # Lifted after a slide: the final blend, kept.
+    state, actions = _blend(state, read)
+    final = _held(state, read.pad)
+    state, more = _end_slide(_drop_hold(state, read.pad), final)
+    return state, actions + more
+
+
+def _tap(state, hold):
+    # The tap's recall, at once, from the press's read.
+    name = _name(hold.slot, False)
+    if not hold.read:
+        return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
+    if hold.bound:
+        # Nothing to recall: the tap names the parameters and their values.
+        items = [f"{p.name} {p.text or _number(p.start)}" for p in hold.read]
+        return state, listed(
+            items, lambda text: buttons.say("slots", "named", name=name, params=text, note=hold.note)
+        )
+    state, actions = _recall_now(state, hold.read)
+    state = _landed(state, hold.slot, False)
+    return state, actions + buttons.say("slots", "recalled", name=name, note=hold.note)
+
+
+def _recall_now(state, macros):
+    # A recall that writes at once. With slides held it takes their shared parameters and joins
+    # their undo step; otherwise it is its own step, closing a fader's or a morph's.
+    writes = tuple((m.key, m.target) for m in macros)
+    if any(h.slid for h in state.fx_holds):
+        state = faders.leave_slides(state, {m.key for m in macros})
+    if state.fx_slide_undo_open:
+        actions = [SetMacros(writes)]
+        if state.fx_undo_open:
+            actions.insert(0, EndUndoStep())
+        return replace(state, morph=None, fx_undo_open=False), actions
+    state, actions = _close_steps(state)
+    actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
+    return replace(state, morph=None, fx_undo_open=False), actions
+
+
+def _close_steps(state):
+    # A recall or a slide closes a fader gesture's undo step and a running morph's.
+    actions = []
+    if state.fader_undo_open:
+        state = replace(state, fader_undo_open=False)
+        actions.append(EndUndoStep())
+    if state.fx_undo_open:
+        state = replace(state, fx_undo_open=False)
+        actions.append(EndUndoStep())
+    return state, actions
+
+
+def _slide_owner(state, key):
+    # The latest started slide holding the parameter, or None.
+    holders = [h for h in state.fx_holds if h.slid and _holds_key(h, key)]
+    return max(holders, key=lambda h: h.order, default=None)
+
+
+def _holds_key(hold, key):
+    return bool(hold.read) and key not in hold.dropped and any(m.key == key for m in hold.read)
+
+
+def _param(state, key):
+    return next((p for p in state.fx_slide_params if p.key == key), None)
+
+
+def _blend(state, hold, keys=None):
+    # The hold's parameters it owns (or just keys) written at its f: continuous ones in
+    # proportion, quantized ones at the slot's value from switch_at on. The first actual write
+    # opens the slides' undo step, closing a fader's or a morph's, and cancels a running morph.
+    if not hold.read:
+        return state, []
+    switch_at = buttons.switch_at()
+    later = [
+        _keys(h) for h in state.fx_holds if h.slid and h is not hold and h.order > hold.order
+    ]
+    params = {p.key: p for p in state.fx_slide_params}
+    writes = []
+    for macro in hold.read:
+        key = macro.key
+        if key in hold.dropped or (keys is not None and key not in keys):
+            continue
+        if any(key in owned for owned in later):
+            continue
+        param = params.get(key)
+        if param is None:
+            param = params[key] = SlideParam(key, macro.start, macro.start, macro.span)
+        value = _slid_value(macro, param.origin, hold.f, switch_at)
+        if value != param.written:
+            writes.append((key, value))
+            params[key] = replace(param, written=value)
+    state = replace(state, fx_slide_params=tuple(params.values()))
+    if not writes:
+        return state, []
+    actions = []
+    if not state.fx_slide_undo_open:
+        state, actions = _close_steps(state)
+        actions.append(BeginUndoStep())
+        state = replace(state, fx_slide_undo_open=True)
+    if not hold.wrote:
+        state = _put_hold(state, hold, replace(hold, wrote=True))
+        if state.morph is not None:
+            if state.fx_undo_open:
+                actions.append(EndUndoStep())
+            state = replace(state, morph=None, fx_undo_open=False)
+    return state, actions + [SetMacros(tuple(writes))]
+
+
+def _keys(hold):
+    return {m.key for m in hold.read or ()} - hold.dropped
+
+
+def _end_slide(state, hold):
+    # The lift after a slide: the values stay. The parameters it owned go back to the latest
+    # remaining slide holding them, at that slide's f; the last slide's lift closes the step.
+    actions = []
+    if hold.read:
+        handed = {}
+        for key in _keys(hold):
+            owner = _slide_owner(state, key) if _param(state, key) is not None else None
+            if owner is not None:
+                handed.setdefault(owner.pad, set()).add(key)
+        for pad, keys in handed.items():
+            state, more = _blend(state, _held(state, pad), keys)
+            actions += more
+        state = _rebase(state)
+    if state.fx_slide_undo_open and not any(h.slid for h in state.fx_holds):
+        state = replace(state, fx_slide_undo_open=False)
+        actions.append(EndUndoStep())
+    percent = round(hold.f * 100)
+    name = _name(hold.slot, False)
+    if hold.bound:
+        message = listed(
+            [p.name for p in hold.read or ()],
+            lambda text: buttons.say(
+                "slots", "slid_bound", name=name, percent=percent, params=text, note=hold.note
+            ),
+        )
+    else:
+        message = buttons.say("slots", "slid", name=name, percent=percent, note=hold.note)
+    return state, actions + message
+
+
+def _slid_value(entry, origin, f, switch_at):
+    # A Set-wide slot's macro blends towards its snapshot value. A bound slot's parameter moves
+    # from its origin by f of its range either way, stopping at its ends; quantized ones
+    # switch to an end from switch_at.
+    if isinstance(entry, BoundRead):
+        if entry.quantized:
+            return entry.high if f >= switch_at else entry.low if f <= -switch_at else origin
+        return min(max(origin + f * entry.span, entry.low), entry.high)
+    if entry.quantized:
+        return entry.target if f >= switch_at else origin
+    return origin + f * (entry.target - origin)
+
+
+def _number(value):
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _rebase(state):
+    # A parameter no slide owns keeps its last write as the origin for the next to take it,
+    # and is forgotten once no hold holds it.
+    params = []
+    for param in state.fx_slide_params:
+        if not any(_holds_key(h, param.key) for h in state.fx_holds):
+            continue
+        if _slide_owner(state, param.key) is None:
+            param = replace(param, origin=param.written)
+        params.append(param)
+    return replace(state, fx_slide_params=tuple(params))
+
+
+def _global(state, slot):
+    # A slot pad's value (1-16) in the selected bank, as the global slot index.
+    return state.fx_bank * layout.FX_SLOTS + slot - 1
+
+
+@functions.register("slots", light=lambda state, snapshot, slot: _slot_light(state, _global(state, slot)))
 def _slot(state, snapshot, slot):
-    return _slot_press(state, slot - 1, False, snapshot)
+    return _slot_press(state, _global(state, slot), False, snapshot)
+
+
+@functions.register(
+    "banks", light=lambda state, snapshot, bank: Light(ORANGE if bank - 1 == state.fx_bank else OFF)
+)
+def _bank(state, snapshot, bank):
+    # One value for the whole Set, held in memory only: a set_data write would put a dead
+    # step on Live's Undo (#63).
+    return replace(state, fx_bank=bank - 1), buttons.say("banks", "selected", bank=bank)
 
 
 @functions.register(
     "scene_slots", light=lambda state, snapshot, row: _scene_slot_light(state, snapshot, row - 1)
 )
 def _scene_slot(state, snapshot, row):
-    # Column 13 follows the scene pads.
+    # Column 14 follows the scene pads.
     scene = state.window.scene + row - 1
     if scene < snapshot.scene_count:
         return _slot_press(state, scene, True, snapshot)
@@ -292,7 +811,9 @@ functions.register_hold(
 
 def _slot_light(state, slot):
     # Pink for one rack's snapshot, cyan for the Set's.
-    colour = PINK if slot in state.fx_scoped else CYAN
+    colour = PINK if is_bound(state.fx_slots[slot]) else CYAN
+    if any(h.slot == slot and h.slid for h in state.fx_holds):
+        return Light(colour, Blink.FAST)
     morph = state.morph
     if morph is not None and not morph.scene and morph.slot == slot:
         return Light(colour, Blink.FAST)
@@ -341,9 +862,9 @@ def render(state, snapshot):
 
 def racks_read(state, event, snapshot):
     # The adapter's rack read after a store or a recall, in any mode.
+    if event.hold:
+        return _hold_read(state, event, snapshot)
     name, owner = _name(event.slot, event.scene), _owner(event.scene)
-    if not event.recall and event.scoped:
-        return _store_scoped(state, event, name)
     if not event.recall:
         if not event.racks:
             return state, buttons.refuse(owner, "no_racks")
@@ -358,14 +879,6 @@ def racks_read(state, event, snapshot):
     note = f", {_count(missing, 'rack')} not found" if missing else ""
     if not macros:
         return state, buttons.refuse(owner, "nothing", name=name, note=note)
-    # A recall closes a fader gesture's undo step; the finger carries on in a new one.
-    actions = []
-    if state.fader_undo_open:
-        state = replace(state, fader_undo_open=False)
-        actions.append(EndUndoStep())
-    # A new recall replaces a running morph and its undo step.
-    if state.fx_undo_open:
-        actions.append(EndUndoStep())
     launch = event.end_beats is not None
     if launch:
         # The press decided the landing: the follow-up's transport may already have started.
@@ -373,32 +886,26 @@ def racks_read(state, event, snapshot):
     else:
         instant = event.bars is None or not snapshot.is_playing
     if instant:
-        writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
-        actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
-        state = replace(state, morph=None, fx_undo_open=False)
+        state, actions = _recall_now(state, macros)
         state = _landed(state, event.slot, event.scene)
         return state, actions + buttons.say(owner, "recalled", name=name, note=note)
     start = snapshot.song_beats
     end = event.end_beats if launch else end_beats(snapshot, event.bars)
     morph = Morph(event.slot, start, end, start, macros, scene=event.scene, launch=launch)
-    state = replace(state, morph=morph, fx_undo_open=True)
     timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
     message = buttons.say(owner, "morphing", name=name, timing=timing, note=note)
+    if any(h.slid for h in state.fx_holds):
+        # Slides are held: the morph takes the parameters it shares.
+        state = faders.leave_slides(state, {m.key for m in macros})
+    if state.fx_slide_undo_open:
+        # ...and joins their step once they have written. A morph it replaces closes its own.
+        actions = [EndUndoStep()] if state.fx_undo_open else []
+        return replace(state, morph=morph, fx_undo_open=False), actions + message
+    # A recall closes a fader gesture's undo step, and replaces a running morph and its step;
+    # the finger carries on in a new one.
+    state, actions = _close_steps(state)
+    state = replace(state, morph=morph, fx_undo_open=True)
     return state, actions + [BeginUndoStep(), *message]
-
-
-def _store_scoped(state, event, name):
-    # The selected rack's macros only; its key counts every rack in the Set, as a recall's do.
-    stored = tuple(
-        item
-        for item, view in zip(capture(event.racks), event.racks)
-        if event.selected is not None and view.path == event.selected
-    )
-    if not stored:
-        return state, buttons.refuse("slots", "no_rack", name=name)
-    slots = _put(state.fx_slots, event.slot, stored)
-    state, save = _save_slots(state, slots, state.fx_scoped | {event.slot})
-    return state, [save, *buttons.say("slots", "stored_scoped", name=name, rack=stored[0].rack)]
 
 
 def tick(state, transport, values, triggered=None):
@@ -425,7 +932,7 @@ def tick(state, transport, values, triggered=None):
         morph = replace(morph, triggered=False)
     # A stop or a backward jump lands at once: there's nothing to interpolate to.
     if played is None or _lands(morph, now, triggered):
-        writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
+        writes = tuple((m.key, m.target) for m in macros)
         actions = [SetMacros(writes)] if writes else []
         if state.fx_undo_open:
             actions.append(EndUndoStep())
@@ -439,7 +946,7 @@ def tick(state, transport, values, triggered=None):
         if not macro.quantized:
             value = macro.start + (macro.target - macro.start) * fraction
             if value != macro.written:
-                writes.append((macro.path, macro.rack_name, macro.index, value))
+                writes.append((macro.key, value))
                 macro = replace(macro, written=value)
         moved.append(macro)
     state = replace(state, morph=replace(morph, macros=tuple(moved), last_beats=now))
@@ -552,6 +1059,8 @@ def launch_tick(state, transport):
 
 def _match(stored, racks):
     # MorphMacro per macro both the snapshot and the Set's rack have, and the missing count.
+    if is_bound(stored):
+        return (), 0
     current = dict(zip(keys(racks), racks))
     macros, missing = [], 0
     for item in stored:
@@ -563,9 +1072,7 @@ def _match(stored, racks):
             target = min(max(value, view.min), view.max)
             macros.append(
                 MorphMacro(
-                    rack.path,
-                    rack.rack_name,
-                    index,
+                    (rack.path, rack.rack_name, index),
                     view.value,
                     target,
                     view.is_quantized,

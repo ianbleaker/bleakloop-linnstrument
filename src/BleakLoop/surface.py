@@ -118,6 +118,7 @@ class BleakLoop(ControlSurface):
         self._slides = device.SlideDecoder()
         self._x_rows = None  # the X and slide rows last sent; None after User Firmware Mode on
         self._x_timing = _Timing()  # X reports in the current fader gesture
+        self._slide_timing = _Timing()  # X reports while snapshot slots are held
         self._saved_split = {}  # the first reply per NRPN: the player's settings
         self._reads = {}  # the latest reply per NRPN
         self._set_numbers = []  # NRPNs BleakLoop set, in setup order
@@ -147,7 +148,6 @@ class BleakLoop(ControlSurface):
         self._fx_text = None  # the stored FX snapshots as last read
         self._fx_scenes_text = None  # the stored scene snapshots as last read
         self._scenes = []  # song.scenes at the last display tick
-        self._faders_text = None  # the stored Mapped FX bindings as last read
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
         self._pending_fresh = False
@@ -196,7 +196,6 @@ class BleakLoop(ControlSurface):
             self._load_fx()
             self._load_fx_scenes()
             self._follow_scenes()
-            self._load_faders()
             self._follow_selected_device()
             if self._state.mode is Mode.LINNSTRUMENT:
                 self._poll_tick()
@@ -231,7 +230,6 @@ class BleakLoop(ControlSurface):
             self._load_fx()
             self._load_fx_scenes()
             self._scenes = list(self.song.scenes)
-            self._load_faders()
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
                 self.show_message(self._refusal)
@@ -333,11 +331,11 @@ class BleakLoop(ControlSurface):
         if text == self._fx_text:
             return
         self._fx_text = text
-        slots, scoped = fx.parse(text)
-        # A valid store round-trips; one with every slot cleared is valid too.
-        if text and fx.dump(slots, scoped) != text:
+        slots = fx.parse(text)
+        # v1 and v2 stores both read; one with every slot cleared is valid too.
+        if text and not fx.readable(text):
             logger.warning("FX: stored snapshots unreadable, starting empty")
-        self._state = replace(self._state, fx_slots=slots, fx_scoped=scoped)
+        self._state = replace(self._state, fx_slots=slots)
 
     def _load_fx_scenes(self):
         # As _load_fx, for the scene snapshots.
@@ -379,17 +377,6 @@ class BleakLoop(ControlSurface):
             [i for i, snapshot in enumerate(before) if snapshot is not None],
             [i for i, snapshot in enumerate(self._state.fx_scenes) if snapshot is not None],
         )
-
-    def _load_faders(self):
-        # As _load_fx, for the fader bindings.
-        text = live_state.read_fader_store(self.song)
-        if text == self._faders_text:
-            return
-        self._faders_text = text
-        bindings = faders.parse(text)
-        if text and faders.dump(bindings) != text:
-            logger.warning("FADERS: stored bindings unreadable, starting empty")
-        self._state = replace(self._state, fader_bindings=bindings)
 
     def disconnect(self):
         if self._editor is not None:
@@ -543,6 +530,11 @@ class BleakLoop(ControlSurface):
             transport = live_state.read_transport(self.song, Live.Application.get_application())
             if self._state.morph is not None:
                 self._morph_tick(transport)
+            if self._state.bind_undo:
+                self._state = engine.bind_tick(self._state, time.monotonic() * 1000)
+            if self._state.fx_slide_params:
+                values = live_state.read_slide_values(self.song, self._state.fx_slide_params)
+                self._state = engine.slide_tick(self._state, values)
             if self._state.pending_launch is not None:
                 self._launch_tick(transport)
             key = phase_key(self._clock(transport))
@@ -684,11 +676,13 @@ class BleakLoop(ControlSurface):
         rows = engine.x_rows(self._state)
         if rows == self._x_rows:
             return
+        before = self._x_rows
         self._send(device.x_rows(rows))
         self._x_rows = rows
         if mode is Mode.SESSION:
             # A Sequencer hold keeps its transfer state: its slide continues on the new row set.
-            self._slides.reset()
+            # A held snapshot slot keeps its row's too, as the split view adds and drops rows.
+            self._slides.reset(None if before is None else set(before) - set(rows))
 
     def _listen_for(self, mode):
         self._remove_listeners()
@@ -813,11 +807,15 @@ class BleakLoop(ControlSurface):
             self._refresh()
         if self._state.fader_touches:
             self._x_timing.add(start)
+        elif self._state.fx_holds:
+            self._slide_timing.add(start)
 
     def _log_fader_gesture(self):
-        # Once the last touch ends: the gesture's X load, for the device check.
+        # Once the last touch or held slot ends: the gesture's X load, for the device check.
         if self._x_timing.runs and not self._state.fader_touches:
             logger.info("FADERS: %d reports, longest %.1f ms", *self._x_timing.take())
+        if self._slide_timing.runs and not self._state.fx_holds:
+            logger.info("FX: slide %d reports, longest %.1f ms", *self._slide_timing.take())
 
     def _on_y_axis(self, column, row, value):
         # 50-100 reports a second per finger: no snapshot or refresh, since only the 10 ms
@@ -927,7 +925,7 @@ class BleakLoop(ControlSurface):
         return self._seq_view
 
     def _update_ring(self, force=False):
-        # In every mode: Live's ring shows which scenes the pads, and FX Mode's column 13, show.
+        # In every mode: Live's ring shows which scenes the pads, and FX Mode's column 14, show.
         window = self._state.window
         width = controls.window_tracks(self._state)
         want = (window.track, window.scene, width, layout.WINDOW_SCENES)

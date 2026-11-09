@@ -43,7 +43,6 @@ BEAT_EPSILON = 1e-6
 
 # Firmware FXD_CALX_FULL_UNIT (4095 / 24): column c's centre is X_COLUMN_WIDTH * (c - 0.5).
 X_COLUMN_WIDTH = 170.625
-FADERS_DATA_KEY = "BleakLoop.faders"  # song.set_data key for the Mapped FX bindings
 
 SEQ_BASE_NOTE = 48  # Sequencer note pads' bottom left: C2 in Live's naming (C3 = 60)
 SEQ_DEFAULT_RATE = 0.25  # beats per step: 1/16
@@ -51,3 +50,9 @@ AUDITION_CHANNEL = 15  # 0-based: channel 16, outside User Firmware Mode's row c
 SLIDE_START = 0.25  # of a column: a held step's X travel that starts a slide
 VELOCITY_PER_COLUMN = 16
 NUDGE_PER_COLUMN = 0.125  # of a step
+# A bound slot's message lists its parameters until it reaches this many characters, then
+# ends "+N" for the rest. To check on the device: how much of Live's status bar shows.
+STATUS_MAX = 80
+# The Undo pad reverses the last bind or removal of a snapshot slot's parameter this long after
+# it, with nothing else pressed since; past it, the pad is Live's Undo again.
+BIND_UNDO_MS = 10000

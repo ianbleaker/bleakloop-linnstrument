@@ -39,6 +39,13 @@ Your changes are saved in `User Library/BleakLoop/buttons.toml`, beside the Remo
   port = 47128
   ```
 
+- To change where a snapshot slide switches on/off and chooser parameters (see Snapshots and morphs), add this, with any number above 0 up to 1. The editor keeps it when it saves:
+
+  ```toml
+  [morph]
+  switch_at = 0.5
+  ```
+
 To check a file by hand, from the repo: `PYTHONPATH=src python3 -m tools.check_buttons --user PATH`.
 
 ## 2. Function Reference
@@ -127,7 +134,7 @@ The outer edge, column 16, holds the mode pads, then Delete and Copy. **Device/C
 With **Shift** held:
 
 - **Tempo**: Tempo +1 or -1 BPM.
-- **Fader source**: Switch the faders between Device FX and Mapped FX, in every mode but Linnstrument Mode. In Session and Mixer Mode, the split view's snapshots come third.
+- **Panel**: Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX or Sequencer Mode.
 - **Window directions**: Move the Ableton session ring in the selected direction.
 <!-- /callouts:navigation -->
 
@@ -166,7 +173,7 @@ With **Shift** held:
 
 #### Split view
 
-The split view shows 8 tracks and a panel side by side. Press Session (column 16, pad 1) while in Session Mode to turn it on or off, with a message. Session is pink while the split view is on. The panel shows eight faders, Device FX or Mapped FX, or FX Mode's snapshots: Shift + FX steps through the three.
+The split view shows 8 tracks and a panel side by side. Press Session (column 16, pad 1) while in Session Mode to turn it on or off, with a message. Session is pink while the split view is on. The panel shows eight Device FX faders or FX Mode's snapshots: Shift + FX switches between them.
 
 ![Session Mode, split view](manual/session-split.svg)
 
@@ -174,7 +181,7 @@ The split view shows 8 tracks and a panel side by side. Press Session (column 16
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
-- **Faders**: One fader per row, as in FX Mode, from the source Shift + FX picks. Its third choice shows the snapshots instead.
+- **Faders**: One Device FX fader per row, as in FX Mode. Shift + FX shows the snapshots instead.
 
 With **Shift** held:
 
@@ -183,7 +190,7 @@ With **Shift** held:
 - **Arm**: Arm or disarm the track alone, keeping the selection.
 <!-- /callouts:split -->
 
-With the snapshots in the panel, columns 11–14 work as FX Mode's, and column 10 is dark.
+With the snapshots in the panel, columns 10–14 work as FX Mode's.
 
 ![Session Mode, split view with the snapshots](manual/session-split-snapshots.svg)
 
@@ -191,9 +198,10 @@ With the snapshots in the panel, columns 11–14 work as FX Mode's, and column 1
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
-- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
-- **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
+- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in pink.
+- **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
+- **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 
 With **Shift** held:
 
@@ -235,7 +243,7 @@ The split view shows 8 tracks' volume faders and the same panel as Session Mode'
 - **Volume faders**: One volume fader per track.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
-- **Panel**: One fader per row, as in FX Mode, from the source Shift + FX picks. Its third choice shows the snapshots instead.
+- **Panel**: One Device FX fader per row, as in FX Mode. Shift + FX shows the snapshots instead.
 
 With **Shift** held:
 
@@ -245,9 +253,9 @@ With **Shift** held:
 
 ### FX Mode
 
-- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX (column 16, pad 3) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to. In Session and Mixer Mode, the snapshots come third, for the split view's panel.
-- Snapshots are saved in the Set. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
-- With Shift held the faders work as without it, and the snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot (see Snapshots and morphs); the other snapshot pads ignore presses.
+- The faders show **Device FX** (magenta and blue), the selected device's macros or parameters. In Session and Mixer Mode, Shift + FX (column 16, pad 3) switches the split view's panel between these faders and the snapshots; in FX Mode it does nothing.
+- Snapshots are saved in the Set, in eight banks of sixteen: the bank pads in column 13 switch which bank the slots show. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
+- With Shift held the faders work as without it, and the snapshot pads stay lit. Shift + a slot binds a parameter to it (see Bound snapshots); the other snapshot pads ignore presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
@@ -256,9 +264,10 @@ With **Shift** held:
 
 <!-- callouts:fx -->
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
-- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
-- **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
+- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in pink.
+- **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
+- **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 <!-- /callouts:fx -->
 
 ### Sequencer Mode
@@ -397,10 +406,10 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 ### Split view
 
 - Session Mode and Mixer Mode each have their own split view, toggled by their own pad. Columns 2–9 work as in that mode for an 8-track window, and Live's ring shrinks to match. The window moves as usual; turning the split view off keeps it where it is, unless it then runs past the last track.
-- Columns 10–14 are the panel, in every row. Shift + FX steps it through Device FX, Mapped FX and the snapshots, and both split views show the same choice.
-- As faders, five pads wide, they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads.
-- As snapshots, columns 11–14 work as FX Mode's: snapshots, scene snapshots and Bars, with Copy and Delete as there. Column 10 is dark.
-- With Shift held the panel's faders work as without it, and its snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot; the other snapshot pads ignore presses.
+- Columns 10–14 are the panel, in every row. Shift + FX switches it between Device FX and the snapshots, and both split views show the same choice. It shows Device FX each time Live starts or a Set opens.
+- As faders, five pads wide, they work as FX Mode's. They have no mute or arm pads.
+- As snapshots, columns 10–14 work as FX Mode's: Bars, snapshots, banks and scene snapshots, with Copy and Delete as there. Both split views and FX Mode show the same bank.
+- With Shift held the panel's faders work as without it, and its snapshot pads stay lit. Shift + a slot binds a parameter to it; the other snapshot pads ignore presses.
 - A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
 - The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
 - FX Mode always shows 13 tracks, and so do Session and Mixer Mode without their split view; near the last track, the window moves left to fill them. Each mode keeps its own split view on or off when you leave it.
@@ -416,26 +425,19 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Hold Stop and press any of a track's pads to stop its clips.
 - Copy and Delete do nothing here.
 
-### FX faders and Mapped FX
+### FX faders
 
-**Faders** (columns 2–10): one fader per row. They have two sources, switched with Shift + FX: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. Selecting a track with pad 8 or Device/Clip + Tracks moves it to the track's first rack (see Select and arm row). The fader source starts on Device FX each time Live starts or a Set opens.
+**Faders** (columns 2–9): one fader per row, **Device FX**, for the device with Live's blue hand. Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. Selecting a track with pad 8 or Device/Clip + Tracks moves it to the track's first rack (see Select and arm row).
 
-- In Device FX, a rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
-- Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 10 the maximum. Slide along the row to move it.
+- A rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
+- Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 9 the maximum. Slide along the row to move it.
 - The lit pads, counted from the left, show the value. Rows alternate magenta and blue so you can count them. The bar follows the parameter, so automation, a morph or a turn of the knob in Live move it too.
-- Slide past either end and the value stays at that end. Your finger can go on over the Global column or the snapshots without pressing them, until you lift it.
+- Slide past either end and the value stays at that end. Your finger can go on over the Global column, Bars or the snapshots without pressing them, until you lift it.
 - One touch is one undo, however many rows you move at once.
-- A fader on a macro that's morphing takes that macro out of the morph; the rest of the morph carries on.
+- A fader on a macro that's morphing takes that macro out of the morph; the rest of the morph carries on. On a macro a held snapshot slide is moving, it takes it out of the slide the same way, and its moves join the slide's undo.
 - Holding Stop or Copy, a fader does nothing. Holding Shift, it works as without it.
 
-**Mapped FX** gives each row a parameter of your choice, from anywhere in the Set.
-
-- To bind a row, click a parameter in Live, then hold Device/Clip and press any pad of the row. The status bar names what it bound, such as "Fader 3: Auto Filter Frequency". Binding a row again replaces its parameter.
-- Any parameter of a device directly on a track, group, return or master can be bound, and so can a track's volume, pan and sends. A parameter of a device inside a rack can't: map it to one of the rack's macros, and bind the macro. Other mixer controls, such as the crossfader or the tempo, can't be bound either.
-- To unbind a row, hold Delete and press any pad of it.
-- Unbound rows are dark. Binding and unbinding only work while the faders show Mapped FX; in Device FX, Device/Clip + a row says "Shift + FX for Mapped FX".
-- The bindings are saved in the Set. Undo doesn't bring back a bind or unbind: bind or unbind the row again.
-- A binding finds its parameter again by the track's name, the device's name and the parameter's name, counting same-named tracks and devices in order. If you rename the track or device, or delete it, the row goes dark, and touching it says "Fader N: parameter not found". Renaming it back brings the row back.
+To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound snapshots).
 
 ### Snapshots and morphs
 
@@ -443,26 +445,55 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 - A snapshot holds the visible macros of every rack on the Set's tracks, groups, returns and master. Racks inside other racks aren't included.
 - Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it.
-- Press a stored (cyan) slot to recall it at once.
-- Hold a Bars pad, then press a stored slot to morph to it. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
+- Tap a stored (cyan) slot to recall it at once. The recall happens as you lift your finger: until then the slot can't tell a tap from a slide.
+- Hold a Bars pad, then press a stored slot to morph to it. This one starts on the press. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
 - While the transport is stopped, a recall always happens at once.
 - Hold Delete and press a stored slot to clear it.
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
 - Snapshots 1–8 in column 11, 9–16 in column 12.
 
-**Scoped snapshots:**
+**Banks** (column 13, pads 1–8):
 
-- A scoped snapshot holds one rack's macros. Select a rack in Live, then hold Shift and press an empty slot: the slot stores that rack alone and turns pink, and the status bar names the rack.
-- The rack must sit directly on a track, group, return or master, as for any snapshot. With anything else selected, or nothing, the status bar says "Select a rack to store Snapshot N" and nothing is stored.
-- Recalling it, or morphing to it with a Bars pad, moves that rack's macros and leaves every other rack alone. If the rack has been renamed or deleted, the recall says so, as above.
-- To replace one, hold Delete and press it, then store again with Shift. Copy + a slot stores over it with every rack, as usual, and the slot turns cyan.
-- Scene snapshots stay Set-wide: Shift + an empty scene snapshot does nothing.
+- There are eight banks of sixteen snapshots, 128 in all. The slots show the selected bank; press a bank pad to switch. The selected bank is orange, the others dark.
+- Every Set opens on bank 1, as does Live starting: the selected bank isn't saved, so switching banks never adds a step to Live's Undo.
+- Past bank 1 the status bar names the bank too, such as "Snapshot 3, bank 2 recalled".
+- A morph and the last-landed blink belong to their slot's bank: switch away and the morph carries on, but its slot blinks only while its bank shows.
 
-**Scene snapshots** (column 13, pads 1–6):
+**Slides:**
+
+- Press a stored slot and slide right: the macros blend from where they were towards the snapshot. Four pads of travel is 100%, so a slot in column 11 reaches it at column 15, and one in column 12 at column 16. Sliding back left blends back, down to 0%.
+- A quarter of a pad's movement either way makes it a slide; less is still a tap. A slide never recalls on the lift.
+- On/off and chooser macros switch to the snapshot's value at half way, and back below it. Set `switch_at` in your buttons file (see Changing the buttons) to move that point.
+- Lift your finger and the macros stay where the slide left them, even at 0%. The status bar says how far it got, such as "Snapshot 3 at 60%".
+- While you slide, the four pads from the slot to its 100% pad fill in the slot's colour, one per 25%, over whatever they normally show, and the slot blinks fast. Nothing your finger crosses is pressed: not the other slots, banks, scene snapshots, scenes or Navigation, and not Bars or column 11's slots on the way back.
+- A Set-wide (cyan) slot slides every rack it holds towards the snapshot. A bound (pink) slot slides both ways instead (see Bound snapshots).
+- Slide several slots at once, one per row; a second slot pressed on a row that's already holding one does nothing. Where two slides share a macro, the one started last moves it. Lift it and the macro goes back to the earlier slide, at that slide's position; lift the earlier one first and nothing moves.
+- A fader, or a turn of the knob in Live, on a macro that's sliding takes it out of every slide. Tapping another slot, or starting a Bars morph, while you slide does the same for the macros it moves.
+- A slide's first move stops a running morph. Holding Bars, a press morphs instead of sliding, and scene snapshots don't slide.
+- One slide is one undo, from its first move to its lift. Slides held at the same time, and any tap, morph or fader you use during them, share it.
+
+**Bound snapshots:**
+
+- A slot can hold parameters of your choice instead of a snapshot: a bound slot, pink. It holds no values. Sliding it moves its parameters from wherever they are.
+- To bind, click a parameter in Live, then hold Shift and tap the slot: it acts as you lift. Or, in FX Mode, hold Shift and the slot and tap a Device FX row: that row's parameter is bound instead.
+- Any parameter of a device directly on a track, group, return or master can be bound, and so can a track's volume, pan and sends; a slot can hold several, from different tracks and devices. A parameter inside a rack's chain can't: map it to one of the rack's macros, and bind the macro.
+- Binding a parameter the slot already holds removes it. Removing the last one empties the slot. The status bar names what the slot holds after a bind, such as "Snapshot 3: Auto Filter Frequency, Bass Rack Macro 2", or what was removed.
+- With nothing clicked in Live, the status bar says "Click a parameter in Live first". A Set-wide (cyan) slot refuses with "Delete Snapshot N to bind to it". A parameter that can't be bound says "Snapshot N can't hold" and its name. A Device FX row with no parameter does nothing.
+- With Shift held, a slot never recalls, stores or slides.
+- Slide a bound slot right to raise its parameters, left to lower them, below where they started too. Every pad moves each parameter by a quarter of its range, and it stops at its minimum or maximum. Sliding back returns exactly to where it started. On/off and chooser parameters switch to their maximum past `switch_at` to the right, and their minimum past it to the left.
+- While you hold a bound slot, the 4 pads to its right show where its first parameter sits, in pink: none lit at its minimum, all 4 at its maximum. They follow the slide, over whatever those pads normally show.
+- A tap changes nothing: the status bar names the slot's parameters and their values. A Bars pad doesn't morph a bound slot. When a list is too long for the status bar it ends with "+N" for the rest.
+- A rack macro is found again by its rack and its number, so renaming or mapping the macro doesn't lose it. Anything else is found by the track's, device's and parameter's names, counting same-named tracks and devices in order; one that can't be found is skipped, with a message.
+- Delete + a bound slot clears it. Copy + a bound slot stores a Set-wide snapshot over it, and it turns cyan.
+- **Undo:** within 10 seconds of a bind or a removal, with nothing else pressed since, the Undo pad (column 1, pad 6) reverses it, newest first, saying "Unbound …" or "Bound … again"; each reversal gives you another 10 seconds. After that, or once you've pressed anything else, the pad is Live's Undo again. Live's own Undo (Cmd-Z) never touches binds. Shift doesn't end the window, but let go of it first: Shift + Undo is Redo.
+- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values.
+- Scene snapshots can't be bound.
+
+**Scene snapshots** (column 14, pads 1–6):
 
 - Each scene can hold one snapshot. Pad N is the snapshot of the scene on column 15's pad N, so the column scrolls with the window. Pads past the last scene, and pads 7 and 8, are dark.
 - Store, recall, morph with a Bars pad, store over with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
-- A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not. A scoped snapshot never does, and landing one leaves the blink where it was.
+- A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not. A bound slot never does.
 - Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. With a Bars pad held, it lands as the timed launch below starts the scene.
 - Shift + a scene (legato) doesn't fire the snapshot, and neither do launches from Live's mouse or another controller. A scene without a snapshot leaves the macros, and any running morph, alone.
 - The snapshots follow Live's scenes. Move a scene and its snapshot moves with it; delete a scene and its snapshot goes; a new scene starts empty.
@@ -487,7 +518,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Live's Arrangement loop coming round isn't a jump: the morph keeps going until it has played its bars, even when it's longer than the loop. Once the loop has come round, a scene's snapshot lands as Live actually starts the scene.
 - The morph carries on when you leave FX Mode.
 
-A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A morph starts from wherever the automation has each macro. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot: store it again, or clear it again.
+A recall or a slide overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A morph starts from wherever the automation has each macro. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot: store it again, or clear it again.
 
 ### Sequencer
 

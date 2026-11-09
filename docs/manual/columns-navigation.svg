@@ -41,7 +41,7 @@
 <rect x="126" y="119" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="144" y="129" font-size="9" fill="#ffffff" text-anchor="middle">Tempo-</text>
 <rect x="126" y="165" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
-<text x="144" y="175" font-size="9" fill="#ffffff" text-anchor="middle">Source</text>
+<text x="144" y="175" font-size="9" fill="#ffffff" text-anchor="middle">Panel</text>
 <rect x="126" y="257" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="144" y="267" font-size="9" fill="#ffffff" text-anchor="middle">Up</text>
 <rect x="126" y="303" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>

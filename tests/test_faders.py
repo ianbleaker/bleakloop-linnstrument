@@ -1,4 +1,3 @@
-import json
 from dataclasses import replace
 
 import pytest
@@ -7,15 +6,12 @@ from BleakLoop.core import engine, faders, fx, global_column, layout, mixer, ses
 from BleakLoop.core.leds import BLUE, MAGENTA, OFF, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
-    BindFader,
     EndUndoStep,
-    FaderBound,
     FaderView,
     MacroView,
     PadPress,
     RacksRead,
     RackView,
-    SaveFaderBindings,
     SetFaderParameter,
     SetMacros,
     ShowMessage,
@@ -24,7 +20,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     XAxis,
 )
-from BleakLoop.core.modes import FaderBinding, FxRack, Morph, MorphMacro, State
+from BleakLoop.core.modes import FxRack, Morph, MorphMacro, State
 from BleakLoop.core.values import X_COLUMN_WIDTH
 
 RACK = ("track", 0, 0)
@@ -95,7 +91,7 @@ def test_press_alone_writes_nothing():
     state, actions = press(5, 3)
     assert actions == []
     (touch,) = state.fader_touches
-    assert (touch.pad, touch.column, touch.first, touch.last) == (3, 5, 2, 10)
+    assert (touch.pad, touch.column, touch.first, touch.last) == (3, 5, 2, 9)
     assert touch.name == "Macro 3"
 
 
@@ -133,7 +129,7 @@ def test_one_undo_step_per_gesture_across_two_rows():
 
 
 def test_a_morphs_step_closes_and_the_touched_macro_leaves_the_morph():
-    macros = tuple(MorphMacro(RACK, "FX", i, 0.0, 100.0, False, 0.0, 127.0) for i in range(3))
+    macros = tuple(MorphMacro((RACK, "FX", i), 0.0, 100.0, False, 0.0, 127.0) for i in range(3))
     morph = Morph(0, 0.0, 16.0, 0.0, macros)
     views = list(VIEWS)
     views[1] = replace(views[1], macro=(RACK, "FX", 1))
@@ -142,7 +138,7 @@ def test_a_morphs_step_closes_and_the_touched_macro_leaves_the_morph():
     state, actions, _ = x(state, 5, 2, centre(5))
     assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
     assert not state.fx_undo_open and state.fader_undo_open
-    assert [m.index for m in state.morph.macros] == [0, 2]
+    assert [m.key[2] for m in state.morph.macros] == [0, 2]
 
 
 def test_a_recall_closes_an_open_fader_step():
@@ -152,7 +148,7 @@ def test_a_recall_closes_an_open_fader_step():
     stopped = replace(SNAP, is_playing=False)
     state, actions = fx.racks_read(state, RacksRead(0, racks, recall=True), stopped)
     assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
-    assert SetMacros(((RACK, "FX", 0, 10.0),)) in actions
+    assert SetMacros((((RACK, "FX", 0), 10.0),)) in actions
     assert not state.fader_undo_open
 
 
@@ -189,17 +185,18 @@ def test_release_under_shift_still_ends_the_touch():
 
 
 def test_a_slide_off_the_fader_keeps_the_touch_and_its_release_ends_it():
-    state, _, _ = x(touched(10, 3), 10, 3, centre(10))
-    state, owned = faders.slide(state, SlideMoved(3, 10, 11))
+    # Past the last pad's centre: the fader is at its top.
+    state, _, _ = x(touched(9, 3), 9, 3, centre(9) + X_COLUMN_WIDTH / 4)
+    state, owned = faders.slide(state, SlideMoved(3, 9, 10))
     assert owned
-    assert state.fader_touches[0].column == 11
-    state, actions, _ = x(state, 11, 3, centre(11))
+    assert state.fader_touches[0].column == 10
+    state, actions, _ = x(state, 10, 3, centre(10))
     assert actions == []  # still 1: nothing new to write
     # Back over the fader: it writes again from where the finger is.
-    state, actions, _ = x(state, 11, 3, centre(9))
+    state, actions, _ = x(state, 10, 3, centre(8))
     (write,) = actions
-    assert write.value == pytest.approx(127.0 * 7 / 8, abs=0.1)
-    state, actions = press(11, 3, False, state=state)
+    assert write.value == pytest.approx(127.0 * 6 / 7, abs=0.1)
+    state, actions = press(10, 3, False, state=state)
     assert state.fader_touches == ()
     assert actions == [EndUndoStep()]
 
@@ -221,7 +218,7 @@ def test_a_slide_from_another_column_is_not_owned():
 def test_fx_modes_fader_columns_go_to_the_faders():
     state, actions = session.handle(FX_ON, PadPress(2, 1, True), SNAP)
     assert state.fader_touches[0].column == 2 and actions == []
-    state, _ = session.handle(FX_ON, PadPress(10, 8, True), SNAP)
+    state, _ = session.handle(FX_ON, PadPress(9, 8, True), SNAP)
     assert state.fader_touches[0].pad == 8
 
 
@@ -232,12 +229,12 @@ def test_fx_modes_slots_and_bars_are_unchanged():
     assert state.fx_length == 1
 
 
-def test_a_slide_onto_a_slot_ends_on_its_release_and_touches_no_snapshot():
-    state, _ = session.handle(FX_ON, PadPress(10, 3, True), SNAP)
-    state, _, _ = x(state, 10, 3, centre(10))
-    state, actions = engine.slide(state, SlideMoved(3, 10, 11), SNAP)
+def test_a_slide_onto_the_panel_ends_on_its_release_and_touches_no_snapshot():
+    state, _ = session.handle(FX_ON, PadPress(9, 3, True), SNAP)
+    state, _, _ = x(state, 9, 3, centre(9))
+    state, actions = engine.slide(state, SlideMoved(3, 9, 10), SNAP)
     assert actions == []
-    state, actions = session.handle(state, PadPress(11, 3, False), SNAP)
+    state, actions = session.handle(state, PadPress(10, 3, False), SNAP)
     assert state.fader_touches == () and not state.fader_undo_open
     assert actions == [EndUndoStep()]
 
@@ -358,14 +355,14 @@ def test_render_alternates_colours_and_lights_from_the_left():
     views = tuple(FaderView("P", value, 0.0, 9.0) for value in (0, 9, 4.5, 0, 0, 0, 0, 0))
     frame = faders.render(FX_ON, replace(SNAP, faders=views))
     assert [frame[(c, 1)] for c in range(2, 4)] == [Light(MAGENTA), Light(OFF)]
-    assert all(frame[(c, 2)] == Light(BLUE) for c in range(2, 11))
-    assert [frame[(c, 3)] for c in range(2, 11)].count(Light(MAGENTA)) == 5
+    assert all(frame[(c, 2)] == Light(BLUE) for c in range(2, 10))
+    assert [frame[(c, 3)] for c in range(2, 10)].count(Light(MAGENTA)) == 5
 
 
 def test_render_follows_the_finger_while_touched():
-    state, _, _ = x(touched(), 5, 3, centre(10))
+    state, _, _ = x(touched(), 5, 3, centre(9))
     frame = faders.render(state, SNAP)
-    assert all(frame[(c, 3)] == Light(MAGENTA) for c in range(2, 11))
+    assert all(frame[(c, 3)] == Light(MAGENTA) for c in range(2, 10))
 
 
 def test_render_dark_rows():
@@ -375,112 +372,3 @@ def test_render_dark_rows():
 
 def test_render_under_shift_is_unchanged():
     assert faders.render(replace(FX_ON, shift=True), SNAP) == faders.render(FX_ON, SNAP)
-
-
-# Mapped FX: bindings
-
-
-MAPPED = replace(FX_ON, fader_source="mapped")
-BINDING = FaderBinding("Bass", 0, "Auto Filter", 1, 5, "Frequency")
-MIXER_BINDING = FaderBinding("A Reverb", 0, None, 0, 0, "Track Volume")
-
-
-def test_bindings_round_trip():
-    bindings = (BINDING, None, MIXER_BINDING) + (None,) * 5
-    text = faders.dump(bindings)
-    assert json.loads(text)["v"] == 1
-    assert faders.parse(text) == bindings
-
-
-def test_binding_format():
-    assert json.loads(faders.dump((BINDING,) + (None,) * 7)) == {
-        "v": 1,
-        "rows": [
-            {
-                "track": "Bass",
-                "tn": 0,
-                "device": "Auto Filter",
-                "dn": 1,
-                "param": 5,
-                "name": "Frequency",
-            }
-        ]
-        + [None] * 7,
-    }
-
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "",
-        "not json",
-        "[]",
-        '{"v": 2, "rows": [null, null, null, null, null, null, null, null]}',
-        '{"v": 1, "rows": [null]}',
-        '{"v": 1, "rows": 5}',
-        '{"v": 1}',
-        '{"v": 1, "rows": [{"track": "A"}, null, null, null, null, null, null, null]}',
-        '{"v": 1, "rows": [{"track": "A", "tn": "x", "device": null, "dn": 0, "param": 0, '
-        '"name": "V"}, null, null, null, null, null, null, null]}',
-        '{"v": 1, "rows": [7, null, null, null, null, null, null, null]}',
-    ],
-)
-def test_bad_binding_text_gives_empty_rows(text):
-    assert faders.parse(text) == (None,) * 8
-
-
-def test_device_clip_and_a_row_binds_in_mapped_fx():
-    state = replace(MAPPED, device_clip=True)
-    assert press(5, 3, state=state) == (state, [BindFader(2)])
-
-
-def test_device_clip_and_a_row_in_device_fx_points_to_mapped_fx():
-    state = replace(FX_ON, device_clip=True)
-    assert press(5, 3, state=state) == (state, [ShowMessage("Shift + FX for Mapped FX")])
-
-
-def test_a_bound_row_stores_and_saves():
-    bound = FaderBound(2, BINDING, "Fader 3: Auto Filter Frequency")
-    state, actions = engine.handle(MAPPED, bound, SNAP)
-    assert state.fader_bindings[2] == BINDING
-    assert actions == [
-        SaveFaderBindings(faders.dump(state.fader_bindings)),
-        ShowMessage("Fader 3: Auto Filter Frequency"),
-    ]
-
-
-def test_a_refused_bind_only_shows_its_message():
-    state, actions = engine.handle(MAPPED, FaderBound(2, None, "Map it to a macro instead"), SNAP)
-    assert state == MAPPED
-    assert actions == [ShowMessage("Map it to a macro instead")]
-
-
-def test_delete_and_a_bound_row_unbinds():
-    bindings = (None, None, BINDING) + (None,) * 5
-    state = replace(MAPPED, delete=True, fader_bindings=bindings)
-    state, actions = press(5, 3, state=state)
-    assert state.fader_bindings == (None,) * 8
-    assert actions == [
-        SaveFaderBindings(faders.dump((None,) * 8)),
-        ShowMessage("Fader 3 unbound"),
-    ]
-
-
-def test_delete_and_an_unbound_row_does_nothing():
-    state = replace(MAPPED, delete=True)
-    assert press(5, 3, state=state) == (state, [])
-
-
-def test_delete_in_device_fx_does_nothing():
-    state = replace(FX_ON, delete=True)
-    assert press(5, 3, state=state) == (state, [])
-
-
-def test_a_bound_row_whose_parameter_is_gone():
-    state = replace(MAPPED, fader_bindings=(None, None, BINDING) + (None,) * 5)
-    snapshot = replace(SNAP, faders=(None,) * 8)
-    assert press(5, 3, state=state, snapshot=snapshot) == (
-        state,
-        [ShowMessage("Fader 3: parameter not found")],
-    )
-    assert press(5, 4, state=state, snapshot=snapshot) == (state, [])

@@ -3,19 +3,44 @@
 from dataclasses import replace
 
 from . import controls, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
-from .model import FaderBound, PadPress, RacksRead, ScenesChanged
+from .model import BindFaderRow, PadPress, ParameterBound, RacksRead, ScenesChanged
 from .modes import Mode
 
 
 def handle(state, event, snapshot):
+    before = state
+    state, actions = _handle(state, event, snapshot)
+    if before.bind_undo and isinstance(event, PadPress) and event.pressed:
+        # Any other press ends the Undo pad's bind window: Shift, the Undo pad and a bind's own
+        # presses keep it.
+        normal = controls.at(controls.sections(before), (event.column, event.pad))
+        keeps = (
+            (normal is not None and normal.function == "shift")
+            or state.bind_undo != before.bind_undo
+            or state.fx_bind_hold != before.fx_bind_hold
+            or any(isinstance(action, BindFaderRow) for action in actions)
+        )
+        if not keeps:
+            state = replace(state, bind_undo=(), bind_undo_at=None, bind_undo_now=None)
+    return state, actions
+
+
+def bind_tick(state, now_ms):
+    # The Undo pad's bind window on the 10 ms timer.
+    if not state.bind_undo:
+        return state
+    return fx.bind_tick(state, now_ms)
+
+
+def _handle(state, event, snapshot):
     if isinstance(event, RacksRead):
         # A morph runs in every mode.
         return fx.racks_read(state, event, snapshot)
     if isinstance(event, ScenesChanged):
         # The scene snapshots follow the Set in every mode.
         return fx.scenes_changed(state, event)
-    if isinstance(event, FaderBound):
-        return faders.bound(state, event)
+    if isinstance(event, ParameterBound):
+        return fx.parameter_bound(state, event)
     if (
         state.device_clip
         and isinstance(event, PadPress)
@@ -39,11 +64,13 @@ def y_axis(state, event):
 
 
 def x_rows(state):
-    # The device rows that want X and slide mode: every row while the faders show, and in
-    # Sequencer Mode the rows holding a step.
+    # The device rows that want X and slide mode: every row while the faders show, the rows
+    # holding a snapshot slot, and in Sequencer Mode the rows holding a step.
     if state.mode is Mode.SEQUENCER:
         return sequencer.x_rows(state)
-    return tuple(range(layout.ROWS)) if faders.visible(state) else ()
+    if faders.visible(state):
+        return tuple(range(layout.ROWS))
+    return tuple(sorted({layout.device_row(hold.pad) for hold in state.fx_holds}))
 
 
 def x_axis(state, event):
@@ -52,6 +79,8 @@ def x_axis(state, event):
         return sequencer.x_axis(state, event)
     if state.mode is not Mode.SESSION:
         return state, [], False
+    if fx.holding(state, event):
+        return fx.x_axis(state, event)
     return faders.x_axis(state, event)
 
 
@@ -60,7 +89,10 @@ def slide(state, event, snapshot):
     if state.mode is Mode.SEQUENCER:
         state, owned = sequencer.slide(state, event)
     else:
-        state, owned = faders.slide(state, event)
+        # A held slot's finger owns its slide over any pad, both ways: nothing it crosses fires.
+        state, owned = fx.slide(state, event)
+        if not owned:
+            state, owned = faders.slide(state, event)
     if owned:
         return state, []
     return handle(state, PadPress(event.from_column, event.pad, False), snapshot)
@@ -79,6 +111,13 @@ def fx_tick(state, transport, values, triggered=None):
     if state.morph is None:
         return state, [], False
     return fx.tick(state, transport, values, triggered)
+
+
+def slide_tick(state, values):
+    # Held snapshot slides on the 10 ms timer, in every mode: values per slide parameter.
+    if not state.fx_slide_params:
+        return state
+    return fx.slide_tick(state, values)
 
 
 def launch_tick(state, transport):

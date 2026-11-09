@@ -166,7 +166,7 @@ FUNCTION_FIELDS = {
     "refusals": _is_messages,
 }
 
-TOP_LEVEL = {"manual_format": str, "system": dict, "functions": dict}
+TOP_LEVEL = {"manual_format": str, "system": dict, "morph": dict, "functions": dict}
 
 
 class Section:
@@ -380,6 +380,7 @@ def _validate(data, items):
             raise ValueError(f"{key}: wrong type")
     if not _is_messages(data.get("system", {})):
         raise ValueError("system: every message must be a string")
+    userfile.check_morph(data.get("morph", {}))
     for name, function in data.get("functions", {}).items():
         if name not in MODES and name not in MESSAGE_ONLY:
             raise ValueError(f"functions.{name}: no such function")
@@ -745,6 +746,11 @@ def refuse(name, key, /, **values):
 
 def system(key, /, **values):
     return _get().system(key, **values)
+
+
+def switch_at():
+    # How far through a snapshot slide a quantized parameter switches: [morph] switch_at.
+    return _get().data["morph"]["switch_at"]
 
 
 def systems():

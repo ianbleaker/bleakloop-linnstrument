@@ -53,6 +53,12 @@ def handle(state, event, snapshot):
         return replace(state, window=window), []
     if not isinstance(event, PadPress):
         return state, []
+    if not event.pressed and fx.binding(state, event):
+        # Shift + a slot's lift binds, even once Shift is let go: the press decided.
+        return fx.bind_release(state)
+    if not event.pressed and fx.holding(state, event):
+        # A held slot's lift, wherever its finger slid to: a tap recalls, a slide keeps.
+        return fx.release(state, event, snapshot)
     if not event.pressed and faders.holds(state, event):
         # A fader touch ends on its cell's release, wherever the finger slid to.
         return faders.press(state, event, snapshot)
@@ -504,6 +510,8 @@ def render(state, snapshot):
         functions.paint(frame, stops, state, snapshot)
     frame.update(global_column.render(state, snapshot))
     _render_copy_source(frame, state)
+    # A slot slide's meter goes over everything on its row, scenes and Navigation included.
+    frame.update(fx.render_meters(state))
     return frame
 
 
