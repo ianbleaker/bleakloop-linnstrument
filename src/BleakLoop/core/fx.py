@@ -5,7 +5,7 @@ import math
 from dataclasses import replace
 
 from . import buttons, faders, functions, layout, mixer
-from .leds import CYAN, LIME, OFF, ORANGE, PINK, WHITE, Blink, Light
+from .leds import CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
 from .model import (
     BeginUndoStep,
     BindSelectedParameter,
@@ -547,16 +547,16 @@ def render_meters(state):
 
 
 def _value_meter(state, hold, column):
-    # A bound slot, held: the 4 pads either side of it are one 8-pad bar, lit from the left up
-    # to where its first parameter sits between its min and max.
+    # A bound slot, held: the 4 pads right of it show where its first parameter sits between
+    # its min (none lit) and max (all 4), in yellow, which nothing else in the panel shows
+    # steadily.
     if not hold.read:
         return {}
     lit = value_meter(state, hold)
-    pads = [column + k for k in range(-SLIDE_COLUMNS, SLIDE_COLUMNS + 1) if k]
     return {
-        (c, hold.pad): Light(PINK if i < lit else OFF)
-        for i, c in enumerate(pads)
-        if layout.GLOBAL_COLUMN < c < layout.COLUMNS
+        (column + k, hold.pad): Light(YELLOW if k <= lit else OFF)
+        for k in range(1, SLIDE_COLUMNS + 1)
+        if column + k < layout.COLUMNS
     }
 
 
@@ -565,7 +565,7 @@ def value_meter(state, hold):
     param = _param(state, first.key)
     value = param.written if param is not None else first.start
     position = (value - first.low) / first.span if first.span else 0.0
-    return round(min(max(position, 0.0), 1.0) * 2 * SLIDE_COLUMNS)
+    return round(min(max(position, 0.0), 1.0) * SLIDE_COLUMNS)
 
 
 def meter(f):

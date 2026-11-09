@@ -1372,22 +1372,20 @@ def test_a_bound_and_a_set_wide_slide_share_a_rack_macro():
 # Bound slots: the value meter (C2b)
 
 
-def test_a_held_bound_slot_shows_its_first_parameters_value_over_8_pads():
+def test_a_held_bound_slot_shows_its_first_parameters_value_right_of_it():
     state, _ = handle(BOUND_AB, SLOT_3)
     assert fx.render_meters(state) == {}  # no read yet
     state, _ = bound_read(state)
     frame = session.render(state, SNAP)
-    # 100 of 127: 6 of 8 pads, columns 7-10 then 12-15 around the slot in column 11.
-    pads = [frame[(c, ROW)] for c in (7, 8, 9, 10, 12, 13, 14, 15)]
-    assert pads == [Light(PINK)] * 6 + [Light(OFF)] * 2
-    assert frame[SLOT_3] == Light(PINK)
+    # 100 of 127: 3 of 4 pads, columns 12-15 right of the slot in column 11.
+    assert [frame[(c, ROW)] for c in (12, 13, 14, 15)] == [Light(YELLOW)] * 3 + [Light(OFF)]
+    assert frame[(10, ROW)] != Light(YELLOW) and frame[SLOT_3] == Light(PINK)
 
 
 def test_the_value_meter_follows_the_slide_and_redraws():
     state, _, redraw = x(bound_sliding(), 11, at(2.2))
     assert redraw
-    frame = fx.render_meters(state)
-    assert all(frame[(c, ROW)] == Light(PINK) for c in (7, 8, 9, 10, 12, 13, 14, 15))
+    assert all(light == Light(YELLOW) for light in fx.render_meters(state).values())
     state, _, _ = x(state, 11, -at(9))
     assert all(light == Light(OFF) for light in fx.render_meters(state).values())
     assert session.render(state, SNAP)[SLOT_3] == Light(PINK, Blink.FAST)
