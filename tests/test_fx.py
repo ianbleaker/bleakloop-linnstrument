@@ -1598,6 +1598,28 @@ def test_a_binds_own_presses_keep_the_window():
     assert state.bind_undo != ()
 
 
+def test_two_rows_in_one_bind_hold_both_undo():
+    state, _ = engine.handle(replace(FX, shift=True), PadPress(*SLOT_3, True), SNAP)
+    state, actions = engine.handle(state, PadPress(5, 2, True), ROW_VIEWS)
+    assert actions == [BindFaderRow(2, 1)]
+    state, _ = bound_answer(state)
+    state, actions = engine.handle(state, PadPress(5, 3, True), ROW_VIEWS)
+    assert actions == [BindFaderRow(2, 2)]
+    state, _ = bound_answer(state, binding=EQ)
+    state, _ = engine.handle(replace(state, shift=False), PadPress(*SLOT_3, False), SNAP)
+    state, actions = engine.handle(state, PadPress(*UNDO, True), CAN_UNDO)
+    assert actions[-1] == ShowMessage("Unbound EQ Frequency from Snapshot 3")
+    state, actions = engine.handle(state, PadPress(*UNDO, True), CAN_UNDO)
+    assert actions[-1] == ShowMessage("Unbound Auto Filter Frequency from Snapshot 3")
+
+
+def test_a_bound_tap_shows_lives_text_for_the_value():
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, (replace(FREQ_READ, text="1.20 kHz"),))
+    _, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz")]
+
+
 # Held slots: the meter (B7)
 
 

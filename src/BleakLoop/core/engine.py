@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from . import controls, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
-from .model import FaderBound, PadPress, ParameterBound, RacksRead, ScenesChanged
+from .model import BindFaderRow, FaderBound, PadPress, ParameterBound, RacksRead, ScenesChanged
 from .modes import Mode
 
 
@@ -18,6 +18,7 @@ def handle(state, event, snapshot):
             (normal is not None and normal.function == "shift")
             or state.bind_undo != before.bind_undo
             or state.fx_bind_hold != before.fx_bind_hold
+            or any(isinstance(action, BindFaderRow) for action in actions)
         )
         if not keeps:
             state = replace(state, bind_undo=(), bind_undo_at=None, bind_undo_now=None)
