@@ -1082,6 +1082,103 @@ def test_leaving_fx_mode_mid_slide_drops_the_hold_and_closes_the_step():
     assert actions[0] == BeginUndoStep()
 
 
+# Held slots: the blend (B5)
+
+
+def sliding(state=AB, x0=0):
+    # Holding slot 3 with its read in, its zero at x0.
+    state, _, _ = x(holding_read(state), 11, x0)
+    return state
+
+
+def at(columns):
+    return round(columns * X_COLUMN_WIDTH)
+
+
+def test_a_slide_blends_from_the_press_values():
+    state, actions, _ = x(sliding(), 11, at(2))
+    f = at(2) / X_COLUMN_WIDTH / 4
+    assert actions == [
+        BeginUndoStep(),
+        SetMacros(tuple((key, target * f) for key, target in AB_TARGETS)),
+    ]
+    assert state.fx_holds[0].f == f
+
+
+@pytest.mark.parametrize("columns, f", [(9.0, 1.0), (-3.0, 0.0)])
+def test_the_blend_clamps_at_both_ends(columns, f):
+    state, _, _ = x(sliding(), 11, at(1))
+    state, _, _ = x(state, 11, at(columns))
+    assert state.fx_holds[0].f == f
+    assert {p.written for p in state.fx_slide_params} == ({0.0} if f == 0 else {10.0, 20.0, 30.0})
+
+
+def test_moving_back_left_lowers_the_blend():
+    state, _, _ = x(sliding(), 11, at(4))
+    state, actions, _ = x(state, 11, at(1))
+    assert actions == [SetMacros(tuple((key, target * at(1) / X_COLUMN_WIDTH / 4) for key, target in AB_TARGETS))]
+
+
+def test_a_quantized_parameter_flips_exactly_at_switch_at_both_ways(monkeypatch):
+    switch = rack("A", "R", 0.0, path=P0)
+    switch = replace(switch, macros=(MacroView(0.0, 0.0, 1.0, is_quantized=True),))
+    state = with_slot(FX, 2, (FxRack("A", "R", 0, (1.0,)),))
+    edge = at(2)
+    monkeypatch.setattr(fx.buttons, "switch_at", lambda: edge / X_COLUMN_WIDTH / 4)
+    state, _ = handle(state, SLOT_3)
+    state, _ = hold_read(state, racks=(switch,))
+    state, _, _ = x(state, 11, 0)
+    state, actions, _ = x(state, 11, edge - 1)
+    assert SetMacros((((P0, "R", 0), 1.0),)) not in actions
+    state, actions, _ = x(state, 11, edge)
+    assert actions[-1] == SetMacros((((P0, "R", 0), 1.0),))
+    state, actions, _ = x(state, 11, edge - 1)
+    assert actions == [SetMacros((((P0, "R", 0), 0.0),))]
+    state, actions, _ = x(state, 11, edge)
+    assert actions == [SetMacros((((P0, "R", 0), 1.0),))]
+
+
+def test_the_lift_keeps_the_values_and_closes_the_step():
+    state, _, _ = x(sliding(), 11, at(2.4))
+    state, actions = lift(state, (11, ROW))
+    assert actions == [EndUndoStep(), ShowMessage("Snapshot 3 at 60%")]
+    assert state.fx_holds == () and state.fx_slide_params == () and not state.fx_slide_undo_open
+
+
+def test_the_first_write_closes_a_fader_step_and_cancels_a_morph():
+    state = replace(AB, fader_undo_open=True, fx_undo_open=True, morph=Morph(5, 0.0, 16.0, 0.0))
+    state, actions, _ = x(sliding(state), 11, at(2))
+    assert actions[:3] == [EndUndoStep(), EndUndoStep(), BeginUndoStep()]
+    assert state.morph is None and not state.fx_undo_open and not state.fader_undo_open
+
+
+OTHER_SLOT = layout.FX.slots[0]  # slot 1, on another row
+
+
+def test_a_tap_on_another_row_mid_slide_takes_its_parameters_and_joins_the_step():
+    state = with_slot(sliding(), 0, (FxRack("A", "R", 0, (99.0,)),))
+    state, _, _ = x(state, 11, at(2))
+    state, _ = handle(state, OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, actions = lift(state, OTHER_SLOT)
+    assert actions == [SetMacros((((P0, "R", 0), 99.0),)), ShowMessage("Snapshot 1 recalled")]
+    (hold,) = state.fx_holds
+    assert hold.dropped == {(P0, "R", 0)}
+    assert [p.key for p in state.fx_slide_params] == [(P0, "R", 1), (P1, "R", 0)]
+    # The next X leaves the tapped macro alone.
+    state, actions, _ = x(state, 11, at(5))
+    assert actions == [SetMacros((((P0, "R", 1), 20.0), ((P1, "R", 0), 30.0)))]
+
+
+def test_a_bars_morph_mid_slide_takes_its_parameters_and_joins_the_step():
+    state = with_slot(sliding(), 0, (FxRack("B", "R", 0, (99.0,)),))
+    state, _, _ = x(state, 11, at(2))
+    state, actions = racks_read(state, 0, NOW_AB, recall=True, bars=4, snapshot=playing(3.0))
+    assert actions == [ShowMessage("Snapshot 1 in 4 bars")]
+    assert state.morph is not None and not state.fx_undo_open
+    assert state.fx_holds[0].dropped == {(P1, "R", 0)}
+
+
 # Render
 
 

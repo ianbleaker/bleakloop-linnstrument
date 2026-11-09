@@ -638,14 +638,6 @@ def racks_read(state, event, snapshot):
     note = f", {_count(missing, 'rack')} not found" if missing else ""
     if not macros:
         return state, buttons.refuse(owner, "nothing", name=name, note=note)
-    # A recall closes a fader gesture's undo step; the finger carries on in a new one.
-    actions = []
-    if state.fader_undo_open:
-        state = replace(state, fader_undo_open=False)
-        actions.append(EndUndoStep())
-    # A new recall replaces a running morph and its undo step.
-    if state.fx_undo_open:
-        actions.append(EndUndoStep())
     launch = event.end_beats is not None
     if launch:
         # The press decided the landing: the follow-up's transport may already have started.
@@ -653,17 +645,24 @@ def racks_read(state, event, snapshot):
     else:
         instant = event.bars is None or not snapshot.is_playing
     if instant:
-        writes = tuple((m.key, m.target) for m in macros)
-        actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
-        state = replace(state, morph=None, fx_undo_open=False)
+        state, actions = _recall_now(state, macros)
         state = _landed(state, event.slot, event.scene)
         return state, actions + buttons.say(owner, "recalled", name=name, note=note)
     start = snapshot.song_beats
     end = event.end_beats if launch else end_beats(snapshot, event.bars)
     morph = Morph(event.slot, start, end, start, macros, scene=event.scene, launch=launch)
-    state = replace(state, morph=morph, fx_undo_open=True)
     timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
     message = buttons.say(owner, "morphing", name=name, timing=timing, note=note)
+    if state.fx_slide_undo_open:
+        # Slides are held: the morph takes the parameters it shares and joins their step. A
+        # morph it replaces closes its own.
+        state = _leave_slides(state, {m.key for m in macros})
+        actions = [EndUndoStep()] if state.fx_undo_open else []
+        return replace(state, morph=morph, fx_undo_open=False), actions + message
+    # A recall closes a fader gesture's undo step, and replaces a running morph and its step;
+    # the finger carries on in a new one.
+    state, actions = _close_steps(state)
+    state = replace(state, morph=morph, fx_undo_open=True)
     return state, actions + [BeginUndoStep(), *message]
 
 
