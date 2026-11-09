@@ -793,24 +793,18 @@ class BleakLoop(ControlSurface):
             else:
                 self._held_note_pads.discard((row, column))
         event = self._slides.pad(row, column, value)
-        if self._state.fx:
-            logger.info("SLIDE-SPIKE pad row %d col %d value %d -> %r", row, column, value, event)
         if isinstance(event, SlideMoved):
             self._handle(event, engine.slide)
         elif event is not None:
             self._handle(event)
 
     def _on_slide_transfer(self, row, value):
-        if self._state.fx:
-            logger.info("SLIDE-SPIKE transfer row %d value %d", row, value)
         self._slides.transfer(row, value)
 
     def _on_x(self, column, row, value):
         # At the firmware's scan rate: no snapshot, and a refresh only on redraw.
         start = time.monotonic()
         event = self._slides.x_msb(row, column, value)
-        if self._state.fx:
-            logger.info("SLIDE-SPIKE x row %d col %d value %d -> %r", row, column, value, event)
         state, actions, redraw = engine.x_axis(self._state, event)
         self._state = state
         for action in actions:
