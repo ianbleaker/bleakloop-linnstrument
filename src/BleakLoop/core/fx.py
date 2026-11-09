@@ -17,7 +17,7 @@ from .model import (
     SetMixer,
     StoreFxSnapshot,
 )
-from .modes import BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
+from .modes import BoundRead, BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
 from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, X_COLUMN_WIDTH
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
@@ -324,9 +324,12 @@ def press(state, event, snapshot):
         if button.function == "slots" and state.fx_slots[_global(state, button.value)] is None:
             return state, [StoreFxSnapshot(_global(state, button.value), scoped=True)]
         return state, []
-    if button.function == "slots" and not (state.copy or state.delete or state.fx_length):
+    if button.function == "slots" and not (state.copy or state.delete):
         slot = _global(state, button.value)
-        if state.fx_slots[slot] is not None:
+        if state.fx_length and is_bound(state.fx_slots[slot]):
+            # A bound slot holds no values to morph to.
+            return state, []
+        if not state.fx_length and state.fx_slots[slot] is not None:
             return _hold(state, event, slot)
     return functions.press(button, state, snapshot)
 
@@ -350,8 +353,12 @@ def _hold(state, event, slot):
     # One hold per row. The read is taken now, so a slide's origins are the press's values.
     if _held(state, event.pad) is not None:
         return state, []
-    hold = SlotHold(event.pad, event.column, slot)
-    return replace(state, fx_holds=state.fx_holds + (hold,)), [RecallFxSnapshot(slot, None, hold=True)]
+    stored = state.fx_slots[slot]
+    bound = is_bound(stored)
+    hold = SlotHold(event.pad, event.column, slot, bound=bound)
+    locators = stored.params if bound else ()
+    read = RecallFxSnapshot(slot, None, hold=True, locators=locators)
+    return replace(state, fx_holds=state.fx_holds + (hold,)), [read]
 
 
 def _drop_hold(state, pad):
@@ -396,7 +403,9 @@ def x_axis(state, event):
         count = state.fx_slide_count + 1
         state = replace(state, fx_slide_count=count)
         new = replace(new, slid=True, order=count)
-    new = replace(new, f=min(max(columns / SLIDE_COLUMNS, 0.0), 1.0))
+    # A bound slot slides both ways; a Set-wide one only towards its snapshot.
+    low = -1.0 if hold.bound else 0.0
+    new = replace(new, f=min(max(columns / SLIDE_COLUMNS, low), 1.0))
     if new == hold:
         return state, [], False
     state = _put_hold(state, hold, new)
@@ -444,8 +453,13 @@ def _hold_read(state, event, snapshot):
     stored = state.fx_slots[event.slot]
     if hold is None or stored is None:
         return state, []
-    macros, missing = _match(stored, event.racks)
-    note = f", {_count(missing, 'rack')} not found" if missing else ""
+    if hold.bound:
+        macros = tuple(p for p in event.params if p is not None)
+        missing = len(event.params) - len(macros)
+        note = f", {_count(missing, 'parameter')} not found" if missing else ""
+    else:
+        macros, missing = _match(stored, event.racks)
+        note = f", {_count(missing, 'rack')} not found" if missing else ""
     read = replace(hold, read=macros, note=note)
     state = _put_hold(state, hold, read)
     if not read.lifted:
@@ -464,6 +478,10 @@ def _tap(state, hold):
     name = _name(hold.slot, False)
     if not hold.read:
         return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
+    if hold.bound:
+        # Nothing to recall: the tap names the parameters and their values.
+        params = ", ".join(f"{p.name} {_number(p.start)}" for p in hold.read)
+        return state, buttons.say("slots", "named", name=name, params=params, note=hold.note)
     state, actions = _recall_now(state, hold.read)
     state = _landed(state, hold.slot, False)
     return state, actions + buttons.say("slots", "recalled", name=name, note=hold.note)
@@ -532,10 +550,7 @@ def _blend(state, hold, keys=None):
         param = params.get(key)
         if param is None:
             param = params[key] = SlideParam(key, macro.start, macro.start, macro.span)
-        if macro.quantized:
-            value = macro.target if hold.f >= switch_at else param.origin
-        else:
-            value = param.origin + hold.f * (macro.target - param.origin)
+        value = _slid_value(macro, param.origin, hold.f, switch_at)
         if value != param.written:
             writes.append((key, value))
             params[key] = replace(param, written=value)
@@ -579,7 +594,31 @@ def _end_slide(state, hold):
         actions.append(EndUndoStep())
     percent = round(hold.f * 100)
     name = _name(hold.slot, False)
-    return state, actions + buttons.say("slots", "slid", name=name, percent=percent, note=hold.note)
+    if hold.bound:
+        params = ", ".join(p.name for p in hold.read or ())
+        message = buttons.say(
+            "slots", "slid_bound", name=name, percent=percent, params=params, note=hold.note
+        )
+    else:
+        message = buttons.say("slots", "slid", name=name, percent=percent, note=hold.note)
+    return state, actions + message
+
+
+def _slid_value(entry, origin, f, switch_at):
+    # A Set-wide slot's macro blends towards its snapshot value. A bound slot's parameter moves
+    # from its origin by f of its range either way, stopping at its ends; quantized ones
+    # switch to an end from switch_at.
+    if isinstance(entry, BoundRead):
+        if entry.quantized:
+            return entry.high if f >= switch_at else entry.low if f <= -switch_at else origin
+        return min(max(origin + f * entry.span, entry.low), entry.high)
+    if entry.quantized:
+        return entry.target if f >= switch_at else origin
+    return origin + f * (entry.target - origin)
+
+
+def _number(value):
+    return f"{value:.2f}".rstrip("0").rstrip(".")
 
 
 def _rebase(state):

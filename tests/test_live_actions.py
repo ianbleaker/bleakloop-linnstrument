@@ -703,3 +703,12 @@ def test_set_macros_writes_macros_and_locators_and_skips_the_missing():
     apply(SetMacros(tuple(zip(keys, (64.0, 200.0, 5.0)))), song)
     assert rack.parameters[2].value == 64.0
     assert filter_.parameters[1].value == 127.0  # clamped to the parameter's range
+
+
+def test_a_bound_slots_read_resolves_its_locators_not_the_racks():
+    from tests.test_live_state import target_song
+
+    frequency = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    event = apply(RecallFxSnapshot(4, None, hold=True, locators=(frequency,)), target_song())
+    assert event.racks == () and event.hold and event.slot == 4
+    assert [p.name for p in event.params] == ["Frequency"]

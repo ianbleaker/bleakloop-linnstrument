@@ -4,7 +4,7 @@ import pytest
 
 from BleakLoop import live_state
 from BleakLoop.core.layout import Window
-from BleakLoop.core.modes import FaderBinding, Morph, MorphMacro
+from BleakLoop.core.modes import BoundRead, FaderBinding, Morph, MorphMacro
 from tests.support import fake_song, fake_track
 
 APPLICATION = SimpleNamespace(view=SimpleNamespace(is_view_visible=lambda name: True))
@@ -601,3 +601,18 @@ def test_read_macro_values_reads_locators_too():
     keys = ((("track", 0, 0), "FX", 0), FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"))
     morph = Morph(0, 0.0, 4.0, 0.0, tuple(MorphMacro(key, 0.0, 1.0, False, 0.0, 1.0) for key in keys))
     assert live_state.read_macro_values(target_song(), morph) == (1.0, 40.0)
+
+
+def test_a_renamed_macro_is_still_found_by_its_index():
+    song = target_song()
+    rack = song.tracks[0].devices[0]
+    rack.parameters[2].name = "Cutoff"
+    (found,) = live_state.read_bound(song, (FaderBinding("Bass", 0, "FX", 0, 2, "Macro 2"),))
+    assert found.name == "Cutoff" and found.key == (("track", 0, 0), "FX", 1)
+
+
+def test_read_bound_gives_locator_keys_for_other_parameters_and_none_when_missing():
+    song = target_song()
+    frequency = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    found = live_state.read_bound(song, (frequency, FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Q")))
+    assert found == (BoundRead(frequency, "Frequency", 40.0, 0.0, 127.0, False), None)

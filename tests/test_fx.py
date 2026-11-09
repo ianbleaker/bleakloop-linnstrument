@@ -28,7 +28,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     TrackView,
 )
-from BleakLoop.core.modes import BoundSlot, FaderBinding, FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
+from BleakLoop.core.modes import BoundRead, BoundSlot, FaderBinding, FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
 from BleakLoop.core.values import FX_TOUCH_TOLERANCE, X_COLUMN_WIDTH
 
 
@@ -1277,6 +1277,96 @@ def test_a_handback_to_an_earlier_slide_at_0_writes_its_origin():
     state, _ = two_slides(f_a=-0.3)
     state, actions = lift(state, OTHER_SLOT)
     assert actions[0] == SetMacros((((P0, "R", 0), 0.0), ((P0, "R", 1), 0.0)))
+
+
+# Bound slots: a relative slide both ways (C2)
+
+FREQ = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+MACRO_KEY = (P0, "R", 0)
+FREQ_READ = BoundRead(FREQ, "Frequency", 100.0, 0.0, 127.0, False)
+SWITCH_READ = BoundRead(MACRO_KEY, "On", 0.0, 0.0, 1.0, True)
+BOUND_AB = with_slot(FX, 2, BoundSlot((FREQ, FaderBinding("A", 0, "R", 0, 1, "Macro 1"))))
+
+
+def bound_read(state, params=(FREQ_READ, SWITCH_READ)):
+    return engine.handle(state, RacksRead(2, (), True, hold=True, params=params), SNAP)
+
+
+def bound_sliding(params=(FREQ_READ, SWITCH_READ)):
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, params)
+    state, _, _ = x(state, 11, 0)
+    return state
+
+
+def test_a_bound_slot_press_reads_its_locators():
+    state, actions = handle(BOUND_AB, SLOT_3)
+    assert actions == [RecallFxSnapshot(2, None, hold=True, locators=BOUND_AB.fx_slots[2].params)]
+    assert state.fx_holds[0].bound
+
+
+def test_bars_and_a_bound_slot_does_nothing():
+    state = replace(BOUND_AB, fx_length=4)
+    assert handle(state, SLOT_3) == (state, [])
+
+
+def test_a_bound_tap_names_its_parameters_and_writes_nothing():
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, (FREQ_READ, None))
+    state, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: Frequency 100, 1 parameter not found")]
+    assert state.fx_holds == () and state.fx_landed is None
+
+
+def test_a_bound_slide_right_moves_a_quarter_range_per_pad_and_stops_at_the_end():
+    state, actions, _ = x(bound_sliding(), 11, at(0.5))
+    f = at(0.5) / X_COLUMN_WIDTH / 4
+    assert actions[-1] == SetMacros(((FREQ, 100.0 + f * 127.0),))
+    state, actions, _ = x(state, 11, at(2.2))
+    assert actions[-1] == SetMacros(((FREQ, 127.0), (MACRO_KEY, 1.0)))
+
+
+def test_a_bound_slide_left_goes_below_the_start_down_to_the_min():
+    state, actions, _ = x(bound_sliding(), 11, -at(2))
+    f = -at(2) / X_COLUMN_WIDTH / 4
+    assert actions[-1] == SetMacros(((FREQ, 100.0 + f * 127.0),))
+    state, actions, _ = x(state, 11, -at(9))
+    assert actions[-1] == SetMacros(((FREQ, 0.0),))
+    assert state.fx_holds[0].f == -1.0
+
+
+def test_back_travel_returns_exactly_to_the_start():
+    state, _, _ = x(bound_sliding(), 11, at(3))
+    state, actions, _ = x(state, 11, 0)
+    assert actions == [SetMacros(((FREQ, 100.0), (MACRO_KEY, 0.0)))]
+
+
+def test_a_quantized_bound_parameter_switches_to_either_end_from_switch_at():
+    state, actions, _ = x(bound_sliding((SWITCH_READ,)), 11, -at(2.2))
+    assert actions == []  # already at its min
+    state, actions, _ = x(state, 11, at(2.2))
+    assert actions[-1] == SetMacros(((MACRO_KEY, 1.0),))
+    state, actions, _ = x(state, 11, at(1.8))
+    assert actions == [SetMacros(((MACRO_KEY, 0.0),))]
+
+
+def test_a_bound_lift_names_its_parameters_with_a_signed_percent():
+    state, _, _ = x(bound_sliding(), 11, -at(1.6))
+    state, actions = lift(state, (11, ROW))
+    assert actions[-1] == ShowMessage("Snapshot 3 at -40%: Frequency, On")
+
+
+def test_a_bound_and_a_set_wide_slide_share_a_rack_macro():
+    # The bound slot's Macro 1 resolves to the same key as the Set-wide slot's.
+    state = with_slot(bound_sliding(), 0, A_ONLY)
+    state, _, _ = x(state, 11, at(1))
+    state, _ = handle(state, OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _, _ = x(state, 11, 0, pad=ROW_1)
+    state, actions, _ = x(state, 11, at(2), pad=ROW_1)
+    assert MACRO_KEY in dict(actions[-1].writes)
+    state, actions, _ = x(state, 11, at(3))
+    assert all(MACRO_KEY not in dict(a.writes) for a in actions if isinstance(a, SetMacros))
 
 
 # Held slots: the meter (B7)

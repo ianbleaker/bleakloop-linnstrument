@@ -107,6 +107,22 @@ class BoundSlot:
 
 
 @dataclass(frozen=True)
+class BoundRead:
+    # A bound slot's parameter as the press found it. key is its rack macro identity when it is
+    # one, as Set-wide slides and faders use, else its locator.
+    key: object
+    name: str
+    start: float
+    low: float
+    high: float
+    quantized: bool
+
+    @property
+    def span(self):
+        return self.high - self.low
+
+
+@dataclass(frozen=True)
 class FxRack:
     # One rack's macros in a stored snapshot, keyed as fx.keys gives them.
     track: str
@@ -142,6 +158,7 @@ class SlotHold:
     order: int = 0  # when the slide started: the latest owns the parameters it shares
     wrote: bool = False  # the slide has written: a running morph is cancelled
     dropped: frozenset = frozenset()  # keys taken out of this slide
+    bound: bool = False  # a bound slot: BoundRead per parameter, and a slide both ways
 
 
 @dataclass(frozen=True)

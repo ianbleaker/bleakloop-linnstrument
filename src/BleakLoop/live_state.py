@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from .core import layout, values
-from .core.modes import FaderBinding
+from .core.modes import BoundRead, FaderBinding
 from .core.model import (
     ClipTarget,
     ClipView,
@@ -296,7 +296,8 @@ def _bound(song, binding):
     if binding.param >= len(parameters):
         return None
     parameter = parameters[binding.param]
-    if parameter.name != binding.name:
+    # A rack macro is found by its index: its name changes as it's mapped or renamed.
+    if macro is None and parameter.name != binding.name:
         return None
     return parameter, macro
 
@@ -448,6 +449,28 @@ def read_macro_values(song, morph):
     # The live value per morphing macro, or None when its rack has moved or gone.
     targets = target_parameters(song, (m.key for m in morph.macros))
     return tuple(None if parameter is None else parameter.value for parameter in targets)
+
+
+def read_bound(song, locators):
+    # A bound slot's parameters as they are now: BoundRead, or None when one can't be found.
+    result = []
+    for locator in locators:
+        found = _bound(song, locator)
+        if found is None:
+            result.append(None)
+            continue
+        parameter, macro = found
+        result.append(
+            BoundRead(
+                locator if macro is None else macro,
+                parameter.name,
+                parameter.value,
+                parameter.min,
+                parameter.max,
+                parameter.is_quantized,
+            )
+        )
+    return tuple(result)
 
 
 def read_slide_values(song, params):
