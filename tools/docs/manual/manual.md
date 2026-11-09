@@ -244,7 +244,7 @@ With **Shift** held:
 ### FX Mode
 
 - The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX ({pad:navigation.fx}) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to. In Session and Mixer Mode, the snapshots come third, for the split view's panel.
-- Snapshots are saved in the Set. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
+- Snapshots are saved in the Set, in eight banks of sixteen: the bank pads in column 13 switch which bank the slots show. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
 - With Shift held the faders work as without it, and the snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot (see Snapshots and morphs); the other snapshot pads ignore presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
@@ -397,7 +397,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Session Mode and Mixer Mode each have their own split view, toggled by their own pad. Columns 2–9 work as in that mode for an 8-track window, and Live's ring shrinks to match. The window moves as usual; turning the split view off keeps it where it is, unless it then runs past the last track.
 - Columns 10–14 are the panel, in every row. Shift + FX steps it through Device FX, Mapped FX and the snapshots, and both split views show the same choice.
 - As faders, five pads wide, they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads.
-- As snapshots, columns 10–14 work as FX Mode's: Bars, snapshots and scene snapshots, with Copy and Delete as there.
+- As snapshots, columns 10–14 work as FX Mode's: Bars, snapshots, banks and scene snapshots, with Copy and Delete as there. Both split views and FX Mode show the same bank.
 - With Shift held the panel's faders work as without it, and its snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot; the other snapshot pads ignore presses.
 - A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
 - The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
@@ -447,6 +447,13 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Hold Delete and press a stored slot to clear it.
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
 - Snapshots {runs:fx.slots}.
+
+**Banks** ({pad:fx.banks}):
+
+- There are eight banks of sixteen snapshots, 128 in all. The slots show the selected bank; press a bank pad to switch. The selected bank is orange, the others dark.
+- Every Set opens on bank 1, as does Live starting: the selected bank isn't saved, so switching banks never adds a step to Live's Undo.
+- Past bank 1 the status bar names the bank too, such as "Snapshot 3, bank 2 recalled".
+- A morph and the last-landed blink belong to their slot's bank: switch away and the morph carries on, but its slot blinks only while its bank shows.
 
 **Scoped snapshots:**
 
