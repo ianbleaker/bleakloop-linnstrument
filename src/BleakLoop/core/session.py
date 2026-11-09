@@ -81,7 +81,7 @@ def handle(state, event, snapshot):
         return _seq(state, event, snapshot)
     if held == "copy" and not shifted:
         if not event.pressed:
-            return replace(state, copy=False, copy_source=None), []
+            return replace(state, copy=False, copy_source=None, fx_copy_source=None), []
         # In Mixer Mode, Copy and Delete only work on the split view's snapshots.
         if state.mixer and not fx.panel_visible(state):
             return state, []

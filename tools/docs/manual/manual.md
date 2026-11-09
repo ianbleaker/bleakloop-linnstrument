@@ -120,7 +120,7 @@ The outer edge, {column:navigation.session,navigation.mixer,navigation.fx,naviga
 - **Seq**: Hold and press a clip, or tap, for Sequencer Mode.
 - **Delete**: Hold, then press a clip or scene to delete it.
 - **Copy**: Hold, press a clip, then an empty slot.
-- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices.
+- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices. Hold and press a snapshot slot to punch it in.
 
 With **Shift** held:
 
@@ -344,7 +344,7 @@ The reserved pad, {row:navigation.reserved}, is dark and does nothing: it's kept
 **Device/Clip** ({pad:navigation.device_clip}, orange):
 
 - A tap flips Live's Detail view: to Clip view if it shows anything else or is hidden, and to Device view if it shows Clip view. It follows what you last clicked in Live. A press counts as a tap only if you press nothing else while holding it.
-- Held, like Shift, its pad blinks fast and {column:device_clip.tracks,device_clip.devices} shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual.
+- Held, like Shift, its pad blinks fast and {column:device_clip.tracks,device_clip.devices} shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual, except that a stored snapshot slot punches in (see Snapshots and morphs).
 - It works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
 - Tracks steps through every track, then the returns and master. Devices are the ones directly on the track; with a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
 - The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.
@@ -433,7 +433,8 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 **Snapshots:**
 
 - A snapshot holds the visible macros of every rack on the Set's tracks, groups, returns and master. Racks inside other racks aren't included.
-- Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it.
+- Press an empty (dark) slot to store a snapshot. To store over a stored slot, clear it with Delete first.
+- To copy a snapshot, hold Copy, press it (it blinks red), then press an empty slot, in any bank. A stored target refuses with "Target not empty", and Copy + an empty slot with nothing picked says "Copy: pick a snapshot". Slots and scene snapshots copy to each other.
 - Tap a stored (cyan) slot to recall it at once. The recall happens as you lift your finger: until then the slot can't tell a tap from a slide.
 - Hold a Bars pad, then press a stored slot to morph to it. This one starts on the press. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
 - While the transport is stopped, a recall always happens at once.
@@ -461,27 +462,41 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 - A slide's first move stops a running morph. Holding Bars, a press morphs instead of sliding, and scene snapshots don't slide.
 - One slide is one undo, from its first move to its lift. Slides held at the same time, and any tap, morph or fader you use during them, share it.
 
+**Punch-in:**
+
+- Hold Device/Clip ({pad:navigation.device_clip}) and press a stored slot to punch it in: it lands at once, at 100%. A Set-wide (cyan) slot jumps to its snapshot, a bound (pink) one to each parameter's punch-in value (see Bound snapshots). The status bar says "Snapshot 3 punched in".
+- Keep holding the slot and slide left to blend back towards the values at the press: four pads left is 0%. Sliding right of the press does nothing more. On/off and chooser parameters switch back halfway.
+- Lift and the parameters return to their values at the press, smoothly over 50 ms; on/off and chooser parameters switch back at once.
+- While you hold a punch, the 4 pads left of the slot fill in red, one per 25% from the slot out, over whatever they show: Bars and the faders in FX Mode, the panel and tracks in the split view. The slot keeps its colour and blinks fast.
+- Device/Clip only matters at the press: let go of it and the punch carries on until you lift the slot. Its release doesn't flip Live's view.
+- Shift, then Copy, then Delete come first: with one held, the press binds, copies or clears as usual. Device/Clip wins over a held Bars pad: the press punches rather than morphs. Device/Clip + an empty slot or a scene snapshot does nothing.
+- As with slides, a fader or a knob turned in Live takes that parameter out of the punch, and it stays where you left it: it doesn't return. Where a punch shares parameters with other slides or punches, the one started last moves them. Its lift hands them back to the earlier one, at that one's position, and only the rest return. A punch stops a running morph.
+- A punch is one undo, from the press to the end of its return, shared with any slides held at the same time. Pressing a slot, a recall, a Bars morph or a fader touch during the return lands it at once.
+
 **Bound snapshots:**
 
-- A slot can hold parameters of your choice instead of a snapshot: a bound slot, pink. It holds no values. Sliding it moves its parameters from wherever they are.
+- A slot can hold parameters of your choice instead of a snapshot: a bound slot, pink. Sliding it moves its parameters from wherever they are, not to stored values.
+- Binding a parameter saves its value at that moment as the slot's punch-in value for it. Binding a second parameter saves that one's value and leaves the others' alone.
 - To bind, click a parameter in Live, then hold Shift and tap the slot: it acts as you lift. Or, in FX Mode, hold Shift and the slot and tap a Device FX row: that row's parameter is bound instead.
 - Any parameter of a device directly on a track, group, return or master can be bound, and so can a track's volume, pan and sends; a slot can hold several, from different tracks and devices. A parameter inside a rack's chain can't: map it to one of the rack's macros, and bind the macro.
-- Binding a parameter the slot already holds removes it. Removing the last one empties the slot. The status bar names what the slot holds after a bind, such as "Snapshot 3: Frequency, Macro 2", or what was removed, such as "Removed Auto Filter Frequency from Snapshot 3".
+- Binding a parameter the slot already holds saves its value now as its new punch-in value, such as "Snapshot 3 punch value: Auto Filter Frequency 3.40 kHz". If that is already its punch-in value, the bind removes it instead, so pressing twice always removes. Removing the last one empties the slot. The status bar names what the slot holds after a bind, the new parameter first with its saved value, such as "Snapshot 3: Auto Filter Frequency 1.20 kHz, Macro 2", or what was removed, such as "Removed Auto Filter Frequency from Snapshot 3".
 - With nothing clicked in Live, the status bar says "Click a parameter in Live first". A Set-wide (cyan) slot refuses with "Delete Snapshot N to bind to it". A parameter that can't be bound says "Snapshot N can't hold" and its name. A Device FX row with no parameter does nothing.
 - With Shift held, a slot never recalls, stores or slides.
 - Slide a bound slot right to raise its parameters, left to lower them, below where they started too. Every pad moves each parameter by a quarter of its range, and it stops at its minimum or maximum. Sliding back returns exactly to where it started. On/off and chooser parameters step to the nearest value: an on/off flips at 2 pads either way, and a chooser steps through its options in order as you slide. To switch somewhere else, map it to a rack macro, set that mapping in Live, and bind the macro.
+- Device/Clip + a bound slot punches its parameters to their punch-in values. A parameter without one is skipped, with "no punch value for" and its name; with none at all, the press refuses, such as "Snapshot 3: no punch value for Frequency, Shift + slot to store". A punch shows its red fill, not the pink meter below.
 - While you hold a bound slot, the 4 pads to its right show where its parameters sit on average, in pink: none lit with all at their minimum, all 4 with all at their maximum. They follow the slide, over whatever those pads normally show.
-- A tap changes nothing: the status bar names the slot's parameters and their values. A Bars pad doesn't morph a bound slot. Lists of a slot's parameters give their names only, adding the device's or track's name where two share a name, such as "Auto Filter Frequency, EQ Frequency, Volume". When a list is too long for the status bar it ends with "+N" for the rest.
+- A tap changes nothing: the status bar names the slot's parameters, their values now and their punch-in values, such as "Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, Macro 2 0.5" (Macro 2 has no punch-in value). A Bars pad doesn't morph a bound slot. Lists of a slot's parameters give their names only, adding the device's or track's name where two share a name, such as "Auto Filter Frequency, EQ Frequency, Volume". When a list is too long for the status bar it ends with "+N" for the rest.
 - A rack macro is found again by its rack and its number, so renaming or mapping the macro doesn't lose it. Anything else is found by the track's, device's and parameter's names, counting same-named tracks and devices in order; one that can't be found is skipped, with a message.
-- Delete + a bound slot clears it. Copy + a bound slot stores a Set-wide snapshot over it, and it turns cyan.
-- **Undo:** within 10 seconds of a bind or a removal, with nothing else pressed since, the Undo pad ({pad:global.undo}) reverses it, newest first, saying "Unbound …" or "Bound … again"; each reversal gives you another 10 seconds. After that, or once you've pressed anything else, the pad is Live's Undo again. Live's own Undo (Cmd-Z) never touches binds. Shift doesn't end the window, but let go of it first: Shift + Undo is Redo.
-- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values.
+- Delete + a bound slot clears it; press the empty slot to store a Set-wide snapshot there.
+- Copy copies a bound slot to an empty slot, punch-in values included. It can't be pasted onto a scene snapshot.
+- **Undo:** within 10 seconds of a bind, a removal or an update, with nothing else pressed since, the Undo pad ({pad:global.undo}) reverses it, newest first, saying "Unbound …" or "Bound … again"; a parameter bound again gets its punch-in value back, and an updated one its old value. Each reversal gives you another 10 seconds. After that, or once you've pressed anything else, the pad is Live's Undo again. Live's own Undo (Cmd-Z) never touches binds. Shift doesn't end the window, but let go of it first: Shift + Undo is Redo.
+- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values. They, and slots bound before punch-in values existed, have no punch-in values until you bind each parameter again.
 - Scene snapshots can't be bound.
 
 **Scene snapshots** ({pad:fx.scene_slots}):
 
 - Each scene can hold one snapshot. Pad N is the snapshot of the scene on column 15's pad N, so the column scrolls with the window. Pads past the last scene, and pads 7 and 8, are dark.
-- Store, recall, morph with a Bars pad, store over with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
+- Store, recall, morph with a Bars pad, copy with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
 - A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not. A bound slot never does.
 - Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. With a Bars pad held, it lands as the timed launch below starts the scene.
 - Shift + a scene (legato) doesn't fire the snapshot, and neither do launches from Live's mouse or another controller. A scene without a snapshot leaves the macros, and any running morph, alone.
@@ -574,6 +589,8 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 The LinnStrument is your instrument again. The Global column keeps the controls it has in Session Mode, so the pads are where you know them. You're playing the selected track, so Record records a new clip on it, Capture captures MIDI to it, and Shift + Play stops its clips. The Global column always opens on the controls page. **Back** ({row:linnstrument.back}) returns to the mode you came from: Session, Mixer, FX or Sequencer.
 
 > **Careful:** in Linnstrument Mode the LinnStrument's own panel buttons work again. Changing a setting there (Octave, Volume, Per-Split, Split and the like) saves BleakLoop's control split as your own, along with any MPE channel it borrowed. To undo that, close Live and set your split up again on the device. If you change the left split's Octave or Transpose, BleakLoop puts them back, so select the right split first. Each Global column press first checks the device's Row Offset, so a press right after a Row Offset change never fires the wrong control. It is ignored while BleakLoop catches up, within about a second, or two for a custom offset or a guitar tuning. Guitar tuning edits are still only picked up by that catch-up. A Row Offset that repeats notes in the Global column (zero offset, or a guitar tuning with repeated strings) turns its controls off, with a message. If you move the right split onto the Global column's channel, BleakLoop moves the Global column to a free channel, with a message. If the right split uses every channel, the Global column's controls go off until one is free again.
+
+> **MIDI mapping:** leave Linnstrument Mode before you MIDI-map anything in Live (⌘M). About once a second BleakLoop reads the device's settings, and the replies end with CC 100 on channel 1. In MIDI Map mode, Live can learn that CC onto whatever you have selected, and that mapping then fires every second while you play.
 
 **Record Clip** needs an armed track. It records into the next empty slot down from the highlighted scene, and adds a scene if there's none. Fixed Length applies.
 

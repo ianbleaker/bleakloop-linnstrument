@@ -100,10 +100,11 @@ class FaderBinding:
 
 @dataclass(frozen=True)
 class BoundSlot:
-    # A snapshot slot bound to parameters, without values: a slide moves them from wherever
-    # they are. params holds a FaderBinding locator per parameter; a rack macro's is matched by
-    # its index alone.
+    # A snapshot slot bound to parameters: a slide moves them from wherever they are. params
+    # holds a FaderBinding locator per parameter; a rack macro's is matched by its index alone.
+    # values holds each parameter's stored punch-in value, a float or None; () means all None.
     params: tuple
+    values: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -118,6 +119,8 @@ class BoundRead:
     quantized: bool
     text: str = ""  # Live's display of the value at the press, such as "1.20 kHz"
     owner: str = ""  # its device's name, or its track's for a mixer parameter
+    target: float | None = None  # its punch-in value, clamped to its range; None when none
+    target_text: str = ""  # Live's display of the punch-in value
 
     @property
     def span(self):
@@ -161,6 +164,15 @@ class SlotHold:
     wrote: bool = False  # the slide has written: a running morph is cancelled
     dropped: frozenset = frozenset()  # keys taken out of this slide
     bound: bool = False  # a bound slot: BoundRead per parameter, and a slide both ways
+    punch: bool = False  # Device/Clip + the slot: it lands at once, and returns on the lift
+
+
+@dataclass(frozen=True)
+class PunchReturn:
+    # A punch's lift, ramping its parameters back: MorphMacro per parameter, start its value at
+    # the lift and target its value at the press.
+    macros: tuple
+    started_at: float | None = None  # the first tick's time, None until it stamps
 
 
 @dataclass(frozen=True)
@@ -253,8 +265,10 @@ class State:
     fx_slide_params: tuple = ()  # SlideParam per parameter a held slide has written
     fx_slide_undo_open: bool = False  # held slides' shared undo step is open in Live
     fx_slide_count: int = 0  # counts slides as they start, for SlotHold.order
+    fx_returns: tuple = ()  # PunchReturn per lifted punch still ramping back
     fx_bind_hold: BindHold | None = None  # Shift + a slot, held
-    # The Undo pad's bind history: (slot, locator, added) per bind or removal, newest last;
+    # The Undo pad's bind history: (slot, locator, punch-in value, fx.ADDED/REMOVED/UPDATED)
+    # per bind, removal or update, newest last;
     # the time of the last one, None until the next 10 ms tick stamps it; the last tick's time.
     bind_undo: tuple = ()
     bind_undo_at: float | None = None
@@ -263,6 +277,7 @@ class State:
     fx_landed: int | None = None  # the global slot of the last recall that landed
     fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty
     fx_landed_scene: int | None = None  # the scene of the last recall that landed
+    fx_copy_source: tuple | None = None  # (slot, scene) of the snapshot Copy picked
     fader_touches: tuple = ()  # FaderTouch per touched fader row
     fader_undo_open: bool = False  # a fader gesture's undo step is open in Live
     device_clip: bool = False  # Device/Clip is held
@@ -317,6 +332,7 @@ def enter(state, mode):
         copy=False,
         delete=False,
         copy_source=None,
+        fx_copy_source=None,
         stop=False,
         touches=(),
         lifts=(),

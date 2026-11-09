@@ -238,6 +238,8 @@ class ParameterBound:
     binding: object  # FaderBinding, or None
     parameter: str | None  # the selected parameter's name, for a refusal
     refusal: str | None  # None, "select", "macro" or "refused"
+    value: float | None = None  # the parameter's value when bound: its punch-in value
+    text: str = ""  # Live's display of that value
 
 
 @dataclass(frozen=True)
@@ -491,6 +493,7 @@ class RecallFxSnapshot:
     end_beats: float | None = None  # a scene launch's landing time, decided at the press
     hold: bool = False  # a held slot: read now, recall or slide later
     locators: tuple = ()  # a bound slot's parameters, read instead of the racks
+    values: tuple = ()  # their punch-in values, None where there's none
 
 
 @dataclass(frozen=True)

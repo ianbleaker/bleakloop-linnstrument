@@ -56,3 +56,6 @@ STATUS_MAX = 160
 # The Undo pad reverses the last bind or removal of a snapshot slot's parameter this long after
 # it, with nothing else pressed since; past it, the pad is Live's Undo again.
 BIND_UNDO_MS = 10000
+# A punched-in snapshot's lift ramps its parameters back to their values at the press this
+# long after it, linearly on the 10 ms timer.
+PUNCH_RETURN_MS = 50

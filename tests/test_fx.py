@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, RED, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
     Undo,
     BindFaderRow,
@@ -151,6 +151,42 @@ def test_bad_bound_entries_are_dropped(entry):
     text = json.dumps({"v": 2, "slots": [{"bound": [entry, good]}, {"bound": [entry]}] + [None] * 126})
     slots = fx.parse(text)
     assert slots[0] == BoundSlot((BOUND.params[0],)) and slots[1] is None
+
+
+def test_bound_punch_values_round_trip():
+    slot = replace(BOUND, values=(0.75, None))
+    text = fx.dump((slot,) + (None,) * 127)
+    entries = json.loads(text)["slots"][0]["bound"]
+    assert entries[0]["value"] == 0.75 and "value" not in entries[1]
+    assert fx.parse(text)[0] == slot
+
+
+def test_a_bound_store_without_values_loads_with_none():
+    text = json.dumps({"v": 2, "slots": [BOUND_JSON] + [None] * 127})
+    slot = fx.parse(text)[0]
+    assert slot == BOUND and fx._values(slot) == (None, None)
+
+
+@pytest.mark.parametrize("value", ["0.5", True, None, [1]])
+def test_a_bad_punch_value_loads_as_none_and_keeps_the_parameter(value):
+    first = dict(BOUND_JSON["bound"][0], value=value)
+    second = dict(BOUND_JSON["bound"][1], value=3)
+    text = json.dumps({"v": 2, "slots": [{"bound": [first, second]}] + [None] * 127})
+    slot = fx.parse(text)[0]
+    assert slot.params == BOUND.params and fx._values(slot) == (None, 3.0)
+
+
+def test_a_dropped_entry_takes_its_value_with_it():
+    bad = {"track": "A", "tn": -1, "device": "D", "dn": 0, "param": 1, "name": "P", "value": 0.1}
+    second = dict(BOUND_JSON["bound"][1], value=0.9)
+    text = json.dumps({"v": 2, "slots": [{"bound": [bad, second]}] + [None] * 127})
+    assert fx.parse(text)[0] == BoundSlot((BOUND.params[1],), (0.9,))
+
+
+def test_a_scoped_slot_converts_without_values():
+    rack = [{"track": "Drums", "rack": "FX", "n": 1, "macros": [0.5, 0.25]}]
+    slot = fx.parse(_v1([None, rack] + [None] * 14, scoped=[1]))[1]
+    assert slot.values == () and fx._values(slot) == (None, None)
 
 
 def test_an_all_empty_store_round_trips():
@@ -326,12 +362,55 @@ def test_a_stored_slot_press_holds_it_and_reads_at_once():
     assert actions == [RecallFxSnapshot(2, None, hold=True)]
 
 
-@pytest.mark.parametrize("stored", [False, True])
-def test_copy_stores_into_any_slot(stored):
+SLOT_5 = layout.FX.slots[4]
+
+
+def test_copy_picks_a_stored_slot_as_the_source():
+    state = with_slot(replace(FX, copy=True), 2)
+    state, actions = handle(state, SLOT_3)
+    assert state.fx_copy_source == (2, False)
+    assert actions == [ShowMessage("Copy: pick an empty slot")]
+    assert session.render(state, SNAP)[SLOT_3] == Light(RED, Blink.FAST)
+
+
+def test_copy_on_an_empty_slot_without_a_source_refuses():
     state = replace(FX, copy=True)
-    if stored:
-        state = with_slot(state, 2)
-    assert handle(state, SLOT_3) == (state, [StoreFxSnapshot(2)])
+    assert handle(state, SLOT_3) == (state, [ShowMessage("Copy: pick a snapshot")])
+
+
+@pytest.mark.parametrize("value", [STORED, BoundSlot((FaderBinding("A", 0, "D", 0, 1, "P"),), (0.5,))])
+def test_copy_pastes_the_source_onto_an_empty_slot(value):
+    state, _ = handle(with_slot(replace(FX, copy=True), 2, value), SLOT_3)
+    state, actions = handle(state, SLOT_5)
+    assert state.fx_slots[4] == value and state.fx_slots[2] == value
+    assert state.fx_copy_source is None
+    assert actions == [
+        SaveFxSnapshots(fx.dump(state.fx_slots)),
+        ShowMessage("Snapshot 3 copied to Snapshot 5"),
+    ]
+
+
+def test_copy_refuses_a_stored_target_and_drops_the_source():
+    state = with_slot(with_slot(replace(FX, copy=True), 2), 4, BoundSlot((FaderBinding("A", 0, "D", 0, 1, "P"),)))
+    state, _ = handle(state, SLOT_3)
+    before = state.fx_slots
+    state, actions = handle(state, SLOT_5)
+    assert actions == [ShowMessage("Target not empty")]
+    assert state.fx_slots == before and state.fx_copy_source is None
+
+
+def test_copy_pastes_across_banks():
+    state, _ = handle(with_slot(replace(FX, copy=True), 2), SLOT_3)
+    state, _ = handle(state, (13, 2))
+    state, actions = handle(state, SLOT_3)
+    assert state.fx_slots[18] == STORED
+    assert actions[-1] == ShowMessage("Snapshot 3 copied to Snapshot 3, bank 2")
+
+
+def test_letting_go_of_copy_drops_the_source():
+    state, _ = handle(with_slot(replace(FX, copy=True), 2), SLOT_3)
+    state, _ = handle(state, layout.NAVIGATION.copy, pressed=False)
+    assert state.fx_copy_source is None and not state.copy
 
 
 def test_delete_clears_a_full_slot():
@@ -382,7 +461,7 @@ def test_slot_release_does_nothing():
 def test_copy_message_in_fx():
     state, actions = handle(FX, layout.NAVIGATION.copy)
     assert state.copy
-    assert actions == [ShowMessage("Copy: press a slot to overwrite")]
+    assert actions == [ShowMessage("Copy: pick a snapshot")]
 
 
 def test_delete_message_in_fx():
@@ -1295,8 +1374,15 @@ def bound_sliding(params=(FREQ_READ, SWITCH_READ)):
 
 def test_a_bound_slot_press_reads_its_locators():
     state, actions = handle(BOUND_AB, SLOT_3)
-    assert actions == [RecallFxSnapshot(2, None, hold=True, locators=BOUND_AB.fx_slots[2].params)]
+    expected = RecallFxSnapshot(2, None, hold=True, locators=BOUND_AB.fx_slots[2].params, values=(None, None))
+    assert actions == [expected]
     assert state.fx_holds[0].bound
+
+
+def test_a_bound_slot_press_reads_its_punch_in_values():
+    state = with_slot(FX, 2, replace(BOUND_AB.fx_slots[2], values=(90.0,)))
+    _, actions = handle(state, SLOT_3)
+    assert actions[0].values == (90.0, None)
 
 
 def test_bars_and_a_bound_slot_does_nothing():
@@ -1419,8 +1505,8 @@ def test_the_value_meter_follows_the_slide_and_redraws():
 EQ = FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency")
 
 
-def bound_answer(state, slot=2, binding=FREQ, parameter="Frequency", refusal=None):
-    return engine.handle(state, ParameterBound(slot, binding, parameter, refusal), SNAP)
+def bound_answer(state, slot=2, binding=FREQ, parameter="Frequency", refusal=None, value=None, text=""):
+    return engine.handle(state, ParameterBound(slot, binding, parameter, refusal, value, text), SNAP)
 
 
 @pytest.mark.parametrize("layer", ["FX", "PANEL", "MIXER_PANEL"])
@@ -1455,7 +1541,7 @@ def test_a_second_bind_adds_and_names_both():
     state, _ = bound_answer(FX)
     state, actions = bound_answer(state, binding=EQ)
     assert state.fx_slots[2] == BoundSlot((FREQ, EQ))
-    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency, EQ Frequency")
+    assert actions[-1] == ShowMessage("Snapshot 3: EQ Frequency, Auto Filter Frequency")
 
 
 def test_binding_a_held_parameter_removes_it_and_the_last_empties_the_slot():
@@ -1464,6 +1550,78 @@ def test_binding_a_held_parameter_removes_it_and_the_last_empties_the_slot():
     state, actions = bound_answer(state, binding=EQ)
     assert state.fx_slots[2] is None
     assert actions[-1] == ShowMessage("Removed EQ Frequency from Snapshot 3")
+
+
+def test_a_bind_saves_the_parameters_value_and_names_it():
+    state, actions = bound_answer(FX, value=0.6, text="1.20 kHz")
+    assert state.fx_slots[2] == BoundSlot((FREQ,), (0.6,))
+    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency 1.20 kHz")
+    assert fx.parse(actions[0].text)[2] == state.fx_slots[2]
+
+
+def test_a_second_bind_saves_its_value_and_leaves_the_firsts():
+    state, _ = bound_answer(FX, value=0.6, text="1.20 kHz")
+    state, actions = bound_answer(state, binding=EQ, value=0.2, text="300 Hz")
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, 0.2))
+    assert actions[-1] == ShowMessage("Snapshot 3: EQ Frequency 300 Hz, Auto Filter Frequency")
+
+
+def test_a_bind_without_a_value_keeps_the_others():
+    state = with_slot(FX, 2, BoundSlot((FREQ,), (0.6,)))
+    state, actions = bound_answer(state, binding=EQ)
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, None))
+    assert actions[-1] == ShowMessage("Snapshot 3: EQ Frequency, Auto Filter Frequency")
+
+
+def test_a_removal_drops_its_value():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, _ = bound_answer(state)
+    assert state.fx_slots[2] == BoundSlot((EQ,), (0.2,))
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (None, 0.2)))
+    state, _ = bound_answer(state, binding=EQ)
+    assert state.fx_slots[2] == BoundSlot((FREQ,))
+
+
+def test_binding_a_held_parameter_with_a_new_value_updates_it():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, actions = bound_answer(state, value=0.9, text="3.40 kHz")
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.9, 0.2))
+    assert actions == [
+        SaveFxSnapshots(fx.dump(state.fx_slots)),
+        ShowMessage("Snapshot 3 punch value: Auto Filter Frequency 3.40 kHz"),
+    ]
+
+
+def test_binding_a_held_parameter_without_a_punch_value_gives_it_one():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ)))
+    state, actions = bound_answer(state, binding=EQ, value=0.25)
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (None, 0.25))
+    assert actions[-1] == ShowMessage("Snapshot 3 punch value: EQ Frequency 0.25")
+
+
+def test_binding_a_held_parameter_at_its_punch_value_removes_it():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, actions = bound_answer(state, value=0.6, text="1.20 kHz")
+    assert state.fx_slots[2] == BoundSlot((EQ,), (0.2,))
+    assert actions[-1] == ShowMessage("Removed Auto Filter Frequency from Snapshot 3")
+
+
+def test_pressing_twice_updates_then_removes():
+    state = with_slot(FX, 2, BoundSlot((FREQ,), (0.6,)))
+    state, _ = bound_answer(state, value=0.9)
+    state, _ = bound_answer(state, value=0.9)
+    assert state.fx_slots[2] is None
+
+
+def test_the_undo_pad_puts_back_an_updated_punch_value():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, _ = bound_answer(state, value=0.9, text="3.40 kHz")
+    state, actions = handle(state, layout.GLOBAL.undo, snapshot=replace(SNAP, can_undo=True))
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, 0.2))
+    assert actions == [
+        SaveFxSnapshots(fx.dump(state.fx_slots)),
+        ShowMessage("Snapshot 3: Auto Filter Frequency's punch value put back"),
+    ]
 
 
 def test_a_renamed_macro_still_toggles_off():
@@ -1551,7 +1709,14 @@ def test_a_bind_message_shortens():
     state = with_slot(FX, 2, BoundSlot(params[:11]))
     _, actions = bound_answer(state, binding=params[11])
     text = actions[-1].text
-    assert text.startswith("Snapshot 3: Device 0 Frequency") and text.endswith(", +5") and len(text) <= STATUS_MAX
+    assert text.startswith("Snapshot 3: Device 11 Frequency, Device 0 Frequency") and text.endswith(", +5") and len(text) <= STATUS_MAX
+
+
+def test_a_long_bind_message_still_shows_the_new_parameters_value():
+    params = tuple(FaderBinding("Bass", 0, f"Device {i}", 0, 1, "Frequency") for i in range(12))
+    state = with_slot(FX, 2, BoundSlot(params[:11]))
+    _, actions = bound_answer(state, binding=params[11], value=0.5, text="1.20 kHz")
+    assert actions[-1].text.startswith("Snapshot 3: Device 11 Frequency 1.20 kHz, Device 0 Frequency")
 
 
 def test_labels_name_the_owner_only_where_two_share_a_name():
@@ -1582,6 +1747,21 @@ def test_the_undo_pad_rebinds_a_removal():
     state, actions = handle(state, UNDO, snapshot=CAN_UNDO)
     assert state.fx_slots[2] == BoundSlot((FREQ,))
     assert actions[-1] == ShowMessage("Bound Auto Filter Frequency to Snapshot 3 again")
+
+
+def test_the_undo_pad_restores_a_removed_parameters_value():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, _ = bound_answer(state)
+    state, actions = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert state.fx_slots[2] == BoundSlot((EQ, FREQ), (0.2, 0.6))
+    assert fx.parse(actions[0].text)[2] == state.fx_slots[2]
+
+
+def test_the_undo_pad_removes_a_bind_and_its_value():
+    state = with_slot(FX, 2, BoundSlot((EQ,), (0.2,)))
+    state, _ = bound_answer(state, value=0.6, text="1.20 kHz")
+    state, _ = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert state.fx_slots[2] == BoundSlot((EQ,), (0.2,))
 
 
 def test_several_undos_pop_newest_first_each_restarting_the_window():
@@ -1644,6 +1824,22 @@ def test_a_bound_tap_shows_lives_text_for_the_value():
     state, _ = bound_read(state, (replace(FREQ_READ, text="1.20 kHz"),))
     _, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz")]
+
+
+def test_a_bound_tap_shows_the_punch_in_value_where_there_is_one():
+    freq = replace(FREQ_READ, text="1.20 kHz", target=90.0, target_text="3.40 kHz")
+    macro = replace(SWITCH_READ, start=0.5, quantized=False)
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, (freq, macro))
+    _, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, On 0.5")]
+
+
+def test_a_bound_tap_shows_a_punch_in_value_without_text_as_a_number():
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, (replace(FREQ_READ, target=90.25),))
+    _, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: Frequency 100 → 90.25")]
 
 
 def test_a_bound_tap_and_lift_name_the_device_where_two_share_a_name():
@@ -1802,12 +1998,49 @@ def test_stored_scene_pad_recalls_with_held_length():
     )
 
 
-@pytest.mark.parametrize("stored", [False, True])
-def test_copy_stores_over_a_scene_snapshot(stored):
-    state = replace(FX, copy=True)
-    if stored:
-        state = with_scene(state, 1)
-    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [StoreFxSnapshot(1, scene=True)])
+def test_copy_pastes_a_scene_snapshot_onto_an_empty_scene():
+    state, actions = handle(with_scene(replace(FX, copy=True), 1), SCENE_2, snapshot=SCENES)
+    assert state.fx_copy_source == (1, True) and actions == [ShowMessage("Copy: pick an empty slot")]
+    assert session.render(state, SCENES)[SCENE_2] == Light(RED, Blink.FAST)
+    state, actions = handle(state, layout.FX.scene_slots[3], snapshot=SCENES)
+    assert state.fx_scenes[3] == STORED
+    assert actions == [
+        SaveFxScenes(fx.dump_scenes(state.fx_scenes)),
+        ShowMessage("Scene 2 snapshot copied to Scene 4 snapshot"),
+    ]
+
+
+def test_copy_refuses_a_stored_scene_target():
+    state = with_scene(with_scene(replace(FX, copy=True), 1), 3)
+    state, _ = handle(state, SCENE_2, snapshot=SCENES)
+    state, actions = handle(state, layout.FX.scene_slots[3], snapshot=SCENES)
+    assert actions == [ShowMessage("Target not empty")]
+
+
+def test_copy_between_slots_and_scene_snapshots():
+    state, _ = handle(with_slot(replace(FX, copy=True), 2), SLOT_3, snapshot=SCENES)
+    state, _ = handle(state, SCENE_2, snapshot=SCENES)
+    assert state.fx_scenes[1] == STORED
+    state, _ = handle(state, SCENE_2, snapshot=SCENES)
+    state, actions = handle(state, SLOT_5, snapshot=SCENES)
+    assert state.fx_slots[4] == STORED
+    assert actions[-1] == ShowMessage("Scene 2 snapshot copied to Snapshot 5")
+
+
+def test_a_bound_slot_cant_be_pasted_onto_a_scene_snapshot():
+    bound = BoundSlot((FaderBinding("A", 0, "D", 0, 1, "P"),))
+    state, _ = handle(with_slot(replace(FX, copy=True), 2, bound), SLOT_3, snapshot=SCENES)
+    state, actions = handle(state, SCENE_2, snapshot=SCENES)
+    assert actions == [ShowMessage("Scene snapshots can't be bound")]
+    assert state.fx_scenes[1:2] in ((), (None,)) and state.fx_copy_source is None
+
+
+def test_a_picked_scene_snapshot_follows_its_scene():
+    state, _ = handle(with_scene(replace(FX, copy=True), 1), SCENE_2, snapshot=SCENES)
+    moved, _ = fx.scenes_changed(state, ScenesChanged((None, 0, 1), (None, None, None)))
+    assert moved.fx_copy_source == (2, True)
+    gone, _ = fx.scenes_changed(state, ScenesChanged((0,), (None,)))
+    assert gone.fx_copy_source is None
 
 
 def test_delete_clears_a_scene_snapshot():
@@ -2323,11 +2556,12 @@ def test_the_panel_is_fx_modes_columns_10_to_14(state):
 
 
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
-def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
+def test_the_panel_copies_and_clears_with_copy_and_delete(state):
     state = with_slot(state, 2)
     copying, _ = handle(state, layout.NAVIGATION.copy)
     assert copying.copy
-    assert handle(copying, SLOT_3)[1] == [StoreFxSnapshot(2)]
+    picked, _ = handle(copying, SLOT_3)
+    assert handle(picked, SLOT_5)[0].fx_slots[4] == STORED
     deleting, _ = handle(state, layout.NAVIGATION.delete)
     assert handle(deleting, SLOT_3)[1] == [
         SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None))),
@@ -2338,8 +2572,11 @@ def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
 @pytest.mark.parametrize("held", ["copy", "delete"])
 def test_copy_and_delete_come_before_shift(held):
     state = replace(with_slot(FX, 2), shift=True, **{held: True})
-    action = handle(state, SLOT_3)[1][0]
-    assert action == StoreFxSnapshot(2) if held == "copy" else isinstance(action, SaveFxSnapshots)
+    new, actions = handle(state, SLOT_3)
+    if held == "copy":
+        assert new.fx_copy_source == (2, False) and new.fx_bind_hold is None
+    else:
+        assert isinstance(actions[0], SaveFxSnapshots)
 
 
 def test_stop_leaves_the_panel_alone():
@@ -2351,7 +2588,7 @@ def test_mixer_copy_and_delete_only_hold_for_the_panel():
     state = State(mixer=True, mixer_split=True)
     assert handle(state, layout.NAVIGATION.copy) == (state, [])
     copying, actions = handle(MIXER_PANEL, layout.NAVIGATION.copy)
-    assert actions == [ShowMessage("Copy: press a slot to overwrite")]
+    assert actions == [ShowMessage("Copy: pick a snapshot")]
     copying = replace(MIXER_PANEL, copy=True)
     assert handle(copying, (2, layout.MUTE_ROW)) == (copying, [])
 
@@ -2386,3 +2623,356 @@ def test_snapshot_buttons_move_to_free_pads(monkeypatch):
     assert handle(FX, (14, 7)) == (FX, [StoreFxSnapshot(0)])
     assert handle(FX, (11, 1)) == (FX, [])
     assert handle(FX, (10, 6))[0].fx_length == 1
+
+
+# Punch-in: Device/Clip + a slot (#112)
+
+DEV_CLP = layout.NAVIGATION.device_clip
+PUNCHING = replace(with_slot(FX, 2), device_clip=True)
+PUNCH_BOUND = replace(BOUND_AB, device_clip=True)
+
+
+@pytest.mark.parametrize("bars", [None, 4])
+def test_device_clip_and_a_stored_slot_makes_a_punch_hold(bars):
+    state = replace(PUNCHING, fx_length=bars)
+    held, actions = handle(state, SLOT_3)
+    assert held.fx_holds == (SlotHold(SLOT_3[1], SLOT_3[0], 2, punch=True),)
+    assert actions == [RecallFxSnapshot(2, None, hold=True)]
+
+
+def test_device_clip_and_a_bound_slot_reads_its_punch_values():
+    state = with_slot(PUNCH_BOUND, 2, replace(BOUND_AB.fx_slots[2], values=(90.0,)))
+    held, actions = handle(state, SLOT_3)
+    assert held.fx_holds[0].punch and held.fx_holds[0].bound
+    assert actions[0].values == (90.0, None)
+
+
+def test_device_clip_and_an_empty_slot_does_nothing():
+    state = replace(FX, device_clip=True)
+    assert handle(state, SLOT_3) == (state, [])
+
+
+def test_device_clip_and_a_scene_snapshot_does_nothing():
+    state = with_scene(PUNCHING, 1)
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
+
+
+def test_copy_comes_before_device_clip():
+    state, actions = handle(replace(PUNCHING, copy=True), SLOT_3)
+    assert state.fx_copy_source == (2, False) and state.fx_holds == ()
+
+
+def test_delete_comes_before_device_clip():
+    state, actions = handle(replace(PUNCHING, delete=True), SLOT_3)
+    assert state.fx_slots[2] is None and actions[-1] == ShowMessage("Snapshot 3 cleared")
+
+
+def test_shift_comes_before_device_clip():
+    state, actions = handle(replace(PUNCHING, shift=True), SLOT_3)
+    assert state.fx_bind_hold == BindHold(SLOT_3[1], SLOT_3[0], 2) and state.fx_holds == ()
+
+
+@pytest.mark.parametrize("layer", ["PANEL", "MIXER_PANEL"])
+def test_the_split_panel_punches_too(layer):
+    state = replace(with_slot(globals()[layer], 2), device_clip=True)
+    held, _ = handle(state, SLOT_3)
+    assert held.fx_holds[0].punch
+
+
+def test_letting_go_of_device_clip_after_a_punch_doesnt_flip_the_view():
+    state, _ = engine.handle(with_slot(FX, 2), PadPress(*DEV_CLP, True), SNAP)
+    state, _ = engine.handle(state, PadPress(*SLOT_3, True), SNAP)
+    state, actions = engine.handle(state, PadPress(*DEV_CLP, False), SNAP)
+    assert not state.device_clip and actions == []
+    assert state.fx_holds[0].punch
+
+
+PUNCH_AB = replace(AB, device_clip=True)
+
+
+def punched(state=PUNCH_AB, racks=NOW_AB):
+    state, _ = handle(state, SLOT_3)
+    return hold_read(state, racks=racks)
+
+
+def test_a_set_wide_punch_writes_its_snapshot_at_once():
+    state, actions = punched()
+    assert actions == [BeginUndoStep(), SetMacros(AB_TARGETS), ShowMessage("Snapshot 3 punched in")]
+    hold = state.fx_holds[0]
+    assert hold.slid and hold.f == 1.0 and hold.order == 1 and state.fx_slide_undo_open
+
+
+def test_a_set_wide_punch_notes_missing_racks():
+    _, actions = punched(racks=NOW_AB[:1])
+    assert actions[-1] == ShowMessage("Snapshot 3 punched in, 1 rack not found")
+
+
+def test_a_set_wide_punch_with_no_racks_refuses_and_drops_the_hold():
+    state, actions = punched(racks=())
+    assert state.fx_holds == () and actions == [ShowMessage("Snapshot 3: nothing to recall, 2 racks not found")]
+
+
+def bound_punched(params):
+    state, _ = handle(PUNCH_BOUND, SLOT_3)
+    return bound_read(state, params)
+
+
+def test_a_bound_punch_writes_the_punch_in_values():
+    switch = replace(SWITCH_READ, target=1.0)
+    state, actions = bound_punched((replace(FREQ_READ, target=20.0), switch))
+    assert actions == [
+        BeginUndoStep(),
+        SetMacros(((FREQ, 20.0), (MACRO_KEY, 1.0))),
+        ShowMessage("Snapshot 3 punched in"),
+    ]
+
+
+def test_a_bound_punch_skips_a_parameter_without_a_value():
+    state, actions = bound_punched((replace(FREQ_READ, target=20.0), SWITCH_READ))
+    assert actions[1] == SetMacros(((FREQ, 20.0),))
+    assert actions[-1] == ShowMessage("Snapshot 3 punched in, no punch value for On")
+    assert [m.key for m in state.fx_holds[0].read] == [FREQ]
+
+
+def test_a_bound_punch_notes_missing_parameters():
+    _, actions = bound_punched((replace(FREQ_READ, target=20.0), None))
+    assert actions[-1] == ShowMessage("Snapshot 3 punched in, 1 parameter not found")
+
+
+def test_a_bound_punch_without_any_values_refuses():
+    state, actions = bound_punched((FREQ_READ, SWITCH_READ))
+    assert state.fx_holds == ()
+    assert actions == [ShowMessage("Snapshot 3: no punch value for Frequency, On, Shift + slot to store")]
+
+
+def test_a_punch_lifted_before_its_read_writes_nothing():
+    state, _ = handle(PUNCH_AB, SLOT_3)
+    state, _ = lift(state)
+    state, actions = hold_read(state)
+    assert actions == [] and state.fx_holds == () and state.fx_slide_params == ()
+
+
+def test_a_punch_stops_a_running_morph():
+    state = replace(PUNCH_AB, morph=MORPH, fx_undo_open=True)
+    state, actions = punched(state)
+    assert state.morph is None and not state.fx_undo_open
+    assert actions[:3] == [EndUndoStep(), BeginUndoStep(), SetMacros(AB_TARGETS)]
+    assert actions.count(BeginUndoStep()) == 1
+
+
+def punch_x(state, columns):
+    return x(state, 11, at(columns))
+
+
+def punch_holding():
+    state, _ = punched()
+    state, actions, _ = punch_x(state, 0)
+    assert actions == []
+    return state
+
+
+@pytest.mark.parametrize("columns, f", [(-2, 0.5), (-4, 0.0), (-7, 0.0), (0.2, 1.0), (3, 1.0)])
+def test_a_punch_blends_back_sliding_left(columns, f):
+    state, actions, _ = punch_x(punch_holding(), columns)
+    assert state.fx_holds[0].f == pytest.approx(f, abs=1e-3)
+    written = {p.key: p.written for p in state.fx_slide_params}
+    assert written == pytest.approx({key: target * f for key, target in AB_TARGETS}, abs=0.1)
+    if f == 1.0:
+        assert actions == []
+
+
+def test_a_punch_has_no_slide_threshold():
+    state, actions, _ = punch_x(punch_holding(), -0.1)
+    assert state.fx_holds[0].f == pytest.approx(0.975, abs=1e-3) and actions
+
+
+def test_a_punched_quantized_macro_switches_at_half_way_both_ways():
+    key = (P0, "R", 0)
+    state, _ = punched(with_slot(PUNCH_AB, 2, (FxRack("A", "R", 0, (1.0,)),)), racks=(rack("A", "R", 0.0, path=P0),))
+    quantized = replace(state.fx_holds[0], read=(MorphMacro(key, 0.0, 1.0, True, 0.0, 1.0),))
+    state, _, _ = punch_x(replace(state, fx_holds=(quantized,)), 0)
+    state, actions, _ = punch_x(state, -1.9)
+    assert actions == []
+    state, actions, _ = punch_x(state, -2.1)
+    assert actions == [SetMacros(((key, 0.0),))]
+    state, actions, _ = punch_x(state, -1.9)
+    assert actions == [SetMacros(((key, 1.0),))]
+
+
+def test_a_punch_lift_queues_a_return_for_continuous_parameters():
+    state, actions = lift(punch_holding())
+    assert actions == [] and state.fx_holds == () and state.fx_slide_params == ()
+    (back,) = state.fx_returns
+    assert back.started_at is None
+    assert [(m.key, m.start, m.target) for m in back.macros] == [(key, value, 0.0) for key, value in AB_TARGETS]
+    assert state.fx_slide_undo_open
+
+
+def test_a_punch_lift_snaps_quantized_parameters_back_at_once():
+    key = (P0, "R", 0)
+    state, _ = punched(with_slot(PUNCH_AB, 2, (FxRack("A", "R", 0, (1.0,)),)), racks=(rack("A", "R", 0.0, path=P0),))
+    quantized = replace(state.fx_holds[0], read=(MorphMacro(key, 0.0, 1.0, True, 0.0, 1.0),))
+    state, actions = lift(replace(state, fx_holds=(quantized,)))
+    assert actions == [SetMacros(((key, 0.0),)), EndUndoStep()]
+    assert state.fx_returns == () and not state.fx_slide_undo_open
+
+
+def test_a_punch_lift_hands_shared_parameters_back_to_an_earlier_slide():
+    state = sliding(with_slot(AB, 0, A_ONLY))
+    state, _, _ = x(state, 11, at(2))
+    state, _ = handle(replace(state, device_clip=True), OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, actions = lift(state, OTHER_SLOT)
+    f_a = at(2) / X_COLUMN_WIDTH / 4
+    assert actions == [SetMacros((((P0, "R", 0), 10.0 * f_a), ((P0, "R", 1), 20.0 * f_a)))]
+    assert state.fx_returns == () and state.fx_slide_undo_open
+
+
+def test_a_parameter_a_fader_took_doesnt_return():
+    from BleakLoop.core import faders
+
+    state = faders.leave_slides(punch_holding(), {(P1, "R", 0)})
+    state, _ = lift(state)
+    assert [m.key for m in state.fx_returns[0].macros] == [(P0, "R", 0), (P0, "R", 1)]
+
+
+def test_a_punch_slid_back_to_0_has_nothing_to_return():
+    state, _, _ = punch_x(punch_holding(), -5)
+    state, actions = lift(state)
+    assert actions == [EndUndoStep()] and state.fx_returns == ()
+
+
+def returning():
+    state, _ = lift(punch_holding())
+    return state
+
+
+def test_a_return_lands_in_about_5_ticks_linearly():
+    state = returning()
+    state, actions = engine.return_tick(state, 1000.0)
+    assert actions == [] and state.fx_returns[0].started_at == 1000.0
+    key, start = AB_TARGETS[0]
+    seen = []
+    for k in range(1, 6):
+        state, actions = engine.return_tick(state, 1000.0 + 10 * k)
+        seen.append(dict(actions[0].writes)[key])
+        if k < 5:
+            assert actions == [actions[0]] and state.fx_slide_undo_open
+    assert seen == pytest.approx([start * (1 - k / 5) for k in range(1, 6)])
+    assert actions[-1] == EndUndoStep() and actions.count(EndUndoStep()) == 1
+    assert state.fx_returns == () and not state.fx_slide_undo_open
+    assert engine.return_tick(state, 2000.0) == (state, [])
+
+
+def test_two_returns_run_side_by_side_and_close_the_step_once():
+    state = with_slot(PUNCH_AB, 0, (FxRack("B", "R", 0, (50.0,)),))
+    state = replace(state, fx_slots=fx._put(state.fx_slots, 2, (FxRack("A", "R", 0, (10.0, 20.0)),)))
+    state, _ = handle(state, SLOT_3)
+    state, _ = hold_read(state)
+    state, _ = handle(state, OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _ = lift(state)
+    state, _ = engine.return_tick(state, 0.0)
+    state, _ = engine.return_tick(state, 30.0)
+    state, _ = lift(state, OTHER_SLOT)
+    assert len(state.fx_returns) == 2
+    state, actions = engine.return_tick(state, 40.0)
+    # The first lands at 50 ms; the second starts timing at this tick.
+    assert len(state.fx_returns) == 2 and state.fx_returns[1].started_at == 40.0
+    state, actions = engine.return_tick(state, 50.0)
+    assert len(state.fx_returns) == 1 and EndUndoStep() not in actions
+    assert {key for key, _ in actions[0].writes} == {(P0, "R", 0), (P0, "R", 1), (P1, "R", 0)}
+    state, actions = engine.return_tick(state, 90.0)
+    assert actions[-1] == EndUndoStep() and state.fx_returns == ()
+
+
+def test_a_held_slide_keeps_the_step_open_after_a_return_lands():
+    state = with_slot(PUNCH_AB, 0, (FxRack("B", "R", 0, (50.0,)),))
+    state, _ = handle(replace(state, device_clip=False), OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _, _ = x(state, 11, 0, pad=ROW_1)
+    state, _, _ = x(state, 11, at(2), pad=ROW_1)
+    state, _ = handle(replace(state, device_clip=True), SLOT_3)
+    state, _ = hold_read(state)
+    state, _ = lift(state)
+    state, _ = engine.return_tick(state, 0.0)
+    state, actions = engine.return_tick(state, 50.0)
+    assert EndUndoStep() not in actions and state.fx_slide_undo_open
+
+
+LANDED = [SetMacros(tuple((key, 0.0) for key, _ in AB_TARGETS)), EndUndoStep()]
+
+
+def test_a_new_hold_lands_running_returns_before_its_read():
+    state, actions = handle(replace(returning(), device_clip=False), SLOT_3)
+    assert actions == LANDED + [RecallFxSnapshot(2, None, hold=True)]
+    assert state.fx_returns == () and not state.fx_slide_undo_open
+
+
+def test_a_recall_lands_running_returns_first():
+    state, actions = racks_read(returning(), 2, NOW_AB, recall=True)
+    assert actions[:2] == LANDED
+    assert actions[2:5] == [BeginUndoStep(), SetMacros(AB_TARGETS), EndUndoStep()]
+
+
+def test_a_morph_lands_running_returns_first():
+    state, actions = racks_read(returning(), 2, NOW_AB, recall=True, bars=4, snapshot=playing(3.0))
+    assert actions[:2] == LANDED and actions[2] == BeginUndoStep()
+    assert state.morph is not None and state.fx_returns == ()
+
+
+def test_a_fader_touch_lands_running_returns():
+    state, actions = session.handle(replace(returning(), device_clip=False), PadPress(5, 2, True), ROW_VIEWS)
+    assert actions == LANDED and len(state.fader_touches) == 1
+
+
+def test_landing_keeps_the_step_open_while_a_slide_is_held():
+    state = with_slot(returning(), 0, A_ONLY)
+    state, _ = handle(replace(state, device_clip=False), OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _, _ = x(state, 11, 0, pad=ROW_1)
+    state, _, _ = x(state, 11, at(2), pad=ROW_1)
+    state = replace(state, fx_returns=returning().fx_returns)
+    state, actions = racks_read(state, 2, NOW_AB, recall=True)
+    assert actions[0] == SetMacros(tuple((key, 0.0) for key, _ in AB_TARGETS))
+    assert EndUndoStep() not in actions and state.fx_slide_undo_open
+
+
+@pytest.mark.parametrize("columns, lit", [(0, 4), (-1.6, 3), (-4.5, 0)])
+@pytest.mark.parametrize("layer", ["FX", "PANEL"])
+def test_a_punch_fills_the_4_pads_left_of_its_slot_in_red(columns, lit, layer):
+    state = replace(with_slot(globals()[layer], 2, STORED_AB), device_clip=True)
+    state, _ = punched(state)
+    state, _, _ = punch_x(state, 0)
+    state, _, _ = punch_x(state, columns)
+    frame = session.render(state, SNAP)
+    column = SLOT_3[0]
+    lights = [frame[(column - k, ROW)] for k in range(1, 5)]
+    assert lights == [Light(RED)] * lit + [Light(OFF)] * (4 - lit)
+    assert all(frame[(column + k, ROW)] != Light(RED) for k in range(1, 5))
+    assert frame[SLOT_3] == Light(CYAN, Blink.FAST)
+
+
+def test_a_bound_punch_shows_the_red_fill_not_the_value_meter():
+    state = with_slot(PUNCH_BOUND, 2, replace(BOUND_AB.fx_slots[2], values=(20.0,)))
+    state, _ = handle(state, SLOT_3)
+    state, _ = bound_read(state, (replace(FREQ_READ, target=20.0), SWITCH_READ))
+    frame = fx.render_meters(state)
+    column = SLOT_3[0]
+    assert set(frame) == {(column - k, ROW) for k in range(1, 5)}
+    assert all(light == Light(RED) for light in frame.values())
+
+
+def test_a_punch_redraws_when_its_fill_changes():
+    state = punch_holding()
+    state, _, redraw = punch_x(state, -0.1)
+    assert not redraw
+    state, _, redraw = punch_x(state, -1.2)
+    assert redraw
+
+
+def test_a_reset_lands_a_running_return_inside_its_step():
+    from BleakLoop.core import faders
+
+    state, actions = faders.reset(returning())
+    assert actions == LANDED and state.fx_returns == () and not state.fx_slide_undo_open
