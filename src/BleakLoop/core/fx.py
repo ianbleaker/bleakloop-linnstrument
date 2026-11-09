@@ -893,8 +893,11 @@ def _scene_slot_light(state, snapshot, row):
 
 
 def _slot_press(state, slot, scene, snapshot):
-    stored = _stored(state, slot, scene) is not None
-    # Copy over Delete, as in Session Mode.
+    value = _stored(state, slot, scene)
+    stored = value is not None
+    # Copy over Delete, as in Session Mode. Copy on a bound slot re-saves its punch-in values.
+    if state.copy and not scene and is_bound(value):
+        return state, [StoreFxSnapshot(slot, locators=value.params)]
     if state.copy or (not state.delete and not stored):
         return state, [StoreFxSnapshot(slot, scene=scene)]
     if state.delete:
@@ -923,6 +926,8 @@ def racks_read(state, event, snapshot):
     if event.hold:
         return _hold_read(state, event, snapshot)
     name, owner = _name(event.slot, event.scene), _owner(event.scene)
+    if not event.recall and event.params:
+        return _resave(state, event)
     if not event.recall:
         if not event.racks:
             return state, buttons.refuse(owner, "no_racks")
@@ -964,6 +969,30 @@ def racks_read(state, event, snapshot):
     state, actions = _close_steps(state)
     state = replace(state, morph=morph, fx_undo_open=True)
     return state, actions + [BeginUndoStep(), *message]
+
+
+def _resave(state, event):
+    # Copy on a bound slot: each found parameter's value now is its new punch-in value; one not
+    # found keeps its old one. The slot stays bound.
+    stored = state.fx_slots[event.slot]
+    if not is_bound(stored) or len(event.params) != len(stored.params):
+        return state, []
+    name = _name(event.slot, False)
+    found = [p for p in event.params if p is not None]
+    missing = len(event.params) - len(found)
+    note = f", {_count(missing, 'parameter')} not found" if missing else ""
+    if not found:
+        return state, buttons.refuse("slots", "nothing", name=name, note=note)
+    values = tuple(
+        old if read is None else read.start for read, old in zip(event.params, _values(stored))
+    )
+    state, save = _save_slots(state, _put(state.fx_slots, event.slot, _bound_slot(stored.params, values)))
+    names = labels([(p.owner, p.name) for p in found])
+    items = [f"{label} {p.text or _number(p.start)}" for label, p in zip(names, found)]
+    return state, [
+        save,
+        *listed(items, lambda text: buttons.say("slots", "saved", name=name, params=text, note=note)),
+    ]
 
 
 def tick(state, transport, values, triggered=None):

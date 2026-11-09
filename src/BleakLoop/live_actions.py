@@ -420,6 +420,8 @@ def apply(action, song, surface):
     elif isinstance(action, RecallFxSnapshot) and action.locators:
         params = live_state.read_bound(song, action.locators)
         return RacksRead(action.slot, (), True, hold=action.hold, params=params)
+    elif isinstance(action, StoreFxSnapshot) and action.locators:
+        return RacksRead(action.slot, (), False, params=live_state.read_bound(song, action.locators))
     elif isinstance(action, (StoreFxSnapshot, RecallFxSnapshot)):
         start = time.monotonic()
         racks = live_state.read_racks(song)

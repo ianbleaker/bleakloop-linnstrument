@@ -906,6 +906,7 @@ rebound = "Bound {param} to {name} again"
 slid = "{name} at {percent}%{note}"
 slid_bound = "{name} at {percent}%: {params}{note}"
 named = "{name}: {params}{note}"
+saved = "{name} punch values: {params}{note}"
 [functions.slots.refusals]
 no_racks = "No racks to store"
 no_parameter = "Click a parameter in Live first"

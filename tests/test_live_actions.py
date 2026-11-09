@@ -656,6 +656,15 @@ def test_a_bound_slots_read_resolves_its_locators_not_the_racks():
     assert [p.name for p in event.params] == ["Frequency"]
 
 
+def test_a_bound_slots_store_reads_its_locators_not_the_racks():
+    from tests.test_live_state import target_song
+
+    frequency = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+    event = apply(StoreFxSnapshot(4, locators=(frequency,)), target_song())
+    assert event.racks == () and not event.recall and event.slot == 4
+    assert [(p.name, p.start) for p in event.params] == [("Frequency", 40.0)]
+
+
 @pytest.mark.parametrize(
     "parameter, expected",
     [

@@ -370,6 +370,50 @@ def test_copy_stores_into_any_slot(stored):
     assert handle(state, SLOT_3) == (state, [StoreFxSnapshot(2)])
 
 
+RESAVE_FREQ = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
+RESAVE_EQ = FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency")
+RESAVE_SLOT = BoundSlot((RESAVE_FREQ, RESAVE_EQ), (0.6, 0.2))
+
+
+def resave_read(state, params):
+    return engine.handle(state, RacksRead(2, (), False, params=params), SNAP)
+
+
+def test_copy_on_a_bound_slot_reads_its_parameters():
+    state = with_slot(replace(FX, copy=True), 2, RESAVE_SLOT)
+    assert handle(state, SLOT_3) == (state, [StoreFxSnapshot(2, locators=RESAVE_SLOT.params)])
+
+
+def test_a_resave_keeps_the_slot_bound_with_new_values():
+    state = with_slot(FX, 2, RESAVE_SLOT)
+    reads = (
+        BoundRead(RESAVE_FREQ, "Frequency", 90.0, 0.0, 127.0, False, "3.40 kHz", "Auto Filter"),
+        BoundRead(RESAVE_EQ, "Frequency", 10.0, 0.0, 127.0, False, "", "EQ"),
+    )
+    state, actions = resave_read(state, reads)
+    assert state.fx_slots[2] == BoundSlot(RESAVE_SLOT.params, (90.0, 10.0))
+    assert actions == [
+        SaveFxSnapshots(fx.dump(state.fx_slots)),
+        ShowMessage("Snapshot 3 punch values: Auto Filter Frequency 3.40 kHz, EQ Frequency 10"),
+    ]
+
+
+def test_a_resave_keeps_a_missing_parameters_old_value():
+    state = with_slot(FX, 2, RESAVE_SLOT)
+    read = BoundRead(RESAVE_EQ, "Frequency", 10.0, 0.0, 127.0, False, "", "EQ")
+    state, actions = resave_read(state, (None, read))
+    assert state.fx_slots[2] == BoundSlot(RESAVE_SLOT.params, (0.6, 10.0))
+    assert actions[-1] == ShowMessage("Snapshot 3 punch values: Frequency 10, 1 parameter not found")
+
+
+def test_a_resave_with_nothing_found_refuses():
+    state = with_slot(FX, 2, RESAVE_SLOT)
+    assert resave_read(state, (None, None)) == (
+        state,
+        [ShowMessage("Snapshot 3: nothing to recall, 2 parameters not found")],
+    )
+
+
 def test_delete_clears_a_full_slot():
     state = with_slot(replace(FX, delete=True), 2)
     state, actions = handle(state, SLOT_3)

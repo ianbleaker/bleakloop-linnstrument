@@ -483,6 +483,7 @@ class EndUndoStep:
 class StoreFxSnapshot:
     slot: int  # 0-15, or the scene index of a scene snapshot
     scene: bool = False
+    locators: tuple = ()  # a bound slot's parameters: re-save their punch-in values
 
 
 @dataclass(frozen=True)
