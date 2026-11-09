@@ -44,20 +44,34 @@ def capture(racks):
     )
 
 
-def dump(slots):
-    return json.dumps({"v": 1, "slots": [_encode(slot) for slot in slots]}, separators=(",", ":"))
+def dump(slots, scoped):
+    # The scoped slots go in their own key, only when there are any: older builds ignore it,
+    # and a store without scoped slots keeps the v1 text it always had.
+    data = {"v": 1, "slots": [_encode(slot) for slot in slots]}
+    if scoped:
+        data["scoped"] = sorted(scoped)
+    return json.dumps(data, separators=(",", ":"))
 
 
 def parse(text):
-    # Anything unreadable gives empty slots: a bad store never stops the script loading.
-    empty = (None,) * layout.FX_SLOTS
+    # (slots, scoped). Anything unreadable gives empty slots: a bad store never stops the
+    # script loading. A bad "scoped" entry is dropped, leaving its slot Set-wide.
+    empty = (None,) * layout.FX_SLOTS, frozenset()
     try:
         data = json.loads(text)
         if data.get("v") != 1 or len(data["slots"]) != layout.FX_SLOTS:
             return empty
-        return tuple(_decode(slot) for slot in data["slots"])
+        slots = tuple(_decode(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):
         return empty
+    scoped = data.get("scoped")
+    if not isinstance(scoped, list):
+        return slots, frozenset()
+    return slots, frozenset(
+        i
+        for i in scoped
+        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < layout.FX_SLOTS and slots[i] is not None
+    )
 
 
 def dump_scenes(scenes):
@@ -181,8 +195,13 @@ def _set(state, slot, scene, value, scene_count):
         padded = state.fx_scenes + (None,) * (slot + 1 - len(state.fx_scenes))
         scenes = _fit(_put(padded, slot, value), scene_count)
         return replace(state, fx_scenes=scenes), SaveFxScenes(dump_scenes(scenes))
-    slots = _put(state.fx_slots, slot, value)
-    return replace(state, fx_slots=slots), SaveFxSnapshots(dump(slots))
+    # A Set-wide store or a clear leaves the slot unscoped.
+    return _save_slots(state, _put(state.fx_slots, slot, value), state.fx_scoped - {slot})
+
+
+def _save_slots(state, slots, scoped):
+    state = replace(state, fx_slots=slots, fx_scoped=frozenset(scoped))
+    return state, SaveFxSnapshots(dump(slots, state.fx_scoped))
 
 
 def _owner(scene):

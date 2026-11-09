@@ -62,19 +62,44 @@ def test_capture():
 def test_dump_parse_round_trip():
     slots = (None,) * 2 + ((FxRack("A", "R", 0, (0.5, 1.0)), FxRack("A", "R", 1, ())),)
     slots += (None,) * 13
-    text = fx.dump(slots)
+    text = fx.dump(slots, frozenset())
     assert json.loads(text)["v"] == 1
-    assert fx.parse(text) == slots
+    assert fx.parse(text) == (slots, frozenset())
+
+
+def test_scoped_round_trip():
+    stored = (FxRack("A", "R", 0, (0.5,)),)
+    slots = (stored, None, stored) + (None,) * 13
+    text = fx.dump(slots, frozenset({2}))
+    assert json.loads(text)["scoped"] == [2]
+    assert fx.parse(text) == (slots, frozenset({2}))
+
+
+def test_a_store_without_scoped_parses_as_before():
+    # v1 text from a build before scoped snapshots.
+    slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 15
+    text = json.dumps({"v": 1, "slots": json.loads(fx.dump(slots, frozenset()))["slots"]})
+    assert fx.parse(text) == (slots, frozenset())
+
+
+@pytest.mark.parametrize(
+    "scoped", ['"x"', "null", "{}", '[1, "0", true, -1, 16, 0.0, 0]', "[3]"]
+)
+def test_bad_scoped_entries_are_dropped(scoped):
+    # Only 0 is a stored slot: anything else, or a non-list, leaves every slot Set-wide.
+    slots = '[[{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]' + ",null" * 15 + "]"
+    expected = frozenset({0}) if scoped.endswith(", 0]") else frozenset()
+    assert fx.parse(f'{{"v": 1, "slots": {slots}, "scoped": {scoped}}}')[1] == expected
 
 
 def test_an_all_empty_store_round_trips():
-    text = fx.dump((None,) * 16)
-    assert fx.dump(fx.parse(text)) == text
+    text = fx.dump((None,) * 16, frozenset())
+    assert fx.dump(*fx.parse(text)) == text
 
 
 def test_dump_format():
     slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 15
-    assert json.loads(fx.dump(slots)) == {
+    assert json.loads(fx.dump(slots, frozenset())) == {
         "v": 1,
         "slots": [[{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]] + [None] * 15,
     }
@@ -97,7 +122,7 @@ def test_dump_format():
     ],
 )
 def test_invalid_store_gives_empty_slots(text):
-    assert fx.parse(text) == (None,) * 16
+    assert fx.parse(text) == ((None,) * 16, frozenset())
 
 
 def test_scene_store_round_trip():
@@ -250,7 +275,20 @@ def test_delete_clears_a_full_slot():
     state = with_slot(replace(FX, delete=True), 2)
     state, actions = handle(state, SLOT_3)
     assert state.fx_slots == (None,) * 16
-    assert actions == [SaveFxSnapshots(fx.dump((None,) * 16)), ShowMessage("Snapshot 3 cleared")]
+    assert actions == [SaveFxSnapshots(fx.dump((None,) * 16, frozenset())), ShowMessage("Snapshot 3 cleared")]
+
+
+def test_delete_unscopes_a_scoped_slot():
+    state = replace(with_slot(replace(FX, delete=True), 2), fx_scoped=frozenset({2, 5}))
+    state, actions = handle(state, SLOT_3)
+    assert state.fx_scoped == frozenset({5})
+    assert actions[0] == SaveFxSnapshots(fx.dump((None,) * 16, frozenset({5})))
+
+
+def test_a_set_wide_store_unscopes_the_slot():
+    state = replace(with_slot(FX, 2), fx_scoped=frozenset({2}))
+    state, _ = racks_read(state, 2, (rack("A", "R", 1.0, path=P0),))
+    assert state.fx_scoped == frozenset()
 
 
 def test_delete_on_an_empty_slot_does_nothing():
@@ -322,7 +360,7 @@ def test_store(state):
     state, actions = racks_read(state, 2, racks)
     slots = (None, None, fx.capture(racks)) + (None,) * 13
     assert state.fx_slots == slots
-    assert actions == [SaveFxSnapshots(fx.dump(slots)), ShowMessage("Snapshot 3 stored (2 racks)")]
+    assert actions == [SaveFxSnapshots(fx.dump(slots, frozenset())), ShowMessage("Snapshot 3 stored (2 racks)")]
 
 
 STORED_AB = (FxRack("A", "R", 0, (10.0, 20.0)), FxRack("B", "R", 0, (30.0,)))
@@ -1288,7 +1326,7 @@ def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
     assert handle(copying, SLOT_3)[1] == [StoreFxSnapshot(2)]
     deleting, _ = handle(state, layout.NAVIGATION.delete)
     assert handle(deleting, SLOT_3)[1] == [
-        SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None))),
+        SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None), frozenset())),
         ShowMessage("Snapshot 3 cleared"),
     ]
 

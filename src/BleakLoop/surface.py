@@ -332,11 +332,11 @@ class BleakLoop(ControlSurface):
         if text == self._fx_text:
             return
         self._fx_text = text
-        slots = fx.parse(text)
+        slots, scoped = fx.parse(text)
         # A valid store round-trips; one with every slot cleared is valid too.
-        if text and fx.dump(slots) != text:
+        if text and fx.dump(slots, scoped) != text:
             logger.warning("FX: stored snapshots unreadable, starting empty")
-        self._state = replace(self._state, fx_slots=slots)
+        self._state = replace(self._state, fx_slots=slots, fx_scoped=scoped)
 
     def _load_fx_scenes(self):
         # As _load_fx, for the scene snapshots.

@@ -182,6 +182,7 @@ class State:
     fx: bool = False
     fx_length: int | None = None  # bars of the held FX length pad
     fx_slots: tuple = (None,) * FX_SLOTS  # tuple of FxRack per stored slot, None when empty
+    fx_scoped: frozenset = frozenset()  # the slots holding one rack's snapshot, not the Set's
     morph: Morph | None = None  # runs in every mode
     fx_undo_open: bool = False  # a recall's undo step is open in Live
     fx_landed: int | None = None  # the slot of the last recall that landed
