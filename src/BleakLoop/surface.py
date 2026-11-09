@@ -756,6 +756,29 @@ class BleakLoop(ControlSurface):
             parameter, setting = reply
             self._reads[parameter] = setting
             self._saved_split.setdefault(parameter, setting)
+            result = self._check.reply(parameter, setting)
+            if result is not None:
+                self._resolve_check(*result)
+
+    def _resolve_check(self, offset, notes, started_ms):
+        # Against the map as it stands now: a poll may have realigned since the press.
+        logger.info("ROW CHECK: %.1f ms", time.monotonic() * 1000 - started_ms)
+        if offset != self._map_offset:
+            # Row Offset changed since the map was built: drop the presses and repoll now.
+            self._repolling, self._poll_due = True, 0
+            return
+        if self._note_map is None or self._repolling or device.shifts_notes(self._pending_sets):
+            return
+        for note in notes:
+            # A delivered press can leave Linnstrument Mode: the rest would stay held there.
+            if self._state.mode is not Mode.LINNSTRUMENT:
+                break
+            pad = self._note_map.get(note)
+            if pad is None:
+                self._poll_due = 0
+                continue
+            self._held_controls[note] = pad
+            self._handle(PadPress(layout.GLOBAL_COLUMN, pad, True))
 
     def _on_pad(self, column, row, value):
         self._hold(("pad", column, row), value)
