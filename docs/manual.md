@@ -434,7 +434,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Any parameter of a device directly on a track, group, return or master can be bound, and so can a track's volume, pan and sends. A parameter of a device inside a rack can't: map it to one of the rack's macros, and bind the macro. Other mixer controls, such as the crossfader or the tempo, can't be bound either.
 - To unbind a row, hold Delete and press any pad of it.
 - Unbound rows are dark. Binding and unbinding only work while the faders show Mapped FX; in Device FX, Device/Clip + a row says "Shift + FX for Mapped FX".
-- The bindings are saved in the Set. Undo doesn't bring back a bind or unbind yet (#63): bind or unbind the row again.
+- The bindings are saved in the Set. Undo doesn't bring back a bind or unbind: bind or unbind the row again.
 - A binding finds its parameter again by the track's name, the device's name and the parameter's name, counting same-named tracks and devices in order. If you rename the track or device, or delete it, the row goes dark, and touching it says "Fader N: parameter not found". Renaming it back brings the row back.
 
 ### Snapshots and morphs
@@ -487,7 +487,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Live's Arrangement loop coming round isn't a jump: the morph keeps going until it has played its bars, even when it's longer than the loop. Once the loop has come round, a scene's snapshot lands as Live actually starts the scene.
 - The morph carries on when you leave FX Mode.
 
-A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot yet (#63).
+A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A morph starts from wherever the automation has each macro. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot: store it again, or clear it again.
 
 ### Sequencer
 
