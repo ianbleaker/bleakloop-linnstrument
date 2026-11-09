@@ -553,8 +553,8 @@ def render_meters(state):
 
 
 def _value_meter(state, hold, column):
-    # A bound slot, held: the 4 pads right of it show where its first parameter sits between
-    # its min (none lit) and max (all 4), in the slot's pink.
+    # A bound slot, held: the 4 pads right of it show where its parameters sit on average
+    # between their mins (none lit) and maxes (all 4), in the slot's pink.
     if not hold.read:
         return {}
     lit = value_meter(state, hold)
@@ -566,11 +566,18 @@ def _value_meter(state, hold, column):
 
 
 def value_meter(state, hold):
-    first = hold.read[0]
-    param = _param(state, first.key)
-    value = param.written if param is not None else first.start
-    position = (value - first.low) / first.span if first.span else 0.0
-    return round(min(max(position, 0.0), 1.0) * SLIDE_COLUMNS)
+    # The lit pads: the mean of each parameter's position in its range, dropped ones and ones
+    # without a range left out.
+    positions = []
+    for read in hold.read:
+        if read.key in hold.dropped or not read.span:
+            continue
+        param = _param(state, read.key)
+        value = param.written if param is not None else read.start
+        positions.append(min(max((value - read.low) / read.span, 0.0), 1.0))
+    if not positions:
+        return 0
+    return round(sum(positions) / len(positions) * SLIDE_COLUMNS)
 
 
 def meter(f):

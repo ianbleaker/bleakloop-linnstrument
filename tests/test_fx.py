@@ -1383,14 +1383,31 @@ def test_a_bound_and_a_set_wide_slide_share_a_rack_macro():
 # Bound slots: the value meter (C2b)
 
 
-def test_a_held_bound_slot_shows_its_first_parameters_value_right_of_it():
+def test_a_held_bound_slot_shows_its_parameters_value_right_of_it():
     state, _ = handle(BOUND_AB, SLOT_3)
     assert fx.render_meters(state) == {}  # no read yet
-    state, _ = bound_read(state)
+    state, _ = bound_read(state, (FREQ_READ,))
     frame = session.render(state, SNAP)
     # 100 of 127: 3 of 4 pads, columns 12-15 right of the slot in column 11.
     assert [frame[(c, ROW)] for c in (12, 13, 14, 15)] == [Light(PINK)] * 3 + [Light(OFF)]
     assert frame[(10, ROW)] != Light(PINK) and frame[SLOT_3] == Light(PINK)
+
+
+def test_the_value_meter_shows_the_average_of_several_parameters():
+    # Frequency at 100 of 127 and On at 0 of 1: about 39%, 2 of 4 pads.
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state)
+    frame = fx.render_meters(state)
+    assert [frame[(c, ROW)] for c in (12, 13, 14, 15)] == [Light(PINK)] * 2 + [Light(OFF)] * 2
+
+
+def test_the_value_meter_leaves_out_dropped_parameters_and_ones_without_a_range():
+    flat = replace(SWITCH_READ, key="flat", high=0.0)
+    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = bound_read(state, (FREQ_READ, SWITCH_READ, flat))
+    hold = replace(state.fx_holds[0], dropped=frozenset({MACRO_KEY}))
+    assert fx.value_meter(state, hold) == 3
+    assert fx.value_meter(state, replace(hold, read=(flat,))) == 0
 
 
 def test_the_value_meter_follows_the_slide_and_redraws():
