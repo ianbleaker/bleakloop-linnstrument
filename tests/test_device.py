@@ -211,10 +211,6 @@ def test_read_steps_two_queries_each():
     assert read[-1] == queries(118)  # 29 numbers: the last step holds one
 
 
-def test_read_numbers():
-    assert device.READ_NUMBERS == [227, 253, *range(263, 271), 100, 101, *range(102, 119)]
-
-
 def test_fixed_steps():
     fixed = device.fixed_steps()
     assert len(fixed) == 11

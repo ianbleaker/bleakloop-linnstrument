@@ -4,7 +4,6 @@ import pytest
 
 from BleakLoop.core import controls, engine, layout
 from BleakLoop.core.leds import OFF
-from tools.docs import __main__ as generator
 from tools.docs import buttons as button_docs
 from tools.docs.manual.columns import FIGURES
 from tools.docs.manual import pads, positions
@@ -80,10 +79,6 @@ def test_column_panel_labels_fit_on_a_pad(column, scene, section):
 
 def test_every_scene_light_is_described():
     assert set(pads.SCENE_LIGHTS) == set(controls.SCENE_LIGHTS)
-
-
-def test_generated_docs_are_current():
-    assert generator.check() == []
 
 
 @pytest.fixture

@@ -78,7 +78,7 @@ def _section(section, heading):
         "| Pad | Label | Function | Message | Outcomes | Refusals | Shown |",
         "|---|---|---|---|---|---|---|",
     ]
-    for name, function, key, value in sorted(namespace.buttons(), key=lambda button: button[2]):
+    for name, function, key, value in sorted(namespace.buttons(), key=lambda button: button.key):
         entry = buttons.function(function)
         pad = f"{key[0]}/{key[1]}" + ("" if key in own or base is None else f" (from {base})")
         rows.append(

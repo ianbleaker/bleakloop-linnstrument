@@ -40,10 +40,9 @@ from .model import (
 )
 from .modes import Mode, StepHold
 
-STEPS = len(layout.SEQ_STEP_COLUMNS) * layout.ROWS  # per page
+STEP_COLUMNS = len(layout.SEQ_STEP_COLUMNS)
+STEPS = STEP_COLUMNS * layout.ROWS  # per page
 NOTE_COLUMNS = len(layout.SEQ_NOTE_COLUMNS)
-# Float error in note times and the play position: a time this close to a boundary is past it.
-EPSILON = 1e-6
 RATE_NAMES = {1.0: "1/4", 0.5: "1/8", 0.25: "1/16", 0.125: "1/32"}
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 NATURALS = {0, 2, 4, 5, 7, 9, 11}
@@ -61,19 +60,19 @@ def step_length(state):
 
 def step_key(s):
     # The (column, pad) of step s of the page in view, 0-63.
-    return layout.SEQ_STEP_COLUMNS[0] + s % 8, 1 + s // 8
+    return layout.SEQ_STEP_COLUMNS[0] + s % STEP_COLUMNS, 1 + s // STEP_COLUMNS
 
 
 def step_of(key):
     # The step of the page in view at (column, pad).
     column, pad = key
-    return (pad - 1) * 8 + column - layout.SEQ_STEP_COLUMNS[0]
+    return (pad - 1) * STEP_COLUMNS + column - layout.SEQ_STEP_COLUMNS[0]
 
 
 def step_of_time(start, length):
     # The global step a note starting at start belongs to: a note past a step's midpoint
     # belongs to the next step.
-    return math.floor(start / length + 0.5 + EPSILON)
+    return math.floor(start / length + 0.5 + values.BEAT_EPSILON)
 
 
 def page_span(state):
@@ -98,7 +97,7 @@ def pad_note(state, view, column, pad):
     # the settings show, off a MIDI track, and above 127.
     if state.seq_settings or not view.is_midi or column not in layout.SEQ_NOTE_COLUMNS:
         return None
-    base = 4 * view.drum.scroll if view.drum is not None else state.seq_base
+    base = NOTE_COLUMNS * view.drum.scroll if view.drum is not None else state.seq_base
     note = base + (layout.ROWS - pad) * NOTE_COLUMNS + column - layout.SEQ_NOTE_COLUMNS[0]
     return note if 0 <= note <= 127 else None
 
@@ -107,7 +106,7 @@ def playhead(state, view):
     # The global step of the play position, or None while the clip isn't playing.
     if not view.is_playing:
         return None
-    return math.floor(view.position / step_length(state) + EPSILON)
+    return math.floor(view.position / step_length(state) + values.BEAT_EPSILON)
 
 
 def selected_pitch(state, view):
@@ -122,7 +121,7 @@ def _inert(state, view, g, snapshot):
     if view.track is None or not view.is_midi:
         return True
     end = view.loop_end if view.has_clip else _create_length(state, snapshot)
-    return g * step_length(state) >= end - EPSILON
+    return g * step_length(state) >= end - values.BEAT_EPSILON
 
 
 def _create_length(state, snapshot):
@@ -278,7 +277,7 @@ def handle(state, event, snapshot):
         # A held step ends on its cell's release, wherever the finger slid to.
         return _release_step(state, event, view, snapshot)
     normal = controls.at(controls.sections(state), key)
-    held = normal[1] if normal is not None else None
+    held = normal.function if normal is not None else None
     if held == "shift":
         return global_column.handle(state, event, snapshot)
     # Under Shift, a hold's press gives way to the Shift layer's button on its pad.
@@ -325,7 +324,7 @@ def handle(state, event, snapshot):
 
 
 def _page_release(state, button):
-    if button[1] == "pages" and button[3] - 1 == state.seq_page_held:
+    if button.function == "pages" and button.value - 1 == state.seq_page_held:
         return replace(state, seq_page_held=None)
     return state
 
@@ -429,7 +428,7 @@ def _halve(state, snapshot, value):
     if not view.has_clip or not view.is_midi:
         return state, buttons.refuse("halve", "no_clip")
     half = (view.loop_end - view.loop_start) / 2
-    if half < step_length(state) - EPSILON:
+    if half < step_length(state) - values.BEAT_EPSILON:
         return state, buttons.refuse("halve", "too_short")
     loop = SetLoop(view.track, view.scene, view.loop_start, view.loop_start + half)
     return _write(state, [loop, *buttons.say("halve")])
@@ -457,7 +456,7 @@ def _page_light(state, snapshot, value):
     playing = playhead(state, view)
     if page == view_page(state, view):
         colour = BLUE
-    elif view.has_clip and page * page_span(state) < view.loop_end - EPSILON:
+    elif view.has_clip and page * page_span(state) < view.loop_end - values.BEAT_EPSILON:
         colour = CYAN
     else:
         return Light(OFF)
@@ -695,7 +694,7 @@ def _scroll(state, view, step):
     scroll = min(MAX_SCROLL, max(0, view.drum.scroll + step))
     if scroll == view.drum.scroll:
         return state, []
-    message = buttons.say(_direction(step), "pads", note=note_name(4 * scroll))
+    message = buttons.say(_direction(step), "pads", note=note_name(NOTE_COLUMNS * scroll))
     return state, [SetDrumScroll(view.track, scroll), *message]
 
 
@@ -716,7 +715,7 @@ def _page(state, page, view):
         return _write(state, [SetLoop(view.track, view.scene, start, end), *loop])
     state = replace(state, seq_page_held=page)
     shown = buttons.say("pages", page=page + 1)
-    if page * span >= view.loop_end - EPSILON:
+    if page * span >= view.loop_end - values.BEAT_EPSILON:
         # Past the end: the loop extends to it.
         state = replace(state, seq_follow=False, seq_page=page)
         loop = SetLoop(view.track, view.scene, view.loop_start, (page + 1) * span)
@@ -794,7 +793,7 @@ def _render_note_pads(frame, state, view):
         sounding = {
             note.pitch
             for note in view.notes
-            if note.start - EPSILON <= view.position < note.start + note.duration
+            if note.start - values.BEAT_EPSILON <= view.position < note.start + note.duration
         }
     selected = selected_pitch(state, view)
     for column in layout.SEQ_NOTE_COLUMNS:
@@ -831,8 +830,7 @@ def _render_buttons(frame, state, snapshot):
     shift_layer = state.shift and not state.copy and not state.delete
     own = controls.sections(state)[2:]
     navigation = layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV
-    for section in (*own, navigation):
-        for button in section.buttons():
-            frame[button[2]] = functions.light(button, state, snapshot)
+    buttons = (button for section in (*own, navigation) for button in section.buttons())
+    functions.paint(frame, buttons, state, snapshot)
     if state.device_clip:
         controls.render_device_clip_layer(frame, state, snapshot)

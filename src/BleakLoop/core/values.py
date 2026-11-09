@@ -37,6 +37,8 @@ FX_SCENES_DATA_KEY = "BleakLoop.fx.scenes"  # song.set_data key for the scene sn
 FX_TOUCH_TOLERANCE = 0.005  # of a macro's range: further from the last write is a hand turn
 # Beats a tick may lag a wrap of the Arrangement loop by: a longer backward move is a jump.
 LOOP_WRAP_TOLERANCE = 2.0
+# Float error in beat and step times: a time this close to a boundary is past it.
+BEAT_EPSILON = 1e-6
 
 # Firmware FXD_CALX_FULL_UNIT (4095 / 24): column c's centre is X_COLUMN_WIDTH * (c - 0.5).
 X_COLUMN_WIDTH = 170.625

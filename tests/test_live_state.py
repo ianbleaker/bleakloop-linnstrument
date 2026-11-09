@@ -5,60 +5,7 @@ import pytest
 from BleakLoop import live_state
 from BleakLoop.core.layout import Window
 from BleakLoop.core.modes import FaderBinding, Morph
-
-
-def fake_track(name, mute=False, solo=False):
-    return SimpleNamespace(
-        name=name,
-        color=0,
-        can_be_armed=True,
-        arm=False,
-        implicit_arm=False,
-        mute=mute,
-        solo=solo,
-        has_midi_input=False,
-        is_foldable=False,
-        is_grouped=False,
-        group_track=None,
-        mixer_device=SimpleNamespace(volume=SimpleNamespace(value=0.85)),
-        clip_slots=[SimpleNamespace(
-            has_clip=False, is_playing=False, is_triggered=False, is_recording=False,
-            is_group_slot=False, controls_other_clips=False,
-        )] * 8,
-        playing_slot_index=-1,
-    )
-
-
-def fake_song(tracks, returns=(), selected=None, scenes=()):
-    return SimpleNamespace(
-        is_playing=False,
-        current_song_time=0.0,
-        tempo=120.0,
-        metronome=False,
-        loop=False,
-        loop_start=0.0,
-        loop_length=16.0,
-        visible_tracks=list(tracks),
-        tracks=list(tracks),
-        return_tracks=list(returns),
-        scenes=list(scenes),
-        can_undo=False,
-        can_redo=False,
-        clip_trigger_quantization=4,
-        signature_numerator=4,
-        signature_denominator=4,
-        session_record=False,
-        arrangement_overdub=False,
-        record_mode=False,
-        back_to_arranger=False,
-        can_capture_midi=False,
-        view=SimpleNamespace(
-            selected_track=selected,
-            highlighted_clip_slot=None,
-            detail_clip=None,
-        ),
-    )
-
+from tests.support import fake_song, fake_track
 
 APPLICATION = SimpleNamespace(view=SimpleNamespace(is_view_visible=lambda name: True))
 
