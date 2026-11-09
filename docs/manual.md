@@ -437,7 +437,7 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 **Snapshots:**
 
 - A snapshot holds the visible macros of every rack on the Set's tracks, groups, returns and master. Racks inside other racks aren't included.
-- Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it.
+- Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it, except a bound (pink) one: that re-saves its punch-in values (see Bound snapshots).
 - Tap a stored (cyan) slot to recall it at once. The recall happens as you lift your finger: until then the slot can't tell a tap from a slide.
 - Hold a Bars pad, then press a stored slot to morph to it. This one starts on the press. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
 - While the transport is stopped, a recall always happens at once.
@@ -467,19 +467,21 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 
 **Bound snapshots:**
 
-- A slot can hold parameters of your choice instead of a snapshot: a bound slot, pink. It holds no values. Sliding it moves its parameters from wherever they are.
+- A slot can hold parameters of your choice instead of a snapshot: a bound slot, pink. Sliding it moves its parameters from wherever they are, not to stored values.
+- Binding a parameter saves its value at that moment as the slot's punch-in value for it. Binding a second parameter saves that one's value and leaves the others' alone.
 - To bind, click a parameter in Live, then hold Shift and tap the slot: it acts as you lift. Or, in FX Mode, hold Shift and the slot and tap a Device FX row: that row's parameter is bound instead.
 - Any parameter of a device directly on a track, group, return or master can be bound, and so can a track's volume, pan and sends; a slot can hold several, from different tracks and devices. A parameter inside a rack's chain can't: map it to one of the rack's macros, and bind the macro.
-- Binding a parameter the slot already holds removes it. Removing the last one empties the slot. The status bar names what the slot holds after a bind, such as "Snapshot 3: Frequency, Macro 2", or what was removed, such as "Removed Auto Filter Frequency from Snapshot 3".
+- Binding a parameter the slot already holds removes it, with its punch-in value. Removing the last one empties the slot. The status bar names what the slot holds after a bind, the new parameter last with its saved value, such as "Snapshot 3: Macro 2, Auto Filter Frequency 1.20 kHz", or what was removed, such as "Removed Auto Filter Frequency from Snapshot 3".
 - With nothing clicked in Live, the status bar says "Click a parameter in Live first". A Set-wide (cyan) slot refuses with "Delete Snapshot N to bind to it". A parameter that can't be bound says "Snapshot N can't hold" and its name. A Device FX row with no parameter does nothing.
 - With Shift held, a slot never recalls, stores or slides.
 - Slide a bound slot right to raise its parameters, left to lower them, below where they started too. Every pad moves each parameter by a quarter of its range, and it stops at its minimum or maximum. Sliding back returns exactly to where it started. On/off and chooser parameters step to the nearest value: an on/off flips at 2 pads either way, and a chooser steps through its options in order as you slide. To switch somewhere else, map it to a rack macro, set that mapping in Live, and bind the macro.
 - While you hold a bound slot, the 4 pads to its right show where its parameters sit on average, in pink: none lit with all at their minimum, all 4 with all at their maximum. They follow the slide, over whatever those pads normally show.
-- A tap changes nothing: the status bar names the slot's parameters and their values. A Bars pad doesn't morph a bound slot. Lists of a slot's parameters give their names only, adding the device's or track's name where two share a name, such as "Auto Filter Frequency, EQ Frequency, Volume". When a list is too long for the status bar it ends with "+N" for the rest.
+- A tap changes nothing: the status bar names the slot's parameters, their values now and their punch-in values, such as "Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, Macro 2 0.5" (Macro 2 has no punch-in value). A Bars pad doesn't morph a bound slot. Lists of a slot's parameters give their names only, adding the device's or track's name where two share a name, such as "Auto Filter Frequency, EQ Frequency, Volume". When a list is too long for the status bar it ends with "+N" for the rest.
 - A rack macro is found again by its rack and its number, so renaming or mapping the macro doesn't lose it. Anything else is found by the track's, device's and parameter's names, counting same-named tracks and devices in order; one that can't be found is skipped, with a message.
-- Delete + a bound slot clears it. Copy + a bound slot stores a Set-wide snapshot over it, and it turns cyan.
-- **Undo:** within 10 seconds of a bind or a removal, with nothing else pressed since, the Undo pad (column 1, pad 6) reverses it, newest first, saying "Unbound …" or "Bound … again"; each reversal gives you another 10 seconds. After that, or once you've pressed anything else, the pad is Live's Undo again. Live's own Undo (Cmd-Z) never touches binds. Shift doesn't end the window, but let go of it first: Shift + Undo is Redo.
-- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values.
+- Delete + a bound slot clears it; press the empty slot to store a Set-wide snapshot there.
+- Copy + a bound slot saves its parameters' values now as their punch-in values, and the slot stays bound, such as "Snapshot 3 punch values: Frequency 3.40 kHz". A parameter that can't be found keeps its old value.
+- **Undo:** within 10 seconds of a bind or a removal, with nothing else pressed since, the Undo pad (column 1, pad 6) reverses it, newest first, saying "Unbound …" or "Bound … again"; a parameter bound again gets its punch-in value back. Each reversal gives you another 10 seconds. After that, or once you've pressed anything else, the pad is Live's Undo again. Live's own Undo (Cmd-Z) never touches binds. Shift doesn't end the window, but let go of it first: Shift + Undo is Redo.
+- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values. They, and slots bound before punch-in values existed, have no punch-in values until you Copy onto them.
 - Scene snapshots can't be bound.
 
 **Scene snapshots** (column 14, pads 1–6):
