@@ -53,6 +53,9 @@ def handle(state, event, snapshot):
         return replace(state, window=window), []
     if not isinstance(event, PadPress):
         return state, []
+    if not event.pressed and fx.holding(state, event):
+        # A held slot's lift, wherever its finger slid to: a tap recalls, a slide keeps.
+        return fx.release(state, event, snapshot)
     if not event.pressed and faders.holds(state, event):
         # A fader touch ends on its cell's release, wherever the finger slid to.
         return faders.press(state, event, snapshot)

@@ -17,8 +17,11 @@ from .model import (
     SetMixer,
     StoreFxSnapshot,
 )
-from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch
+from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
 from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
+
+# A slide's travel to 100%, in columns: four pads to the right of its slot.
+SLIDE_COLUMNS = 4
 
 # Launch quantization values (global_column.QUANTIZATION_NAMES) to their length: bars, then beats.
 LAUNCH_BARS = {1: 8, 2: 4, 3: 2, 4: 1}
@@ -284,7 +287,211 @@ def press(state, event, snapshot):
         if button.function == "slots" and state.fx_slots[_global(state, button.value)] is None:
             return state, [StoreFxSnapshot(_global(state, button.value), scoped=True)]
         return state, []
+    if button.function == "slots" and not (state.copy or state.delete or state.fx_length):
+        slot = _global(state, button.value)
+        if state.fx_slots[slot] is not None:
+            return _hold(state, event, slot)
     return functions.press(button, state, snapshot)
+
+
+# Held slots: a tap recalls on the lift, a slide right blends towards the slot.
+
+
+def holding(state, event):
+    # The release ends a slot hold: on its row, at the column its finger is on now.
+    return _held(state, event.pad, event.column) is not None
+
+
+def _held(state, pad, column=None):
+    return next(
+        (h for h in state.fx_holds if h.pad == pad and (column is None or h.column == column)),
+        None,
+    )
+
+
+def _hold(state, event, slot):
+    # One hold per row. The read is taken now, so a slide's origins are the press's values.
+    if _held(state, event.pad) is not None:
+        return state, []
+    hold = SlotHold(event.pad, event.column, slot)
+    return replace(state, fx_holds=state.fx_holds + (hold,)), [RecallFxSnapshot(slot, None, hold=True)]
+
+
+def _drop_hold(state, pad):
+    return replace(state, fx_holds=tuple(h for h in state.fx_holds if h.pad != pad))
+
+
+def _put_hold(state, old, new):
+    return replace(state, fx_holds=tuple(new if h is old else h for h in state.fx_holds))
+
+
+def release(state, event, snapshot):
+    # A held slot's lift: a tap recalls, a slide keeps where it got to.
+    hold = _held(state, event.pad, event.column)
+    if hold.read is None:
+        # The read hasn't landed: it decides.
+        return _put_hold(state, hold, replace(hold, lifted=True)), []
+    state = _drop_hold(state, hold.pad)
+    if hold.slid:
+        return _end_slide(state, hold)
+    return _tap(state, hold)
+
+
+def _hold_read(state, event, snapshot):
+    hold = next((h for h in state.fx_holds if h.slot == event.slot and h.read is None), None)
+    stored = state.fx_slots[event.slot]
+    if hold is None or stored is None:
+        return state, []
+    macros, missing = _match(stored, event.racks)
+    note = f", {_count(missing, 'rack')} not found" if missing else ""
+    read = replace(hold, read=macros, note=note)
+    state = _put_hold(state, hold, read)
+    if not read.lifted:
+        return _blend(state, read) if read.slid else (state, [])
+    if not read.slid:
+        return _tap(_drop_hold(state, read.pad), read)
+    # Lifted after a slide: the final blend, kept.
+    state, actions = _blend(state, read)
+    final = _held(state, read.pad)
+    state, more = _end_slide(_drop_hold(state, read.pad), final)
+    return state, actions + more
+
+
+def _tap(state, hold):
+    # The tap's recall, at once, from the press's read.
+    name = _name(hold.slot, False)
+    if not hold.read:
+        return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
+    state, actions = _recall_now(state, hold.read)
+    state = _landed(state, hold.slot, False)
+    return state, actions + buttons.say("slots", "recalled", name=name, note=hold.note)
+
+
+def _recall_now(state, macros):
+    # A recall that writes at once. With slides held it takes their shared parameters and joins
+    # their undo step; otherwise it is its own step, closing a fader's or a morph's.
+    writes = tuple((m.key, m.target) for m in macros)
+    if state.fx_slide_undo_open:
+        state = _leave_slides(state, {m.key for m in macros})
+        actions = [SetMacros(writes)]
+        if state.fx_undo_open:
+            actions.insert(0, EndUndoStep())
+        return replace(state, morph=None, fx_undo_open=False), actions
+    state, actions = _close_steps(state)
+    actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
+    return replace(state, morph=None, fx_undo_open=False), actions
+
+
+def _close_steps(state):
+    # A recall or a slide closes a fader gesture's undo step and a running morph's.
+    actions = []
+    if state.fader_undo_open:
+        state = replace(state, fader_undo_open=False)
+        actions.append(EndUndoStep())
+    if state.fx_undo_open:
+        state = replace(state, fx_undo_open=False)
+        actions.append(EndUndoStep())
+    return state, actions
+
+
+def _leave_slides(state, keys):
+    # These parameters leave every held slide, and stay where they are.
+    holds = tuple(replace(h, dropped=h.dropped | keys) for h in state.fx_holds)
+    params = tuple(p for p in state.fx_slide_params if p.key not in keys)
+    return replace(state, fx_holds=holds, fx_slide_params=params)
+
+
+def _slide_owner(state, key):
+    # The latest started slide holding the parameter, or None.
+    holders = [h for h in state.fx_holds if h.slid and _holds_key(h, key)]
+    return max(holders, key=lambda h: h.order, default=None)
+
+
+def _holds_key(hold, key):
+    return bool(hold.read) and key not in hold.dropped and any(m.key == key for m in hold.read)
+
+
+def _param(state, key):
+    return next((p for p in state.fx_slide_params if p.key == key), None)
+
+
+def _blend(state, hold, keys=None):
+    # The hold's parameters it owns (or just keys) written at its f: continuous ones in
+    # proportion, quantized ones at the slot's value from switch_at on.
+    if not hold.read:
+        return state, []
+    actions = []
+    if not state.fx_slide_undo_open:
+        state, actions = _close_steps(state)
+        actions.append(BeginUndoStep())
+        state = replace(state, fx_slide_undo_open=True)
+    if not hold.wrote:
+        # A slide's first write cancels a running morph.
+        new = replace(hold, wrote=True)
+        state, hold = _put_hold(state, hold, new), new
+        if state.morph is not None:
+            if state.fx_undo_open:
+                actions.append(EndUndoStep())
+            state = replace(state, morph=None, fx_undo_open=False)
+    switch_at = buttons.switch_at()
+    params = list(state.fx_slide_params)
+    writes = []
+    for macro in hold.read:
+        key = macro.key
+        if key in hold.dropped or (keys is not None and key not in keys):
+            continue
+        if _slide_owner(state, key) is not hold:
+            continue
+        param = _param(state, key)
+        if param is None:
+            param = SlideParam(key, macro.start, macro.start, macro.span)
+            params.append(param)
+        if macro.quantized:
+            value = macro.target if hold.f >= switch_at else param.origin
+        else:
+            value = param.origin + hold.f * (macro.target - param.origin)
+        if value != param.written:
+            writes.append((key, value))
+            params = [replace(p, written=value) if p.key == key else p for p in params]
+    state = replace(state, fx_slide_params=tuple(params))
+    if writes:
+        actions.append(SetMacros(tuple(writes)))
+    return state, actions
+
+
+def _end_slide(state, hold):
+    # The lift after a slide: the values stay. The parameters it owned go back to the latest
+    # remaining slide holding them, at that slide's f; the last slide's lift closes the step.
+    actions = []
+    if hold.read:
+        owned = {m.key for m in hold.read if m.key not in hold.dropped}
+        for key in owned:
+            if _param(state, key) is None:
+                continue
+            owner = _slide_owner(state, key)
+            if owner is not None and owner.wrote:
+                state, more = _blend(state, owner, {key})
+                actions += more
+        state = _rebase(state)
+    if state.fx_slide_undo_open and not any(h.slid for h in state.fx_holds):
+        state = replace(state, fx_slide_undo_open=False)
+        actions.append(EndUndoStep())
+    percent = round(hold.f * 100)
+    name = _name(hold.slot, False)
+    return state, actions + buttons.say("slots", "slid", name=name, percent=percent, note=hold.note)
+
+
+def _rebase(state):
+    # A parameter no slide owns keeps its last write as the origin for the next to take it,
+    # and is forgotten once no hold holds it.
+    params = []
+    for param in state.fx_slide_params:
+        if not any(_holds_key(h, param.key) for h in state.fx_holds):
+            continue
+        if _slide_owner(state, param.key) is None:
+            param = replace(param, origin=param.written)
+        params.append(param)
+    return replace(state, fx_slide_params=tuple(params))
 
 
 def _global(state, slot):
@@ -374,6 +581,8 @@ def render(state, snapshot):
 
 def racks_read(state, event, snapshot):
     # The adapter's rack read after a store or a recall, in any mode.
+    if event.hold:
+        return _hold_read(state, event, snapshot)
     name, owner = _name(event.slot, event.scene), _owner(event.scene)
     if not event.recall and event.scoped:
         return _store_scoped(state, event, name)

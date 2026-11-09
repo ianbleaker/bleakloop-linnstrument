@@ -120,6 +120,32 @@ class MorphMacro:
 
 
 @dataclass(frozen=True)
+class SlotHold:
+    # A finger on a stored snapshot slot: a tap recalls on the lift, a slide right blends.
+    pad: int  # the row's pad, 1-8
+    column: int  # the column the finger is on now
+    slot: int  # the global slot
+    x0: int | None = None  # the first X report, the slide's zero
+    slid: bool = False  # moved a quarter column: the lift won't recall
+    f: float = 0.0  # the blend, 0 to 1
+    read: tuple | None = None  # MorphMacro per parameter, as the press found it; None until read
+    note: str = ""  # the read's "N racks not found" note
+    lifted: bool = False  # released before the read landed
+    order: int = 0  # when the slide started: the latest owns the parameters it shares
+    wrote: bool = False  # the slide has written: a running morph is cancelled
+    dropped: frozenset = frozenset()  # keys taken out of this slide
+
+
+@dataclass(frozen=True)
+class SlideParam:
+    # A parameter a held slide has taken: one origin for every slide holding it.
+    key: object
+    origin: float
+    written: float
+    span: float
+
+
+@dataclass(frozen=True)
 class Morph:
     slot: int | None  # None once a morphing scene snapshot's scene is deleted
     start_beats: float
@@ -186,6 +212,10 @@ class State:
     fx_scoped: frozenset = frozenset()  # the global slots holding one rack's snapshot, not the Set's
     fx_bank: int = 0  # the snapshot bank the slot pads show, 0-based; never saved
     morph: Morph | None = None  # runs in every mode
+    fx_holds: tuple = ()  # SlotHold per row holding a stored slot
+    fx_slide_params: tuple = ()  # SlideParam per parameter a held slide has written
+    fx_slide_undo_open: bool = False  # held slides' shared undo step is open in Live
+    fx_slide_count: int = 0  # counts slides as they start, for SlotHold.order
     fx_undo_open: bool = False  # a recall's undo step is open in Live
     fx_landed: int | None = None  # the global slot of the last recall that landed
     fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty

@@ -414,7 +414,9 @@ def apply(action, song, surface):
         racks = live_state.read_racks(song)
         logger.info("FX: read %d racks in %.1f ms", len(racks), (time.monotonic() - start) * 1000)
         if isinstance(action, RecallFxSnapshot):
-            return RacksRead(action.slot, racks, True, action.bars, action.scene, action.end_beats)
+            return RacksRead(
+                action.slot, racks, True, action.bars, action.scene, action.end_beats, hold=action.hold
+            )
         selected = live_state.read_selected_rack(song) if action.scoped else None
         return RacksRead(
             action.slot, racks, False, scene=action.scene, scoped=action.scoped, selected=selected

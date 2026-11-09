@@ -263,6 +263,7 @@ class RacksRead:
     end_beats: float | None = None  # a scene launch's landing time, decided at the press
     scoped: bool = False  # a store of the selected rack only
     selected: tuple | None = None  # the selected top-level rack's path, for a scoped store
+    hold: bool = False  # a held slot's read: a tap or a slide decides on the lift
 
 
 # Actions
@@ -489,6 +490,7 @@ class RecallFxSnapshot:
     bars: int | None  # None for a jump
     scene: bool = False
     end_beats: float | None = None  # a scene launch's landing time, decided at the press
+    hold: bool = False  # a held slot: read now, recall or slide later
 
 
 @dataclass(frozen=True)

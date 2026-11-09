@@ -25,7 +25,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     TrackView,
 )
-from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, State
+from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
 from BleakLoop.core.values import FX_TOUCH_TOLERANCE
 
 
@@ -283,9 +283,11 @@ def test_full_slot_recalls_with_held_length():
     assert handle(state, SLOT_3) == (state, [RecallFxSnapshot(2, 8)])
 
 
-def test_full_slot_recalls_as_a_jump_with_no_length():
+def test_a_stored_slot_press_holds_it_and_reads_at_once():
     state = with_slot(FX, 2)
-    assert handle(state, SLOT_3) == (state, [RecallFxSnapshot(2, None)])
+    held, actions = handle(state, SLOT_3)
+    assert held.fx_holds == (SlotHold(SLOT_3[1], SLOT_3[0], 2),)
+    assert actions == [RecallFxSnapshot(2, None, hold=True)]
 
 
 @pytest.mark.parametrize("stored", [False, True])
@@ -425,7 +427,7 @@ def test_a_store_in_bank_2_names_the_bank():
 
 def test_a_stored_slot_in_bank_2_recalls_its_global_slot():
     state = with_slot(BANK_2, 18)
-    assert handle(state, SLOT_3) == (state, [RecallFxSnapshot(18, None)])
+    assert handle(state, SLOT_3)[1] == [RecallFxSnapshot(18, None, hold=True)]
 
 
 def test_a_recall_in_bank_2_names_the_bank():
@@ -875,6 +877,105 @@ def test_an_unreadable_macro_drops_out():
     assert actions == [SetMacros((((P1, "R", 0), 30.0),))]
     assert [m.key[0] for m in state.morph.macros] == [P0, P1]
     assert state.morph.macros[0].key[2] == 1
+
+
+# Held slots: a tap recalls on the lift (B3)
+
+AB_TARGETS = ((((P0, "R", 0), 10.0), ((P0, "R", 1), 20.0), ((P1, "R", 0), 30.0)))
+AB = with_slot(FX, 2, STORED_AB)
+
+
+def hold_read(state, slot=2, racks=NOW_AB):
+    return engine.handle(state, RacksRead(slot, racks, True, hold=True), SNAP)
+
+
+def lift(state, key=SLOT_3):
+    return handle(state, key, pressed=False)
+
+
+def held(state, **changes):
+    (hold,) = state.fx_holds
+    return replace(state, fx_holds=(replace(hold, **changes),))
+
+
+def test_a_tap_recalls_on_the_lift():
+    state, _ = handle(AB, SLOT_3)
+    state, actions = hold_read(state)
+    assert actions == [] and state.fx_holds[0].read is not None
+    state, actions = lift(state)
+    assert actions == [
+        BeginUndoStep(),
+        SetMacros(AB_TARGETS),
+        EndUndoStep(),
+        ShowMessage("Snapshot 3 recalled"),
+    ]
+    assert state.fx_holds == () and state.fx_landed == 2
+
+
+def test_a_lift_before_the_read_lands_taps_when_it_lands():
+    state, _ = handle(AB, SLOT_3)
+    state, actions = lift(state)
+    assert actions == [] and state.fx_holds[0].lifted
+    state, actions = hold_read(state)
+    assert actions[1] == SetMacros(AB_TARGETS)
+    assert actions[-1] == ShowMessage("Snapshot 3 recalled")
+    assert state.fx_holds == ()
+
+
+def test_a_slide_before_the_read_lands_blends_when_it_lands():
+    state, _ = handle(AB, SLOT_3)
+    state = held(state, x0=100, slid=True, f=0.5, order=1)
+    state, actions = hold_read(state)
+    assert actions == [
+        BeginUndoStep(),
+        SetMacros((((P0, "R", 0), 5.0), ((P0, "R", 1), 10.0), ((P1, "R", 0), 15.0))),
+    ]
+    assert state.fx_holds[0].wrote and state.fx_slide_undo_open
+
+
+def test_a_lift_after_a_slide_before_the_read_lands_writes_the_final_blend_and_keeps_it():
+    state, _ = handle(AB, SLOT_3)
+    state = held(state, x0=100, slid=True, f=0.6, order=1, lifted=True)
+    state, actions = hold_read(state)
+    assert actions == [
+        BeginUndoStep(),
+        SetMacros((((P0, "R", 0), 6.0), ((P0, "R", 1), 12.0), ((P1, "R", 0), 18.0))),
+        EndUndoStep(),
+        ShowMessage("Snapshot 3 at 60%"),
+    ]
+    assert state.fx_holds == () and not state.fx_slide_undo_open and state.fx_slide_params == ()
+
+
+def test_a_read_with_nothing_found_taps_a_refusal():
+    state, _ = handle(AB, SLOT_3)
+    state, _ = hold_read(state, racks=())
+    state, actions = lift(state)
+    assert actions == [ShowMessage("Snapshot 3: nothing to recall, 2 racks not found")]
+
+
+def test_bars_held_recalls_on_the_press_as_before():
+    state = replace(AB, fx_length=4)
+    assert handle(state, SLOT_3) == (state, [RecallFxSnapshot(2, 4)])
+
+
+def test_a_scene_snapshot_recalls_on_the_press_as_before():
+    state = with_scene(FX, 1)
+    assert handle(state, SCENE_2, snapshot=SCENES)[1] == [RecallFxSnapshot(1, None, scene=True)]
+
+
+def test_a_second_slot_press_on_a_held_row_is_ignored():
+    # Slot 11 is on slot 3's row, in column 12.
+    state, _ = handle(with_slot(AB, 10), SLOT_3)
+    assert layout.FX.slots[10][1] == SLOT_3[1]
+    assert handle(state, layout.FX.slots[10]) == (state, [])
+
+
+def test_a_tap_cancels_a_running_morph_and_closes_its_step():
+    state, _ = handle(replace(AB, morph=Morph(5, 0.0, 16.0, 0.0), fx_undo_open=True), SLOT_3)
+    state, _ = hold_read(state)
+    state, actions = lift(state)
+    assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
+    assert state.morph is None and not state.fx_undo_open
 
 
 # Render
@@ -1550,7 +1651,7 @@ def test_a_scoped_store_holds_the_selected_rack_only():
 
 def test_stop_leaves_the_panel_alone():
     state = with_slot(replace(PANEL, stop=True), 2)
-    assert handle(state, SLOT_3)[1][0] == RecallFxSnapshot(2, None)
+    assert handle(state, SLOT_3)[1][0] == RecallFxSnapshot(2, None, hold=True)
 
 
 def test_mixer_copy_and_delete_only_hold_for_the_panel():
