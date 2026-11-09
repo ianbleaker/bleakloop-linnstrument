@@ -59,50 +59,70 @@ def test_capture():
     )
 
 
+V1_RACK = [{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]
+ONE = (FxRack("A", "R", 0, (0.5,)),)
+
+
+def _v1(slots, **more):
+    return json.dumps({"v": 1, "slots": slots, **more})
+
+
 def test_dump_parse_round_trip():
     slots = (None,) * 2 + ((FxRack("A", "R", 0, (0.5, 1.0)), FxRack("A", "R", 1, ())),)
-    slots += (None,) * 125
+    slots += (None,) * 100 + (ONE,) + (None,) * 24
     text = fx.dump(slots, frozenset())
-    assert json.loads(text)["v"] == 1
+    assert json.loads(text)["v"] == 2
     assert fx.parse(text) == (slots, frozenset())
+    assert fx.readable(text)
 
 
 def test_scoped_round_trip():
-    stored = (FxRack("A", "R", 0, (0.5,)),)
-    slots = (stored, None, stored) + (None,) * 125
-    text = fx.dump(slots, frozenset({2}))
-    assert json.loads(text)["scoped"] == [2]
-    assert fx.parse(text) == (slots, frozenset({2}))
+    slots = (ONE, None, ONE) + (None,) * 120 + (ONE,) + (None,) * 4
+    text = fx.dump(slots, frozenset({2, 123}))
+    assert json.loads(text)["scoped"] == [2, 123]
+    assert fx.parse(text) == (slots, frozenset({2, 123}))
 
 
-def test_a_store_without_scoped_parses_as_before():
-    # v1 text from a build before scoped snapshots.
-    slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 127
-    text = json.dumps({"v": 1, "slots": json.loads(fx.dump(slots, frozenset()))["slots"]})
-    assert fx.parse(text) == (slots, frozenset())
+def test_a_v1_store_loads_as_bank_1():
+    text = _v1([V1_RACK] + [None] * 14 + [V1_RACK])
+    assert fx.parse(text) == ((ONE,) + (None,) * 14 + (ONE,) + (None,) * 112, frozenset())
+    assert fx.readable(text)
+
+
+def test_a_v1_store_keeps_its_scoped_slots():
+    text = _v1([None, V1_RACK] + [None] * 14, scoped=[1])
+    assert fx.parse(text)[1] == frozenset({1})
+
+
+def test_a_v1_store_saves_as_v2():
+    slots, scoped = fx.parse(_v1([V1_RACK] + [None] * 15))
+    data = json.loads(fx.dump(slots, scoped))
+    assert data["v"] == 2 and len(data["slots"]) == 128 and data["slots"][0] == V1_RACK
 
 
 @pytest.mark.parametrize(
-    "scoped", ['"x"', "null", "{}", '[1, "0", true, -1, 16, 0.0, 0]', "[3]"]
+    "scoped", ['"x"', "null", "{}", '[1, "0", true, -1, 128, 0.0, 0]', "[3]"]
 )
 def test_bad_scoped_entries_are_dropped(scoped):
     # Only 0 is a stored slot: anything else, or a non-list, leaves every slot Set-wide.
-    slots = '[[{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]' + ",null" * 15 + "]"
+    slots = "[" + json.dumps(V1_RACK) + ",null" * 127 + "]"
     expected = frozenset({0}) if scoped.endswith(", 0]") else frozenset()
-    assert fx.parse(f'{{"v": 1, "slots": {slots}, "scoped": {scoped}}}')[1] == expected
+    assert fx.parse(f'{{"v": 2, "slots": {slots}, "scoped": {scoped}}}')[1] == expected
+
+
+def test_a_v1_scoped_entry_past_bank_1_is_dropped():
+    text = _v1([V1_RACK] + [None] * 15, scoped=[0, 16])
+    assert fx.parse(text)[1] == frozenset({0})
 
 
 def test_an_all_empty_store_round_trips():
-    text = fx.dump((None,) * 16, frozenset())
+    text = fx.dump(EMPTY_SLOTS, frozenset())
     assert fx.dump(*fx.parse(text)) == text
 
 
 def test_dump_format():
-    slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 15
-    assert json.loads(fx.dump(slots, frozenset())) == {
-        "v": 1,
-        "slots": [[{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]] + [None] * 15,
-    }
+    slots = (ONE,) + (None,) * 127
+    assert json.loads(fx.dump(slots, frozenset())) == {"v": 2, "slots": [V1_RACK] + [None] * 127}
 
 
 @pytest.mark.parametrize(
@@ -112,17 +132,21 @@ def test_dump_format():
         "{",
         "null",
         "[]",
+        '{"v": 3, "slots": [' + ",".join(["null"] * 128) + "]}",
         '{"v": 2, "slots": [' + ",".join(["null"] * 16) + "]}",
+        '{"v": 2, "slots": [' + ",".join(["null"] * 127) + "]}",
         '{"v": 1, "slots": [' + ",".join(["null"] * 15) + "]}",
+        '{"v": 1, "slots": [' + ",".join(["null"] * 128) + "]}",
         '{"v": 1}',
         '{"v": 1, "slots": [[{"track": "A"}]' + ",null" * 15 + "]}",
-        '{"v": 1, "slots": [[{"track": "A", "rack": "R", "n": 0, "macros": ["x"]}]'
-        + ",null" * 15
+        '{"v": 2, "slots": [[{"track": "A", "rack": "R", "n": 0, "macros": ["x"]}]'
+        + ",null" * 127
         + "]}",
     ],
 )
 def test_invalid_store_gives_empty_slots(text):
     assert fx.parse(text) == (EMPTY_SLOTS, frozenset())
+    assert not fx.readable(text)
 
 
 def test_scene_store_round_trip():
@@ -283,7 +307,7 @@ def test_delete_unscopes_a_scoped_slot():
     state = replace(with_slot(replace(FX, delete=True), 2), fx_scoped=frozenset({2, 5}))
     state, actions = handle(state, SLOT_3)
     assert state.fx_scoped == frozenset({5})
-    assert actions[0] == SaveFxSnapshots(fx.dump((None,) * 16, frozenset({5})))
+    assert actions[0] == SaveFxSnapshots(fx.dump(EMPTY_SLOTS, frozenset({5})))
 
 
 def test_a_set_wide_store_unscopes_the_slot():
@@ -520,7 +544,7 @@ def test_delete_clears_a_scoped_slot():
     state, actions = handle(replace(scoped(FX), delete=True), layout.FX.slots[4])
     assert state.fx_slots[4] is None and state.fx_scoped == frozenset()
     assert actions == [
-        SaveFxSnapshots(fx.dump((None,) * 16, frozenset())),
+        SaveFxSnapshots(fx.dump(EMPTY_SLOTS, frozenset())),
         ShowMessage("Snapshot 5 cleared"),
     ]
 

@@ -44,34 +44,48 @@ def capture(racks):
     )
 
 
+# The slot count each store version holds: v1 is bank 1 alone, from before banks.
+STORE_SLOTS = {1: layout.FX_SLOTS, 2: layout.FX_SNAPSHOTS}
+
+
 def dump(slots, scoped):
-    # The scoped slots go in their own key, only when there are any: older builds ignore it,
-    # and a store without scoped slots keeps the v1 text it always had. Bank 1 only, for now.
-    data = {"v": 1, "slots": [_encode(slot) for slot in slots[: layout.FX_SLOTS]]}
+    # v2: every bank's slots by global index. The scoped slots go in their own key, only when
+    # there are any.
+    data = {"v": 2, "slots": [_encode(slot) for slot in slots]}
     if scoped:
-        data["scoped"] = sorted(i for i in scoped if i < layout.FX_SLOTS)
+        data["scoped"] = sorted(scoped)
     return json.dumps(data, separators=(",", ":"))
 
 
 def parse(text):
     # (slots, scoped). Anything unreadable gives empty slots: a bad store never stops the
-    # script loading. A bad "scoped" entry is dropped, leaving its slot Set-wide.
-    empty = (None,) * layout.FX_SNAPSHOTS, frozenset()
+    # script loading. A bad "scoped" entry is dropped, leaving its slot Set-wide. A v1 store
+    # loads as bank 1, with banks 2-8 empty.
+    return _parse(text) or ((None,) * layout.FX_SNAPSHOTS, frozenset())
+
+
+def readable(text):
+    # The store parses as a whole: v1 or v2, with every slot decoding.
+    return _parse(text) is not None
+
+
+def _parse(text):
     try:
         data = json.loads(text)
-        if data.get("v") != 1 or len(data["slots"]) != layout.FX_SLOTS:
-            return empty
+        count = STORE_SLOTS.get(data.get("v"))
+        if count is None or len(data["slots"]) != count:
+            return None
         slots = tuple(_decode(slot) for slot in data["slots"])
-        slots += (None,) * (layout.FX_SNAPSHOTS - len(slots))
     except (ValueError, TypeError, KeyError, AttributeError):
-        return empty
+        return None
+    slots += (None,) * (layout.FX_SNAPSHOTS - count)
     scoped = data.get("scoped")
     if not isinstance(scoped, list):
         return slots, frozenset()
     return slots, frozenset(
         i
         for i in scoped
-        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < layout.FX_SLOTS and slots[i] is not None
+        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < count and slots[i] is not None
     )
 
 
