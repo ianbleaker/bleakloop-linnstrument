@@ -118,6 +118,7 @@ class BleakLoop(ControlSurface):
         self._slides = device.SlideDecoder()
         self._x_rows = None  # the X and slide rows last sent; None after User Firmware Mode on
         self._x_timing = _Timing()  # X reports in the current fader gesture
+        self._slide_timing = _Timing()  # X reports while snapshot slots are held
         self._saved_split = {}  # the first reply per NRPN: the player's settings
         self._reads = {}  # the latest reply per NRPN
         self._set_numbers = []  # NRPNs BleakLoop set, in setup order
@@ -818,11 +819,15 @@ class BleakLoop(ControlSurface):
             self._refresh()
         if self._state.fader_touches:
             self._x_timing.add(start)
+        elif self._state.fx_holds:
+            self._slide_timing.add(start)
 
     def _log_fader_gesture(self):
-        # Once the last touch ends: the gesture's X load, for the device check.
+        # Once the last touch or held slot ends: the gesture's X load, for the device check.
         if self._x_timing.runs and not self._state.fader_touches:
             logger.info("FADERS: %d reports, longest %.1f ms", *self._x_timing.take())
+        if self._slide_timing.runs and not self._state.fx_holds:
+            logger.info("FX: slide %d reports, longest %.1f ms", *self._slide_timing.take())
 
     def _on_y_axis(self, column, row, value):
         # 50-100 reports a second per finger: no snapshot or refresh, since only the 10 ms
