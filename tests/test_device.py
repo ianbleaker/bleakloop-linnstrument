@@ -280,6 +280,32 @@ def test_poll_missed_not_when_already_polled():
     assert device.poll_missed({227: 12}, polled, 7, False) is False
 
 
+@pytest.mark.parametrize(
+    ("reads", "offset"),
+    [
+        ({227: 5, 253: 23}, (5, None)),
+        ({227: 12, 253: 23}, (12, 23)),
+        ({227: 13, 253: 23}, (13, None)),
+    ],
+)
+def test_map_offset(reads, offset):
+    assert device.map_offset(reads) == offset
+
+
+@pytest.mark.parametrize(
+    ("sets", "shifts"),
+    [
+        ([], False),
+        ([(device.NRPN_LEFT_MAIN_CHANNEL, 3)], False),
+        ([(device.NRPN_OCTAVE, 5)], True),
+        ([(device.NRPN_TRANSPOSE_PITCH, 7)], True),
+        ([(device.NRPN_TRANSPOSE_LIGHTS, 7)], True),
+    ],
+)
+def test_shifts_notes(sets, shifts):
+    assert device.shifts_notes(sets) is shifts
+
+
 def test_poll_steps():
     assert device.poll_steps([227, 36, 37]) == [queries(227, 36), queries(37)]
 
@@ -355,6 +381,63 @@ def test_reader_resets_mid_reply():
 
 def frame(mode_colour=WHITE):
     return {(1, 5): Light(OFF), (1, 8): Light(mode_colour), (2, 1): Light(OFF)}
+
+
+def test_press_check_first_press_queries_row_offset():
+    assert device.PressCheck().press(60, (5, None), 0) == device.query(device.NRPN_ROW_OFFSET)
+
+
+def test_press_check_first_press_queries_custom_offset():
+    check = device.PressCheck()
+    assert check.press(60, (12, 23), 0) == device.query(227) + device.query(253)
+
+
+def test_press_check_joins_pending_check():
+    check = device.PressCheck()
+    check.press(60, (5, None), 10)
+    assert check.pending
+    assert check.press(65, (5, None), 20) == []
+    assert check.reply(227, 5) == ((5, None), [60, 65], 10)
+
+
+def test_press_check_release():
+    check = device.PressCheck()
+    check.press(60, (5, None), 0)
+    check.press(65, (5, None), 0)
+    assert check.release(60) is True
+    assert check.release(70) is False
+    assert check.reply(227, 5) == ((5, None), [65], 0)
+
+
+def test_press_check_ignores_unwanted_number():
+    check = device.PressCheck()
+    check.press(60, (5, None), 0)
+    assert check.reply(36, 5) is None
+    assert check.pending
+
+
+def test_press_check_custom_waits_for_both():
+    check = device.PressCheck()
+    check.press(60, (12, 23), 0)
+    assert check.reply(227, 12) is None
+    assert check.reply(253, 23) == ((12, 23), [60], 0)
+    assert not check.pending
+
+
+def test_press_check_custom_left_waits_for_253():
+    check = device.PressCheck()
+    check.press(60, (12, 23), 0)
+    assert check.reply(227, 6) is None
+    assert check.reply(253, 23) == ((6, None), [60], 0)
+
+
+def test_press_check_reset_empties_queue():
+    check = device.PressCheck()
+    check.press(60, (5, None), 0)
+    check.reset()
+    assert not check.pending
+    check.press(65, (5, None), 5)
+    assert check.reply(227, 5) == ((5, None), [65], 5)
 
 
 def test_driver_sends_everything_first():

@@ -128,6 +128,9 @@ class BleakLoop(ControlSurface):
         self._rescan = False  # the next poll reads every right split channel
         self._clash = False  # the right split uses every channel: controls off
         self._note_map = None  # Global column note -> pad, None while refused
+        self._map_offset = None  # the Row Offset the note map was built from
+        self._check = device.PressCheck()
+        self._held_controls = {}  # Global column note -> the pad its accepted press fired
         self._refusal = None
         self._right_split_unread = False
         self._sent = {}  # BleakLoop's last left split Octave/Transpose
@@ -434,6 +437,7 @@ class BleakLoop(ControlSurface):
 
     def _compute_settings(self):
         settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
+        self._map_offset = device.map_offset(self._reads)
         self._control_channel = channel
         self._right_split_unread = self._refusal == buttons.system("refuse_right_split")
         self._sent = {
@@ -456,6 +460,11 @@ class BleakLoop(ControlSurface):
         # Linnstrument Mode re-check of Row Offset, the left split's Octave/Transpose and the
         # right split's channels, one step per tick. Sets go out before the next poll starts.
         now_ms = time.monotonic() * 1000
+        if self._check.pending and now_ms - self._check.started_ms >= values.PRESS_CHECK_TIMEOUT_MS:
+            # No Row Offset reply: never guess the map, drop the held presses and repoll now.
+            logger.info("ROW CHECK: no reply in %d ms, presses dropped", values.PRESS_CHECK_TIMEOUT_MS)
+            self._check.reset()
+            self._repolling, self._poll_due = True, 0
         if self._pending_sets:
             number, value = self._pending_sets.pop(0)
             self._send(device.nrpn(number, value))
@@ -484,6 +493,7 @@ class BleakLoop(ControlSurface):
         note_map, refusal, settings, player_changed = device.realign(self._reads, self._sent)
         self._pending_sets = settings
         self._sent = {number: self._reads.get(number) for number in self._sent} | dict(settings)
+        self._map_offset = device.map_offset(self._reads)
         if self._right_split_unread:
             # No channel is known to be free: the controls stay off for the session.
             return
@@ -591,6 +601,7 @@ class BleakLoop(ControlSurface):
 
     def enter_mode(self, mode):
         self._poll, self._pending_sets, self._poll_wait = [], [], False
+        self._check.reset()
         if mode is Mode.LINNSTRUMENT:
             self._poll_due = 0  # re-check at once
         if mode is not Mode.SEQUENCER and self._seq_timing.longest_ms:
@@ -683,6 +694,8 @@ class BleakLoop(ControlSurface):
         self._remove_listeners()
         # A release may now reach another listener, or none: a held pad can't block a reload.
         self._held_pads.clear()
+        self._check.reset()
+        self._held_controls.clear()
         if mode in (Mode.SESSION, Mode.SEQUENCER):
             for row in range(layout.ROWS):
                 for column in range(layout.COLUMNS):
@@ -748,6 +761,29 @@ class BleakLoop(ControlSurface):
             parameter, setting = reply
             self._reads[parameter] = setting
             self._saved_split.setdefault(parameter, setting)
+            result = self._check.reply(parameter, setting)
+            if result is not None:
+                self._resolve_check(*result)
+
+    def _resolve_check(self, offset, notes, started_ms):
+        # Against the map as it stands now: a poll may have realigned since the press.
+        logger.info("ROW CHECK: %.1f ms", time.monotonic() * 1000 - started_ms)
+        if offset != self._map_offset:
+            # Row Offset changed since the map was built: drop the presses and repoll now.
+            self._repolling, self._poll_due = True, 0
+            return
+        if self._note_map is None or self._repolling or device.shifts_notes(self._pending_sets):
+            return
+        for note in notes:
+            # A delivered press can leave Linnstrument Mode: the rest would stay held there.
+            if self._state.mode is not Mode.LINNSTRUMENT:
+                break
+            pad = self._note_map.get(note)
+            if pad is None:
+                self._poll_due = 0
+                continue
+            self._held_controls[note] = pad
+            self._handle(PadPress(layout.GLOBAL_COLUMN, pad, True))
 
     def _on_pad(self, column, row, value):
         self._hold(("pad", column, row), value)
@@ -797,20 +833,28 @@ class BleakLoop(ControlSurface):
 
     def _on_control_note(self, note, value):
         self._hold(("note", note), value)
+        if value == 0:
+            # A release follows its press: dropped with a press still waiting for its check,
+            # else on the pad the press fired, whatever the map is now. None if it was dropped.
+            if self._check.release(note):
+                return
+            pad = self._held_controls.pop(note, None)
+            if pad is not None:
+                self._handle(PadPress(layout.GLOBAL_COLUMN, pad, False))
+            return
         if self._note_map is None:
-            if value > 0:
-                self.show_message(self._refusal)
+            self.show_message(self._refusal)
             return
-        if self._repolling and value > 0:
-            # Row Offset changed type: drop the press until the repeat poll. A release goes
-            # through, on the note its press was mapped from.
+        if self._repolling or device.shifts_notes(self._pending_sets):
+            # The map is stale until the repeat poll, or BleakLoop's own Octave/Transpose set
+            # is still queued: drop the press.
             return
-        pad = self._note_map.get(note)
-        if pad is None:
+        if note not in self._note_map:
             # Row Offset changed since the last re-check: drop the press and re-check now.
             self._poll_due = 0
             return
-        self._handle(PadPress(layout.GLOBAL_COLUMN, pad, value > 0))
+        # Held until a Row Offset reply confirms the map (#44).
+        self._send(self._check.press(note, self._map_offset, time.monotonic() * 1000))
 
     def _handle(self, event, entry=engine.handle):
         state, actions = entry(self._state, event, self._snapshot())
