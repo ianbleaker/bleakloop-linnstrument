@@ -805,20 +805,28 @@ class BleakLoop(ControlSurface):
 
     def _on_control_note(self, note, value):
         self._hold(("note", note), value)
+        if value == 0:
+            # A release follows its press: dropped with a press still waiting for its check,
+            # else on the pad the press fired, whatever the map is now. None if it was dropped.
+            if self._check.release(note):
+                return
+            pad = self._held_controls.pop(note, None)
+            if pad is not None:
+                self._handle(PadPress(layout.GLOBAL_COLUMN, pad, False))
+            return
         if self._note_map is None:
-            if value > 0:
-                self.show_message(self._refusal)
+            self.show_message(self._refusal)
             return
-        if self._repolling and value > 0:
-            # Row Offset changed type: drop the press until the repeat poll. A release goes
-            # through, on the note its press was mapped from.
+        if self._repolling or device.shifts_notes(self._pending_sets):
+            # The map is stale until the repeat poll, or BleakLoop's own Octave/Transpose set
+            # is still queued: drop the press.
             return
-        pad = self._note_map.get(note)
-        if pad is None:
+        if note not in self._note_map:
             # Row Offset changed since the last re-check: drop the press and re-check now.
             self._poll_due = 0
             return
-        self._handle(PadPress(layout.GLOBAL_COLUMN, pad, value > 0))
+        # Held until a Row Offset reply confirms the map (#44).
+        self._send(self._check.press(note, self._map_offset, time.monotonic() * 1000))
 
     def _handle(self, event, entry=engine.handle):
         state, actions = entry(self._state, event, self._snapshot())
