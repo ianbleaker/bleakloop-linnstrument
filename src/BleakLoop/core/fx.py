@@ -46,22 +46,23 @@ def capture(racks):
 
 def dump(slots, scoped):
     # The scoped slots go in their own key, only when there are any: older builds ignore it,
-    # and a store without scoped slots keeps the v1 text it always had.
-    data = {"v": 1, "slots": [_encode(slot) for slot in slots]}
+    # and a store without scoped slots keeps the v1 text it always had. Bank 1 only, for now.
+    data = {"v": 1, "slots": [_encode(slot) for slot in slots[: layout.FX_SLOTS]]}
     if scoped:
-        data["scoped"] = sorted(scoped)
+        data["scoped"] = sorted(i for i in scoped if i < layout.FX_SLOTS)
     return json.dumps(data, separators=(",", ":"))
 
 
 def parse(text):
     # (slots, scoped). Anything unreadable gives empty slots: a bad store never stops the
     # script loading. A bad "scoped" entry is dropped, leaving its slot Set-wide.
-    empty = (None,) * layout.FX_SLOTS, frozenset()
+    empty = (None,) * layout.FX_SNAPSHOTS, frozenset()
     try:
         data = json.loads(text)
         if data.get("v") != 1 or len(data["slots"]) != layout.FX_SLOTS:
             return empty
         slots = tuple(_decode(slot) for slot in data["slots"])
+        slots += (None,) * (layout.FX_SNAPSHOTS - len(slots))
     except (ValueError, TypeError, KeyError, AttributeError):
         return empty
     scoped = data.get("scoped")
@@ -210,7 +211,11 @@ def _owner(scene):
 
 
 def _name(slot, scene):
-    return f"Scene {slot + 1} snapshot" if scene else f"Snapshot {slot + 1}"
+    # slot is the global slot: its number within its bank, and the bank past bank 1.
+    if scene:
+        return f"Scene {slot + 1} snapshot"
+    bank, n = divmod(slot, layout.FX_SLOTS)
+    return f"Snapshot {n + 1}" if bank == 0 else f"Snapshot {n + 1}, bank {bank + 1}"
 
 
 def _landed(state, slot, scene):
@@ -262,15 +267,20 @@ def press(state, event, snapshot):
     # The Shift layer (Copy and Delete come first): an empty slot stores the selected rack
     # alone. Scene snapshots stay Set-wide, and the other pads do nothing.
     if state.shift and not state.copy and not state.delete:
-        if button.function == "slots" and state.fx_slots[button.value - 1] is None:
-            return state, [StoreFxSnapshot(button.value - 1, scoped=True)]
+        if button.function == "slots" and state.fx_slots[_global(state, button.value)] is None:
+            return state, [StoreFxSnapshot(_global(state, button.value), scoped=True)]
         return state, []
     return functions.press(button, state, snapshot)
 
 
-@functions.register("slots", light=lambda state, snapshot, slot: _slot_light(state, slot - 1))
+def _global(state, slot):
+    # A slot pad's value (1-16) in the selected bank, as the global slot index.
+    return state.fx_bank * layout.FX_SLOTS + slot - 1
+
+
+@functions.register("slots", light=lambda state, snapshot, slot: _slot_light(state, _global(state, slot)))
 def _slot(state, snapshot, slot):
-    return _slot_press(state, slot - 1, False, snapshot)
+    return _slot_press(state, _global(state, slot), False, snapshot)
 
 
 @functions.register(

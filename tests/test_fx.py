@@ -61,7 +61,7 @@ def test_capture():
 
 def test_dump_parse_round_trip():
     slots = (None,) * 2 + ((FxRack("A", "R", 0, (0.5, 1.0)), FxRack("A", "R", 1, ())),)
-    slots += (None,) * 13
+    slots += (None,) * 125
     text = fx.dump(slots, frozenset())
     assert json.loads(text)["v"] == 1
     assert fx.parse(text) == (slots, frozenset())
@@ -69,7 +69,7 @@ def test_dump_parse_round_trip():
 
 def test_scoped_round_trip():
     stored = (FxRack("A", "R", 0, (0.5,)),)
-    slots = (stored, None, stored) + (None,) * 13
+    slots = (stored, None, stored) + (None,) * 125
     text = fx.dump(slots, frozenset({2}))
     assert json.loads(text)["scoped"] == [2]
     assert fx.parse(text) == (slots, frozenset({2}))
@@ -77,7 +77,7 @@ def test_scoped_round_trip():
 
 def test_a_store_without_scoped_parses_as_before():
     # v1 text from a build before scoped snapshots.
-    slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 15
+    slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 127
     text = json.dumps({"v": 1, "slots": json.loads(fx.dump(slots, frozenset()))["slots"]})
     assert fx.parse(text) == (slots, frozenset())
 
@@ -122,7 +122,7 @@ def test_dump_format():
     ],
 )
 def test_invalid_store_gives_empty_slots(text):
-    assert fx.parse(text) == ((None,) * 16, frozenset())
+    assert fx.parse(text) == (EMPTY_SLOTS, frozenset())
 
 
 def test_scene_store_round_trip():
@@ -178,6 +178,7 @@ SNAP = Snapshot(
     is_playing=False, song_beats=0.0, tempo=120.0, metronome=False, session_view=True
 )
 FX = State(fx=True)
+EMPTY_SLOTS = (None,) * layout.FX_SNAPSHOTS
 STORED = (FxRack("A", "R", 0, (1.0,)),)
 SLOT_3 = layout.FX.slots[2]
 
@@ -274,8 +275,8 @@ def test_copy_stores_into_any_slot(stored):
 def test_delete_clears_a_full_slot():
     state = with_slot(replace(FX, delete=True), 2)
     state, actions = handle(state, SLOT_3)
-    assert state.fx_slots == (None,) * 16
-    assert actions == [SaveFxSnapshots(fx.dump((None,) * 16, frozenset())), ShowMessage("Snapshot 3 cleared")]
+    assert state.fx_slots == EMPTY_SLOTS
+    assert actions == [SaveFxSnapshots(fx.dump(EMPTY_SLOTS, frozenset())), ShowMessage("Snapshot 3 cleared")]
 
 
 def test_delete_unscopes_a_scoped_slot():
@@ -369,13 +370,80 @@ def test_store_with_no_racks():
 def test_store(state):
     racks = (rack("A", "R", 1.0, 2.0, path=P0), rack("B", "R", 3.0, path=P1))
     state, actions = racks_read(state, 2, racks)
-    slots = (None, None, fx.capture(racks)) + (None,) * 13
+    slots = (None, None, fx.capture(racks)) + (None,) * 125
     assert state.fx_slots == slots
     assert actions == [SaveFxSnapshots(fx.dump(slots, frozenset())), ShowMessage("Snapshot 3 stored (2 racks)")]
 
 
 STORED_AB = (FxRack("A", "R", 0, (10.0, 20.0)), FxRack("B", "R", 0, (30.0,)))
 NOW_AB = (rack("A", "R", 0.0, 0.0, path=P0), rack("B", "R", 0.0, path=P1))
+
+
+# Banks: a slot is the global index bank * 16 + slot.
+
+BANK_2 = replace(FX, fx_bank=1)
+
+
+def test_an_empty_slot_in_bank_2_stores_its_global_slot():
+    assert handle(BANK_2, SLOT_3) == (BANK_2, [StoreFxSnapshot(18)])
+
+
+def test_shift_and_an_empty_slot_in_bank_2_scopes_its_global_slot():
+    assert handle(replace(BANK_2, shift=True), SLOT_3)[1] == [StoreFxSnapshot(18, scoped=True)]
+
+
+def test_a_store_in_bank_2_names_the_bank():
+    racks = (rack("A", "R", 1.0, path=P0),)
+    state, actions = racks_read(BANK_2, 18, racks)
+    assert state.fx_slots[18] == fx.capture(racks) and state.fx_slots[2] is None
+    assert actions[1:] == [ShowMessage("Snapshot 3, bank 2 stored (1 rack)")]
+
+
+def test_a_stored_slot_in_bank_2_recalls_its_global_slot():
+    state = with_slot(BANK_2, 18)
+    assert handle(state, SLOT_3) == (state, [RecallFxSnapshot(18, None)])
+
+
+def test_a_recall_in_bank_2_names_the_bank():
+    state = with_slot(BANK_2, 18, STORED_AB)
+    _, actions = racks_read(state, 18, NOW_AB, recall=True)
+    assert actions[-1] == ShowMessage("Snapshot 3, bank 2 recalled")
+
+
+def test_delete_clears_the_slot_in_the_selected_bank_only():
+    state = with_slot(with_slot(replace(BANK_2, delete=True), 18), 2)
+    state, actions = handle(state, SLOT_3)
+    assert state.fx_slots[18] is None and state.fx_slots[2] == STORED
+    assert actions[1:] == [ShowMessage("Snapshot 3, bank 2 cleared")]
+
+
+def test_banks_show_their_own_slots():
+    state = with_slot(FX, 2)
+    assert fx.render(state, SNAP)[SLOT_3] == Light(CYAN)
+    assert fx.render(replace(state, fx_bank=1), SNAP)[SLOT_3] == Light(OFF)
+
+
+def test_switching_bank_mid_morph_keeps_the_morph_and_its_blink_in_its_bank():
+    state = replace(with_slot(with_slot(FX, 2), 18), morph=Morph(2, 0.0, 16.0, 0.0))
+    state, _ = handle(state, (13, 2))
+    assert state.morph == Morph(2, 0.0, 16.0, 0.0)
+    assert fx.render(state, SNAP)[SLOT_3] == Light(CYAN)
+    state, _ = handle(state, (13, 1))
+    assert fx.render(state, SNAP)[SLOT_3] == Light(CYAN, Blink.FAST)
+
+
+def test_the_landed_blink_stays_in_its_bank():
+    state = replace(with_slot(with_slot(FX, 2), 18), fx_landed=18)
+    assert fx.render(state, SNAP)[SLOT_3] == Light(CYAN)
+    assert fx.render(replace(state, fx_bank=1), SNAP)[SLOT_3] == Light(CYAN, Blink.TEMPO)
+
+
+def test_a_recall_landing_in_bank_2_blinks_its_global_slot():
+    state = with_slot(BANK_2, 18, STORED_AB)
+    state, _ = racks_read(state, 18, NOW_AB, recall=True)
+    assert state.fx_landed == 18
+
+
 
 
 def test_recall_jump_while_playing_with_no_length():

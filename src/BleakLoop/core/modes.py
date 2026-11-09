@@ -4,7 +4,7 @@ import enum
 from dataclasses import dataclass, replace
 
 from . import values
-from .layout import FX_SLOTS, ROWS, Window
+from .layout import FX_SNAPSHOTS, ROWS, Window
 
 
 class Mode(enum.Enum):
@@ -181,12 +181,13 @@ class State:
     came_from: Origin = Origin.SESSION  # where Linnstrument Mode's Back returns to
     fx: bool = False
     fx_length: int | None = None  # bars of the held FX length pad
-    fx_slots: tuple = (None,) * FX_SLOTS  # tuple of FxRack per stored slot, None when empty
-    fx_scoped: frozenset = frozenset()  # the slots holding one rack's snapshot, not the Set's
+    # Per global slot (bank * FX_SLOTS + slot): tuple of FxRack, None when empty.
+    fx_slots: tuple = (None,) * FX_SNAPSHOTS
+    fx_scoped: frozenset = frozenset()  # the global slots holding one rack's snapshot, not the Set's
     fx_bank: int = 0  # the snapshot bank the slot pads show, 0-based; never saved
     morph: Morph | None = None  # runs in every mode
     fx_undo_open: bool = False  # a recall's undo step is open in Live
-    fx_landed: int | None = None  # the slot of the last recall that landed
+    fx_landed: int | None = None  # the global slot of the last recall that landed
     fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty
     fx_landed_scene: int | None = None  # the scene of the last recall that landed
     fader_touches: tuple = ()  # FaderTouch per touched fader row
