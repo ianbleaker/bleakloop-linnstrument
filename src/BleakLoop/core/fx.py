@@ -436,8 +436,9 @@ def _recall_now(state, macros):
     # A recall that writes at once. With slides held it takes their shared parameters and joins
     # their undo step; otherwise it is its own step, closing a fader's or a morph's.
     writes = tuple((m.key, m.target) for m in macros)
-    if state.fx_slide_undo_open:
+    if any(h.slid for h in state.fx_holds):
         state = faders.leave_slides(state, {m.key for m in macros})
+    if state.fx_slide_undo_open:
         actions = [SetMacros(writes)]
         if state.fx_undo_open:
             actions.insert(0, EndUndoStep())
@@ -475,8 +476,34 @@ def _param(state, key):
 
 def _blend(state, hold, keys=None):
     # The hold's parameters it owns (or just keys) written at its f: continuous ones in
-    # proportion, quantized ones at the slot's value from switch_at on.
+    # proportion, quantized ones at the slot's value from switch_at on. The first actual write
+    # opens the slides' undo step, closing a fader's or a morph's, and cancels a running morph.
     if not hold.read:
+        return state, []
+    switch_at = buttons.switch_at()
+    later = [
+        _keys(h) for h in state.fx_holds if h.slid and h is not hold and h.order > hold.order
+    ]
+    params = {p.key: p for p in state.fx_slide_params}
+    writes = []
+    for macro in hold.read:
+        key = macro.key
+        if key in hold.dropped or (keys is not None and key not in keys):
+            continue
+        if any(key in owned for owned in later):
+            continue
+        param = params.get(key)
+        if param is None:
+            param = params[key] = SlideParam(key, macro.start, macro.start, macro.span)
+        if macro.quantized:
+            value = macro.target if hold.f >= switch_at else param.origin
+        else:
+            value = param.origin + hold.f * (macro.target - param.origin)
+        if value != param.written:
+            writes.append((key, value))
+            params[key] = replace(param, written=value)
+    state = replace(state, fx_slide_params=tuple(params.values()))
+    if not writes:
         return state, []
     actions = []
     if not state.fx_slide_undo_open:
@@ -484,37 +511,16 @@ def _blend(state, hold, keys=None):
         actions.append(BeginUndoStep())
         state = replace(state, fx_slide_undo_open=True)
     if not hold.wrote:
-        # A slide's first write cancels a running morph.
-        new = replace(hold, wrote=True)
-        state, hold = _put_hold(state, hold, new), new
+        state = _put_hold(state, hold, replace(hold, wrote=True))
         if state.morph is not None:
             if state.fx_undo_open:
                 actions.append(EndUndoStep())
             state = replace(state, morph=None, fx_undo_open=False)
-    switch_at = buttons.switch_at()
-    params = list(state.fx_slide_params)
-    writes = []
-    for macro in hold.read:
-        key = macro.key
-        if key in hold.dropped or (keys is not None and key not in keys):
-            continue
-        if _slide_owner(state, key) is not hold:
-            continue
-        param = _param(state, key)
-        if param is None:
-            param = SlideParam(key, macro.start, macro.start, macro.span)
-            params.append(param)
-        if macro.quantized:
-            value = macro.target if hold.f >= switch_at else param.origin
-        else:
-            value = param.origin + hold.f * (macro.target - param.origin)
-        if value != param.written:
-            writes.append((key, value))
-            params = [replace(p, written=value) if p.key == key else p for p in params]
-    state = replace(state, fx_slide_params=tuple(params))
-    if writes:
-        actions.append(SetMacros(tuple(writes)))
-    return state, actions
+    return state, actions + [SetMacros(tuple(writes))]
+
+
+def _keys(hold):
+    return {m.key for m in hold.read or ()} - hold.dropped
 
 
 def _end_slide(state, hold):
@@ -522,14 +528,14 @@ def _end_slide(state, hold):
     # remaining slide holding them, at that slide's f; the last slide's lift closes the step.
     actions = []
     if hold.read:
-        owned = {m.key for m in hold.read if m.key not in hold.dropped}
-        for key in owned:
-            if _param(state, key) is None:
-                continue
-            owner = _slide_owner(state, key)
-            if owner is not None and owner.wrote:
-                state, more = _blend(state, owner, {key})
-                actions += more
+        handed = {}
+        for key in _keys(hold):
+            owner = _slide_owner(state, key) if _param(state, key) is not None else None
+            if owner is not None:
+                handed.setdefault(owner.pad, set()).add(key)
+        for pad, keys in handed.items():
+            state, more = _blend(state, _held(state, pad), keys)
+            actions += more
         state = _rebase(state)
     if state.fx_slide_undo_open and not any(h.slid for h in state.fx_holds):
         state = replace(state, fx_slide_undo_open=False)
@@ -675,10 +681,11 @@ def racks_read(state, event, snapshot):
     morph = Morph(event.slot, start, end, start, macros, scene=event.scene, launch=launch)
     timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
     message = buttons.say(owner, "morphing", name=name, timing=timing, note=note)
-    if state.fx_slide_undo_open:
-        # Slides are held: the morph takes the parameters it shares and joins their step. A
-        # morph it replaces closes its own.
+    if any(h.slid for h in state.fx_holds):
+        # Slides are held: the morph takes the parameters it shares.
         state = faders.leave_slides(state, {m.key for m in macros})
+    if state.fx_slide_undo_open:
+        # ...and joins their step once they have written. A morph it replaces closes its own.
         actions = [EndUndoStep()] if state.fx_undo_open else []
         return replace(state, morph=morph, fx_undo_open=False), actions + message
     # A recall closes a fader gesture's undo step, and replaces a running morph and its step;

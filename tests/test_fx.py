@@ -1214,8 +1214,7 @@ def test_lifting_the_later_slide_hands_back_to_the_earlier_at_its_blend():
     f_a = at(2) / X_COLUMN_WIDTH / 4
     state, actions = lift(state, OTHER_SLOT)
     assert actions == [
-        SetMacros((((P0, "R", 0), 10.0 * f_a),)),
-        SetMacros((((P0, "R", 1), 20.0 * f_a),)),
+        SetMacros((((P0, "R", 0), 10.0 * f_a), ((P0, "R", 1), 20.0 * f_a))),
         ShowMessage(f"Snapshot 1 at {round(at(1) / X_COLUMN_WIDTH / 4 * 100)}%"),
     ]
     state, actions = lift(state, (11, ROW))
@@ -1276,6 +1275,33 @@ def test_a_hand_turned_parameter_leaves_the_slide():
 def test_a_second_slide_on_a_row_is_ignored():
     state, _, _ = x(sliding(with_slot(AB, 10)), 11, at(2))
     assert handle(state, layout.FX.slots[10]) == (state, [])
+
+
+def test_a_slide_at_0_writes_nothing_and_leaves_a_morph_running():
+    morph = Morph(5, 0.0, 16.0, 0.0)
+    state = sliding(replace(AB, morph=morph, fx_undo_open=True))
+    state, actions, _ = x(state, 11, -at(0.3))
+    assert state.fx_holds[0].slid and actions == []
+    assert state.morph == morph and state.fx_undo_open and not state.fx_slide_undo_open
+    # Its first write cancels the morph.
+    state, actions, _ = x(state, 11, at(2))
+    assert actions[:2] == [EndUndoStep(), BeginUndoStep()] and state.morph is None
+
+
+def test_a_tap_beside_a_slide_at_0_is_its_own_step_and_takes_the_shared_macros():
+    state = with_slot(sliding(), 0, A_ONLY)
+    state, _, _ = x(state, 11, -at(0.3))
+    state, _ = handle(state, OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, actions = lift(state, OTHER_SLOT)
+    assert actions[0] == BeginUndoStep() and actions[2] == EndUndoStep()
+    assert state.fx_holds[0].dropped == {(P0, "R", 0), (P0, "R", 1)}
+
+
+def test_a_handback_to_an_earlier_slide_at_0_writes_its_origin():
+    state, _ = two_slides(f_a=-0.3)
+    state, actions = lift(state, OTHER_SLOT)
+    assert actions[0] == SetMacros((((P0, "R", 0), 0.0), ((P0, "R", 1), 0.0)))
 
 
 # Held slots: the meter (B7)
