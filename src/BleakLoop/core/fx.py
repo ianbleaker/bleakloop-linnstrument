@@ -5,7 +5,7 @@ import math
 from dataclasses import replace
 
 from . import buttons, faders, functions, layout, mixer
-from .leds import CYAN, LIME, OFF, WHITE, Blink, Light
+from .leds import CYAN, LIME, OFF, PINK, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
     EndUndoStep,
@@ -288,11 +288,13 @@ functions.register_hold(
 
 
 def _slot_light(state, slot):
+    # Pink for one rack's snapshot, cyan for the Set's.
+    colour = PINK if slot in state.fx_scoped else CYAN
     morph = state.morph
     if morph is not None and not morph.scene and morph.slot == slot:
-        return Light(CYAN, Blink.FAST)
+        return Light(colour, Blink.FAST)
     if state.fx_slots[slot] is not None:
-        return Light(CYAN, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
+        return Light(colour, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
     return Light(OFF)
 
 

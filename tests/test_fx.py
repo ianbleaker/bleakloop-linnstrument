@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, WHITE, YELLOW, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
     EndUndoStep,
@@ -769,6 +769,15 @@ def test_render_slots_and_lengths():
         assert frame[key] == Light(WHITE)
     lit = {key for key, light in frame.items() if light != Light(OFF)}
     assert lit == {layout.FX.slots[i] for i in (0, 5, 9)} | set(layout.FX.bars)
+
+
+def test_render_scoped_slots_pink():
+    state = with_slot(with_slot(with_slot(FX, 0), 9), 5)
+    state = replace(state, fx_scoped=frozenset({0, 5, 9}), fx_landed=9, morph=Morph(5, 0.0, 16.0, 0.0))
+    frame = fx.render(state, SNAP)
+    assert frame[layout.FX.slots[0]] == Light(PINK)
+    assert frame[layout.FX.slots[9]] == Light(PINK, Blink.TEMPO)
+    assert frame[layout.FX.slots[5]] == Light(PINK, Blink.FAST)
 
 
 def test_render_column_13_is_dark_with_no_scene_snapshots():
