@@ -412,7 +412,10 @@ def x_axis(state, event):
     redraw = not hold.slid or meter(hold.f) != meter(new.f)
     if new.read is None or (hold.slid and new.f == hold.f):
         return state, [], redraw
+    before = value_meter(state, new) if new.bound else None
     state, actions = _blend(state, new)
+    if new.bound:
+        redraw = redraw or value_meter(state, _held(state, new.pad)) != before
     return state, actions, redraw
 
 
@@ -421,15 +424,40 @@ def render_meters(state):
     # per 25%. Until the lift, they hide whatever those pads show.
     frame = {}
     for hold in state.fx_holds:
+        column = layout.FX.slots[hold.slot % layout.FX_SLOTS][0]
+        if hold.bound:
+            frame.update(_value_meter(state, hold, column))
+            continue
         if not hold.slid:
             continue
         colour = PINK if is_bound(state.fx_slots[hold.slot]) else CYAN
-        column = layout.FX.slots[hold.slot % layout.FX_SLOTS][0]
         lit = meter(hold.f)
         for k in range(1, SLIDE_COLUMNS + 1):
             if column + k < layout.COLUMNS:
                 frame[(column + k, hold.pad)] = Light(colour if k <= lit else OFF)
     return frame
+
+
+def _value_meter(state, hold, column):
+    # A bound slot, held: the 4 pads either side of it are one 8-pad bar, lit from the left up
+    # to where its first parameter sits between its min and max.
+    if not hold.read:
+        return {}
+    lit = value_meter(state, hold)
+    pads = [column + k for k in range(-SLIDE_COLUMNS, SLIDE_COLUMNS + 1) if k]
+    return {
+        (c, hold.pad): Light(PINK if i < lit else OFF)
+        for i, c in enumerate(pads)
+        if layout.GLOBAL_COLUMN < c < layout.COLUMNS
+    }
+
+
+def value_meter(state, hold):
+    first = hold.read[0]
+    param = _param(state, first.key)
+    value = param.written if param is not None else first.start
+    position = (value - first.low) / first.span if first.span else 0.0
+    return round(min(max(position, 0.0), 1.0) * 2 * SLIDE_COLUMNS)
 
 
 def meter(f):
