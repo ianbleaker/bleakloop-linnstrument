@@ -38,14 +38,6 @@ def test_x_rows_on_listed_rows_only():
     assert {m[0] - 0xB0 for m in messages if m[2] == 1} == {0, 7}
 
 
-def test_z_rows_on_listed_rows_only():
-    messages = device.z_rows((2, 5))
-    assert len(messages) == 8
-    assert messages[0] == (0xB0, 12, 0)
-    assert {m[1] for m in messages} == {12}
-    assert {m[0] - 0xB0 for m in messages if m[2] == 1} == {2, 5}
-
-
 def test_loading_column_lights_one_column_per_tick():
     for tick, column in ((0, 1), (15, 16), (16, 1)):
         messages = device.loading_column(tick)

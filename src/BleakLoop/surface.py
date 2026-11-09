@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 Y_AXIS_CC_BASE = 64  # Y-axis CC = 64 + column
 X_LSB_CC_BASE = 32  # X: MSB on CC column, LSB on CC 32 + column
 CC_SLIDE_TRANSFER = 119  # value = the column a finger slid from
-POLY_PRESSURE_STATUS = 0xA0  # + device row; note = column, value = pressure
 NRPN_REPLY_CCS = (
     device.CC_NRPN_MSB,
     device.CC_NRPN_LSB,
@@ -118,7 +117,6 @@ class BleakLoop(ControlSurface):
         self._reader = device.NrpnReader()
         self._slides = device.SlideDecoder()
         self._x_rows = None  # the X and slide rows last sent; None after User Firmware Mode on
-        self._z_rows = None  # the pressure rows last sent
         self._x_timing = _Timing()  # X reports in the current fader gesture
         self._saved_split = {}  # the first reply per NRPN: the player's settings
         self._reads = {}  # the latest reply per NRPN
@@ -410,7 +408,6 @@ class BleakLoop(ControlSurface):
         self._send(
             device.y_axis(False)
             + device.x_rows(())
-            + device.z_rows(())
             + device.user_firmware_mode(False)
             + self._driver.release_global_column()
         )
@@ -611,24 +608,15 @@ class BleakLoop(ControlSurface):
             # Y and X off too: Mixer Mode's Y and the faders' X may be on, and nothing claims
             # them here. CC 64 is sustain on the armed track, CC 1-16 mod wheel, volume, pan.
             self._send(
-                device.user_firmware_mode(True)
-                + device.y_axis(False)
-                + device.x_rows(())
-                + device.z_rows(())
+                device.user_firmware_mode(True) + device.y_axis(False) + device.x_rows(())
             )
-            self._x_rows = self._z_rows = ()
+            self._x_rows = ()
             self._slides.reset()
         else:
-            self._send(
-                device.y_axis(False)
-                + device.x_rows(())
-                + device.z_rows(())
-                + device.user_firmware_mode(False)
-            )
-            self._x_rows = self._z_rows = ()
+            self._send(device.y_axis(False) + device.x_rows(()) + device.user_firmware_mode(False))
+            self._x_rows = ()
         self._listen_for(mode)
         self._sync_x_rows()
-        self._sync_z_rows()
         self._update_ring(force=True)
         self._driver.reset()
         self._refresh()
@@ -690,15 +678,6 @@ class BleakLoop(ControlSurface):
         if mode is Mode.SESSION:
             # A Sequencer hold keeps its transfer state: its slide continues on the new row set.
             self._slides.reset()
-
-    def _sync_z_rows(self):
-        # Pressure spike (#100 A1): every row while Shift is held in Session Mode.
-        state = self._state
-        rows = tuple(range(layout.ROWS)) if state.mode is Mode.SESSION and state.shift else ()
-        if rows == self._z_rows:
-            return
-        self._send(device.z_rows(rows))
-        self._z_rows = rows
 
     def _listen_for(self, mode):
         self._remove_listeners()
@@ -762,17 +741,6 @@ class BleakLoop(ControlSurface):
             element.remove_value_listener(fn)
 
     # Input
-
-    def receive_midi(self, midi_bytes):
-        # Poly pressure has no element type or MIDI-map forward: see whether it arrives here.
-        if len(midi_bytes) == 3 and midi_bytes[0] & 0xF0 == POLY_PRESSURE_STATUS:
-            row, column, value = midi_bytes[0] & 0x0F, midi_bytes[1], midi_bytes[2]
-            if row < layout.ROWS:
-                logger.info("PRESSURE: %d %d %d", column, layout.pad_of(row), value)
-                return
-        if midi_bytes and midi_bytes[0] & 0xF0 not in (0x80, 0x90, 0xB0, 0xE0, 0xF0):
-            logger.info("MIDI: unhandled %s", midi_bytes)
-        super().receive_midi(midi_bytes)
 
     def _on_nrpn_reply(self, number, value):
         reply = self._reader.feed(number, value)
@@ -858,7 +826,6 @@ class BleakLoop(ControlSurface):
                 for action in more:
                     live_actions.apply(action, self.song, self)
         self._sync_x_rows()
-        self._sync_z_rows()
         self._log_fader_gesture()
         self._update_ring()
         self._refresh()

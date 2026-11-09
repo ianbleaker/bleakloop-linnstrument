@@ -32,7 +32,6 @@ NRPN_QUERY = 299
 CC_SLIDE_MODE = 9
 CC_X_AXIS = 10
 CC_Y_AXIS = 11
-CC_Z_AXIS = 12
 CC_LIGHT_COLUMN = 20
 CC_LIGHT_ROW = 21
 CC_LIGHT_COLOUR = 22
@@ -160,11 +159,6 @@ def x_rows(rows):
         for number in (CC_X_AXIS, CC_SLIDE_MODE)
         for m in cc(channel, number, int(channel in rows))
     ]
-
-
-def z_rows(rows):
-    # Pressure (Z) on for the device rows in rows, off for the others.
-    return [m for channel in range(layout.ROWS) for m in cc(channel, CC_Z_AXIS, int(channel in rows))]
 
 
 # The Global column's notes (architecture section 5, "Note numbers in a playing split").
