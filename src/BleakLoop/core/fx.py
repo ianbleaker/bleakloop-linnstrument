@@ -370,6 +370,22 @@ def x_axis(state, event):
     return state, actions, redraw
 
 
+def render_meters(state):
+    # Each slide's fill: the pads right of its slot to its 100% pad, in the slot's colour, one
+    # per 25%. Until the lift, they hide whatever those pads show.
+    frame = {}
+    for hold in state.fx_holds:
+        if not hold.slid:
+            continue
+        colour = PINK if hold.slot in state.fx_scoped else CYAN
+        column = layout.FX.slots[hold.slot % layout.FX_SLOTS][0]
+        lit = meter(hold.f)
+        for k in range(1, SLIDE_COLUMNS + 1):
+            if column + k < layout.COLUMNS:
+                frame[(column + k, hold.pad)] = Light(colour if k <= lit else OFF)
+    return frame
+
+
 def meter(f):
     # The meter's lit pads past the slot: one per 25%, the first as soon as f is above 0.
     return sum(f > k / SLIDE_COLUMNS for k in range(SLIDE_COLUMNS))
@@ -575,6 +591,8 @@ functions.register_hold(
 def _slot_light(state, slot):
     # Pink for one rack's snapshot, cyan for the Set's.
     colour = PINK if slot in state.fx_scoped else CYAN
+    if any(h.slot == slot and h.slid for h in state.fx_holds):
+        return Light(colour, Blink.FAST)
     morph = state.morph
     if morph is not None and not morph.scene and morph.slot == slot:
         return Light(colour, Blink.FAST)

@@ -1278,6 +1278,55 @@ def test_a_second_slide_on_a_row_is_ignored():
     assert handle(state, layout.FX.slots[10]) == (state, [])
 
 
+# Held slots: the meter (B7)
+
+
+def test_the_meter_fills_one_pad_per_quarter():
+    state = held(holding_read(), x0=0, slid=True, f=0.6, order=1)
+    frame = session.render(state, SNAP)
+    assert [frame[(c, ROW)] for c in range(12, 16)] == [Light(CYAN)] * 3 + [Light(OFF)]
+    assert frame[SLOT_3] == Light(CYAN, Blink.FAST)
+
+
+@pytest.mark.parametrize("f, lit", [(0.0, 0), (0.01, 1), (0.25, 1), (0.26, 2), (1.0, 4)])
+def test_meter_counts(f, lit):
+    assert fx.meter(f) == lit
+
+
+def test_a_column_12_slides_meter_covers_scenes_and_navigation():
+    slot_11 = layout.FX.slots[10]
+    state, _ = handle(with_slot(AB, 10), slot_11)
+    state = held(state, x0=0, slid=True, f=1.0, order=1)
+    frame = session.render(state, SCENES)
+    assert [frame[(c, slot_11[1])] for c in range(13, 17)] == [Light(CYAN)] * 4
+
+
+def test_a_held_slot_before_it_slides_shows_no_meter():
+    state = holding_read()
+    assert fx.render_meters(state) == {}
+    assert session.render(state, SNAP)[SLOT_3] == Light(CYAN)
+
+
+def test_a_scoped_slots_meter_is_pink():
+    state = held(replace(holding_read(), fx_scoped=frozenset({2})), x0=0, slid=True, f=0.3, order=1)
+    assert fx.render_meters(state)[(12, ROW)] == Light(PINK)
+
+
+def test_the_meter_goes_on_the_lift():
+    state, _, _ = x(sliding(), 11, at(3))
+    state, _ = lift(state, (11, ROW))
+    assert session.render(state, SNAP)[(12, ROW)] == Light(OFF)
+
+
+def test_x_redraws_when_the_meter_changes():
+    state, _, redraw = x(sliding(), 11, at(0.5))
+    assert redraw  # the slide starts
+    state, _, redraw = x(state, 11, at(0.6))
+    assert not redraw
+    state, _, redraw = x(state, 11, at(1.1))
+    assert redraw
+
+
 # Render
 
 

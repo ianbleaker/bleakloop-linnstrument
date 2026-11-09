@@ -507,6 +507,8 @@ def render(state, snapshot):
         functions.paint(frame, stops, state, snapshot)
     frame.update(global_column.render(state, snapshot))
     _render_copy_source(frame, state)
+    # A slot slide's meter goes over everything on its row, scenes and Navigation included.
+    frame.update(fx.render_meters(state))
     return frame
 
 
