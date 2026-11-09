@@ -14,6 +14,7 @@ from .core.model import (
     ArmExclusive,
     BeginUndoStep,
     BindFader,
+    BindFaderRow,
     BindSelectedParameter,
     CaptureAndInsertScene,
     CaptureMidi,
@@ -174,11 +175,12 @@ def _binding(song, row):
     return binding, buttons.system("bound", fader=row + 1, owner=owner, parameter=name)
 
 
-def _locate(song):
-    # (FaderBinding, owner name, parameter name, None) for Live's selected parameter, or
-    # (None, None, its name or None, refusal): "select" with nothing selected, "macro" inside
-    # a rack chain, "refused" for anything else that can't be bound.
-    parameter = song.view.selected_parameter
+def _locate(song, parameter=None):
+    # (FaderBinding, owner name, parameter name, None) for Live's selected parameter, or the
+    # one given, or (None, None, its name or None, refusal): "select" with nothing selected,
+    # "macro" inside a rack chain, "refused" for anything else that can't be bound.
+    if parameter is None:
+        parameter = song.view.selected_parameter
     if parameter is None:
         return None, None, None, "select"
     owner = getattr(parameter, "canonical_parent", None)
@@ -451,6 +453,12 @@ def apply(action, song, surface):
             parameter.value = min(max(action.value, parameter.min), parameter.max)
     elif isinstance(action, BindSelectedParameter):
         binding, _, name, refusal = _locate(song)
+        return ParameterBound(action.slot, binding, name, refusal)
+    elif isinstance(action, BindFaderRow):
+        (target,) = live_state.fader_targets(song, surface.core_state, [action.row])
+        if target is None:
+            return None
+        binding, _, name, refusal = _locate(song, target[0])
         return ParameterBound(action.slot, binding, name, refusal)
     elif isinstance(action, BindFader):
         binding, message = _binding(song, action.row)

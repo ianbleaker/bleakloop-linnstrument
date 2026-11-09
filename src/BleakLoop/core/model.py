@@ -529,6 +529,12 @@ class BindSelectedParameter:
 
 
 @dataclass(frozen=True)
+class BindFaderRow:
+    slot: int  # the global slot: add this Device FX row's parameter, or remove it if there
+    row: int  # 0-7, pad 1 first
+
+
+@dataclass(frozen=True)
 class BindFader:
     row: int  # 0-7: bind Live's selected parameter to this row
 

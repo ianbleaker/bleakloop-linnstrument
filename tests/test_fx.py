@@ -6,6 +6,7 @@ import pytest
 from BleakLoop.core import engine, fx, layout, session
 from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
+    BindFaderRow,
     BindSelectedParameter,
     ParameterBound,
     FaderView,
@@ -1465,6 +1466,36 @@ def test_bind_refusals(refusal, parameter, message):
 def test_a_set_wide_slot_refuses_a_bind():
     state = with_slot(FX, 2)
     assert bound_answer(state) == (state, [ShowMessage("Delete Snapshot 3 to bind to it")])
+
+
+# Binding: Shift + a slot + a Device FX row (C4)
+
+ROW_VIEWS = replace(SNAP, faders=(FaderView("Frequency", 1.0, 0.0, 127.0),) * 4 + (None,) * 4)
+
+
+def bind_holding():
+    state, _ = handle(replace(FX, shift=True), SLOT_3)
+    return state
+
+
+def test_a_device_fx_row_during_a_bind_hold_binds_its_parameter():
+    state, actions = session.handle(bind_holding(), PadPress(5, 2, True), ROW_VIEWS)
+    assert actions == [BindFaderRow(2, 1)]
+    assert state.fader_touches == () and state.fx_bind_hold.used
+    # The slot's lift then does nothing more.
+    state, actions = handle(state, SLOT_3, pressed=False)
+    assert actions == [] and state.fx_bind_hold is None
+
+
+def test_a_row_with_no_parameter_does_nothing():
+    state = bind_holding()
+    assert session.handle(state, PadPress(5, 6, True), ROW_VIEWS) == (state, [])
+
+
+def test_rows_answer_with_the_same_toggle():
+    state, _ = bound_answer(bind_holding())
+    state, actions = bound_answer(state)
+    assert state.fx_slots[2] is None
 
 
 # Held slots: the meter (B7)

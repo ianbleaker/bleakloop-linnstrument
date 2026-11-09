@@ -8,6 +8,7 @@ from .leds import BLUE, MAGENTA, OFF, ORANGE, YELLOW, Light
 from .model import (
     BeginUndoStep,
     BindFader,
+    BindFaderRow,
     EndUndoStep,
     SaveFaderBindings,
     SetFaderParameter,
@@ -76,6 +77,13 @@ def press(state, event, snapshot):
     # Shift leaves the faders working: they can move while Shift holds the snapshots' layer.
     if not visible(state) or state.stop or state.copy:
         return state, []
+    hold = state.fx_bind_hold
+    if hold is not None and state.fx:
+        # Shift + a slot, held: a row binds its parameter to the slot instead of moving.
+        if _view(snapshot, event.pad) is None:
+            return state, []
+        state = replace(state, fx_bind_hold=replace(hold, used=True))
+        return state, [BindFaderRow(hold.slot, event.pad - 1)]
     mapped = state.fader_source == "mapped"
     row = event.pad - 1
     if state.device_clip:
