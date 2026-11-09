@@ -2790,3 +2790,46 @@ def test_a_punched_quantized_macro_switches_at_half_way_both_ways():
     assert actions == [SetMacros(((key, 0.0),))]
     state, actions, _ = punch_x(state, -1.9)
     assert actions == [SetMacros(((key, 1.0),))]
+
+
+def test_a_punch_lift_queues_a_return_for_continuous_parameters():
+    state, actions = lift(punch_holding())
+    assert actions == [] and state.fx_holds == () and state.fx_slide_params == ()
+    (back,) = state.fx_returns
+    assert back.started_at is None
+    assert [(m.key, m.start, m.target) for m in back.macros] == [(key, value, 0.0) for key, value in AB_TARGETS]
+    assert state.fx_slide_undo_open
+
+
+def test_a_punch_lift_snaps_quantized_parameters_back_at_once():
+    key = (P0, "R", 0)
+    state, _ = punched(with_slot(PUNCH_AB, 2, (FxRack("A", "R", 0, (1.0,)),)), racks=(rack("A", "R", 0.0, path=P0),))
+    quantized = replace(state.fx_holds[0], read=(MorphMacro(key, 0.0, 1.0, True, 0.0, 1.0),))
+    state, actions = lift(replace(state, fx_holds=(quantized,)))
+    assert actions == [SetMacros(((key, 0.0),)), EndUndoStep()]
+    assert state.fx_returns == () and not state.fx_slide_undo_open
+
+
+def test_a_punch_lift_hands_shared_parameters_back_to_an_earlier_slide():
+    state = sliding(with_slot(AB, 0, A_ONLY))
+    state, _, _ = x(state, 11, at(2))
+    state, _ = handle(replace(state, device_clip=True), OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, actions = lift(state, OTHER_SLOT)
+    f_a = at(2) / X_COLUMN_WIDTH / 4
+    assert actions == [SetMacros((((P0, "R", 0), 10.0 * f_a), ((P0, "R", 1), 20.0 * f_a)))]
+    assert state.fx_returns == () and state.fx_slide_undo_open
+
+
+def test_a_parameter_a_fader_took_doesnt_return():
+    from BleakLoop.core import faders
+
+    state = faders.leave_slides(punch_holding(), {(P1, "R", 0)})
+    state, _ = lift(state)
+    assert [m.key for m in state.fx_returns[0].macros] == [(P0, "R", 0), (P0, "R", 1)]
+
+
+def test_a_punch_slid_back_to_0_has_nothing_to_return():
+    state, _, _ = punch_x(punch_holding(), -5)
+    state, actions = lift(state)
+    assert actions == [EndUndoStep()] and state.fx_returns == ()

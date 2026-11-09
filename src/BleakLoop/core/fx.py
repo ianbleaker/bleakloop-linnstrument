@@ -18,7 +18,20 @@ from .model import (
     SetMixer,
     StoreFxSnapshot,
 )
-from .modes import BindHold, BoundRead, BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
+from .modes import (
+    BindHold,
+    BoundRead,
+    BoundSlot,
+    FaderBinding,
+    FxRack,
+    Mode,
+    Morph,
+    MorphMacro,
+    PendingLaunch,
+    PunchReturn,
+    SlideParam,
+    SlotHold,
+)
 from .values import BEAT_EPSILON, BIND_UNDO_MS, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, STATUS_MAX, X_COLUMN_WIDTH
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
@@ -573,6 +586,8 @@ def release(state, event, snapshot):
         # The read hasn't landed: it decides.
         return _put_hold(state, hold, replace(hold, lifted=True)), []
     state = _drop_hold(state, hold.pad)
+    if hold.punch:
+        return _end_punch(state, hold)
     if hold.slid:
         return _end_slide(state, hold)
     return _tap(state, hold)
@@ -902,6 +917,44 @@ def _end_slide(state, hold):
     else:
         message = buttons.say("slots", "slid", name=name, percent=percent, note=hold.note)
     return state, actions + message
+
+
+def _end_punch(state, hold):
+    # A punch's lift: the parameters it shares go back to the latest remaining slide holding
+    # them, at that slide's f, as a slide's lift does. The rest return to their values at the
+    # press: on/off and choosers at once, the others over PUNCH_RETURN_MS. One a fader or a knob
+    # took out of the punch stays where it is. The slides' undo step stays open until the last
+    # return lands.
+    quantized = {m.key: m.quantized for m in hold.read}
+    handed, snaps, ramps = {}, [], []
+    for key in _keys(hold):
+        param = _param(state, key)
+        if param is None:
+            continue
+        owner = _slide_owner(state, key)
+        if owner is not None:
+            handed.setdefault(owner.pad, set()).add(key)
+        elif param.written != param.origin:
+            back = MorphMacro(key, param.written, param.origin, quantized[key], param.written, param.span)
+            (snaps if back.quantized else ramps).append(back)
+    actions = []
+    for pad, keys in handed.items():
+        state, more = _blend(state, _held(state, pad), keys)
+        actions += more
+    if snaps:
+        actions.append(SetMacros(tuple((m.key, m.target) for m in snaps)))
+    if ramps:
+        state = replace(state, fx_returns=state.fx_returns + (PunchReturn(tuple(ramps)),))
+    state = _rebase(state)
+    return _close_slides(state, actions)
+
+
+def _close_slides(state, actions):
+    # The slides' undo step closes once no slide is held and no punch is returning.
+    if state.fx_slide_undo_open and not state.fx_returns and not any(h.slid for h in state.fx_holds):
+        state = replace(state, fx_slide_undo_open=False)
+        actions = actions + [EndUndoStep()]
+    return state, actions
 
 
 def _slid_value(entry, origin, f):
