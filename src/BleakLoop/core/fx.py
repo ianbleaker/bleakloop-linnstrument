@@ -116,17 +116,34 @@ LOCATOR_FIELDS = ("track", "tn", "device", "dn", "param", "name")
 
 
 def _encode_slot(slot):
+    # A bound locator's punch-in value goes in its entry as "value", left out when it has none.
     if isinstance(slot, BoundSlot):
-        return {"bound": [{field: getattr(p, field) for field in LOCATOR_FIELDS} for p in slot.params]}
+        return {"bound": [_encode_locator(p, v) for p, v in zip(slot.params, _values(slot))]}
     return _encode(slot)
 
 
+def _encode_locator(locator, value):
+    item = {field: getattr(locator, field) for field in LOCATOR_FIELDS}
+    if value is not None:
+        item["value"] = value
+    return item
+
+
 def _decode_slot(slot):
-    # A bound slot's bad entries are dropped; with none left, the slot is empty.
+    # A bound slot's bad entries are dropped with their values; with none left, the slot is
+    # empty. A bad value is dropped alone.
     if isinstance(slot, dict):
-        params = tuple(p for p in (_locator(item) for item in slot["bound"]) if p is not None)
-        return BoundSlot(params) if params else None
+        entries = [(_locator(item), _value(item)) for item in slot["bound"]]
+        kept = [(p, v) for p, v in entries if p is not None]
+        return _bound_slot([p for p, _ in kept], [v for _, v in kept])
     return _decode(slot)
+
+
+def _value(item):
+    value = item.get("value") if isinstance(item, dict) else None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return None
 
 
 def _locator(item):

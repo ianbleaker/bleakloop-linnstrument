@@ -153,6 +153,42 @@ def test_bad_bound_entries_are_dropped(entry):
     assert slots[0] == BoundSlot((BOUND.params[0],)) and slots[1] is None
 
 
+def test_bound_punch_values_round_trip():
+    slot = replace(BOUND, values=(0.75, None))
+    text = fx.dump((slot,) + (None,) * 127)
+    entries = json.loads(text)["slots"][0]["bound"]
+    assert entries[0]["value"] == 0.75 and "value" not in entries[1]
+    assert fx.parse(text)[0] == slot
+
+
+def test_a_bound_store_without_values_loads_with_none():
+    text = json.dumps({"v": 2, "slots": [BOUND_JSON] + [None] * 127})
+    slot = fx.parse(text)[0]
+    assert slot == BOUND and fx._values(slot) == (None, None)
+
+
+@pytest.mark.parametrize("value", ["0.5", True, None, [1]])
+def test_a_bad_punch_value_loads_as_none_and_keeps_the_parameter(value):
+    first = dict(BOUND_JSON["bound"][0], value=value)
+    second = dict(BOUND_JSON["bound"][1], value=3)
+    text = json.dumps({"v": 2, "slots": [{"bound": [first, second]}] + [None] * 127})
+    slot = fx.parse(text)[0]
+    assert slot.params == BOUND.params and fx._values(slot) == (None, 3.0)
+
+
+def test_a_dropped_entry_takes_its_value_with_it():
+    bad = {"track": "A", "tn": -1, "device": "D", "dn": 0, "param": 1, "name": "P", "value": 0.1}
+    second = dict(BOUND_JSON["bound"][1], value=0.9)
+    text = json.dumps({"v": 2, "slots": [{"bound": [bad, second]}] + [None] * 127})
+    assert fx.parse(text)[0] == BoundSlot((BOUND.params[1],), (0.9,))
+
+
+def test_a_scoped_slot_converts_without_values():
+    rack = [{"track": "Drums", "rack": "FX", "n": 1, "macros": [0.5, 0.25]}]
+    slot = fx.parse(_v1([None, rack] + [None] * 14, scoped=[1]))[1]
+    assert slot.values == () and fx._values(slot) == (None, None)
+
+
 def test_an_all_empty_store_round_trips():
     text = fx.dump(EMPTY_SLOTS)
     assert fx.dump(fx.parse(text)) == text
