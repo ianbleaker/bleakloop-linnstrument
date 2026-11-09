@@ -456,7 +456,6 @@ def apply(action, song, surface):
         return ParameterBound(action.slot, binding, name, refusal)
     elif isinstance(action, BindFaderRow):
         (target,) = live_state.fader_targets(song, surface.core_state, [action.row])
-        logger.info("BIND-DEBUG row %d target %r", action.row, target)
         if target is None:
             return None
         binding, _, name, refusal = _locate(song, target[0])
