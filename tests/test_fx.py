@@ -387,6 +387,44 @@ def test_recall_jumps_while_stopped_with_a_length():
     assert state.fx_landed == 4
 
 
+# Scoped snapshots: stored as one rack, they act on that rack alone.
+
+SCOPED_B = (FxRack("B", "R", 0, (30.0,)),)
+
+
+def scoped(state):
+    return replace(with_slot(state, 4, SCOPED_B), fx_scoped=frozenset({4}))
+
+
+def test_a_scoped_recall_writes_its_rack_only():
+    _, actions = racks_read(scoped(FX), 4, NOW_AB, recall=True)
+    assert actions[1] == SetMacros(((P1, "R", 0, 30.0),))
+    assert actions[-1] == ShowMessage("Snapshot 5 recalled")
+
+
+def test_a_scoped_morph_moves_its_rack_only():
+    state, _ = racks_read(scoped(FX), 4, NOW_AB, recall=True, bars=4, snapshot=playing(1.0))
+    assert [(m.path, m.index) for m in state.morph.macros] == [(P1, 0)]
+
+
+def test_a_scoped_recall_with_its_rack_gone():
+    racks = (rack("A", "R", 0.0, 0.0, path=P0),)
+    state = scoped(FX)
+    assert racks_read(state, 4, racks, recall=True) == (
+        state,
+        [ShowMessage("Snapshot 5: nothing to recall, 1 rack not found")],
+    )
+
+
+def test_delete_clears_a_scoped_slot():
+    state, actions = handle(replace(scoped(FX), delete=True), layout.FX.slots[4])
+    assert state.fx_slots[4] is None and state.fx_scoped == frozenset()
+    assert actions == [
+        SaveFxSnapshots(fx.dump((None,) * 16, frozenset())),
+        ShowMessage("Snapshot 5 cleared"),
+    ]
+
+
 def test_recall_clamps_targets():
     state = with_slot(FX, 0, (FxRack("A", "R", 0, (200.0, -5.0)),))
     _, actions = racks_read(state, 0, (rack("A", "R", 0.0, 0.0),), recall=True)
