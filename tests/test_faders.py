@@ -299,6 +299,23 @@ def test_split_render_draws_the_faders_in_columns_10_to_14():
     assert [frame[(c, 2)] for c in range(10, 15)] == [Light(BLUE)] + [Light(OFF)] * 4
 
 
+@pytest.mark.parametrize(
+    "state, column",
+    [(FX_ON, 5), (SPLIT, 12), (State(mixer=True, mixer_split=True), 12)],
+)
+def test_shift_leaves_the_faders_working_through_the_router(state, column):
+    state, _ = session.handle(replace(state, shift=True), PadPress(column, 4, True), SNAP)
+    (touch,) = state.fader_touches
+    assert touch.pad == 4
+
+
+def test_shift_still_darkens_mixers_volume_faders():
+    state = State(mixer=True, shift=True)
+    state, _ = session.handle(state, PadPress(5, 1, True), SNAP)
+    assert state.touches == ()
+    assert session.render(state, SNAP)[(5, 1)] == Light(OFF)
+
+
 def test_x_rows_follow_the_split_view():
     assert engine.x_rows(SPLIT) == tuple(range(8))
     assert engine.x_rows(replace(SPLIT, mixer=True)) == ()
