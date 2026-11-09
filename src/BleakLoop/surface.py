@@ -460,6 +460,11 @@ class BleakLoop(ControlSurface):
         # Linnstrument Mode re-check of Row Offset, the left split's Octave/Transpose and the
         # right split's channels, one step per tick. Sets go out before the next poll starts.
         now_ms = time.monotonic() * 1000
+        if self._check.pending and now_ms - self._check.started_ms >= values.PRESS_CHECK_TIMEOUT_MS:
+            # No Row Offset reply: never guess the map, drop the held presses and repoll now.
+            logger.info("ROW CHECK: no reply in %d ms, presses dropped", values.PRESS_CHECK_TIMEOUT_MS)
+            self._check.reset()
+            self._repolling, self._poll_due = True, 0
         if self._pending_sets:
             number, value = self._pending_sets.pop(0)
             self._send(device.nrpn(number, value))
