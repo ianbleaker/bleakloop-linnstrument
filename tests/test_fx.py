@@ -1376,14 +1376,14 @@ def test_a_held_bound_slot_shows_its_first_parameters_value_right_of_it():
     state, _ = bound_read(state)
     frame = session.render(state, SNAP)
     # 100 of 127: 3 of 4 pads, columns 12-15 right of the slot in column 11.
-    assert [frame[(c, ROW)] for c in (12, 13, 14, 15)] == [Light(YELLOW)] * 3 + [Light(OFF)]
-    assert frame[(10, ROW)] != Light(YELLOW) and frame[SLOT_3] == Light(PINK)
+    assert [frame[(c, ROW)] for c in (12, 13, 14, 15)] == [Light(PINK)] * 3 + [Light(OFF)]
+    assert frame[(10, ROW)] != Light(PINK) and frame[SLOT_3] == Light(PINK)
 
 
 def test_the_value_meter_follows_the_slide_and_redraws():
     state, _, redraw = x(bound_sliding(), 11, at(2.2))
     assert redraw
-    assert all(light == Light(YELLOW) for light in fx.render_meters(state).values())
+    assert all(light == Light(PINK) for light in fx.render_meters(state).values())
     state, _, _ = x(state, 11, -at(9))
     assert all(light == Light(OFF) for light in fx.render_meters(state).values())
     assert session.render(state, SNAP)[SLOT_3] == Light(PINK, Blink.FAST)
