@@ -100,10 +100,11 @@ class FaderBinding:
 
 @dataclass(frozen=True)
 class BoundSlot:
-    # A snapshot slot bound to parameters, without values: a slide moves them from wherever
-    # they are. params holds a FaderBinding locator per parameter; a rack macro's is matched by
-    # its index alone.
+    # A snapshot slot bound to parameters: a slide moves them from wherever they are. params
+    # holds a FaderBinding locator per parameter; a rack macro's is matched by its index alone.
+    # values holds each parameter's stored punch-in value, a float or None; () means all None.
     params: tuple
+    values: tuple = ()
 
 
 @dataclass(frozen=True)

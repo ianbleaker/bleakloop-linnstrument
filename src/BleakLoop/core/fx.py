@@ -94,7 +94,22 @@ def bind_racks(racks):
         for rack in racks
         for index in range(len(rack.values))
     )
-    return BoundSlot(params) if params else None
+    return _bound_slot(params, ())
+
+
+def _bound_slot(params, values):
+    # A bound slot of these parameters and their punch-in values (None where there's none), or
+    # None with no parameters. All None is stored as ().
+    if not params:
+        return None
+    values = tuple(values)
+    return BoundSlot(tuple(params), values if any(v is not None for v in values) else ())
+
+
+def _values(slot):
+    # A bound slot's punch-in value per parameter, None where there's none.
+    values = slot.values[: len(slot.params)]
+    return tuple(values) + (None,) * (len(slot.params) - len(values))
 
 
 LOCATOR_FIELDS = ("track", "tn", "device", "dn", "param", "name")
