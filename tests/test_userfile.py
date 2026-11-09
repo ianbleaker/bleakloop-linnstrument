@@ -149,6 +149,7 @@ def test_the_writer_round_trips_through_tomllib():
 
     overlay = {
         "editor": {"enabled": False, "port": 50000},
+        "morph": {"switch_at": 0.25},
         "system": {"track": 'Quote " back \\ slash\nnew {track} — é ✓'},
         "functions": {
             "metronome": {
@@ -165,6 +166,50 @@ def test_the_writer_round_trips_through_tomllib():
     text = userfile.to_toml(overlay)
     assert text.startswith("# BleakLoop's user buttons")
     assert tomllib.loads(text) == overlay
+
+
+# [morph]
+
+
+def _user(tmp_path, text):
+    path = tmp_path / "buttons.toml"
+    path.write_text(text)
+    return buttons.load(buttons.PATH, path)
+
+
+@pytest.mark.parametrize("text, value", [("switch_at = 0.8", 0.8), ("switch_at = 1", 1)])
+def test_a_user_switch_at_merges_over_the_shipped_one(tmp_path, text, value):
+    registry = _user(tmp_path, f"[morph]\n{text}\n")
+    assert registry.data["morph"] == {"switch_at": value}
+    assert registry.overlay == {"morph": {"switch_at": value}}
+
+
+def test_a_user_switch_at_reaches_the_accessor(tmp_path, shipped):
+    path = tmp_path / "buttons.toml"
+    path.write_text("[morph]\nswitch_at = 0.75\n")
+    buttons.reload(buttons.PATH, path)
+    assert buttons.switch_at() == 0.75
+
+
+@pytest.mark.parametrize("value", ["0", "-0.5", "1.5", "true", '"0.5"', "[0.5]"])
+def test_a_bad_switch_at_is_refused(tmp_path, value):
+    with pytest.raises(ValueError, match="morph: switch_at is a number above 0, up to 1"):
+        _user(tmp_path, f"[morph]\nswitch_at = {value}\n")
+
+
+def test_an_unknown_morph_setting_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="morph: no such setting 'curve'"):
+        _user(tmp_path, "[morph]\ncurve = 2\n")
+
+
+def test_morph_must_be_a_table(tmp_path):
+    with pytest.raises(ValueError, match="morph: not a table"):
+        _user(tmp_path, "morph = 0.5\n")
+
+
+def test_the_shipped_morph_table_is_checked():
+    with pytest.raises(ValueError, match="morph: switch_at"):
+        buttons.Registry({**buttons._read(buttons.PATH), "morph": {"switch_at": 2}})
 
 
 def test_prune_drops_empty_tables():
