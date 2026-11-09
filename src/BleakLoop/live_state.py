@@ -434,6 +434,15 @@ def read_racks(song):
     return tuple(racks)
 
 
+def read_selected_rack(song):
+    # The path of the device selected in Live when it's a rack directly on a track, return or
+    # master, as read_racks lists them; else None.
+    device = song.view.selected_track.view.selected_device
+    if device is None or not device.can_have_chains:
+        return None
+    return _rack_path(song, device)
+
+
 def read_macro_values(song, morph):
     # The live value per morphing macro, or None when its rack has moved or gone.
     targets = macro_parameters(song, ((m.path, m.rack_name, m.index) for m in morph.macros))

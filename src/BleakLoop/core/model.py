@@ -269,6 +269,8 @@ class RacksRead:
     bars: int | None = None  # the morph length; None for a jump
     scene: bool = False
     end_beats: float | None = None  # a scene launch's landing time, decided at the press
+    scoped: bool = False  # a store of the selected rack only
+    selected: tuple | None = None  # the selected top-level rack's path, for a scoped store
 
 
 # Actions
@@ -486,6 +488,7 @@ class EndUndoStep:
 class StoreFxSnapshot:
     slot: int  # 0-15, or the scene index of a scene snapshot
     scene: bool = False
+    scoped: bool = False  # the selected rack only, not every rack in the Set
 
 
 @dataclass(frozen=True)

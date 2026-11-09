@@ -413,7 +413,10 @@ def apply(action, song, surface):
         logger.info("FX: read %d racks in %.1f ms", len(racks), (time.monotonic() - start) * 1000)
         if isinstance(action, RecallFxSnapshot):
             return RacksRead(action.slot, racks, True, action.bars, action.scene, action.end_beats)
-        return RacksRead(action.slot, racks, False, scene=action.scene)
+        selected = live_state.read_selected_rack(song) if action.scoped else None
+        return RacksRead(
+            action.slot, racks, False, scene=action.scene, scoped=action.scoped, selected=selected
+        )
     elif isinstance(action, SetMacros):
         # The Set can change mid-morph: a rack that has moved or gone is skipped.
         targets = live_state.macro_parameters(song, (write[:3] for write in action.writes))

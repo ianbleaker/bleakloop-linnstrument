@@ -254,8 +254,13 @@ def press(state, event, snapshot):
         if state.fx_length == bars:
             return replace(state, fx_length=None), []
         return state, []
-    # Under Shift the grid is dark and does nothing, as Mixer's faders.
-    if not event.pressed or state.shift:
+    if not event.pressed:
+        return state, []
+    # The Shift layer (Copy and Delete come first): an empty slot stores the selected rack
+    # alone. Scene snapshots stay Set-wide, and the other pads do nothing.
+    if state.shift and not state.copy and not state.delete:
+        if button.function == "slots" and state.fx_slots[button.value - 1] is None:
+            return state, [StoreFxSnapshot(button.value - 1, scoped=True)]
         return state, []
     return functions.press(button, state, snapshot)
 
@@ -332,6 +337,8 @@ def render(state, snapshot):
 def racks_read(state, event, snapshot):
     # The adapter's rack read after a store or a recall, in any mode.
     name, owner = _name(event.slot, event.scene), _owner(event.scene)
+    if not event.recall and event.scoped:
+        return _store_scoped(state, event, name)
     if not event.recall:
         if not event.racks:
             return state, buttons.refuse(owner, "no_racks")
@@ -373,6 +380,20 @@ def racks_read(state, event, snapshot):
     timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
     message = buttons.say(owner, "morphing", name=name, timing=timing, note=note)
     return state, actions + [BeginUndoStep(), *message]
+
+
+def _store_scoped(state, event, name):
+    # The selected rack's macros only; its key counts every rack in the Set, as a recall's do.
+    stored = tuple(
+        item
+        for item, view in zip(capture(event.racks), event.racks)
+        if event.selected is not None and view.path == event.selected
+    )
+    if not stored:
+        return state, buttons.refuse("slots", "no_rack", name=name)
+    slots = _put(state.fx_slots, event.slot, stored)
+    state, save = _save_slots(state, slots, state.fx_scoped | {event.slot})
+    return state, [save, *buttons.say("slots", "stored_scoped", name=name, rack=stored[0].rack)]
 
 
 def tick(state, transport, values, triggered=None):

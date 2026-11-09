@@ -855,8 +855,10 @@ cleared = "{name} cleared"
 stored = "{name} stored ({racks})"
 recalled = "{name} recalled{note}"
 morphing = "{name} {timing}{note}"
+stored_scoped = "{name} stored ({rack})"
 [functions.slots.refusals]
 no_racks = "No racks to store"
+no_rack = "Select a rack to store {name}"
 nothing = "{name}: nothing to recall{note}"
 
 [functions.scene_slots]

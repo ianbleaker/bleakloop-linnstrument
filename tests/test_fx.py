@@ -313,11 +313,6 @@ def test_slot_release_does_nothing():
     assert handle(FX, SLOT_3, pressed=False) == (FX, [])
 
 
-def test_shift_slot_does_nothing():
-    state = replace(FX, shift=True)
-    assert handle(state, SLOT_3) == (state, [])
-
-
 def test_copy_message_in_fx():
     state, actions = handle(FX, layout.NAVIGATION.copy)
     assert state.copy
@@ -1330,6 +1325,50 @@ def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
     assert handle(deleting, SLOT_3)[1] == [
         SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None), frozenset())),
         ShowMessage("Snapshot 3 cleared"),
+    ]
+
+
+@pytest.mark.parametrize("state", [FX, PANEL, MIXER_PANEL])
+def test_shift_and_an_empty_slot_stores_scoped(state):
+    shifted = replace(state, shift=True)
+    assert handle(shifted, SLOT_3) == (shifted, [StoreFxSnapshot(2, scoped=True)])
+
+
+def test_shift_and_a_stored_slot_or_a_scene_snapshot_does_nothing():
+    state = replace(with_slot(FX, 2), shift=True)
+    assert handle(state, SLOT_3) == (state, [])
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
+    assert handle(with_scene(state, 1), SCENE_2, snapshot=SCENES) == (with_scene(state, 1), [])
+
+
+@pytest.mark.parametrize("held", ["copy", "delete"])
+def test_copy_and_delete_come_before_shift(held):
+    state = replace(with_slot(FX, 2), shift=True, **{held: True})
+    action = handle(state, SLOT_3)[1][0]
+    assert action == StoreFxSnapshot(2) if held == "copy" else isinstance(action, SaveFxSnapshots)
+
+
+def scoped_read(state, slot, racks, selected):
+    event = RacksRead(slot, racks, False, scoped=True, selected=selected)
+    return engine.handle(state, event, SNAP)
+
+
+def test_a_scoped_store_without_a_selected_rack_refuses():
+    racks = (rack("A", "R", 1.0, path=P0),)
+    assert scoped_read(FX, 2, racks, None) == (FX, [ShowMessage("Select a rack to store Snapshot 3")])
+
+
+def test_a_scoped_store_holds_the_selected_rack_only():
+    racks = (rack("A", "R", 1.0, path=P0), rack("A", "R", 2.0, path=P1), rack("B", "S", 3.0))
+    state, actions = scoped_read(FX, 2, racks, P1)
+    # Keyed over every rack: the second "A"/"R" is n = 1.
+    stored = (FxRack("A", "R", 1, (2.0,)),)
+    assert state.fx_slots[2] == stored
+    assert state.fx_scoped == frozenset({2})
+    slots = fx._put(FX.fx_slots, 2, stored)
+    assert actions == [
+        SaveFxSnapshots(fx.dump(slots, frozenset({2}))),
+        ShowMessage("Snapshot 3 stored (R)"),
     ]
 
 
