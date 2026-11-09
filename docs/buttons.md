@@ -276,7 +276,7 @@ The faders' and timed scene launches' wording.
 
 ## System messages
 
-The device setup, Device/Clip's track and device names and Mapped FX's binding. These always show.
+The device setup, and Device/Clip's track and device names. These always show.
 
 | Key | Message |
 |---|---|
