@@ -927,7 +927,7 @@ class BleakLoop(ControlSurface):
         return self._seq_view
 
     def _update_ring(self, force=False):
-        # In every mode: Live's ring shows which scenes the pads, and FX Mode's column 13, show.
+        # In every mode: Live's ring shows which scenes the pads, and FX Mode's column 14, show.
         window = self._state.window
         width = controls.window_tracks(self._state)
         want = (window.track, window.scene, width, layout.WINDOW_SCENES)

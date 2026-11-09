@@ -181,7 +181,7 @@ With **Shift** held:
 - **Arm**: Arm or disarm the track alone, keeping the selection.
 <!-- /callouts:split -->
 
-With the snapshots in the panel, columns 11–14 work as FX Mode's, and column 10 is dark.
+With the snapshots in the panel, columns 10–14 work as FX Mode's.
 
 ![Session Mode, split view with the snapshots](manual/session-split-snapshots.svg)
 
@@ -397,7 +397,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Session Mode and Mixer Mode each have their own split view, toggled by their own pad. Columns 2–9 work as in that mode for an 8-track window, and Live's ring shrinks to match. The window moves as usual; turning the split view off keeps it where it is, unless it then runs past the last track.
 - Columns 10–14 are the panel, in every row. Shift + FX steps it through Device FX, Mapped FX and the snapshots, and both split views show the same choice.
 - As faders, five pads wide, they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads.
-- As snapshots, columns 11–14 work as FX Mode's: snapshots, scene snapshots and Bars, with Copy and Delete as there. Column 10 is dark.
+- As snapshots, columns 10–14 work as FX Mode's: Bars, snapshots and scene snapshots, with Copy and Delete as there.
 - With Shift held the panel's faders work as without it, and its snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot; the other snapshot pads ignore presses.
 - A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
 - The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
@@ -416,10 +416,10 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 ### FX faders and Mapped FX
 
-**Faders** (columns 2–10): one fader per row. They have two sources, switched with Shift + FX: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. Selecting a track with pad 8 or Device/Clip + Tracks moves it to the track's first rack (see Select and arm row). The fader source starts on Device FX each time Live starts or a Set opens.
+**Faders** (columns 2–9): one fader per row. They have two sources, switched with Shift + FX: **Device FX**, magenta and blue, for the device with Live's blue hand, and **Mapped FX**, orange and yellow, for eight parameters you bind yourself (below). Clicking a device in Live, or Device/Clip + Devices, moves the blue hand there; so does another controller's device navigation. Selecting a track with pad 8 or Device/Clip + Tracks moves it to the track's first rack (see Select and arm row). The fader source starts on Device FX each time Live starts or a Set opens.
 
 - In Device FX, a rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
-- Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 10 the maximum. Slide along the row to move it.
+- Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 9 the maximum. Slide along the row to move it.
 - The lit pads, counted from the left, show the value. Rows alternate magenta and blue so you can count them. The bar follows the parameter, so automation, a morph or a turn of the knob in Live move it too.
 - Slide past either end and the value stays at that end. Your finger can go on over the Global column or the snapshots without pressing them, until you lift it.
 - One touch is one undo, however many rows you move at once.

@@ -95,7 +95,7 @@ def test_press_alone_writes_nothing():
     state, actions = press(5, 3)
     assert actions == []
     (touch,) = state.fader_touches
-    assert (touch.pad, touch.column, touch.first, touch.last) == (3, 5, 2, 10)
+    assert (touch.pad, touch.column, touch.first, touch.last) == (3, 5, 2, 9)
     assert touch.name == "Macro 3"
 
 
@@ -189,17 +189,18 @@ def test_release_under_shift_still_ends_the_touch():
 
 
 def test_a_slide_off_the_fader_keeps_the_touch_and_its_release_ends_it():
-    state, _, _ = x(touched(10, 3), 10, 3, centre(10))
-    state, owned = faders.slide(state, SlideMoved(3, 10, 11))
+    # Past the last pad's centre: the fader is at its top.
+    state, _, _ = x(touched(9, 3), 9, 3, centre(9) + X_COLUMN_WIDTH / 4)
+    state, owned = faders.slide(state, SlideMoved(3, 9, 10))
     assert owned
-    assert state.fader_touches[0].column == 11
-    state, actions, _ = x(state, 11, 3, centre(11))
+    assert state.fader_touches[0].column == 10
+    state, actions, _ = x(state, 10, 3, centre(10))
     assert actions == []  # still 1: nothing new to write
     # Back over the fader: it writes again from where the finger is.
-    state, actions, _ = x(state, 11, 3, centre(9))
+    state, actions, _ = x(state, 10, 3, centre(8))
     (write,) = actions
-    assert write.value == pytest.approx(127.0 * 7 / 8, abs=0.1)
-    state, actions = press(11, 3, False, state=state)
+    assert write.value == pytest.approx(127.0 * 6 / 7, abs=0.1)
+    state, actions = press(10, 3, False, state=state)
     assert state.fader_touches == ()
     assert actions == [EndUndoStep()]
 
@@ -221,7 +222,7 @@ def test_a_slide_from_another_column_is_not_owned():
 def test_fx_modes_fader_columns_go_to_the_faders():
     state, actions = session.handle(FX_ON, PadPress(2, 1, True), SNAP)
     assert state.fader_touches[0].column == 2 and actions == []
-    state, _ = session.handle(FX_ON, PadPress(10, 8, True), SNAP)
+    state, _ = session.handle(FX_ON, PadPress(9, 8, True), SNAP)
     assert state.fader_touches[0].pad == 8
 
 
@@ -232,12 +233,12 @@ def test_fx_modes_slots_and_bars_are_unchanged():
     assert state.fx_length == 1
 
 
-def test_a_slide_onto_a_slot_ends_on_its_release_and_touches_no_snapshot():
-    state, _ = session.handle(FX_ON, PadPress(10, 3, True), SNAP)
-    state, _, _ = x(state, 10, 3, centre(10))
-    state, actions = engine.slide(state, SlideMoved(3, 10, 11), SNAP)
+def test_a_slide_onto_the_panel_ends_on_its_release_and_touches_no_snapshot():
+    state, _ = session.handle(FX_ON, PadPress(9, 3, True), SNAP)
+    state, _, _ = x(state, 9, 3, centre(9))
+    state, actions = engine.slide(state, SlideMoved(3, 9, 10), SNAP)
     assert actions == []
-    state, actions = session.handle(state, PadPress(11, 3, False), SNAP)
+    state, actions = session.handle(state, PadPress(10, 3, False), SNAP)
     assert state.fader_touches == () and not state.fader_undo_open
     assert actions == [EndUndoStep()]
 
@@ -358,14 +359,14 @@ def test_render_alternates_colours_and_lights_from_the_left():
     views = tuple(FaderView("P", value, 0.0, 9.0) for value in (0, 9, 4.5, 0, 0, 0, 0, 0))
     frame = faders.render(FX_ON, replace(SNAP, faders=views))
     assert [frame[(c, 1)] for c in range(2, 4)] == [Light(MAGENTA), Light(OFF)]
-    assert all(frame[(c, 2)] == Light(BLUE) for c in range(2, 11))
-    assert [frame[(c, 3)] for c in range(2, 11)].count(Light(MAGENTA)) == 5
+    assert all(frame[(c, 2)] == Light(BLUE) for c in range(2, 10))
+    assert [frame[(c, 3)] for c in range(2, 10)].count(Light(MAGENTA)) == 5
 
 
 def test_render_follows_the_finger_while_touched():
-    state, _, _ = x(touched(), 5, 3, centre(10))
+    state, _, _ = x(touched(), 5, 3, centre(9))
     frame = faders.render(state, SNAP)
-    assert all(frame[(c, 3)] == Light(MAGENTA) for c in range(2, 11))
+    assert all(frame[(c, 3)] == Light(MAGENTA) for c in range(2, 10))
 
 
 def test_render_dark_rows():

@@ -243,9 +243,9 @@ def test_length_pad_held(key, bars):
 
 
 def test_length_release_keeps_a_newer_length():
-    state, _ = handle(FX, (14, 1))
-    state, _ = handle(state, (14, 3))
-    state, _ = handle(state, (14, 1), pressed=False)
+    state, _ = handle(FX, (10, 1))
+    state, _ = handle(state, (10, 3))
+    state, _ = handle(state, (10, 1), pressed=False)
     assert state.fx_length == 4
 
 
@@ -303,7 +303,7 @@ def test_slot_numbers():
     assert handle(FX, (12, 8))[1] == [StoreFxSnapshot(15)]
 
 
-@pytest.mark.parametrize("key", [(2, 1), (13, 7), (13, 8), (2, 8), (14, 6), (14, 8)])
+@pytest.mark.parametrize("key", [(2, 1), (10, 6), (10, 8), (2, 8), (14, 7), (14, 8)])
 def test_other_grid_pads_do_nothing(key):
     assert handle(FX, key) == (FX, [])
     assert handle(FX, key, pressed=False) == (FX, [])
@@ -780,8 +780,8 @@ def test_render_slots_and_lengths():
     assert frame[layout.FX.slots[9]] == Light(CYAN, Blink.TEMPO)
     assert frame[layout.FX.slots[5]] == Light(CYAN, Blink.FAST)
     assert frame[layout.FX.slots[1]] == Light(OFF)
-    assert frame[(14, 3)] == Light(WHITE, Blink.FAST)
-    for key in ((14, 1), (14, 2), (14, 4), (14, 5)):
+    assert frame[(10, 3)] == Light(WHITE, Blink.FAST)
+    for key in ((10, 1), (10, 2), (10, 4), (10, 5)):
         assert frame[key] == Light(WHITE)
     lit = {key for key, light in frame.items() if light != Light(OFF)}
     assert lit == {layout.FX.slots[i] for i in (0, 5, 9)} | set(layout.FX.bars)
@@ -796,9 +796,9 @@ def test_render_scoped_slots_pink():
     assert frame[layout.FX.slots[5]] == Light(PINK, Blink.FAST)
 
 
-def test_render_column_13_is_dark_with_no_scene_snapshots():
+def test_render_column_14_is_dark_with_no_scene_snapshots():
     frame = fx.render(with_slot(FX, 2), SNAP)
-    assert all(frame[(13, pad)] == Light(OFF) for pad in range(1, layout.ROWS + 1))
+    assert all(frame[(14, pad)] == Light(OFF) for pad in range(1, layout.ROWS + 1))
 
 
 def test_render_landed_slot_that_was_cleared_is_dark():
@@ -969,7 +969,7 @@ def test_render_scene_snapshots():
     assert frame[keys[1]] == Light(OFF)
     assert frame[keys[2]] == Light(LIME, Blink.TEMPO)
     assert frame[keys[4]] == Light(LIME, Blink.FAST)
-    assert frame[(13, 7)] == frame[(13, 8)] == Light(OFF)
+    assert frame[(14, 7)] == frame[(14, 8)] == Light(OFF)
 
 
 def test_a_scene_morph_does_not_blink_the_global_slot_with_its_number():
@@ -1369,13 +1369,13 @@ MIXER_PANEL = State(mixer=True, mixer_split=True, split_snapshots=True)
 
 
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
-def test_the_panel_is_fx_modes_columns_11_to_14(state):
+def test_the_panel_is_fx_modes_columns_10_to_14(state):
     assert handle(state, SLOT_3) == (state, [StoreFxSnapshot(2)])
     assert handle(state, SCENE_2, snapshot=SCENES) == (state, [StoreFxSnapshot(1, scene=True)])
-    assert handle(state, (10, 3)) == (state, [])
-    held, _ = handle(state, (14, 3))
+    assert handle(state, (10, 7)) == (state, [])
+    held, _ = handle(state, (10, 3))
     assert held.fx_length == 4
-    assert handle(held, (14, 3), pressed=False)[0] == state
+    assert handle(held, (10, 3), pressed=False)[0] == state
 
 
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
@@ -1455,12 +1455,12 @@ def test_a_timed_launch_from_the_panel():
 
 
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
-def test_the_panel_renders_as_fx_mode_with_column_10_dark(state):
+def test_the_panel_renders_as_fx_mode_with_its_free_pads_dark(state):
     state = with_slot(state, 2)
     frame = session.render(state, SCENES)
     assert frame[SLOT_3] == Light(CYAN)
-    assert frame[(14, 1)] == Light(WHITE)
-    assert all(frame[(10, pad)] == Light(OFF) for pad in range(1, 9))
+    assert frame[(10, 1)] == Light(WHITE)
+    assert all(frame[(10, pad)] == Light(OFF) for pad in range(6, 9))
 
 
 def test_leaving_a_split_view_lets_go_of_a_held_length():
@@ -1471,11 +1471,11 @@ def test_leaving_a_split_view_lets_go_of_a_held_length():
 
 
 def test_snapshot_buttons_move_to_free_pads(monkeypatch):
-    # Slot 1 to column 13's unused pad 7, and the 1-bar pad to column 14's pad 6.
+    # Slot 1 to column 14's unused pad 7, and the 1-bar pad to column 10's pad 6.
     slots = list(layout.FX.slots)
-    slots[0] = (13, 7)
+    slots[0] = (14, 7)
     monkeypatch.setattr(layout.FX, "slots", tuple(slots))
-    monkeypatch.setattr(layout.FX, "bars", {(14, 6) if bars == 1 else key: bars for key, bars in layout.FX.bars.items()})
-    assert handle(FX, (13, 7)) == (FX, [StoreFxSnapshot(0)])
+    monkeypatch.setattr(layout.FX, "bars", {(10, 6) if bars == 1 else key: bars for key, bars in layout.FX.bars.items()})
+    assert handle(FX, (14, 7)) == (FX, [StoreFxSnapshot(0)])
     assert handle(FX, (11, 1)) == (FX, [])
-    assert handle(FX, (14, 6))[0].fx_length == 1
+    assert handle(FX, (10, 6))[0].fx_length == 1

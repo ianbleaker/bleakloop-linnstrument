@@ -315,67 +315,67 @@ does = "slots"
 value = 16
 
 [fx.scene_slot_1]
-pad = [13, 1]
+pad = [14, 1]
 does = "scene_slots"
 value = 1
 label = "Scene 1"
 
 [fx.scene_slot_2]
-pad = [13, 2]
+pad = [14, 2]
 does = "scene_slots"
 value = 2
 label = "Scene 2"
 
 [fx.scene_slot_3]
-pad = [13, 3]
+pad = [14, 3]
 does = "scene_slots"
 value = 3
 label = "Scene 3"
 
 [fx.scene_slot_4]
-pad = [13, 4]
+pad = [14, 4]
 does = "scene_slots"
 value = 4
 label = "Scene 4"
 
 [fx.scene_slot_5]
-pad = [13, 5]
+pad = [14, 5]
 does = "scene_slots"
 value = 5
 label = "Scene 5"
 
 [fx.scene_slot_6]
-pad = [13, 6]
+pad = [14, 6]
 does = "scene_slots"
 value = 6
 label = "Scene 6"
 
 [fx.bars_1]
-pad = [14, 1]
+pad = [10, 1]
 does = "bars"
 value = 1
 label = "1 bar"
 
 [fx.bars_2]
-pad = [14, 2]
+pad = [10, 2]
 does = "bars"
 value = 2
 label = "2 bars"
 
 [fx.bars_4]
-pad = [14, 3]
+pad = [10, 3]
 does = "bars"
 value = 4
 label = "4 bars"
 
 [fx.bars_8]
-pad = [14, 4]
+pad = [10, 4]
 does = "bars"
 value = 8
 label = "8 bars"
 
 [fx.bars_16]
-pad = [14, 5]
+pad = [10, 5]
 does = "bars"
 value = 16
 label = "16 bars"

@@ -23,7 +23,7 @@ MUTE_ROW = 7
 SELECT_ROW = 8
 
 # FX Mode: one horizontal fader per pad row.
-FX_FADER_COLUMNS = range(2, 11)
+FX_FADER_COLUMNS = range(2, 10)
 # The FX snapshot slot count: buttons.toml lists this many slots buttons.
 FX_SLOTS = 16
 

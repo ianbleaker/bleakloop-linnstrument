@@ -97,6 +97,11 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 
 | Pad | Label | Function | Message | Outcomes | Refusals | Shown |
 |---|---|---|---|---|---|---|
+| 10/1 | 1 bar | `bars` 1 | Bars: {bars}, press a snapshot or scene |  |  | yes |
+| 10/2 | 2 bars | `bars` 2 | Bars: {bars}, press a snapshot or scene |  |  | yes |
+| 10/3 | 4 bars | `bars` 4 | Bars: {bars}, press a snapshot or scene |  |  | yes |
+| 10/4 | 8 bars | `bars` 8 | Bars: {bars}, press a snapshot or scene |  |  | yes |
+| 10/5 | 16 bars | `bars` 16 | Bars: {bars}, press a snapshot or scene |  |  | yes |
 | 11/1 | slots | `slots` 1 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
 | 11/2 | slots | `slots` 2 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
 | 11/3 | slots | `slots` 3 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
@@ -113,17 +118,12 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 | 12/6 | slots | `slots` 14 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
 | 12/7 | slots | `slots` 15 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
 | 12/8 | slots | `slots` 16 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
-| 13/1 | Scene 1 | `scene_slots` 1 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
-| 13/2 | Scene 2 | `scene_slots` 2 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
-| 13/3 | Scene 3 | `scene_slots` 3 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
-| 13/4 | Scene 4 | `scene_slots` 4 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
-| 13/5 | Scene 5 | `scene_slots` 5 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
-| 13/6 | Scene 6 | `scene_slots` 6 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
-| 14/1 | 1 bar | `bars` 1 | Bars: {bars}, press a snapshot or scene |  |  | yes |
-| 14/2 | 2 bars | `bars` 2 | Bars: {bars}, press a snapshot or scene |  |  | yes |
-| 14/3 | 4 bars | `bars` 4 | Bars: {bars}, press a snapshot or scene |  |  | yes |
-| 14/4 | 8 bars | `bars` 8 | Bars: {bars}, press a snapshot or scene |  |  | yes |
-| 14/5 | 16 bars | `bars` 16 | Bars: {bars}, press a snapshot or scene |  |  | yes |
+| 14/1 | Scene 1 | `scene_slots` 1 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
+| 14/2 | Scene 2 | `scene_slots` 2 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
+| 14/3 | Scene 3 | `scene_slots` 3 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
+| 14/4 | Scene 4 | `scene_slots` 4 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
+| 14/5 | Scene 5 | `scene_slots` 5 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
+| 14/6 | Scene 6 | `scene_slots` 6 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
 
 ## Global column: Linnstrument Mode
 

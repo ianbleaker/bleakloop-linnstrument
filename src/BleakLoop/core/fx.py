@@ -224,7 +224,7 @@ def _landed(state, slot, scene):
 
 
 def panel_visible(state):
-    # Session or Mixer Mode's split view shows the snapshots in columns 11-14.
+    # Session or Mixer Mode's split view shows the snapshots in columns 10-14.
     return state.mode is Mode.SESSION and faders.split_view(state) and state.split_snapshots
 
 
@@ -277,7 +277,7 @@ def _slot(state, snapshot, slot):
     "scene_slots", light=lambda state, snapshot, row: _scene_slot_light(state, snapshot, row - 1)
 )
 def _scene_slot(state, snapshot, row):
-    # Column 13 follows the scene pads.
+    # Column 14 follows the scene pads.
     scene = state.window.scene + row - 1
     if scene < snapshot.scene_count:
         return _slot_press(state, scene, True, snapshot)

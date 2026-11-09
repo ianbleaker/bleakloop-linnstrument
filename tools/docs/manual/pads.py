@@ -261,7 +261,7 @@ _FX = (
     _group("Bars", "fx", "bars"),
 )
 
-# The split views' snapshot panel: FX Mode's columns 11-14, column 10 dark.
+# The split views' snapshot panel: FX Mode's columns 10-14.
 _SNAPSHOT_PANEL = _FX[1:]
 
 _SPLIT_SNAPSHOTS = (
