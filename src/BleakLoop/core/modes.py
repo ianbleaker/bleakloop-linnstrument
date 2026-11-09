@@ -164,6 +164,15 @@ class SlotHold:
     wrote: bool = False  # the slide has written: a running morph is cancelled
     dropped: frozenset = frozenset()  # keys taken out of this slide
     bound: bool = False  # a bound slot: BoundRead per parameter, and a slide both ways
+    punch: bool = False  # Device/Clip + the slot: it lands at once, and returns on the lift
+
+
+@dataclass(frozen=True)
+class PunchReturn:
+    # A punch's lift, ramping its parameters back: MorphMacro per parameter, start its value at
+    # the lift and target its value at the press.
+    macros: tuple
+    started_at: float | None = None  # the first tick's time, None until it stamps
 
 
 @dataclass(frozen=True)
@@ -256,6 +265,7 @@ class State:
     fx_slide_params: tuple = ()  # SlideParam per parameter a held slide has written
     fx_slide_undo_open: bool = False  # held slides' shared undo step is open in Live
     fx_slide_count: int = 0  # counts slides as they start, for SlotHold.order
+    fx_returns: tuple = ()  # PunchReturn per lifted punch still ramping back
     fx_bind_hold: BindHold | None = None  # Shift + a slot, held
     # The Undo pad's bind history: (slot, locator, punch-in value, fx.ADDED/REMOVED/UPDATED)
     # per bind, removal or update, newest last;
