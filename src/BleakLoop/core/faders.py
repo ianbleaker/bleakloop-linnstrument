@@ -200,11 +200,22 @@ def slide(state, event):
 
 
 def reset(state):
-    # The faders stop showing: drop the touches and close an open undo step.
-    state = replace(state, fader_touches=())
-    if not state.fader_undo_open:
-        return state, []
-    return replace(state, fader_undo_open=False), [EndUndoStep()]
+    # The faders stop showing, or the layer under a held snapshot slot changes: drop the
+    # touches and the slot holds, and close their undo steps. A slide's values stay.
+    actions = []
+    if state.fader_undo_open:
+        actions.append(EndUndoStep())
+    if state.fx_slide_undo_open:
+        actions.append(EndUndoStep())
+    state = replace(
+        state,
+        fader_touches=(),
+        fader_undo_open=False,
+        fx_holds=(),
+        fx_slide_params=(),
+        fx_slide_undo_open=False,
+    )
+    return state, actions
 
 
 def render(state, snapshot):

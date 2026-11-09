@@ -39,11 +39,13 @@ def y_axis(state, event):
 
 
 def x_rows(state):
-    # The device rows that want X and slide mode: every row while the faders show, and in
-    # Sequencer Mode the rows holding a step.
+    # The device rows that want X and slide mode: every row while the faders show, the rows
+    # holding a snapshot slot, and in Sequencer Mode the rows holding a step.
     if state.mode is Mode.SEQUENCER:
         return sequencer.x_rows(state)
-    return tuple(range(layout.ROWS)) if faders.visible(state) else ()
+    if faders.visible(state):
+        return tuple(range(layout.ROWS))
+    return tuple(sorted({layout.device_row(hold.pad) for hold in state.fx_holds}))
 
 
 def x_axis(state, event):
@@ -52,6 +54,8 @@ def x_axis(state, event):
         return sequencer.x_axis(state, event)
     if state.mode is not Mode.SESSION:
         return state, [], False
+    if fx.holding(state, event):
+        return fx.x_axis(state, event)
     return faders.x_axis(state, event)
 
 
@@ -60,7 +64,10 @@ def slide(state, event, snapshot):
     if state.mode is Mode.SEQUENCER:
         state, owned = sequencer.slide(state, event)
     else:
-        state, owned = faders.slide(state, event)
+        # A held slot's finger owns its slide over any pad, both ways: nothing it crosses fires.
+        state, owned = fx.slide(state, event)
+        if not owned:
+            state, owned = faders.slide(state, event)
     if owned:
         return state, []
     return handle(state, PadPress(event.from_column, event.pad, False), snapshot)

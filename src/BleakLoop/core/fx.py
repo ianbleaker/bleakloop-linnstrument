@@ -18,7 +18,7 @@ from .model import (
     StoreFxSnapshot,
 )
 from .modes import FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
-from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE
+from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, X_COLUMN_WIDTH
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
 SLIDE_COLUMNS = 4
@@ -335,6 +335,44 @@ def release(state, event, snapshot):
     if hold.slid:
         return _end_slide(state, hold)
     return _tap(state, hold)
+
+
+def slide(state, event):
+    # The hold follows its finger into any column; whether a hold owns the slide.
+    hold = _held(state, event.pad, event.from_column)
+    if hold is None:
+        return state, False
+    return _put_hold(state, hold, replace(hold, column=event.to_column)), True
+
+
+def x_axis(state, event):
+    # An X report on a held slot's finger: the first sets the zero, a quarter column either way
+    # makes it a slide, and a slide blends by how far right it is, 4 columns to 100%.
+    hold = _held(state, event.pad, event.column)
+    if hold.x0 is None:
+        return _put_hold(state, hold, replace(hold, x0=event.value)), [], False
+    columns = (event.value - hold.x0) / X_COLUMN_WIDTH
+    new = hold
+    if not hold.slid:
+        if abs(columns) < SLIDE_START:
+            return state, [], False
+        count = state.fx_slide_count + 1
+        state = replace(state, fx_slide_count=count)
+        new = replace(new, slid=True, order=count)
+    new = replace(new, f=min(max(columns / SLIDE_COLUMNS, 0.0), 1.0))
+    if new == hold:
+        return state, [], False
+    state = _put_hold(state, hold, new)
+    redraw = not hold.slid or meter(hold.f) != meter(new.f)
+    if new.read is None or (hold.slid and new.f == hold.f):
+        return state, [], redraw
+    state, actions = _blend(state, new)
+    return state, actions, redraw
+
+
+def meter(f):
+    # The meter's lit pads past the slot: one per 25%, the first as soon as f is above 0.
+    return sum(f > k / SLIDE_COLUMNS for k in range(SLIDE_COLUMNS))
 
 
 def _hold_read(state, event, snapshot):

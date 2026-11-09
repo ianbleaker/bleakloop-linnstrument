@@ -197,8 +197,10 @@ def toggle_fader_source(state):
     # snapshots: Device FX -> Mapped FX -> FX snapshots -> Device FX.
     panel = state.mode is Mode.SESSION and not state.fx
     if state.split_snapshots and panel:
+        # The snapshots stop showing: a held slot lets go.
+        state, actions = faders.reset(state)
         state = replace(state, split_snapshots=False, fader_source="device", fx_length=None)
-        return state, buttons.say("fader_source", "device")
+        return state, actions + buttons.say("fader_source", "device")
     if state.fader_source == "mapped" and panel:
         # The faders stop showing.
         state, actions = faders.reset(state)

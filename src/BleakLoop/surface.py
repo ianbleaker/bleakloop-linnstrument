@@ -684,11 +684,13 @@ class BleakLoop(ControlSurface):
         rows = engine.x_rows(self._state)
         if rows == self._x_rows:
             return
+        before = self._x_rows
         self._send(device.x_rows(rows))
         self._x_rows = rows
         if mode is Mode.SESSION:
             # A Sequencer hold keeps its transfer state: its slide continues on the new row set.
-            self._slides.reset()
+            # A held snapshot slot keeps its row's too, as the split view adds and drops rows.
+            self._slides.reset(None if before is None else set(before) - set(rows))
 
     def _listen_for(self, mode):
         self._remove_listeners()

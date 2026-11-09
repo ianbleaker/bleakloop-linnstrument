@@ -6,6 +6,9 @@ import pytest
 from BleakLoop.core import engine, fx, layout, session
 from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
+    FaderView,
+    SlideMoved,
+    XAxis,
     BeginUndoStep,
     EndUndoStep,
     FireScene,
@@ -26,7 +29,7 @@ from BleakLoop.core.model import (
     TrackView,
 )
 from BleakLoop.core.modes import FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
-from BleakLoop.core.values import FX_TOUCH_TOLERANCE
+from BleakLoop.core.values import FX_TOUCH_TOLERANCE, X_COLUMN_WIDTH
 
 
 def rack(track, name, *values, path=("track", 0, 0)):
@@ -976,6 +979,107 @@ def test_a_tap_cancels_a_running_morph_and_closes_its_step():
     state, actions = lift(state)
     assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
     assert state.morph is None and not state.fx_undo_open
+
+
+# Held slots: X and capture (B4)
+
+ROW = SLOT_3[1]
+
+
+def centre(column):
+    return X_COLUMN_WIDTH * (column - 0.5)
+
+
+def x(state, column, value, pad=ROW):
+    return engine.x_axis(state, XAxis(column, pad, round(value)))
+
+
+def slide_to(state, *columns, pad=ROW):
+    # The finger crosses each column in turn; every slide's actions.
+    actions = []
+    for to in columns:
+        (hold,) = [h for h in state.fx_holds if h.pad == pad]
+        state, more = engine.slide(state, SlideMoved(pad, hold.column, to), SNAP)
+        actions += more
+    return state, actions
+
+
+def holding_read(state=AB):
+    state, _ = handle(state, SLOT_3)
+    state, _ = hold_read(state)
+    return state
+
+
+def test_the_first_x_sets_the_zero():
+    state, actions, _ = x(holding_read(), 11, centre(11))
+    assert actions == [] and state.fx_holds[0].x0 == round(centre(11))
+
+
+def test_a_slide_right_over_the_panel_and_back_fires_nothing_and_ends_where_it_lifts():
+    state, _, _ = x(holding_read(), 11, centre(11))
+    state, actions = slide_to(state, 12, 13, 14, 15, 16)
+    assert actions == [] and state.fx_holds[0].column == 16
+    state, actions = slide_to(state, 15, 14, 13, 12, 11, 10)
+    assert actions == [] and state.fx_holds[0].column == 10
+    # A release where the finger started isn't the hold's: the finger is on column 10.
+    assert lift(state, (11, ROW)) == (state, [])
+    state, _, _ = x(state, 10, centre(10))
+    state, actions = lift(state, (10, ROW))
+    assert state.fx_holds == () and actions[-1] == ShowMessage("Snapshot 3 at 0%")
+
+
+def test_a_release_at_column_16_ends_the_hold():
+    state, _, _ = x(holding_read(), 11, centre(11))
+    state, _ = slide_to(state, 12, 13, 14, 15, 16)
+    state, _, _ = x(state, 16, centre(16))
+    state, actions = lift(state, (16, ROW))
+    assert state.fx_holds == () and actions[-1] == ShowMessage("Snapshot 3 at 100%")
+
+
+def test_a_sub_threshold_wobble_across_a_cell_edge_still_taps():
+    edge = X_COLUMN_WIDTH * 11 - 10
+    state, _, _ = x(holding_read(), 11, edge)
+    state, actions = slide_to(state, 12)
+    assert actions == []
+    state, actions, _ = x(state, 12, edge + 0.2 * X_COLUMN_WIDTH)
+    assert actions == [] and not state.fx_holds[0].slid
+    state, actions = lift(state, (12, ROW))
+    assert actions[-1] == ShowMessage("Snapshot 3 recalled")
+
+
+def test_a_quarter_column_left_is_a_slide_at_0():
+    state, _, _ = x(holding_read(), 11, centre(11))
+    state, _, redraw = x(state, 11, centre(11) - 0.3 * X_COLUMN_WIDTH)
+    assert state.fx_holds[0].slid and state.fx_holds[0].f == 0.0 and redraw
+    state, actions = lift(state, (11, ROW))
+    assert actions[-1] == ShowMessage("Snapshot 3 at 0%")
+
+
+def test_x_from_another_finger_on_the_row_is_not_the_holds():
+    state, _, _ = x(holding_read(), 11, centre(11))
+    assert not fx.holding(state, XAxis(14, ROW, 0))
+
+
+def test_a_held_slots_row_wants_x_in_the_split_view():
+    state, _ = handle(with_slot(PANEL, 2, STORED_AB), SLOT_3)
+    assert engine.x_rows(PANEL) == ()
+    assert engine.x_rows(state) == (layout.device_row(ROW),)
+
+
+def test_leaving_fx_mode_mid_slide_drops_the_hold_and_closes_the_step():
+    state, _, _ = x(holding_read(), 11, centre(11))
+    state, _, _ = x(state, 11, centre(12))
+    assert state.fx_slide_undo_open
+    state, actions = handle(state, layout.NAVIGATION.fx)
+    assert state.fx_holds == () and state.fx_slide_params == () and not state.fx_slide_undo_open
+    assert actions.count(EndUndoStep()) == 1
+    # Back in FX Mode, a fader touch opens its own step.
+    state, _ = handle(state, layout.NAVIGATION.fx)
+    view = FaderView("Macro 1", 0.0, 0.0, 127.0)
+    faders_snap = replace(SNAP, faders=(view,) * 8)
+    state, _ = session.handle(state, PadPress(5, 1, True), faders_snap)
+    _, actions, _ = engine.x_axis(state, XAxis(5, 1, round(centre(7))))
+    assert actions[0] == BeginUndoStep()
 
 
 # Render

@@ -427,10 +427,16 @@ class SlideDecoder:
     def __init__(self):
         self.reset()
 
-    def reset(self):
-        self._lsb = {}  # (row, column) -> the latest X LSB
-        self._armed = {}  # row -> the source column of a transfer, until its target's Note On
-        self._swallow = set()  # (row, column): a transfer's source release, still to come
+    def reset(self, rows=None):
+        # Every row, or only those given: the others' slides carry on.
+        if rows is None:
+            self._lsb = {}  # (row, column) -> the latest X LSB
+            self._armed = {}  # row -> the source column of a transfer, until its target's Note On
+            self._swallow = set()  # (row, column): a transfer's source release, still to come
+            return
+        self._lsb = {key: value for key, value in self._lsb.items() if key[0] not in rows}
+        self._armed = {row: column for row, column in self._armed.items() if row not in rows}
+        self._swallow = {key for key in self._swallow if key[0] not in rows}
 
     def x_lsb(self, row, column, value):
         # The LSB comes first; the MSB completes the report.
