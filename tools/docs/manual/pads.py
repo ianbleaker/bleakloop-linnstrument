@@ -254,7 +254,8 @@ _FX = (
         range(layout.FX.slots[0][0], layout.FX.slots[-1][0] + 1),
         ALL_PADS,
         f"Sixteen snapshots of every rack's macros: slots {positions.runs('fx.slots')}. "
-        "Press an empty slot to store, a stored one to recall.",
+        "Press an empty slot to store, a stored one to recall. Shift + an empty slot stores "
+        "the selected rack alone, in pink.",
     ),
     _group("Scene snapshots", "fx", "scene_slots"),
     _group("Bars", "fx", "bars"),
@@ -376,7 +377,7 @@ SECTIONS = {
     "mixer-split": _MIXER_SPLIT,
     "mixer-split-shift": _MIXER_SPLIT_SHIFT,
     "fx": _FX,
-    "fx-shift": (),  # the grid is dark under Shift
+    "fx-shift": _FX,  # the grid works as without Shift
     "device-clip": _DEVICE_CLIP,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,

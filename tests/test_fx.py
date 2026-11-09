@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from BleakLoop.core import engine, fx, layout, session
-from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, WHITE, YELLOW, Blink, Light
+from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
     BeginUndoStep,
     EndUndoStep,
@@ -62,19 +62,44 @@ def test_capture():
 def test_dump_parse_round_trip():
     slots = (None,) * 2 + ((FxRack("A", "R", 0, (0.5, 1.0)), FxRack("A", "R", 1, ())),)
     slots += (None,) * 13
-    text = fx.dump(slots)
+    text = fx.dump(slots, frozenset())
     assert json.loads(text)["v"] == 1
-    assert fx.parse(text) == slots
+    assert fx.parse(text) == (slots, frozenset())
+
+
+def test_scoped_round_trip():
+    stored = (FxRack("A", "R", 0, (0.5,)),)
+    slots = (stored, None, stored) + (None,) * 13
+    text = fx.dump(slots, frozenset({2}))
+    assert json.loads(text)["scoped"] == [2]
+    assert fx.parse(text) == (slots, frozenset({2}))
+
+
+def test_a_store_without_scoped_parses_as_before():
+    # v1 text from a build before scoped snapshots.
+    slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 15
+    text = json.dumps({"v": 1, "slots": json.loads(fx.dump(slots, frozenset()))["slots"]})
+    assert fx.parse(text) == (slots, frozenset())
+
+
+@pytest.mark.parametrize(
+    "scoped", ['"x"', "null", "{}", '[1, "0", true, -1, 16, 0.0, 0]', "[3]"]
+)
+def test_bad_scoped_entries_are_dropped(scoped):
+    # Only 0 is a stored slot: anything else, or a non-list, leaves every slot Set-wide.
+    slots = '[[{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]' + ",null" * 15 + "]"
+    expected = frozenset({0}) if scoped.endswith(", 0]") else frozenset()
+    assert fx.parse(f'{{"v": 1, "slots": {slots}, "scoped": {scoped}}}')[1] == expected
 
 
 def test_an_all_empty_store_round_trips():
-    text = fx.dump((None,) * 16)
-    assert fx.dump(fx.parse(text)) == text
+    text = fx.dump((None,) * 16, frozenset())
+    assert fx.dump(*fx.parse(text)) == text
 
 
 def test_dump_format():
     slots = ((FxRack("A", "R", 0, (0.5,)),),) + (None,) * 15
-    assert json.loads(fx.dump(slots)) == {
+    assert json.loads(fx.dump(slots, frozenset())) == {
         "v": 1,
         "slots": [[{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]] + [None] * 15,
     }
@@ -97,7 +122,7 @@ def test_dump_format():
     ],
 )
 def test_invalid_store_gives_empty_slots(text):
-    assert fx.parse(text) == (None,) * 16
+    assert fx.parse(text) == ((None,) * 16, frozenset())
 
 
 def test_scene_store_round_trip():
@@ -250,7 +275,20 @@ def test_delete_clears_a_full_slot():
     state = with_slot(replace(FX, delete=True), 2)
     state, actions = handle(state, SLOT_3)
     assert state.fx_slots == (None,) * 16
-    assert actions == [SaveFxSnapshots(fx.dump((None,) * 16)), ShowMessage("Snapshot 3 cleared")]
+    assert actions == [SaveFxSnapshots(fx.dump((None,) * 16, frozenset())), ShowMessage("Snapshot 3 cleared")]
+
+
+def test_delete_unscopes_a_scoped_slot():
+    state = replace(with_slot(replace(FX, delete=True), 2), fx_scoped=frozenset({2, 5}))
+    state, actions = handle(state, SLOT_3)
+    assert state.fx_scoped == frozenset({5})
+    assert actions[0] == SaveFxSnapshots(fx.dump((None,) * 16, frozenset({5})))
+
+
+def test_a_set_wide_store_unscopes_the_slot():
+    state = replace(with_slot(FX, 2), fx_scoped=frozenset({2}))
+    state, _ = racks_read(state, 2, (rack("A", "R", 1.0, path=P0),))
+    assert state.fx_scoped == frozenset()
 
 
 def test_delete_on_an_empty_slot_does_nothing():
@@ -273,11 +311,6 @@ def test_other_grid_pads_do_nothing(key):
 
 def test_slot_release_does_nothing():
     assert handle(FX, SLOT_3, pressed=False) == (FX, [])
-
-
-def test_shift_slot_does_nothing():
-    state = replace(FX, shift=True)
-    assert handle(state, SLOT_3) == (state, [])
 
 
 def test_copy_message_in_fx():
@@ -322,7 +355,7 @@ def test_store(state):
     state, actions = racks_read(state, 2, racks)
     slots = (None, None, fx.capture(racks)) + (None,) * 13
     assert state.fx_slots == slots
-    assert actions == [SaveFxSnapshots(fx.dump(slots)), ShowMessage("Snapshot 3 stored (2 racks)")]
+    assert actions == [SaveFxSnapshots(fx.dump(slots, frozenset())), ShowMessage("Snapshot 3 stored (2 racks)")]
 
 
 STORED_AB = (FxRack("A", "R", 0, (10.0, 20.0)), FxRack("B", "R", 0, (30.0,)))
@@ -352,6 +385,60 @@ def test_recall_jumps_while_stopped_with_a_length():
     ]
     assert state.morph is None
     assert state.fx_landed == 4
+
+
+# Scoped snapshots: stored as one rack, they act on that rack alone.
+
+SCOPED_B = (FxRack("B", "R", 0, (30.0,)),)
+
+
+def scoped(state):
+    return replace(with_slot(state, 4, SCOPED_B), fx_scoped=frozenset({4}))
+
+
+def test_a_scoped_recall_writes_its_rack_only():
+    _, actions = racks_read(scoped(FX), 4, NOW_AB, recall=True)
+    assert actions[1] == SetMacros(((P1, "R", 0, 30.0),))
+    assert actions[-1] == ShowMessage("Snapshot 5 recalled")
+
+
+def test_a_scoped_recall_leaves_the_last_landed_blink():
+    state = replace(scoped(FX), fx_landed=1)
+    state, _ = racks_read(state, 4, NOW_AB, recall=True)
+    assert state.fx_landed == 1
+    assert fx.render(state, SNAP)[layout.FX.slots[4]] == Light(PINK)
+
+
+def test_a_scoped_morph_landing_leaves_the_last_landed_blink():
+    state = replace(scoped(FX), fx_landed_scene=2)
+    state, _ = racks_read(state, 4, NOW_AB, recall=True, bars=1, snapshot=playing(1.0))
+    assert state.morph is not None
+    state, _, _ = tick(state, 8.0, (0.0,))
+    assert state.morph is None
+    assert (state.fx_landed, state.fx_landed_scene) == (None, 2)
+
+
+def test_a_scoped_morph_moves_its_rack_only():
+    state, _ = racks_read(scoped(FX), 4, NOW_AB, recall=True, bars=4, snapshot=playing(1.0))
+    assert [(m.path, m.index) for m in state.morph.macros] == [(P1, 0)]
+
+
+def test_a_scoped_recall_with_its_rack_gone():
+    racks = (rack("A", "R", 0.0, 0.0, path=P0),)
+    state = scoped(FX)
+    assert racks_read(state, 4, racks, recall=True) == (
+        state,
+        [ShowMessage("Snapshot 5: nothing to recall, 1 rack not found")],
+    )
+
+
+def test_delete_clears_a_scoped_slot():
+    state, actions = handle(replace(scoped(FX), delete=True), layout.FX.slots[4])
+    assert state.fx_slots[4] is None and state.fx_scoped == frozenset()
+    assert actions == [
+        SaveFxSnapshots(fx.dump((None,) * 16, frozenset())),
+        ShowMessage("Snapshot 5 cleared"),
+    ]
 
 
 def test_recall_clamps_targets():
@@ -700,6 +787,15 @@ def test_render_slots_and_lengths():
     assert lit == {layout.FX.slots[i] for i in (0, 5, 9)} | set(layout.FX.bars)
 
 
+def test_render_scoped_slots_pink():
+    state = with_slot(with_slot(with_slot(FX, 0), 9), 5)
+    state = replace(state, fx_scoped=frozenset({0, 5, 9}), fx_landed=9, morph=Morph(5, 0.0, 16.0, 0.0))
+    frame = fx.render(state, SNAP)
+    assert frame[layout.FX.slots[0]] == Light(PINK)
+    assert frame[layout.FX.slots[9]] == Light(PINK, Blink.TEMPO)
+    assert frame[layout.FX.slots[5]] == Light(PINK, Blink.FAST)
+
+
 def test_render_column_13_is_dark_with_no_scene_snapshots():
     frame = fx.render(with_slot(FX, 2), SNAP)
     assert all(frame[(13, pad)] == Light(OFF) for pad in range(1, layout.ROWS + 1))
@@ -714,9 +810,9 @@ def test_render_morph_target_blinks_over_landed():
     assert fx.render(state, SNAP)[SLOT_3] == Light(CYAN, Blink.FAST)
 
 
-def test_render_under_shift_is_dark():
-    state = replace(with_slot(FX, 2), shift=True, fx_length=1)
-    assert set(fx.render(state, SNAP).values()) == {Light(OFF)}
+def test_render_under_shift_is_unchanged():
+    state = replace(with_slot(FX, 2), fx_length=1)
+    assert fx.render(replace(state, shift=True), SNAP) == fx.render(state, SNAP)
 
 
 def test_session_render_in_fx_mode():
@@ -737,9 +833,11 @@ def test_session_render_fx_pad_off():
 
 
 def test_session_render_shift_layer_in_fx():
-    frame = session.render(replace(with_slot(FX, 2), shift=True), SNAP)
+    state = with_slot(FX, 2)
+    frame = session.render(replace(state, shift=True), SNAP)
     assert frame[layout.NAVIGATION.fx] == Light(ORANGE)
-    assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))
+    plain = session.render(state, SNAP)
+    assert all(frame[(c, p)] == plain[(c, p)] for c in layout.GRID_COLUMNS for p in range(1, 9))
 
 
 # Scene snapshots
@@ -903,9 +1001,9 @@ def test_render_scene_snapshots_past_the_last_scene_are_dark():
     assert fx.render(state, replace(SNAP, scene_count=3))[layout.FX.scene_slots[3]] == Light(OFF)
 
 
-def test_render_scene_snapshots_under_shift_are_dark():
+def test_render_scene_snapshots_under_shift_stay_lit():
     state = replace(with_scene(FX, 0), shift=True)
-    assert fx.render(state, SCENES)[layout.FX.scene_slots[0]] == Light(OFF)
+    assert fx.render(state, SCENES)[layout.FX.scene_slots[0]] == Light(LIME)
 
 
 # Scene launch
@@ -1288,8 +1386,52 @@ def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
     assert handle(copying, SLOT_3)[1] == [StoreFxSnapshot(2)]
     deleting, _ = handle(state, layout.NAVIGATION.delete)
     assert handle(deleting, SLOT_3)[1] == [
-        SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None))),
+        SaveFxSnapshots(fx.dump(fx._put(state.fx_slots, 2, None), frozenset())),
         ShowMessage("Snapshot 3 cleared"),
+    ]
+
+
+@pytest.mark.parametrize("state", [FX, PANEL, MIXER_PANEL])
+def test_shift_and_an_empty_slot_stores_scoped(state):
+    shifted = replace(state, shift=True)
+    assert handle(shifted, SLOT_3) == (shifted, [StoreFxSnapshot(2, scoped=True)])
+
+
+def test_shift_and_a_stored_slot_or_a_scene_snapshot_does_nothing():
+    state = replace(with_slot(FX, 2), shift=True)
+    assert handle(state, SLOT_3) == (state, [])
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
+    assert handle(with_scene(state, 1), SCENE_2, snapshot=SCENES) == (with_scene(state, 1), [])
+
+
+@pytest.mark.parametrize("held", ["copy", "delete"])
+def test_copy_and_delete_come_before_shift(held):
+    state = replace(with_slot(FX, 2), shift=True, **{held: True})
+    action = handle(state, SLOT_3)[1][0]
+    assert action == StoreFxSnapshot(2) if held == "copy" else isinstance(action, SaveFxSnapshots)
+
+
+def scoped_read(state, slot, racks, selected):
+    event = RacksRead(slot, racks, False, scoped=True, selected=selected)
+    return engine.handle(state, event, SNAP)
+
+
+def test_a_scoped_store_without_a_selected_rack_refuses():
+    racks = (rack("A", "R", 1.0, path=P0),)
+    assert scoped_read(FX, 2, racks, None) == (FX, [ShowMessage("Select a rack to store Snapshot 3")])
+
+
+def test_a_scoped_store_holds_the_selected_rack_only():
+    racks = (rack("A", "R", 1.0, path=P0), rack("A", "R", 2.0, path=P1), rack("B", "S", 3.0))
+    state, actions = scoped_read(FX, 2, racks, P1)
+    # Keyed over every rack: the second "A"/"R" is n = 1.
+    stored = (FxRack("A", "R", 1, (2.0,)),)
+    assert state.fx_slots[2] == stored
+    assert state.fx_scoped == frozenset({2})
+    slots = fx._put(FX.fx_slots, 2, stored)
+    assert actions == [
+        SaveFxSnapshots(fx.dump(slots, frozenset({2}))),
+        ShowMessage("Snapshot 3 stored (R)"),
     ]
 
 

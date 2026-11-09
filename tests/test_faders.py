@@ -156,8 +156,14 @@ def test_a_recall_closes_an_open_fader_step():
     assert not state.fader_undo_open
 
 
-@pytest.mark.parametrize("held", ["shift", "stop", "copy"])
-def test_presses_ignored_while_shift_stop_or_copy_is_held(held):
+def test_a_shift_touch_sets_the_value():
+    state, _ = press(5, 3, state=replace(FX_ON, shift=True))
+    state, actions, _ = x(state, 5, 3, centre(11))
+    assert actions == [BeginUndoStep(), SetFaderParameter(2, "Macro 3", 127.0)]
+
+
+@pytest.mark.parametrize("held", ["stop", "copy"])
+def test_presses_ignored_while_stop_or_copy_is_held(held):
     state = replace(FX_ON, **{held: True})
     assert press(5, 3, state=state) == (state, [])
 
@@ -293,6 +299,23 @@ def test_split_render_draws_the_faders_in_columns_10_to_14():
     assert [frame[(c, 2)] for c in range(10, 15)] == [Light(BLUE)] + [Light(OFF)] * 4
 
 
+@pytest.mark.parametrize(
+    "state, column",
+    [(FX_ON, 5), (SPLIT, 12), (State(mixer=True, mixer_split=True), 12)],
+)
+def test_shift_leaves_the_faders_working_through_the_router(state, column):
+    state, _ = session.handle(replace(state, shift=True), PadPress(column, 4, True), SNAP)
+    (touch,) = state.fader_touches
+    assert touch.pad == 4
+
+
+def test_shift_still_darkens_mixers_volume_faders():
+    state = State(mixer=True, shift=True)
+    state, _ = session.handle(state, PadPress(5, 1, True), SNAP)
+    assert state.touches == ()
+    assert session.render(state, SNAP)[(5, 1)] == Light(OFF)
+
+
 def test_x_rows_follow_the_split_view():
     assert engine.x_rows(SPLIT) == tuple(range(8))
     assert engine.x_rows(replace(SPLIT, mixer=True)) == ()
@@ -345,10 +368,13 @@ def test_render_follows_the_finger_while_touched():
     assert all(frame[(c, 3)] == Light(MAGENTA) for c in range(2, 11))
 
 
-def test_render_dark_rows_and_dark_under_shift():
+def test_render_dark_rows():
     snapshot = replace(SNAP, faders=(None,) * 8)
     assert set(faders.render(FX_ON, snapshot).values()) == {Light(OFF)}
-    assert set(faders.render(replace(FX_ON, shift=True), SNAP).values()) == {Light(OFF)}
+
+
+def test_render_under_shift_is_unchanged():
+    assert faders.render(replace(FX_ON, shift=True), SNAP) == faders.render(FX_ON, SNAP)
 
 
 # Mapped FX: bindings

@@ -106,6 +106,7 @@ MIXER_SNAPSHOT = replace(
 _STORED = (FxRack("Drums", "FX Rack", 0, (0.0,) * 8),)
 FX_SLOTS = tuple(_STORED if slot in (0, 1, 2, 8, 9) else None for slot in range(16))
 FX_SCENES = (_STORED, None, _STORED)
+FX_SCOPED = frozenset({9})  # one rack's snapshot: pink
 
 # Device FX on an eight-macro rack, at varied values.
 FADER_VALUES = (100, 30, 64, 127, 0, 85, 45, 110)
@@ -175,7 +176,12 @@ LINNSTRUMENT_SCENES = (State(mode=Mode.LINNSTRUMENT, scene_page=True), SNAPSHOT)
 DEVICE_CLIP_HELD = (State(device_clip=True, fixed_length=2), SNAPSHOT)
 
 FX_STATE = State(
-    fx=True, fx_slots=FX_SLOTS, fx_scenes=FX_SCENES, fx_landed_scene=2, fx_length=4
+    fx=True,
+    fx_slots=FX_SLOTS,
+    fx_scoped=FX_SCOPED,
+    fx_scenes=FX_SCENES,
+    fx_landed_scene=2,
+    fx_length=4,
 )
 
 SCENES = {
@@ -188,6 +194,7 @@ SCENES = {
             split_snapshots=True,
             fader_source="mapped",
             fx_slots=FX_SLOTS,
+            fx_scoped=FX_SCOPED,
             fx_scenes=FX_SCENES,
             fx_landed_scene=2,
             fixed_length=2,

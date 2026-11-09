@@ -459,6 +459,12 @@ def test_fx_snapshot_reads_pass_scene_and_end_through(no_racks, action, event):
     assert apply(action, SimpleNamespace()) == event
 
 
+def test_a_scoped_store_reads_the_selected_rack(no_racks, monkeypatch):
+    monkeypatch.setattr(live_actions.live_state, "read_selected_rack", lambda song: ("track", 1, 0))
+    event = apply(StoreFxSnapshot(3, scoped=True), SimpleNamespace())
+    assert event == RacksRead(3, (), False, scoped=True, selected=("track", 1, 0))
+
+
 # Sequencer Mode actions
 
 

@@ -5,7 +5,7 @@ import math
 from dataclasses import replace
 
 from . import buttons, faders, functions, layout, mixer
-from .leds import CYAN, LIME, OFF, WHITE, Blink, Light
+from .leds import CYAN, LIME, OFF, PINK, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
     EndUndoStep,
@@ -44,20 +44,34 @@ def capture(racks):
     )
 
 
-def dump(slots):
-    return json.dumps({"v": 1, "slots": [_encode(slot) for slot in slots]}, separators=(",", ":"))
+def dump(slots, scoped):
+    # The scoped slots go in their own key, only when there are any: older builds ignore it,
+    # and a store without scoped slots keeps the v1 text it always had.
+    data = {"v": 1, "slots": [_encode(slot) for slot in slots]}
+    if scoped:
+        data["scoped"] = sorted(scoped)
+    return json.dumps(data, separators=(",", ":"))
 
 
 def parse(text):
-    # Anything unreadable gives empty slots: a bad store never stops the script loading.
-    empty = (None,) * layout.FX_SLOTS
+    # (slots, scoped). Anything unreadable gives empty slots: a bad store never stops the
+    # script loading. A bad "scoped" entry is dropped, leaving its slot Set-wide.
+    empty = (None,) * layout.FX_SLOTS, frozenset()
     try:
         data = json.loads(text)
         if data.get("v") != 1 or len(data["slots"]) != layout.FX_SLOTS:
             return empty
-        return tuple(_decode(slot) for slot in data["slots"])
+        slots = tuple(_decode(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):
         return empty
+    scoped = data.get("scoped")
+    if not isinstance(scoped, list):
+        return slots, frozenset()
+    return slots, frozenset(
+        i
+        for i in scoped
+        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < layout.FX_SLOTS and slots[i] is not None
+    )
 
 
 def dump_scenes(scenes):
@@ -181,8 +195,13 @@ def _set(state, slot, scene, value, scene_count):
         padded = state.fx_scenes + (None,) * (slot + 1 - len(state.fx_scenes))
         scenes = _fit(_put(padded, slot, value), scene_count)
         return replace(state, fx_scenes=scenes), SaveFxScenes(dump_scenes(scenes))
-    slots = _put(state.fx_slots, slot, value)
-    return replace(state, fx_slots=slots), SaveFxSnapshots(dump(slots))
+    # A Set-wide store or a clear leaves the slot unscoped.
+    return _save_slots(state, _put(state.fx_slots, slot, value), state.fx_scoped - {slot})
+
+
+def _save_slots(state, slots, scoped):
+    state = replace(state, fx_slots=slots, fx_scoped=frozenset(scoped))
+    return state, SaveFxSnapshots(dump(slots, state.fx_scoped))
 
 
 def _owner(scene):
@@ -195,7 +214,10 @@ def _name(slot, scene):
 
 
 def _landed(state, slot, scene):
-    # Only the last snapshot to land blinks, global or scene.
+    # Only the last Set-wide snapshot to land blinks, global or scene. A scoped one moves a
+    # single rack, so it leaves the blink where it was.
+    if not scene and slot in state.fx_scoped:
+        return state
     if scene:
         return replace(state, fx_landed=None, fx_landed_scene=slot)
     return replace(state, fx_landed=slot, fx_landed_scene=None)
@@ -235,8 +257,13 @@ def press(state, event, snapshot):
         if state.fx_length == bars:
             return replace(state, fx_length=None), []
         return state, []
-    # Under Shift the grid is dark and does nothing, as Mixer's faders.
-    if not event.pressed or state.shift:
+    if not event.pressed:
+        return state, []
+    # The Shift layer (Copy and Delete come first): an empty slot stores the selected rack
+    # alone. Scene snapshots stay Set-wide, and the other pads do nothing.
+    if state.shift and not state.copy and not state.delete:
+        if button.function == "slots" and state.fx_slots[button.value - 1] is None:
+            return state, [StoreFxSnapshot(button.value - 1, scoped=True)]
         return state, []
     return functions.press(button, state, snapshot)
 
@@ -264,11 +291,13 @@ functions.register_hold(
 
 
 def _slot_light(state, slot):
+    # Pink for one rack's snapshot, cyan for the Set's.
+    colour = PINK if slot in state.fx_scoped else CYAN
     morph = state.morph
     if morph is not None and not morph.scene and morph.slot == slot:
-        return Light(CYAN, Blink.FAST)
+        return Light(colour, Blink.FAST)
     if state.fx_slots[slot] is not None:
-        return Light(CYAN, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
+        return Light(colour, Blink.TEMPO if slot == state.fx_landed else Blink.STEADY)
     return Light(OFF)
 
 
@@ -298,16 +327,14 @@ def _slot_press(state, slot, scene, snapshot):
 
 
 def render(state, snapshot):
-    # The grid columns right of the faders in FX Mode, and the split views' snapshot panel;
-    # dark under Shift, as Mixer's faders.
+    # The grid columns right of the faders in FX Mode, and the split views' snapshot panel,
+    # lit under Shift too: the player sees what's there.
     frame = {
         (column, pad): Light(OFF)
         for column in layout.GRID_COLUMNS
         if column not in layout.FX_FADER_COLUMNS
         for pad in range(1, layout.ROWS + 1)
     }
-    if state.shift and not state.copy and not state.delete:
-        return frame
     functions.paint(frame, layout.FX.buttons(), state, snapshot)
     return frame
 
@@ -315,6 +342,8 @@ def render(state, snapshot):
 def racks_read(state, event, snapshot):
     # The adapter's rack read after a store or a recall, in any mode.
     name, owner = _name(event.slot, event.scene), _owner(event.scene)
+    if not event.recall and event.scoped:
+        return _store_scoped(state, event, name)
     if not event.recall:
         if not event.racks:
             return state, buttons.refuse(owner, "no_racks")
@@ -356,6 +385,20 @@ def racks_read(state, event, snapshot):
     timing = "on launch" if launch else f"in {_count(event.bars, 'bar')}"
     message = buttons.say(owner, "morphing", name=name, timing=timing, note=note)
     return state, actions + [BeginUndoStep(), *message]
+
+
+def _store_scoped(state, event, name):
+    # The selected rack's macros only; its key counts every rack in the Set, as a recall's do.
+    stored = tuple(
+        item
+        for item, view in zip(capture(event.racks), event.racks)
+        if event.selected is not None and view.path == event.selected
+    )
+    if not stored:
+        return state, buttons.refuse("slots", "no_rack", name=name)
+    slots = _put(state.fx_slots, event.slot, stored)
+    state, save = _save_slots(state, slots, state.fx_scoped | {event.slot})
+    return state, [save, *buttons.say("slots", "stored_scoped", name=name, rack=stored[0].rack)]
 
 
 def tick(state, transport, values, triggered=None):

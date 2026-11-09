@@ -199,6 +199,29 @@ def test_faders_of_a_device_skip_device_on_and_dark_past_its_parameters():
     assert views[1].is_quantized and views[0].macro is None
 
 
+def selected_song(device, track):
+    song = fader_song(None, [fake_track("a"), track])
+    track.view = SimpleNamespace(selected_device=device)
+    song.view = SimpleNamespace(selected_track=track)
+    return song
+
+
+def test_the_selected_rack_is_its_path():
+    track = SimpleNamespace(devices=[])
+    rack = fake_device("FX", [], rack=True, parent=track)
+    track.devices = [fake_device("Synth", []), rack]
+    assert live_state.read_selected_rack(selected_song(rack, track)) == ("track", 1, 1)
+
+
+def test_no_selected_rack():
+    track = SimpleNamespace(devices=[])
+    synth = fake_device("Synth", [], parent=track)
+    nested = fake_device("Inner", [], rack=True, parent=object())
+    track.devices = [synth]
+    for device in (None, synth, nested):
+        assert live_state.read_selected_rack(selected_song(device, track)) is None
+
+
 def test_no_selected_device_or_mapped_fx_gives_dark_faders():
     assert live_state.read_faders(fader_song(None), DEVICE_FX) == (None,) * 8
     device = fake_device("EQ", [fake_parameter("P1")])

@@ -245,7 +245,7 @@ With **Shift** held:
 
 - The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX ({pad:navigation.fx}) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to. In Session and Mixer Mode, the snapshots come third, for the split view's panel.
 - Snapshots are saved in the Set. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
-- With Shift held the grid, faders included, goes dark and ignores presses.
+- With Shift held the faders work as without it, and the snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot (see Snapshots and morphs); the other snapshot pads ignore presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
@@ -398,7 +398,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Columns 10–14 are the panel, in every row. Shift + FX steps it through Device FX, Mapped FX and the snapshots, and both split views show the same choice.
 - As faders, five pads wide, they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads.
 - As snapshots, columns 11–14 work as FX Mode's: snapshots, scene snapshots and Bars, with Copy and Delete as there. Column 10 is dark.
-- With Shift held the panel goes dark and ignores presses.
+- With Shift held the panel's faders work as without it, and its snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot; the other snapshot pads ignore presses.
 - A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
 - The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
 - FX Mode always shows 13 tracks, and so do Session and Mixer Mode without their split view; near the last track, the window moves left to fill them. Each mode keeps its own split view on or off when you leave it.
@@ -424,7 +424,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Slide past either end and the value stays at that end. Your finger can go on over the Global column or the snapshots without pressing them, until you lift it.
 - One touch is one undo, however many rows you move at once.
 - A fader on a macro that's morphing takes that macro out of the morph; the rest of the morph carries on.
-- Holding Stop or Copy, a fader does nothing.
+- Holding Stop or Copy, a fader does nothing. Holding Shift, it works as without it.
 
 **Mapped FX** gives each row a parameter of your choice, from anywhere in the Set.
 
@@ -448,11 +448,19 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
 - Snapshots {runs:fx.slots}.
 
+**Scoped snapshots:**
+
+- A scoped snapshot holds one rack's macros. Select a rack in Live, then hold Shift and press an empty slot: the slot stores that rack alone and turns pink, and the status bar names the rack.
+- The rack must sit directly on a track, group, return or master, as for any snapshot. With anything else selected, or nothing, the status bar says "Select a rack to store Snapshot N" and nothing is stored.
+- Recalling it, or morphing to it with a Bars pad, moves that rack's macros and leaves every other rack alone. If the rack has been renamed or deleted, the recall says so, as above.
+- To replace one, hold Delete and press it, then store again with Shift. Copy + a slot stores over it with every rack, as usual, and the slot turns cyan.
+- Scene snapshots stay Set-wide: Shift + an empty scene snapshot does nothing.
+
 **Scene snapshots** ({pad:fx.scene_slots}):
 
 - Each scene can hold one snapshot. Pad N is the snapshot of the scene on column 15's pad N, so the column scrolls with the window. Pads past the last scene, and pads 7 and 8, are dark.
 - Store, recall, morph with a Bars pad, store over with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
-- A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not.
+- A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not. A scoped snapshot never does, and landing one leaves the blink where it was.
 - Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. With a Bars pad held, it lands as the timed launch below starts the scene.
 - Shift + a scene (legato) doesn't fire the snapshot, and neither do launches from Live's mouse or another controller. A scene without a snapshot leaves the macros, and any running morph, alone.
 - The snapshots follow Live's scenes. Move a scene and its snapshot moves with it; delete a scene and its snapshot goes; a new scene starts empty.
@@ -470,7 +478,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 **During a morph:**
 
-- Its slot blinks fast. The last slot to land blinks with the beat.
+- Its slot blinks fast. The last Set-wide slot to land blinks with the beat.
 - A new recall takes over from where the macros are.
 - A macro you turn yourself drops out of the morph and keeps your value.
 - Stopping the transport, or jumping back in the song, lands the morph at once.
