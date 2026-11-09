@@ -4,7 +4,7 @@ import pytest
 
 from BleakLoop import live_state
 from BleakLoop.core.layout import Window
-from BleakLoop.core.modes import FaderBinding, Morph
+from BleakLoop.core.modes import FaderBinding, Morph, MorphMacro
 from tests.support import fake_song, fake_track
 
 APPLICATION = SimpleNamespace(view=SimpleNamespace(is_view_visible=lambda name: True))
@@ -571,3 +571,33 @@ def test_read_launch_triggered(triggered, slot, expected):
 def test_read_launch_triggered_ignores_other_morphs():
     morph = Morph(0, 0.0, 8.0, 0.0, scene=True)
     assert live_state.read_launch_triggered(_launch_song(True), morph) is None
+
+
+# Morph targets: a rack macro or a parameter locator
+
+
+def target_song():
+    rack = fake_device("FX", [fake_parameter(f"Macro {i}", float(i)) for i in range(1, 9)], rack=True)
+    filter_ = fake_device("Auto Filter", [fake_parameter("Frequency", 40.0)])
+    return mapped_song([mapped_track("Bass", [rack, filter_])])
+
+
+def test_target_parameters_resolve_macros_and_locators():
+    song = target_song()
+    keys = (
+        (("track", 0, 0), "FX", 2),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),
+        FaderBinding("Bass", 0, None, 0, 0, "Track Volume"),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Resonance"),
+        (("track", 0, 1), "FX", 0),
+    )
+    found = live_state.target_parameters(song, keys)
+    assert [p and (p.name, p.value) for p in found] == [
+        ("Macro 3", 3.0), ("Frequency", 40.0), ("Track Volume", 0.85), None, None,
+    ]
+
+
+def test_read_macro_values_reads_locators_too():
+    keys = ((("track", 0, 0), "FX", 0), FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"))
+    morph = Morph(0, 0.0, 4.0, 0.0, tuple(MorphMacro(key, 0.0, 1.0, False, 0.0, 1.0) for key in keys))
+    assert live_state.read_macro_values(target_song(), morph) == (1.0, 40.0)

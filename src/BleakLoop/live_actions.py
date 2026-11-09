@@ -420,11 +420,11 @@ def apply(action, song, surface):
             action.slot, racks, False, scene=action.scene, scoped=action.scoped, selected=selected
         )
     elif isinstance(action, SetMacros):
-        # The Set can change mid-morph: a rack that has moved or gone is skipped.
-        targets = live_state.macro_parameters(song, (write[:3] for write in action.writes))
-        for (path, rack_name, index, value), parameter in zip(action.writes, targets):
+        # The Set can change mid-morph: a parameter that has moved or gone is skipped.
+        targets = live_state.target_parameters(song, (key for key, _ in action.writes))
+        for (key, value), parameter in zip(action.writes, targets):
             if parameter is None:
-                logger.info("FX: skipped %s macro %d of %r", path, index + 1, rack_name)
+                logger.info("FX: skipped %r", key)
                 continue
             parameter.value = min(max(value, parameter.min), parameter.max)
     elif isinstance(action, SetFaderParameter):

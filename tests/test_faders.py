@@ -133,7 +133,7 @@ def test_one_undo_step_per_gesture_across_two_rows():
 
 
 def test_a_morphs_step_closes_and_the_touched_macro_leaves_the_morph():
-    macros = tuple(MorphMacro(RACK, "FX", i, 0.0, 100.0, False, 0.0, 127.0) for i in range(3))
+    macros = tuple(MorphMacro((RACK, "FX", i), 0.0, 100.0, False, 0.0, 127.0) for i in range(3))
     morph = Morph(0, 0.0, 16.0, 0.0, macros)
     views = list(VIEWS)
     views[1] = replace(views[1], macro=(RACK, "FX", 1))
@@ -142,7 +142,7 @@ def test_a_morphs_step_closes_and_the_touched_macro_leaves_the_morph():
     state, actions, _ = x(state, 5, 2, centre(5))
     assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
     assert not state.fx_undo_open and state.fader_undo_open
-    assert [m.index for m in state.morph.macros] == [0, 2]
+    assert [m.key[2] for m in state.morph.macros] == [0, 2]
 
 
 def test_a_recall_closes_an_open_fader_step():
@@ -152,7 +152,7 @@ def test_a_recall_closes_an_open_fader_step():
     stopped = replace(SNAP, is_playing=False)
     state, actions = fx.racks_read(state, RacksRead(0, racks, recall=True), stopped)
     assert actions[:2] == [EndUndoStep(), BeginUndoStep()]
-    assert SetMacros(((RACK, "FX", 0, 10.0),)) in actions
+    assert SetMacros((((RACK, "FX", 0), 10.0),)) in actions
     assert not state.fader_undo_open
 
 

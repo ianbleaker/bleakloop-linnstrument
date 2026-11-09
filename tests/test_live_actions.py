@@ -9,6 +9,7 @@ sys.modules.setdefault("Live", ModuleType("Live"))
 from BleakLoop import live_actions  # noqa: E402
 from BleakLoop.core.modes import FaderBinding  # noqa: E402
 from BleakLoop.core.model import (  # noqa: E402
+    SetMacros,
     ShowMessage,
     BindFader,
     CopyGroupClips,
@@ -687,3 +688,18 @@ def test_show_message_logs_its_problem_and_shows_the_text(caplog):
     live_actions.apply(ShowMessage("Tempo {bpm}", "nav.tempo_up: no bpm"), None, surface)
     assert surface.shown == ["Tempo {bpm}"]
     assert "nav.tempo_up: no bpm" in caplog.text
+
+
+def test_set_macros_writes_macros_and_locators_and_skips_the_missing():
+    from tests.test_live_state import target_song
+
+    song = target_song()
+    rack, filter_ = song.tracks[0].devices
+    keys = (
+        (("track", 0, 0), "FX", 1),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency"),
+        FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Gone"),
+    )
+    apply(SetMacros(tuple(zip(keys, (64.0, 200.0, 5.0)))), song)
+    assert rack.parameters[2].value == 64.0
+    assert filter_.parameters[1].value == 127.0  # clamped to the parameter's range

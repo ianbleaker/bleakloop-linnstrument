@@ -234,12 +234,7 @@ def _leave_morph(state, macro):
     morph = state.morph
     if morph is None:
         return state
-    path, rack_name, index = macro
-    macros = tuple(
-        m
-        for m in morph.macros
-        if (m.path, m.rack_name, m.index) != (path, rack_name, index)
-    )
+    macros = tuple(m for m in morph.macros if m.key != macro)
     return replace(state, morph=replace(morph, macros=macros))
 
 

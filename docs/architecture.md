@@ -325,6 +325,7 @@ flowchart TD
   live_actions --> live_state
   live_state --> core_layout
   live_state --> core_model
+  live_state --> core_modes
   live_state --> core_values
   surface --> Live
   surface --> ableton_v3

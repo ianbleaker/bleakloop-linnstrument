@@ -406,7 +406,7 @@ def racks_read(state, event, snapshot):
     else:
         instant = event.bars is None or not snapshot.is_playing
     if instant:
-        writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
+        writes = tuple((m.key, m.target) for m in macros)
         actions += [BeginUndoStep(), SetMacros(writes), EndUndoStep()]
         state = replace(state, morph=None, fx_undo_open=False)
         state = _landed(state, event.slot, event.scene)
@@ -458,7 +458,7 @@ def tick(state, transport, values, triggered=None):
         morph = replace(morph, triggered=False)
     # A stop or a backward jump lands at once: there's nothing to interpolate to.
     if played is None or _lands(morph, now, triggered):
-        writes = tuple((m.path, m.rack_name, m.index, m.target) for m in macros)
+        writes = tuple((m.key, m.target) for m in macros)
         actions = [SetMacros(writes)] if writes else []
         if state.fx_undo_open:
             actions.append(EndUndoStep())
@@ -472,7 +472,7 @@ def tick(state, transport, values, triggered=None):
         if not macro.quantized:
             value = macro.start + (macro.target - macro.start) * fraction
             if value != macro.written:
-                writes.append((macro.path, macro.rack_name, macro.index, value))
+                writes.append((macro.key, value))
                 macro = replace(macro, written=value)
         moved.append(macro)
     state = replace(state, morph=replace(morph, macros=tuple(moved), last_beats=now))
@@ -596,9 +596,7 @@ def _match(stored, racks):
             target = min(max(value, view.min), view.max)
             macros.append(
                 MorphMacro(
-                    rack.path,
-                    rack.rack_name,
-                    index,
+                    (rack.path, rack.rack_name, index),
                     view.value,
                     target,
                     view.is_quantized,

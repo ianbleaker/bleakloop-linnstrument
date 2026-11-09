@@ -109,9 +109,9 @@ class FxRack:
 
 @dataclass(frozen=True)
 class MorphMacro:
-    path: tuple
-    rack_name: str
-    index: int  # macro index, 0 for Macro 1
+    # key: a rack macro as (path, rack name, macro index from 0), or a parameter locator
+    # (a FaderBinding), as live_state.target_parameters resolves either.
+    key: object
     start: float
     target: float
     quantized: bool

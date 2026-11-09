@@ -493,7 +493,7 @@ class RecallFxSnapshot:
 
 @dataclass(frozen=True)
 class SetMacros:
-    writes: tuple  # (path, rack name, macro index, value) per macro
+    writes: tuple  # (MorphMacro key, value) per parameter
 
 
 @dataclass(frozen=True)

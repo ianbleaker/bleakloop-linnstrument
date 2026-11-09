@@ -473,7 +473,7 @@ def test_a_recall_landing_in_bank_2_blinks_its_global_slot():
 def test_recall_jump_while_playing_with_no_length():
     state = with_slot(FX, 4, STORED_AB)
     state, actions = racks_read(state, 4, NOW_AB, recall=True, snapshot=playing(3.0))
-    writes = ((P0, "R", 0, 10.0), (P0, "R", 1, 20.0), (P1, "R", 0, 30.0))
+    writes = (((P0, "R", 0), 10.0), ((P0, "R", 1), 20.0), ((P1, "R", 0), 30.0))
     assert actions == [
         BeginUndoStep(),
         SetMacros(writes),
@@ -488,7 +488,7 @@ def test_recall_jumps_while_stopped_with_a_length():
     state, actions = racks_read(state, 4, NOW_AB, recall=True, bars=4)
     assert actions[:3] == [
         BeginUndoStep(),
-        SetMacros(((P0, "R", 0, 10.0), (P0, "R", 1, 20.0), (P1, "R", 0, 30.0))),
+        SetMacros((((P0, "R", 0), 10.0), ((P0, "R", 1), 20.0), ((P1, "R", 0), 30.0))),
         EndUndoStep(),
     ]
     assert state.morph is None
@@ -506,7 +506,7 @@ def scoped(state):
 
 def test_a_scoped_recall_writes_its_rack_only():
     _, actions = racks_read(scoped(FX), 4, NOW_AB, recall=True)
-    assert actions[1] == SetMacros(((P1, "R", 0, 30.0),))
+    assert actions[1] == SetMacros((((P1, "R", 0), 30.0),))
     assert actions[-1] == ShowMessage("Snapshot 5 recalled")
 
 
@@ -528,7 +528,7 @@ def test_a_scoped_morph_landing_leaves_the_last_landed_blink():
 
 def test_a_scoped_morph_moves_its_rack_only():
     state, _ = racks_read(scoped(FX), 4, NOW_AB, recall=True, bars=4, snapshot=playing(1.0))
-    assert [(m.path, m.index) for m in state.morph.macros] == [(P1, 0)]
+    assert [(m.key[0], m.key[2]) for m in state.morph.macros] == [(P1, 0)]
 
 
 def test_a_scoped_recall_with_its_rack_gone():
@@ -552,7 +552,7 @@ def test_delete_clears_a_scoped_slot():
 def test_recall_clamps_targets():
     state = with_slot(FX, 0, (FxRack("A", "R", 0, (200.0, -5.0)),))
     _, actions = racks_read(state, 0, (rack("A", "R", 0.0, 0.0),), recall=True)
-    assert actions[1] == SetMacros(((P0, "R", 0, 127.0), (P0, "R", 1, 0.0)))
+    assert actions[1] == SetMacros((((P0, "R", 0), 127.0), ((P0, "R", 1), 0.0)))
 
 
 def test_morph_start():
@@ -571,9 +571,9 @@ def test_morph_start():
         end_beats=16.0,
         last_beats=1.0,
         macros=(
-            MorphMacro(P0, "R", 0, 5.0, 10.0, False, 5.0, 127.0),
-            MorphMacro(P0, "R", 1, 1.0, 1.0, True, 1.0, 1.0),
-            MorphMacro(P1, "R", 0, 7.0, 30.0, False, 7.0, 127.0),
+            MorphMacro((P0, "R", 0), 5.0, 10.0, False, 5.0, 127.0),
+            MorphMacro((P0, "R", 1), 1.0, 1.0, True, 1.0, 1.0),
+            MorphMacro((P1, "R", 0), 7.0, 30.0, False, 7.0, 127.0),
         ),
     )
 
@@ -606,7 +606,7 @@ def test_recall_with_a_missing_rack():
     state, actions = racks_read(state, 0, NOW_AB[:1], recall=True)
     assert actions == [
         BeginUndoStep(),
-        SetMacros(((P0, "R", 0, 10.0), (P0, "R", 1, 20.0))),
+        SetMacros((((P0, "R", 0), 10.0), ((P0, "R", 1), 20.0))),
         EndUndoStep(),
         ShowMessage("Snapshot 1 recalled, 1 rack not found"),
     ]
@@ -623,8 +623,8 @@ def test_recall_with_every_rack_missing():
 @pytest.mark.parametrize(
     "stored, now, writes",
     [
-        ((1.0, 2.0, 3.0), (0.0,), ((P0, "R", 0, 1.0),)),
-        ((1.0,), (0.0, 0.0, 0.0), ((P0, "R", 0, 1.0),)),
+        ((1.0, 2.0, 3.0), (0.0,), (((P0, "R", 0), 1.0),)),
+        ((1.0,), (0.0, 0.0, 0.0), (((P0, "R", 0), 1.0),)),
     ],
 )
 def test_recall_with_a_macro_count_mismatch(stored, now, writes):
@@ -637,7 +637,7 @@ def test_recall_matches_by_name_not_position():
     state = with_slot(FX, 0, (FxRack("B", "R", 0, (30.0,)),))
     now = (rack("A", "R", 0.0, path=P0), rack("B", "R", 0.0, path=P1))
     _, actions = racks_read(state, 0, now, recall=True)
-    assert actions[1] == SetMacros(((P1, "R", 0, 30.0),))
+    assert actions[1] == SetMacros((((P1, "R", 0), 30.0),))
 
 
 @pytest.mark.parametrize("bars", [None, 2])
@@ -669,9 +669,9 @@ def test_a_mixer_press_closes_the_morph_undo_step():
 
 # Morph tick
 
-M_FREE = MorphMacro(P0, "R", 0, 0.0, 100.0, False, 0.0, 127.0)
-M_SWITCH = MorphMacro(P0, "R", 1, 0.0, 1.0, True, 0.0, 1.0)
-M_OTHER = MorphMacro(P1, "R", 0, 50.0, 10.0, False, 50.0, 127.0)
+M_FREE = MorphMacro((P0, "R", 0), 0.0, 100.0, False, 0.0, 127.0)
+M_SWITCH = MorphMacro((P0, "R", 1), 0.0, 1.0, True, 0.0, 1.0)
+M_OTHER = MorphMacro((P1, "R", 0), 50.0, 10.0, False, 50.0, 127.0)
 MORPH = Morph(3, 0.0, 16.0, 0.0, (M_FREE, M_SWITCH, M_OTHER))
 MORPHING = replace(FX, morph=MORPH, fx_undo_open=True)
 
@@ -687,7 +687,7 @@ def test_no_morph_no_tick():
 
 def test_halfway():
     state, actions, redraw = tick(MORPHING, 8.0, (0.0, 0.0, 50.0))
-    assert actions == [SetMacros(((P0, "R", 0, 50.0), (P1, "R", 0, 30.0)))]
+    assert actions == [SetMacros((((P0, "R", 0), 50.0), ((P1, "R", 0), 30.0)))]
     assert not redraw
     assert state.morph.last_beats == 8.0
     assert [m.written for m in state.morph.macros] == [50.0, 0.0, 30.0]
@@ -704,10 +704,10 @@ def test_quantized_macro_switches_only_on_landing():
     state = MORPHING
     for beats in (4.0, 12.0, 15.9):
         state, actions, _ = tick(state, beats, tuple(m.written for m in state.morph.macros))
-        assert all(write[2] != 1 or write[0] != P0 for write in actions[0].writes)
+        assert all(key != (P0, "R", 1) for key, _ in actions[0].writes)
     state, actions, redraw = tick(state, 16.0, tuple(m.written for m in state.morph.macros))
     assert actions == [
-        SetMacros(((P0, "R", 0, 100.0), (P0, "R", 1, 1.0), (P1, "R", 0, 10.0))),
+        SetMacros((((P0, "R", 0), 100.0), ((P0, "R", 1), 1.0), ((P1, "R", 0), 10.0))),
         EndUndoStep(),
     ]
     assert redraw
@@ -716,7 +716,7 @@ def test_quantized_macro_switches_only_on_landing():
 def test_lands_exactly_on_the_end_beat():
     state, actions, redraw = tick(MORPHING, 16.0, (0.0, 0.0, 50.0))
     assert actions == [
-        SetMacros(((P0, "R", 0, 100.0), (P0, "R", 1, 1.0), (P1, "R", 0, 10.0))),
+        SetMacros((((P0, "R", 0), 100.0), ((P0, "R", 1), 1.0), ((P1, "R", 0), 10.0))),
         EndUndoStep(),
     ]
     assert redraw
@@ -725,7 +725,7 @@ def test_lands_exactly_on_the_end_beat():
 
 def test_a_stop_lands():
     state, actions, redraw = tick(MORPHING, 4.0, (0.0, 0.0, 50.0), is_playing=False)
-    assert actions[0] == SetMacros(((P0, "R", 0, 100.0), (P0, "R", 1, 1.0), (P1, "R", 0, 10.0)))
+    assert actions[0] == SetMacros((((P0, "R", 0), 100.0), ((P0, "R", 1), 1.0), ((P1, "R", 0), 10.0)))
     assert (state.morph, state.fx_landed, redraw) == (None, 3, True)
 
 
@@ -752,7 +752,7 @@ def written(state):
 def test_a_loop_wrap_carries_the_morph_on():
     state = replace(MORPHING, morph=replace(MORPH, start_beats=8.0, end_beats=24.0, last_beats=15.9))
     state, actions, redraw = loop_tick(state, 0.0)
-    assert actions == [SetMacros(((P0, "R", 0, 50.0), (P1, "R", 0, 30.0)))]
+    assert actions == [SetMacros((((P0, "R", 0), 50.0), ((P1, "R", 0), 30.0)))]
     assert not redraw
     morph = state.morph
     assert (morph.start_beats, morph.end_beats, morph.last_beats) == (-8.0, 8.0, 0.0)
@@ -808,14 +808,14 @@ def test_after_a_wrap_a_launch_morph_lands_as_the_scene_starts():
     state, _, redraw = loop_tick(state, 7.99, written(state), triggered=True)
     assert not redraw
     state, actions, redraw = loop_tick(state, 8.01, written(state), triggered=False)
-    assert actions[0] == SetMacros(((P0, "R", 0, 100.0), (P0, "R", 1, 1.0), (P1, "R", 0, 10.0)))
+    assert actions[0] == SetMacros((((P0, "R", 0), 100.0), ((P0, "R", 1), 1.0), ((P1, "R", 0), 10.0)))
     assert (state.morph, state.fx_landed_scene, redraw) == (None, 3, True)
 
 
 def test_after_a_wrap_a_launch_morph_holds_at_its_targets_while_the_scene_starts_late():
     state, _, _ = loop_tick(LAUNCH_MORPH, 4.0, triggered=True)
     state, actions, redraw = loop_tick(state, 9.0, (50.0, 0.0, 30.0), triggered=True)
-    assert actions == [SetMacros(((P0, "R", 0, 100.0), (P1, "R", 0, 10.0)))]
+    assert actions == [SetMacros((((P0, "R", 0), 100.0), ((P1, "R", 0), 10.0)))]
     assert not redraw
     assert state.morph is not None
 
@@ -858,10 +858,10 @@ def test_landing_after_the_step_closed_keeps_the_mixer_step():
 
 def test_a_hand_turned_macro_drops_out():
     state, actions, _ = tick(MORPHING, 8.0, (0.0, 0.0, 60.0))
-    assert actions == [SetMacros(((P0, "R", 0, 50.0),))]
-    assert [m.index for m in state.morph.macros] == [0, 1]
+    assert actions == [SetMacros((((P0, "R", 0), 50.0),))]
+    assert [m.key[2] for m in state.morph.macros] == [0, 1]
     state, actions, _ = tick(state, 16.0, (50.0, 0.0))
-    assert actions[0] == SetMacros(((P0, "R", 0, 100.0), (P0, "R", 1, 1.0)))
+    assert actions[0] == SetMacros((((P0, "R", 0), 100.0), ((P0, "R", 1), 1.0)))
 
 
 def test_a_value_within_the_tolerance_stays():
@@ -872,9 +872,9 @@ def test_a_value_within_the_tolerance_stays():
 
 def test_an_unreadable_macro_drops_out():
     state, actions, _ = tick(MORPHING, 8.0, (None, 0.0, 50.0))
-    assert actions == [SetMacros(((P1, "R", 0, 30.0),))]
-    assert [m.path for m in state.morph.macros] == [P0, P1]
-    assert state.morph.macros[0].index == 1
+    assert actions == [SetMacros((((P1, "R", 0), 30.0),))]
+    assert [m.key[0] for m in state.morph.macros] == [P0, P1]
+    assert state.morph.macros[0].key[2] == 1
 
 
 # Render

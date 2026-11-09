@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from .core import layout, values
+from .core.modes import FaderBinding
 from .core.model import (
     ClipTarget,
     ClipView,
@@ -445,7 +446,7 @@ def read_selected_rack(song):
 
 def read_macro_values(song, morph):
     # The live value per morphing macro, or None when its rack has moved or gone.
-    targets = macro_parameters(song, ((m.path, m.rack_name, m.index) for m in morph.macros))
+    targets = target_parameters(song, (m.key for m in morph.macros))
     return tuple(None if parameter is None else parameter.value for parameter in targets)
 
 
@@ -461,12 +462,17 @@ def read_launch_triggered(song, morph):
     return None if any(scene.is_triggered for scene in scenes) else False
 
 
-def macro_parameters(song, macros_wanted):
-    # The parameter per (path, rack name, index), or None; each rack resolved once per call,
-    # since a morph tick touches every macro of every rack.
+def target_parameters(song, keys):
+    # The parameter per MorphMacro key, or None. A rack macro's rack is resolved once per call,
+    # since a morph tick touches every macro of every rack; a locator by its names.
     racks = {}
     result = []
-    for path, rack_name, index in macros_wanted:
+    for key in keys:
+        if isinstance(key, FaderBinding):
+            found = _bound(song, key)
+            result.append(None if found is None else found[0])
+            continue
+        path, rack_name, index = key
         if (path, rack_name) not in racks:
             device = rack_at(song, path, rack_name)
             racks[path, rack_name] = macros(device) if device is not None else []
