@@ -684,6 +684,8 @@ def _hold_read(state, event, snapshot):
     stored = state.fx_slots[event.slot]
     if hold is None or stored is None:
         return state, []
+    if hold.punch:
+        return _punch_read(state, hold, event, stored)
     if hold.bound:
         macros = tuple(p for p in event.params if p is not None)
         missing = len(event.params) - len(macros)
@@ -702,6 +704,44 @@ def _hold_read(state, event, snapshot):
     final = _held(state, read.pad)
     state, more = _end_slide(_drop_hold(state, read.pad), final)
     return state, actions + more
+
+
+def _punch_read(state, hold, event, stored):
+    # A punch lands at once, at 100%: a Set-wide slot at its snapshot, a bound one at each
+    # parameter's punch-in value. A parameter without one is skipped. Lifted before the read
+    # landed, it writes nothing.
+    if hold.lifted:
+        return _drop_hold(state, hold.pad), []
+    name = _name(hold.slot, False)
+    if hold.bound:
+        found = [p for p in event.params if p is not None]
+        missing = len(event.params) - len(found)
+        note = f", {_count(missing, 'parameter')} not found" if missing else ""
+        macros = tuple(
+            MorphMacro(p.key, p.start, p.target, p.quantized, p.start, p.span)
+            for p in found
+            if p.target is not None
+        )
+        skipped = labels([(p.owner, p.name) for p in found if p.target is None])
+    else:
+        macros, missing = _match(stored, event.racks)
+        note = f", {_count(missing, 'rack')} not found" if missing else ""
+        skipped = []
+    if not macros:
+        state = _drop_hold(state, hold.pad)
+        if skipped:
+            return state, listed(skipped, lambda text: buttons.refuse("slots", "no_punch", name=name, params=text))
+        return state, buttons.refuse("slots", "nothing", name=name, note=note)
+    count = state.fx_slide_count + 1
+    state = replace(state, fx_slide_count=count)
+    read = replace(hold, read=macros, note=note, slid=True, order=count, f=1.0)
+    state, actions = _blend(_put_hold(state, hold, read), read)
+    if not skipped:
+        return state, actions + buttons.say("slots", "punched", name=name, note=note)
+    return state, actions + listed(
+        skipped,
+        lambda text: buttons.say("slots", "punched", name=name, note=f"{note}, no punch value for {text}"),
+    )
 
 
 def _tap(state, hold):

@@ -2678,3 +2678,76 @@ def test_letting_go_of_device_clip_after_a_punch_doesnt_flip_the_view():
     state, actions = engine.handle(state, PadPress(*DEV_CLP, False), SNAP)
     assert not state.device_clip and actions == []
     assert state.fx_holds[0].punch
+
+
+PUNCH_AB = replace(AB, device_clip=True)
+
+
+def punched(state=PUNCH_AB, racks=NOW_AB):
+    state, _ = handle(state, SLOT_3)
+    return hold_read(state, racks=racks)
+
+
+def test_a_set_wide_punch_writes_its_snapshot_at_once():
+    state, actions = punched()
+    assert actions == [BeginUndoStep(), SetMacros(AB_TARGETS), ShowMessage("Snapshot 3 punched in")]
+    hold = state.fx_holds[0]
+    assert hold.slid and hold.f == 1.0 and hold.order == 1 and state.fx_slide_undo_open
+
+
+def test_a_set_wide_punch_notes_missing_racks():
+    _, actions = punched(racks=NOW_AB[:1])
+    assert actions[-1] == ShowMessage("Snapshot 3 punched in, 1 rack not found")
+
+
+def test_a_set_wide_punch_with_no_racks_refuses_and_drops_the_hold():
+    state, actions = punched(racks=())
+    assert state.fx_holds == () and actions == [ShowMessage("Snapshot 3: nothing to recall, 2 racks not found")]
+
+
+def bound_punched(params):
+    state, _ = handle(PUNCH_BOUND, SLOT_3)
+    return bound_read(state, params)
+
+
+def test_a_bound_punch_writes_the_punch_in_values():
+    switch = replace(SWITCH_READ, target=1.0)
+    state, actions = bound_punched((replace(FREQ_READ, target=20.0), switch))
+    assert actions == [
+        BeginUndoStep(),
+        SetMacros(((FREQ, 20.0), (MACRO_KEY, 1.0))),
+        ShowMessage("Snapshot 3 punched in"),
+    ]
+
+
+def test_a_bound_punch_skips_a_parameter_without_a_value():
+    state, actions = bound_punched((replace(FREQ_READ, target=20.0), SWITCH_READ))
+    assert actions[1] == SetMacros(((FREQ, 20.0),))
+    assert actions[-1] == ShowMessage("Snapshot 3 punched in, no punch value for On")
+    assert [m.key for m in state.fx_holds[0].read] == [FREQ]
+
+
+def test_a_bound_punch_notes_missing_parameters():
+    _, actions = bound_punched((replace(FREQ_READ, target=20.0), None))
+    assert actions[-1] == ShowMessage("Snapshot 3 punched in, 1 parameter not found")
+
+
+def test_a_bound_punch_without_any_values_refuses():
+    state, actions = bound_punched((FREQ_READ, SWITCH_READ))
+    assert state.fx_holds == ()
+    assert actions == [ShowMessage("Snapshot 3: no punch value for Frequency, On, Shift + slot to store")]
+
+
+def test_a_punch_lifted_before_its_read_writes_nothing():
+    state, _ = handle(PUNCH_AB, SLOT_3)
+    state, _ = lift(state)
+    state, actions = hold_read(state)
+    assert actions == [] and state.fx_holds == () and state.fx_slide_params == ()
+
+
+def test_a_punch_stops_a_running_morph():
+    state = replace(PUNCH_AB, morph=MORPH, fx_undo_open=True)
+    state, actions = punched(state)
+    assert state.morph is None and not state.fx_undo_open
+    assert actions[:3] == [EndUndoStep(), BeginUndoStep(), SetMacros(AB_TARGETS)]
+    assert actions.count(BeginUndoStep()) == 1
