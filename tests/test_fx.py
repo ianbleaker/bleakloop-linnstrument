@@ -752,9 +752,9 @@ def test_render_morph_target_blinks_over_landed():
     assert fx.render(state, SNAP)[SLOT_3] == Light(CYAN, Blink.FAST)
 
 
-def test_render_under_shift_is_dark():
-    state = replace(with_slot(FX, 2), shift=True, fx_length=1)
-    assert set(fx.render(state, SNAP).values()) == {Light(OFF)}
+def test_render_under_shift_is_unchanged():
+    state = replace(with_slot(FX, 2), fx_length=1)
+    assert fx.render(replace(state, shift=True), SNAP) == fx.render(state, SNAP)
 
 
 def test_session_render_in_fx_mode():
@@ -775,9 +775,11 @@ def test_session_render_fx_pad_off():
 
 
 def test_session_render_shift_layer_in_fx():
-    frame = session.render(replace(with_slot(FX, 2), shift=True), SNAP)
+    state = with_slot(FX, 2)
+    frame = session.render(replace(state, shift=True), SNAP)
     assert frame[layout.NAVIGATION.fx] == Light(ORANGE)
-    assert all(frame[(c, p)] == Light(OFF) for c in layout.GRID_COLUMNS for p in range(1, 9))
+    plain = session.render(state, SNAP)
+    assert all(frame[(c, p)] == plain[(c, p)] for c in layout.GRID_COLUMNS for p in range(1, 9))
 
 
 # Scene snapshots
@@ -941,9 +943,9 @@ def test_render_scene_snapshots_past_the_last_scene_are_dark():
     assert fx.render(state, replace(SNAP, scene_count=3))[layout.FX.scene_slots[3]] == Light(OFF)
 
 
-def test_render_scene_snapshots_under_shift_are_dark():
+def test_render_scene_snapshots_under_shift_stay_lit():
     state = replace(with_scene(FX, 0), shift=True)
-    assert fx.render(state, SCENES)[layout.FX.scene_slots[0]] == Light(OFF)
+    assert fx.render(state, SCENES)[layout.FX.scene_slots[0]] == Light(LIME)
 
 
 # Scene launch

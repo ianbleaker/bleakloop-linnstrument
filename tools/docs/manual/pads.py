@@ -376,7 +376,7 @@ SECTIONS = {
     "mixer-split": _MIXER_SPLIT,
     "mixer-split-shift": _MIXER_SPLIT_SHIFT,
     "fx": _FX,
-    "fx-shift": (),  # the grid is dark under Shift
+    "fx-shift": _FX,  # the grid works as without Shift
     "device-clip": _DEVICE_CLIP,
     "linnstrument": _LINNSTRUMENT,
     "linnstrument-shift": _LINNSTRUMENT_SHIFT,

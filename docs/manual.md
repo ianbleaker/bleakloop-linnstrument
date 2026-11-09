@@ -247,7 +247,7 @@ With **Shift** held:
 
 - The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX (column 16, pad 3) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to. In Session and Mixer Mode, the snapshots come third, for the split view's panel.
 - Snapshots are saved in the Set. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
-- With Shift held the grid, faders included, goes dark and ignores presses.
+- With Shift held the faders work as without it, and the snapshot pads stay lit but ignore presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
@@ -400,7 +400,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Columns 10–14 are the panel, in every row. Shift + FX steps it through Device FX, Mapped FX and the snapshots, and both split views show the same choice.
 - As faders, five pads wide, they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads.
 - As snapshots, columns 11–14 work as FX Mode's: snapshots, scene snapshots and Bars, with Copy and Delete as there. Column 10 is dark.
-- With Shift held the panel goes dark and ignores presses.
+- With Shift held the panel's faders work as without it, and its snapshot pads stay lit but ignore presses.
 - A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
 - The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
 - FX Mode always shows 13 tracks, and so do Session and Mixer Mode without their split view; near the last track, the window moves left to fill them. Each mode keeps its own split view on or off when you leave it.
@@ -426,7 +426,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Slide past either end and the value stays at that end. Your finger can go on over the Global column or the snapshots without pressing them, until you lift it.
 - One touch is one undo, however many rows you move at once.
 - A fader on a macro that's morphing takes that macro out of the morph; the rest of the morph carries on.
-- Holding Stop or Copy, a fader does nothing.
+- Holding Stop or Copy, a fader does nothing. Holding Shift, it works as without it.
 
 **Mapped FX** gives each row a parameter of your choice, from anywhere in the Set.
 

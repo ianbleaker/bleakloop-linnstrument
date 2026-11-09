@@ -73,7 +73,8 @@ def press(state, event, snapshot):
         if state.fader_touches or not state.fader_undo_open:
             return state, []
         return replace(state, fader_undo_open=False), [EndUndoStep()]
-    if not visible(state) or state.shift or state.stop or state.copy:
+    # Shift leaves the faders working: they can move while Shift holds the snapshots' layer.
+    if not visible(state) or state.stop or state.copy:
         return state, []
     mapped = state.fader_source == "mapped"
     row = event.pad - 1
@@ -207,12 +208,10 @@ def reset(state):
 
 
 def render(state, snapshot):
-    # Dark under Shift, as Mixer's faders. The bar follows the parameter, or the finger
+    # Lit under Shift too, unlike Mixer's faders. The bar follows the parameter, or the finger
     # while a row is touched.
     span = columns(state)
     frame = {(column, pad): Light(OFF) for column in span for pad in range(1, layout.ROWS + 1)}
-    if state.shift and not state.copy and not state.delete:
-        return frame
     odd, even = COLOURS[state.fader_source]
     for pad in range(1, layout.ROWS + 1):
         touch = _find(state.fader_touches, pad)

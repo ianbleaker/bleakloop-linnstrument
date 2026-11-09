@@ -317,16 +317,14 @@ def _slot_press(state, slot, scene, snapshot):
 
 
 def render(state, snapshot):
-    # The grid columns right of the faders in FX Mode, and the split views' snapshot panel;
-    # dark under Shift, as Mixer's faders.
+    # The grid columns right of the faders in FX Mode, and the split views' snapshot panel,
+    # lit under Shift too: the player sees what's there.
     frame = {
         (column, pad): Light(OFF)
         for column in layout.GRID_COLUMNS
         if column not in layout.FX_FADER_COLUMNS
         for pad in range(1, layout.ROWS + 1)
     }
-    if state.shift and not state.copy and not state.delete:
-        return frame
     functions.paint(frame, layout.FX.buttons(), state, snapshot)
     return frame
 
