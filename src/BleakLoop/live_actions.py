@@ -299,12 +299,14 @@ def apply(action, song, surface):
     elif isinstance(action, EnterMode):
         surface.enter_mode(action.mode)
     elif isinstance(action, FireSlot):
+        slot = _slot(song, action.track, action.scene)
         options = {}
-        if action.legato:
+        # Live refuses legato on an empty slot: that press fires as a plain one.
+        if action.legato and slot.has_clip:
             options["force_legato"] = True
         if action.record_length is not None:
             options["record_length"] = action.record_length
-        _slot(song, action.track, action.scene).fire(**options)
+        slot.fire(**options)
     elif isinstance(action, FireScene):
         song.scenes[action.scene].fire(force_legato=action.legato)
     elif isinstance(action, ToggleMute):
