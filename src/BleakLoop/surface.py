@@ -801,6 +801,11 @@ class BleakLoop(ControlSurface):
             else:
                 self._held_note_pads.discard((row, column))
         event = self._slides.pad(row, column, value)
+        if self._state.fx:
+            logger.info(
+                "BIND-DEBUG %r shift=%s bind_hold=%r touches=%d",
+                event, self._state.shift, self._state.fx_bind_hold, len(self._state.fader_touches),
+            )
         if isinstance(event, SlideMoved):
             self._handle(event, engine.slide)
         elif event is not None:
