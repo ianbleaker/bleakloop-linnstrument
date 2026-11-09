@@ -214,7 +214,10 @@ def _name(slot, scene):
 
 
 def _landed(state, slot, scene):
-    # Only the last snapshot to land blinks, global or scene.
+    # Only the last Set-wide snapshot to land blinks, global or scene. A scoped one moves a
+    # single rack, so it leaves the blink where it was.
+    if not scene and slot in state.fx_scoped:
+        return state
     if scene:
         return replace(state, fx_landed=None, fx_landed_scene=slot)
     return replace(state, fx_landed=slot, fx_landed_scene=None)

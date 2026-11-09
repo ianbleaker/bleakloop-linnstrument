@@ -462,7 +462,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 - Each scene can hold one snapshot. Pad N is the snapshot of the scene on column 15's pad N, so the column scrolls with the window. Pads past the last scene, and pads 7 and 8, are dark.
 - Store, recall, morph with a Bars pad, store over with Copy and clear with Delete as with the snapshots above. Pressing one never launches its scene.
-- A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not.
+- A stored scene snapshot is lime. It blinks fast while it is the morph's target, and with the beat when it was the last snapshot to land. Only one snapshot blinks as the last to land, scene or not. A scoped snapshot never does, and landing one leaves the blink where it was.
 - Launching the scene from column 15, or from Linnstrument Mode's scene page, morphs the macros to its snapshot. The morph starts at the press and lands exactly as the scene starts, on the next launch quantization boundary: with 1 Bar, pressed at bar 3 beat 2, it lands at bar 4. With launch quantization None, or the transport stopped, it recalls at once. With a Bars pad held, it lands as the timed launch below starts the scene.
 - Shift + a scene (legato) doesn't fire the snapshot, and neither do launches from Live's mouse or another controller. A scene without a snapshot leaves the macros, and any running morph, alone.
 - The snapshots follow Live's scenes. Move a scene and its snapshot moves with it; delete a scene and its snapshot goes; a new scene starts empty.
@@ -480,7 +480,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 **During a morph:**
 
-- Its slot blinks fast. The last slot to land blinks with the beat.
+- Its slot blinks fast. The last Set-wide slot to land blinks with the beat.
 - A new recall takes over from where the macros are.
 - A macro you turn yourself drops out of the morph and keeps your value.
 - Stopping the transport, or jumping back in the song, lands the morph at once.

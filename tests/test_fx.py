@@ -402,6 +402,22 @@ def test_a_scoped_recall_writes_its_rack_only():
     assert actions[-1] == ShowMessage("Snapshot 5 recalled")
 
 
+def test_a_scoped_recall_leaves_the_last_landed_blink():
+    state = replace(scoped(FX), fx_landed=1)
+    state, _ = racks_read(state, 4, NOW_AB, recall=True)
+    assert state.fx_landed == 1
+    assert fx.render(state, SNAP)[layout.FX.slots[4]] == Light(PINK)
+
+
+def test_a_scoped_morph_landing_leaves_the_last_landed_blink():
+    state = replace(scoped(FX), fx_landed_scene=2)
+    state, _ = racks_read(state, 4, NOW_AB, recall=True, bars=1, snapshot=playing(1.0))
+    assert state.morph is not None
+    state, _, _ = tick(state, 8.0, (0.0,))
+    assert state.morph is None
+    assert (state.fx_landed, state.fx_landed_scene) == (None, 2)
+
+
 def test_a_scoped_morph_moves_its_rack_only():
     state, _ = racks_read(scoped(FX), 4, NOW_AB, recall=True, bars=4, snapshot=playing(1.0))
     assert [(m.path, m.index) for m in state.morph.macros] == [(P1, 0)]
