@@ -2751,3 +2751,42 @@ def test_a_punch_stops_a_running_morph():
     assert state.morph is None and not state.fx_undo_open
     assert actions[:3] == [EndUndoStep(), BeginUndoStep(), SetMacros(AB_TARGETS)]
     assert actions.count(BeginUndoStep()) == 1
+
+
+def punch_x(state, columns):
+    return x(state, 11, at(columns))
+
+
+def punch_holding():
+    state, _ = punched()
+    state, actions, _ = punch_x(state, 0)
+    assert actions == []
+    return state
+
+
+@pytest.mark.parametrize("columns, f", [(-2, 0.5), (-4, 0.0), (-7, 0.0), (0.2, 1.0), (3, 1.0)])
+def test_a_punch_blends_back_sliding_left(columns, f):
+    state, actions, _ = punch_x(punch_holding(), columns)
+    assert state.fx_holds[0].f == pytest.approx(f, abs=1e-3)
+    written = {p.key: p.written for p in state.fx_slide_params}
+    assert written == pytest.approx({key: target * f for key, target in AB_TARGETS}, abs=0.1)
+    if f == 1.0:
+        assert actions == []
+
+
+def test_a_punch_has_no_slide_threshold():
+    state, actions, _ = punch_x(punch_holding(), -0.1)
+    assert state.fx_holds[0].f == pytest.approx(0.975, abs=1e-3) and actions
+
+
+def test_a_punched_quantized_macro_switches_at_half_way_both_ways():
+    key = (P0, "R", 0)
+    state, _ = punched(with_slot(PUNCH_AB, 2, (FxRack("A", "R", 0, (1.0,)),)), racks=(rack("A", "R", 0.0, path=P0),))
+    quantized = replace(state.fx_holds[0], read=(MorphMacro(key, 0.0, 1.0, True, 0.0, 1.0),))
+    state, _, _ = punch_x(replace(state, fx_holds=(quantized,)), 0)
+    state, actions, _ = punch_x(state, -1.9)
+    assert actions == []
+    state, actions, _ = punch_x(state, -2.1)
+    assert actions == [SetMacros(((key, 0.0),))]
+    state, actions, _ = punch_x(state, -1.9)
+    assert actions == [SetMacros(((key, 1.0),))]

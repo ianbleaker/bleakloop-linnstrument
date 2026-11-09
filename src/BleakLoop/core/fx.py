@@ -593,6 +593,8 @@ def x_axis(state, event):
     if hold.x0 is None:
         return _put_hold(state, hold, replace(hold, x0=event.value)), [], False
     columns = (event.value - hold.x0) / X_COLUMN_WIDTH
+    if hold.punch:
+        return _punch_x(state, hold, columns)
     new = hold
     if not hold.slid:
         if abs(columns) < SLIDE_START:
@@ -614,6 +616,20 @@ def x_axis(state, event):
     if new.bound:
         redraw = redraw or value_meter(state, _held(state, new.pad)) != before
     return state, actions, redraw
+
+
+def _punch_x(state, hold, columns):
+    # A punch is already slid, at 100%: left of the press blends back, 4 columns to 0%, and
+    # right of it stays at 100%.
+    new = replace(hold, f=min(max(1 + columns / SLIDE_COLUMNS, 0.0), 1.0))
+    if new == hold:
+        return state, [], False
+    state = _put_hold(state, hold, new)
+    if not new.slid:
+        # The read hasn't landed: it lands at 100%.
+        return state, [], False
+    state, actions = _blend(state, new)
+    return state, actions, meter(hold.f) != meter(new.f)
 
 
 def render_meters(state):
