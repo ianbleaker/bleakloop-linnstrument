@@ -2929,3 +2929,36 @@ def test_landing_keeps_the_step_open_while_a_slide_is_held():
     state, actions = racks_read(state, 2, NOW_AB, recall=True)
     assert actions[0] == SetMacros(tuple((key, 0.0) for key, _ in AB_TARGETS))
     assert EndUndoStep() not in actions and state.fx_slide_undo_open
+
+
+@pytest.mark.parametrize("columns, lit", [(0, 4), (-1.6, 3), (-4.5, 0)])
+@pytest.mark.parametrize("layer", ["FX", "PANEL"])
+def test_a_punch_fills_the_4_pads_left_of_its_slot_in_red(columns, lit, layer):
+    state = replace(with_slot(globals()[layer], 2, STORED_AB), device_clip=True)
+    state, _ = punched(state)
+    state, _, _ = punch_x(state, 0)
+    state, _, _ = punch_x(state, columns)
+    frame = session.render(state, SNAP)
+    column = SLOT_3[0]
+    lights = [frame[(column - k, ROW)] for k in range(1, 5)]
+    assert lights == [Light(RED)] * lit + [Light(OFF)] * (4 - lit)
+    assert all(frame[(column + k, ROW)] != Light(RED) for k in range(1, 5))
+    assert frame[SLOT_3] == Light(CYAN, Blink.FAST)
+
+
+def test_a_bound_punch_shows_the_red_fill_not_the_value_meter():
+    state = with_slot(PUNCH_BOUND, 2, replace(BOUND_AB.fx_slots[2], values=(20.0,)))
+    state, _ = handle(state, SLOT_3)
+    state, _ = bound_read(state, (replace(FREQ_READ, target=20.0), SWITCH_READ))
+    frame = fx.render_meters(state)
+    column = SLOT_3[0]
+    assert set(frame) == {(column - k, ROW) for k in range(1, 5)}
+    assert all(light == Light(RED) for light in frame.values())
+
+
+def test_a_punch_redraws_when_its_fill_changes():
+    state = punch_holding()
+    state, _, redraw = punch_x(state, -0.1)
+    assert not redraw
+    state, _, redraw = punch_x(state, -1.2)
+    assert redraw

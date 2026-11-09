@@ -660,10 +660,15 @@ def _punch_x(state, hold, columns):
 
 def render_meters(state):
     # Each slide's fill: the pads right of its slot to its 100% pad, in the slot's colour, one
-    # per 25%. Until the lift, they hide whatever those pads show.
+    # per 25%. A punch's fills the 4 pads left of its slot in red instead, from the slot out.
+    # Until the lift, they hide whatever those pads show.
     frame = {}
     for hold in state.fx_holds:
         column = layout.FX.slots[hold.slot % layout.FX_SLOTS][0]
+        if hold.punch:
+            if hold.slid:
+                frame.update(_punch_meter(hold, column))
+            continue
         if hold.bound:
             frame.update(_value_meter(state, hold, column))
             continue
@@ -675,6 +680,15 @@ def render_meters(state):
             if column + k < layout.COLUMNS:
                 frame[(column + k, hold.pad)] = Light(colour if k <= lit else OFF)
     return frame
+
+
+def _punch_meter(hold, column):
+    lit = meter(hold.f)
+    return {
+        (column - k, hold.pad): Light(RED if k <= lit else OFF)
+        for k in range(1, SLIDE_COLUMNS + 1)
+        if column - k >= 1
+    }
 
 
 def _value_meter(state, hold, column):
