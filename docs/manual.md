@@ -191,7 +191,7 @@ With the snapshots in the panel, columns 11–14 work as FX Mode's, and column 1
 - **Clip slots**: Launch a clip. On an armed track, an empty slot records.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
-- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall.
+- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
 
@@ -247,7 +247,7 @@ With **Shift** held:
 
 - The faders show **Device FX** (magenta and blue), the selected device's macros or parameters, or **Mapped FX** (orange and yellow), eight parameters you bind yourself. Hold Shift and press FX (column 16, pad 3) to switch between them, in any mode but Linnstrument Mode; the status bar names the one you switched to. In Session and Mixer Mode, the snapshots come third, for the split view's panel.
 - Snapshots are saved in the Set. A held Bars pad turns a recall into a morph, and holds back a scene launch to its bar line.
-- With Shift held the faders work as without it, and the snapshot pads stay lit but ignore presses.
+- With Shift held the faders work as without it, and the snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot (see Snapshots and morphs); the other snapshot pads ignore presses.
 - Press FX again, or Session, for Session Mode. FX and Mixer Mode replace each other.
 
 ![FX Mode](manual/fx.svg)
@@ -256,7 +256,7 @@ With **Shift** held:
 
 <!-- callouts:fx -->
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
-- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall.
+- **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
 <!-- /callouts:fx -->
@@ -400,7 +400,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Columns 10–14 are the panel, in every row. Shift + FX steps it through Device FX, Mapped FX and the snapshots, and both split views show the same choice.
 - As faders, five pads wide, they work as FX Mode's, Device FX or Mapped FX. They have no mute or arm pads.
 - As snapshots, columns 11–14 work as FX Mode's: snapshots, scene snapshots and Bars, with Copy and Delete as there. Column 10 is dark.
-- With Shift held the panel's faders work as without it, and its snapshot pads stay lit but ignore presses.
+- With Shift held the panel's faders work as without it, and its snapshot pads stay lit. Shift + an empty slot stores a scoped snapshot; the other snapshot pads ignore presses.
 - A slide off either end of a fader doesn't press the clip, mute or arm pad in column 9, or the scene in column 15.
 - The faders need the LinnStrument's slides, which change columns 2–9 a little: rolling a finger from one clip onto the next launches only the first, and two neighbouring clips pressed near their shared edge may launch only one.
 - FX Mode always shows 13 tracks, and so do Session and Mixer Mode without their split view; near the last track, the window moves left to fill them. Each mode keeps its own split view on or off when you leave it.
@@ -449,6 +449,14 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Hold Delete and press a stored slot to clear it.
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
 - Snapshots 1–8 in column 11, 9–16 in column 12.
+
+**Scoped snapshots:**
+
+- A scoped snapshot holds one rack's macros. Select a rack in Live, then hold Shift and press an empty slot: the slot stores that rack alone and turns pink, and the status bar names the rack.
+- The rack must sit directly on a track, group, return or master, as for any snapshot. With anything else selected, or nothing, the status bar says "Select a rack to store Snapshot N" and nothing is stored.
+- Recalling it, or morphing to it with a Bars pad, moves that rack's macros and leaves every other rack alone. If the rack has been renamed or deleted, the recall says so, as above.
+- To replace one, hold Delete and press it, then store again with Shift. Copy + a slot stores over it with every rack, as usual, and the slot turns cyan.
+- Scene snapshots stay Set-wide: Shift + an empty scene snapshot does nothing.
 
 **Scene snapshots** (column 13, pads 1–6):
 
