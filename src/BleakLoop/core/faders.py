@@ -39,12 +39,12 @@ def norm(x, first, last):
 
 def value(touch, position):
     result = touch.min + position * (touch.max - touch.min)
-    return float(_round(result)) if touch.is_quantized else result
+    return float(round_half(result)) if touch.is_quantized else result
 
 
 def lit(position, count):
     # The first pad is always lit for a live fader.
-    return 1 + _round(position * (count - 1))
+    return 1 + round_half(position * (count - 1))
 
 
 def holds(state, event):
@@ -189,8 +189,8 @@ def _view(snapshot, pad):
     return snapshot.faders[pad - 1] if pad <= len(snapshot.faders) else None
 
 
-def _round(x):
-    # Halves up, not to even.
+def round_half(x):
+    # The nearest whole number, halves away from zero: round() takes them to even.
     return int(x + 0.5) if x >= 0 else -int(-x + 0.5)
 
 

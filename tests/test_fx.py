@@ -1107,11 +1107,6 @@ def test_a_quantized_macro_takes_the_nearest_step_both_ways():
     assert actions == [SetMacros((((P0, "R", 0), 0.0),))]
 
 
-@pytest.mark.parametrize("move, steps", [(0.5, 1), (-0.5, -1), (1.5, 2), (2.5, 3), (-2.5, -3), (0.49, 0), (0.0, 0)])
-def test_a_half_step_rounds_away_from_zero(move, steps):
-    assert fx._nearest(move) == steps
-
-
 def test_the_lift_keeps_the_values_and_closes_the_step():
     state, _, _ = x(sliding(), 11, at(2.4))
     state, actions = lift(state, (11, ROW))

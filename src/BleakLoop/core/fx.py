@@ -759,20 +759,15 @@ def _end_slide(state, hold):
 def _slid_value(entry, origin, f):
     # A Set-wide slot's macro blends towards its snapshot value. A bound slot's parameter moves
     # from its origin by f of its range either way, stopping at its ends. An on/off or chooser
-    # takes the nearest step, halves away from its origin; where it switches otherwise is set
-    # by a macro's range in Live.
+    # takes the nearest step, halves away from its origin; anything else is a macro's mapping
+    # in Live.
     if isinstance(entry, BoundRead):
         move = f * entry.span
         if entry.quantized:
-            move = _nearest(move)
+            move = faders.round_half(move)
         return min(max(origin + move, entry.low), entry.high)
     move = f * (entry.target - origin)
-    return origin + (_nearest(move) if entry.quantized else move)
-
-
-def _nearest(move):
-    # A whole number of steps, halves away from zero: round() would take halves to even.
-    return math.copysign(math.floor(abs(move) + 0.5), move)
+    return origin + (faders.round_half(move) if entry.quantized else move)
 
 
 def _number(value):

@@ -51,7 +51,7 @@ SLIDE_START = 0.25  # of a column: a held step's X travel that starts a slide
 VELOCITY_PER_COLUMN = 16
 NUDGE_PER_COLUMN = 0.125  # of a step
 # A bound slot's message lists its parameters until it reaches this many characters, then
-# ends "+N" for the rest: about what Live's status bar shows on the rig.
+# ends "+N" for the rest. Chosen, not measured: check how much of Live's status bar shows.
 STATUS_MAX = 160
 # The Undo pad reverses the last bind or removal of a snapshot slot's parameter this long after
 # it, with nothing else pressed since; past it, the pad is Live's Undo again.

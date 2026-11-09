@@ -77,6 +77,11 @@ def test_lit(position, count, expected):
     assert faders.lit(position, count) == expected
 
 
+@pytest.mark.parametrize("x, whole", [(0.5, 1), (-0.5, -1), (1.5, 2), (2.5, 3), (-2.5, -3), (0.49, 0), (0.0, 0)])
+def test_round_half_takes_halves_away_from_zero(x, whole):
+    assert faders.round_half(x) == whole
+
+
 def test_quantized_values_round():
     state = touched(snapshot=replace(SNAP, faders=(None, None, FaderView("Mode", 0, 0, 3, True))))
     touch = state.fader_touches[0]
