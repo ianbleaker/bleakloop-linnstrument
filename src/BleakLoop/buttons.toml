@@ -706,7 +706,7 @@ manual = "Move the Ableton session ring in the selected direction."
 
 [functions.fader_source]
 label = "Panel"
-manual = "Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX Mode."
+manual = "Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX or Sequencer Mode."
 [functions.fader_source.outcomes]
 device = "Faders: Device FX"
 snapshots = "Faders: FX snapshots"

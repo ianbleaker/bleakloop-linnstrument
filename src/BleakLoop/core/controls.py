@@ -193,9 +193,9 @@ def _device_step(state, snapshot, step):
 
 
 def toggle_fader_source(state):
-    # Shift + FX: the Session and Mixer split views' panel, Device FX <-> the snapshots. FX Mode
-    # has no panel.
-    if state.fx:
+    # Shift + FX: the Session and Mixer split views' panel, Device FX <-> the snapshots. FX and
+    # Sequencer Mode have no panel.
+    if state.fx or state.mode is not Mode.SESSION:
         return state, []
     # The layer under a held fader or slot changes: it lets go.
     state, actions = faders.reset(state)

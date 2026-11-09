@@ -134,7 +134,7 @@ The outer edge, column 16, holds the mode pads, then Delete and Copy. **Device/C
 With **Shift** held:
 
 - **Tempo**: Tempo +1 or -1 BPM.
-- **Panel**: Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX Mode.
+- **Panel**: Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX or Sequencer Mode.
 - **Window directions**: Move the Ableton session ring in the selected direction.
 <!-- /callouts:navigation -->
 

@@ -132,7 +132,7 @@ The outer edge, {column:navigation.session,navigation.mixer,navigation.fx,naviga
 With **Shift** held:
 
 - **Tempo**: Tempo +1 or -1 BPM.
-- **Panel**: Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX Mode.
+- **Panel**: Switch Session and Mixer Mode's split view panel between Device FX and the snapshots. Does nothing in FX or Sequencer Mode.
 - **Window directions**: Move the Ableton session ring in the selected direction.
 <!-- /callouts:navigation -->
 

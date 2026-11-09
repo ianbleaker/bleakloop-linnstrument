@@ -383,12 +383,9 @@ def test_shift_tempo_steps():
     assert handle(SHIFTED, TEMPO_DOWN)[1][0] == SetTempo(119.0)
 
 
-def test_shift_fx_toggles_the_split_panel():
-    # With no panel on screen too: the choice is kept for when it shows.
-    snapshots, actions = handle(SHIFTED, layout.NAVIGATION_SHIFT.fader_source)
-    assert snapshots == replace(SHIFTED, split_snapshots=True)
-    assert actions == [ShowMessage("Faders: FX snapshots")]
-    assert handle(snapshots, layout.NAVIGATION_SHIFT.fader_source) == (SHIFTED, [ShowMessage("Faders: Device FX")])
+def test_shift_fx_does_nothing():
+    # No panel on screen.
+    assert handle(SHIFTED, layout.NAVIGATION_SHIFT.fader_source) == (SHIFTED, [])
 
 
 def test_shift_moves_the_window():
