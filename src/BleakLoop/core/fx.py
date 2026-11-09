@@ -8,6 +8,7 @@ from . import buttons, faders, functions, layout, mixer
 from .leds import CYAN, LIME, OFF, ORANGE, PINK, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
+    BindSelectedParameter,
     EndUndoStep,
     FireScene,
     RecallFxSnapshot,
@@ -17,7 +18,7 @@ from .model import (
     SetMixer,
     StoreFxSnapshot,
 )
-from .modes import BoundRead, BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
+from .modes import BindHold, BoundRead, BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
 from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, X_COLUMN_WIDTH
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
@@ -318,11 +319,12 @@ def press(state, event, snapshot):
         return state, []
     if not event.pressed:
         return state, []
-    # The Shift layer (Copy and Delete come first): an empty slot stores the selected rack
-    # alone. Scene snapshots stay Set-wide, and the other pads do nothing.
+    # The Shift layer (Copy and Delete come first): a slot's hold binds a parameter to it.
+    # Scene snapshots and the other pads do nothing.
     if state.shift and not state.copy and not state.delete:
-        if button.function == "slots" and state.fx_slots[_global(state, button.value)] is None:
-            return state, [StoreFxSnapshot(_global(state, button.value), scoped=True)]
+        if button.function == "slots" and state.fx_bind_hold is None:
+            hold = BindHold(event.pad, event.column, _global(state, button.value))
+            return replace(state, fx_bind_hold=hold), []
         return state, []
     if button.function == "slots" and not (state.copy or state.delete):
         slot = _global(state, button.value)
@@ -332,6 +334,60 @@ def press(state, event, snapshot):
         if not state.fx_length and state.fx_slots[slot] is not None:
             return _hold(state, event, slot)
     return functions.press(button, state, snapshot)
+
+
+# Binding: Shift + a slot adds Live's selected parameter to it, or removes it if it's there.
+
+
+def binding(state, event):
+    hold = state.fx_bind_hold
+    return hold is not None and (hold.pad, hold.column) == (event.pad, event.column)
+
+
+def bind_release(state):
+    hold = state.fx_bind_hold
+    state = replace(state, fx_bind_hold=None)
+    if hold.used:
+        return state, []
+    return state, [BindSelectedParameter(hold.slot)]
+
+
+def parameter_bound(state, event):
+    # The adapter's answer: the selected parameter, or why it can't be bound.
+    name = _name(event.slot, False)
+    if event.refusal == "select":
+        return state, buttons.refuse("slots", "no_parameter")
+    if event.refusal is not None:
+        return state, buttons.refuse("slots", "cannot_hold", name=name, parameter=event.parameter)
+    return bind(state, event.slot, event.binding)
+
+
+def bind(state, slot, locator):
+    # Toggle: a parameter the slot holds is removed, any other added. A Set-wide slot refuses.
+    stored = state.fx_slots[slot]
+    name = _name(slot, False)
+    if stored is not None and not is_bound(stored):
+        return state, buttons.refuse("slots", "set_wide", name=name)
+    params = stored.params if stored is not None else ()
+    same = [p for p in params if _same(p, locator)]
+    if same:
+        kept = tuple(p for p in params if not _same(p, locator))
+        state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(kept) if kept else None))
+        return state, [save, *buttons.say("slots", "removed", name=name, param=describe(same[0]))]
+    bound_slot = BoundSlot(params + (locator,))
+    state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
+    listed = ", ".join(describe(p) for p in bound_slot.params)
+    return state, [save, *buttons.say("slots", "bound", name=name, params=listed)]
+
+
+def _same(a, b):
+    # The same parameter: a rack macro's name may have changed since it was bound.
+    return (a.track, a.tn, a.device, a.dn, a.param) == (b.track, b.tn, b.device, b.dn, b.param)
+
+
+def describe(locator):
+    # "Auto Filter Frequency", or a mixer parameter's "Bass Track Volume".
+    return f"{locator.device or locator.track} {locator.name}"
 
 
 # Held slots: a tap recalls on the lift, a slide right blends towards the slot.
@@ -754,8 +810,6 @@ def racks_read(state, event, snapshot):
     if event.hold:
         return _hold_read(state, event, snapshot)
     name, owner = _name(event.slot, event.scene), _owner(event.scene)
-    if not event.recall and event.scoped:
-        return _store_scoped(state, event, name)
     if not event.recall:
         if not event.racks:
             return state, buttons.refuse(owner, "no_racks")
@@ -797,19 +851,6 @@ def racks_read(state, event, snapshot):
     state, actions = _close_steps(state)
     state = replace(state, morph=morph, fx_undo_open=True)
     return state, actions + [BeginUndoStep(), *message]
-
-
-def _store_scoped(state, event, name):
-    # The selected rack's macros only; its key counts every rack in the Set, as a recall's do.
-    stored = tuple(
-        item
-        for item, view in zip(capture(event.racks), event.racks)
-        if event.selected is not None and view.path == event.selected
-    )
-    if not stored:
-        return state, buttons.refuse("slots", "no_rack", name=name)
-    state, save = _save_slots(state, _put(state.fx_slots, event.slot, bind_racks(stored)))
-    return state, [save, *buttons.say("slots", "stored_scoped", name=name, rack=stored[0].rack)]
 
 
 def tick(state, transport, values, triggered=None):

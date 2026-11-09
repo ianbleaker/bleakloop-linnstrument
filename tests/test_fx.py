@@ -6,6 +6,8 @@ import pytest
 from BleakLoop.core import engine, fx, layout, session
 from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
+    BindSelectedParameter,
+    ParameterBound,
     FaderView,
     SlideMoved,
     XAxis,
@@ -28,7 +30,7 @@ from BleakLoop.core.model import (
     StoreFxSnapshot,
     TrackView,
 )
-from BleakLoop.core.modes import BoundRead, BoundSlot, FaderBinding, FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
+from BleakLoop.core.modes import BindHold, BoundRead, BoundSlot, FaderBinding, FxRack, Glide, Mode, Morph, MorphMacro, PendingLaunch, SlotHold, State
 from BleakLoop.core.values import FX_TOUCH_TOLERANCE, X_COLUMN_WIDTH
 
 
@@ -433,10 +435,6 @@ BANK_2 = replace(FX, fx_bank=1)
 
 def test_an_empty_slot_in_bank_2_stores_its_global_slot():
     assert handle(BANK_2, SLOT_3) == (BANK_2, [StoreFxSnapshot(18)])
-
-
-def test_shift_and_an_empty_slot_in_bank_2_scopes_its_global_slot():
-    assert handle(replace(BANK_2, shift=True), SLOT_3)[1] == [StoreFxSnapshot(18, scoped=True)]
 
 
 def test_a_store_in_bank_2_names_the_bank():
@@ -1393,6 +1391,82 @@ def test_the_value_meter_follows_the_slide_and_redraws():
     assert session.render(state, SNAP)[SLOT_3] == Light(PINK, Blink.FAST)
 
 
+# Binding: Shift + a slot (C3)
+
+EQ = FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency")
+
+
+def bound_answer(state, slot=2, binding=FREQ, parameter="Frequency", refusal=None):
+    return engine.handle(state, ParameterBound(slot, binding, parameter, refusal), SNAP)
+
+
+@pytest.mark.parametrize("layer", ["FX", "PANEL", "MIXER_PANEL"])
+def test_shift_and_a_slot_binds_on_the_lift(layer):
+    # The panels are defined further down.
+    shifted = replace(globals()[layer], shift=True)
+    held, actions = handle(shifted, SLOT_3)
+    assert actions == [] and held.fx_bind_hold == BindHold(SLOT_3[1], SLOT_3[0], 2)
+    released, actions = handle(replace(held, shift=False), SLOT_3, pressed=False)
+    assert actions == [BindSelectedParameter(2)] and released.fx_bind_hold is None
+
+
+def test_shift_and_a_slot_in_bank_2_binds_its_global_slot():
+    held, _ = handle(replace(BANK_2, shift=True), SLOT_3)
+    assert handle(held, SLOT_3, pressed=False)[1] == [BindSelectedParameter(18)]
+
+
+def test_shift_and_a_stored_slot_never_recalls_or_slides():
+    state = replace(with_slot(FX, 2), shift=True)
+    held, actions = handle(state, SLOT_3)
+    assert actions == [] and held.fx_holds == ()
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
+
+
+def test_a_bind_adds_to_an_empty_slot_and_names_it():
+    state, actions = bound_answer(FX)
+    assert state.fx_slots[2] == BoundSlot((FREQ,))
+    assert actions == [SaveFxSnapshots(fx.dump(state.fx_slots)), ShowMessage("Snapshot 3: Auto Filter Frequency")]
+
+
+def test_a_second_bind_adds_and_names_both():
+    state, _ = bound_answer(FX)
+    state, actions = bound_answer(state, binding=EQ)
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ))
+    assert actions[-1] == ShowMessage("Snapshot 3: Auto Filter Frequency, EQ Frequency")
+
+
+def test_binding_a_held_parameter_removes_it_and_the_last_empties_the_slot():
+    state, _ = bound_answer(with_slot(FX, 2, BoundSlot((FREQ, EQ))))
+    assert state.fx_slots[2] == BoundSlot((EQ,))
+    state, actions = bound_answer(state, binding=EQ)
+    assert state.fx_slots[2] is None
+    assert actions[-1] == ShowMessage("Removed EQ Frequency from Snapshot 3")
+
+
+def test_a_renamed_macro_still_toggles_off():
+    macro = FaderBinding("A", 0, "R", 0, 1, "Macro 1")
+    renamed = replace(macro, name="Cutoff")
+    state, _ = bound_answer(with_slot(FX, 2, BoundSlot((macro,))), binding=renamed)
+    assert state.fx_slots[2] is None
+
+
+@pytest.mark.parametrize(
+    "refusal, parameter, message",
+    [
+        ("select", None, "Click a parameter in Live first"),
+        ("macro", "Gain", "Snapshot 3 can't hold Gain"),
+        ("refused", "Crossfader", "Snapshot 3 can't hold Crossfader"),
+    ],
+)
+def test_bind_refusals(refusal, parameter, message):
+    assert bound_answer(FX, binding=None, parameter=parameter, refusal=refusal) == (FX, [ShowMessage(message)])
+
+
+def test_a_set_wide_slot_refuses_a_bind():
+    state = with_slot(FX, 2)
+    assert bound_answer(state) == (state, [ShowMessage("Delete Snapshot 3 to bind to it")])
+
+
 # Held slots: the meter (B7)
 
 
@@ -2070,48 +2144,11 @@ def test_the_panel_stores_over_and_clears_with_copy_and_delete(state):
     ]
 
 
-@pytest.mark.parametrize("state", [FX, PANEL, MIXER_PANEL])
-def test_shift_and_an_empty_slot_stores_scoped(state):
-    shifted = replace(state, shift=True)
-    assert handle(shifted, SLOT_3) == (shifted, [StoreFxSnapshot(2, scoped=True)])
-
-
-def test_shift_and_a_stored_slot_or_a_scene_snapshot_does_nothing():
-    state = replace(with_slot(FX, 2), shift=True)
-    assert handle(state, SLOT_3) == (state, [])
-    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
-    assert handle(with_scene(state, 1), SCENE_2, snapshot=SCENES) == (with_scene(state, 1), [])
-
-
 @pytest.mark.parametrize("held", ["copy", "delete"])
 def test_copy_and_delete_come_before_shift(held):
     state = replace(with_slot(FX, 2), shift=True, **{held: True})
     action = handle(state, SLOT_3)[1][0]
     assert action == StoreFxSnapshot(2) if held == "copy" else isinstance(action, SaveFxSnapshots)
-
-
-def scoped_read(state, slot, racks, selected):
-    event = RacksRead(slot, racks, False, scoped=True, selected=selected)
-    return engine.handle(state, event, SNAP)
-
-
-def test_a_scoped_store_without_a_selected_rack_refuses():
-    racks = (rack("A", "R", 1.0, path=P0),)
-    assert scoped_read(FX, 2, racks, None) == (FX, [ShowMessage("Select a rack to store Snapshot 3")])
-
-
-def test_a_scoped_store_holds_the_selected_rack_only():
-    racks = (rack("A", "R", 1.0, path=P0), rack("A", "R", 2.0, path=P1), rack("B", "S", 3.0))
-    state, actions = scoped_read(FX, 2, racks, P1)
-    # Keyed over every rack: the second "A"/"R" is n = 1.
-    stored = fx.bind_racks((FxRack("A", "R", 1, (2.0,)),))
-    assert stored == BoundSlot((FaderBinding("A", 0, "R", 1, 1, "Macro 1"),))
-    assert state.fx_slots[2] == stored
-    slots = fx._put(FX.fx_slots, 2, stored)
-    assert actions == [
-        SaveFxSnapshots(fx.dump(slots)),
-        ShowMessage("Snapshot 3 stored (R)"),
-    ]
 
 
 def test_stop_leaves_the_panel_alone():

@@ -215,6 +215,7 @@ def reset(state):
         fx_holds=(),
         fx_slide_params=(),
         fx_slide_undo_open=False,
+        fx_bind_hold=None,
     )
     return state, actions
 

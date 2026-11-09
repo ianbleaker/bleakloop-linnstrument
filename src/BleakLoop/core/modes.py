@@ -162,6 +162,16 @@ class SlotHold:
 
 
 @dataclass(frozen=True)
+class BindHold:
+    # Shift + a snapshot slot, held: its lift binds Live's selected parameter, unless a Device
+    # FX row was tapped during the hold, which bound that row's instead.
+    pad: int
+    column: int
+    slot: int  # the global slot
+    used: bool = False
+
+
+@dataclass(frozen=True)
 class SlideParam:
     # A parameter a held slide has taken: one origin for every slide holding it.
     key: object
@@ -241,6 +251,7 @@ class State:
     fx_slide_params: tuple = ()  # SlideParam per parameter a held slide has written
     fx_slide_undo_open: bool = False  # held slides' shared undo step is open in Live
     fx_slide_count: int = 0  # counts slides as they start, for SlotHold.order
+    fx_bind_hold: BindHold | None = None  # Shift + a slot, held
     fx_undo_open: bool = False  # a recall's undo step is open in Live
     fx_landed: int | None = None  # the global slot of the last recall that landed
     fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty

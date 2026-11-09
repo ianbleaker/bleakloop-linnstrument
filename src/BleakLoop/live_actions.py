@@ -14,6 +14,7 @@ from .core.model import (
     ArmExclusive,
     BeginUndoStep,
     BindFader,
+    BindSelectedParameter,
     CaptureAndInsertScene,
     CaptureMidi,
     ClearBackToArrangement,
@@ -28,6 +29,7 @@ from .core.model import (
     EndUndoStep,
     EnterMode,
     FaderBound,
+    ParameterBound,
     FireScene,
     FireSlot,
     HighlightSlot,
@@ -162,33 +164,44 @@ def _mixable(song):
 
 def _binding(song, row):
     # (FaderBinding, message) for Live's selected parameter, or (None, the refusal).
+    binding, owner, name, refusal = _locate(song)
+    if refusal == "select":
+        return None, buttons.system("bind_select")
+    if refusal == "macro":
+        return None, buttons.system("bind_macro")
+    if refusal is not None:
+        return None, buttons.system("bind_refused")
+    return binding, buttons.system("bound", fader=row + 1, owner=owner, parameter=name)
+
+
+def _locate(song):
+    # (FaderBinding, owner name, parameter name, None) for Live's selected parameter, or
+    # (None, None, its name or None, refusal): "select" with nothing selected, "macro" inside
+    # a rack chain, "refused" for anything else that can't be bound.
     parameter = song.view.selected_parameter
     if parameter is None:
-        return None, buttons.system("bind_select")
+        return None, None, None, "select"
     owner = getattr(parameter, "canonical_parent", None)
     track = getattr(owner, "canonical_parent", None)
     tracks = [entry[2] for entry in live_state.fx_tracks(song)]
     if not any(track == other for other in tracks):
         # Inside a rack chain, or not on a track at all.
-        if _on_a_track(track, tracks):
-            return None, buttons.system("bind_macro")
-        return None, buttons.system("bind_refused")
+        return None, None, parameter.name, "macro" if _on_a_track(track, tracks) else "refused"
     tn = _earlier_named(tracks, track)
     if hasattr(owner, "sends"):
         # The track's mixer: volume, pan and sends only.
         index = _index(live_state.mixer_parameters(track), parameter)
         if index is None:
-            return None, buttons.system("bind_refused")
-        binding = FaderBinding(track.name, tn, None, 0, index, parameter.name)
-        return binding, buttons.system("bound", fader=row + 1, owner=track.name, parameter=parameter.name)
+            return None, None, parameter.name, "refused"
+        return FaderBinding(track.name, tn, None, 0, index, parameter.name), track.name, parameter.name, None
     index = _index(list(owner.parameters), parameter)
     if index is None:
-        return None, buttons.system("bind_refused")
+        return None, None, parameter.name, "refused"
     devices = list(track.devices)
     binding = FaderBinding(
         track.name, tn, owner.name, _earlier_named(devices, owner), index, parameter.name
     )
-    return binding, buttons.system("bound", fader=row + 1, owner=owner.name, parameter=parameter.name)
+    return binding, owner.name, parameter.name, None
 
 
 def _on_a_track(item, tracks):
@@ -420,10 +433,7 @@ def apply(action, song, surface):
             return RacksRead(
                 action.slot, racks, True, action.bars, action.scene, action.end_beats, hold=action.hold
             )
-        selected = live_state.read_selected_rack(song) if action.scoped else None
-        return RacksRead(
-            action.slot, racks, False, scene=action.scene, scoped=action.scoped, selected=selected
-        )
+        return RacksRead(action.slot, racks, False, scene=action.scene)
     elif isinstance(action, SetMacros):
         # The Set can change mid-morph: a parameter that has moved or gone is skipped.
         targets = live_state.target_parameters(song, (key for key, _ in action.writes))
@@ -439,6 +449,9 @@ def apply(action, song, surface):
             logger.info("FADERS: skipped row %d, %r not found", action.row + 1, action.name)
         else:
             parameter.value = min(max(action.value, parameter.min), parameter.max)
+    elif isinstance(action, BindSelectedParameter):
+        binding, _, name, refusal = _locate(song)
+        return ParameterBound(action.slot, binding, name, refusal)
     elif isinstance(action, BindFader):
         binding, message = _binding(song, action.row)
         return FaderBound(action.row, binding, message)

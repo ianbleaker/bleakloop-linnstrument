@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from . import controls, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
-from .model import FaderBound, PadPress, RacksRead, ScenesChanged
+from .model import FaderBound, PadPress, ParameterBound, RacksRead, ScenesChanged
 from .modes import Mode
 
 
@@ -14,6 +14,8 @@ def handle(state, event, snapshot):
     if isinstance(event, ScenesChanged):
         # The scene snapshots follow the Set in every mode.
         return fx.scenes_changed(state, event)
+    if isinstance(event, ParameterBound):
+        return fx.parameter_bound(state, event)
     if isinstance(event, FaderBound):
         return faders.bound(state, event)
     if (

@@ -12,6 +12,8 @@ from BleakLoop.core.model import (  # noqa: E402
     SetMacros,
     ShowMessage,
     BindFader,
+    BindSelectedParameter,
+    ParameterBound,
     CopyGroupClips,
     CopyScene,
     DeleteGroupClips,
@@ -460,12 +462,6 @@ def test_fx_snapshot_reads_pass_scene_and_end_through(no_racks, action, event):
     assert apply(action, SimpleNamespace()) == event
 
 
-def test_a_scoped_store_reads_the_selected_rack(no_racks, monkeypatch):
-    monkeypatch.setattr(live_actions.live_state, "read_selected_rack", lambda song: ("track", 1, 0))
-    event = apply(StoreFxSnapshot(3, scoped=True), SimpleNamespace())
-    assert event == RacksRead(3, (), False, scoped=True, selected=("track", 1, 0))
-
-
 # Sequencer Mode actions
 
 
@@ -712,3 +708,18 @@ def test_a_bound_slots_read_resolves_its_locators_not_the_racks():
     event = apply(RecallFxSnapshot(4, None, hold=True, locators=(frequency,)), target_song())
     assert event.racks == () and event.hold and event.slot == 4
     assert [p.name for p in event.params] == ["Frequency"]
+
+
+@pytest.mark.parametrize(
+    "parameter, expected",
+    [
+        (
+            BIND_TRACKS[0].devices[1].parameters[1],
+            ParameterBound(5, FaderBinding("Bass", 0, "EQ", 1, 1, "Frequency"), "Frequency", None),
+        ),
+        (None, ParameterBound(5, None, None, "select")),
+        (BIND_MASTER.mixer_device.crossfader, ParameterBound(5, None, "Crossfader", "refused")),
+    ],
+)
+def test_bind_the_selected_parameter_to_a_slot(parameter, expected):
+    assert apply(BindSelectedParameter(5), bind_song(parameter)) == expected

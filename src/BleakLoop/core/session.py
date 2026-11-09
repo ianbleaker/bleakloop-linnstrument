@@ -53,6 +53,9 @@ def handle(state, event, snapshot):
         return replace(state, window=window), []
     if not isinstance(event, PadPress):
         return state, []
+    if not event.pressed and fx.binding(state, event):
+        # Shift + a slot's lift binds, even once Shift is let go: the press decided.
+        return fx.bind_release(state)
     if not event.pressed and fx.holding(state, event):
         # A held slot's lift, wherever its finger slid to: a tap recalls, a slide keeps.
         return fx.release(state, event, snapshot)

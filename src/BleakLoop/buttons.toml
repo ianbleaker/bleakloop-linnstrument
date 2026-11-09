@@ -909,13 +909,16 @@ cleared = "{name} cleared"
 stored = "{name} stored ({racks})"
 recalled = "{name} recalled{note}"
 morphing = "{name} {timing}{note}"
-stored_scoped = "{name} stored ({rack})"
+bound = "{name}: {params}"
+removed = "Removed {param} from {name}"
 slid = "{name} at {percent}%{note}"
 slid_bound = "{name} at {percent}%: {params}{note}"
 named = "{name}: {params}{note}"
 [functions.slots.refusals]
 no_racks = "No racks to store"
-no_rack = "Select a rack to store {name}"
+no_parameter = "Click a parameter in Live first"
+set_wide = "Delete {name} to bind to it"
+cannot_hold = "{name} can't hold {parameter}"
 nothing = "{name}: nothing to recall{note}"
 
 [functions.banks]

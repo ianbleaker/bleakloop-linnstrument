@@ -232,6 +232,15 @@ class SlideMoved:
 
 
 @dataclass(frozen=True)
+class ParameterBound:
+    # Fed back by the adapter after BindSelectedParameter.
+    slot: int  # the global slot
+    binding: object  # FaderBinding, or None
+    parameter: str | None  # the selected parameter's name, for a refusal
+    refusal: str | None  # None, "select", "macro" or "refused"
+
+
+@dataclass(frozen=True)
 class FaderBound:
     # Fed back by the adapter after BindFader.
     row: int  # 0-7, pad 1 first
@@ -261,8 +270,6 @@ class RacksRead:
     bars: int | None = None  # the morph length; None for a jump
     scene: bool = False
     end_beats: float | None = None  # a scene launch's landing time, decided at the press
-    scoped: bool = False  # a store of the selected rack only
-    selected: tuple | None = None  # the selected top-level rack's path, for a scoped store
     hold: bool = False  # a held slot's read: a tap or a slide decides on the lift
     params: tuple = ()  # a bound slot's read: BoundRead or None per locator
 
@@ -482,7 +489,6 @@ class EndUndoStep:
 class StoreFxSnapshot:
     slot: int  # 0-15, or the scene index of a scene snapshot
     scene: bool = False
-    scoped: bool = False  # the selected rack only, not every rack in the Set
 
 
 @dataclass(frozen=True)
@@ -515,6 +521,11 @@ class SetFaderParameter:
     row: int  # 0-7, pad 1 first
     name: str  # the parameter's name at the press: a different parameter isn't written
     value: float
+
+
+@dataclass(frozen=True)
+class BindSelectedParameter:
+    slot: int  # the global slot: add Live's selected parameter to it, or remove it if there
 
 
 @dataclass(frozen=True)
