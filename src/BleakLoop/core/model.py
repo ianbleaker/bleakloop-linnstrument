@@ -216,6 +216,14 @@ class YAxis:
 
 
 @dataclass(frozen=True)
+class Pressure:
+    # A held pad's pressure, 0-127 (Polyphonic Pressure, note = column, channel = device row).
+    column: int
+    pad: int
+    value: int
+
+
+@dataclass(frozen=True)
 class XAxis:
     # X position across the whole surface, 0-2730 (architecture section 5).
     column: int
