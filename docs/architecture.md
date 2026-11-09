@@ -624,6 +624,7 @@ Every tuned number lives here with its reason and status. Code reads them from `
 | `SEQ_DEFAULT_RATE = 0.25`: Sequencer Mode's step length in beats (1/16) until a rate pad is pressed | `modes.State` | Chosen (#53) | Confirmed on device (stage 1 check) |
 | `AUDITION_CHANNEL = 15` (0-based): the channel note pads are translated to for audition, outside User Firmware Mode's row channels 1–8 | `surface` | Chosen (#53) | Confirmed on device (stage 1 check) |
 | `SLIDE_START = 0.25`: of a column, the X travel from a held step's first report that starts a velocity or nudge slide | `sequencer`, `fx` | Chosen (#53) | Fine on device (stage 2 check); a snapshot slot's slide uses it too (#100) |
+| `BIND_UNDO_MS = 10000`: the Undo pad's window to reverse a snapshot slot's bind or removal, with nothing else pressed | `fx` | Chosen (#100) | Check on the device |
 | `STATUS_MAX = 80`: characters of a bound slot's message before its parameter list ends "+N" | `fx` | Guess (#100) | Check on the device |
 | `VELOCITY_PER_COLUMN = 16`: velocity change per column of a velocity slide | `sequencer` | Chosen (#53 issue: about 16 per column) | Fine on device (stage 2 check) |
 | `NUDGE_PER_COLUMN = 0.125`: of a step, the start-time move per column of a nudge slide | `sequencer` | Chosen (#53 issue: one column per 1/8 step) | Fine on device (stage 2 check) |

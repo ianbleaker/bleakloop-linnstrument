@@ -135,6 +135,10 @@ def _fixed_length_press(state, snapshot, value):
 
 @functions.register("undo", light=_lit(WHITE))
 def _undo(state, snapshot, value):
+    # Within 10 s of binding a parameter to a snapshot slot, or removing one, with nothing
+    # pressed since, the pad reverses that instead: Live's Undo can't.
+    if fx.bind_undo_open(state):
+        return fx.unbind_last(state)
     return state, controls.undo(snapshot)
 
 

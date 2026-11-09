@@ -8,6 +8,30 @@ from .modes import Mode
 
 
 def handle(state, event, snapshot):
+    before = state
+    state, actions = _handle(state, event, snapshot)
+    if before.bind_undo and isinstance(event, PadPress) and event.pressed:
+        # Any other press ends the Undo pad's bind window: Shift, the Undo pad and a bind's own
+        # presses keep it.
+        normal = controls.at(controls.sections(before), (event.column, event.pad))
+        keeps = (
+            (normal is not None and normal.function == "shift")
+            or state.bind_undo != before.bind_undo
+            or state.fx_bind_hold != before.fx_bind_hold
+        )
+        if not keeps:
+            state = replace(state, bind_undo=(), bind_undo_at=None, bind_undo_now=None)
+    return state, actions
+
+
+def bind_tick(state, now_ms):
+    # The Undo pad's bind window on the 10 ms timer.
+    if not state.bind_undo:
+        return state
+    return fx.bind_tick(state, now_ms)
+
+
+def _handle(state, event, snapshot):
     if isinstance(event, RacksRead):
         # A morph runs in every mode.
         return fx.racks_read(state, event, snapshot)

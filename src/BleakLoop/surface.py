@@ -544,6 +544,8 @@ class BleakLoop(ControlSurface):
             transport = live_state.read_transport(self.song, Live.Application.get_application())
             if self._state.morph is not None:
                 self._morph_tick(transport)
+            if self._state.bind_undo:
+                self._state = engine.bind_tick(self._state, time.monotonic() * 1000)
             if self._state.fx_slide_params:
                 values = live_state.read_slide_values(self.song, self._state.fx_slide_params)
                 self._state = engine.slide_tick(self._state, values)

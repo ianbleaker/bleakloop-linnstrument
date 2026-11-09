@@ -19,7 +19,7 @@ from .model import (
     StoreFxSnapshot,
 )
 from .modes import BindHold, BoundRead, BoundSlot, FaderBinding, FxRack, Mode, Morph, MorphMacro, PendingLaunch, SlideParam, SlotHold
-from .values import BEAT_EPSILON, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, STATUS_MAX, X_COLUMN_WIDTH
+from .values import BEAT_EPSILON, BIND_UNDO_MS, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, STATUS_MAX, X_COLUMN_WIDTH
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
 SLIDE_COLUMNS = 4
@@ -373,7 +373,9 @@ def bind(state, slot, locator):
     if same:
         kept = tuple(p for p in params if not _same(p, locator))
         state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(kept) if kept else None))
+        state = _remember(state, slot, same[0], False)
         return state, [save, *buttons.say("slots", "removed", name=name, param=describe(same[0]))]
+    state = _remember(state, slot, locator, True)
     bound_slot = BoundSlot(params + (locator,))
     state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
     items = [describe(p) for p in bound_slot.params]
@@ -388,6 +390,46 @@ def listed(items, say):
         if not message or len(message[0].text) <= STATUS_MAX:
             return message
     return message
+
+
+def _remember(state, slot, locator, added):
+    # For the Undo pad: the window starts again at the next tick.
+    return replace(state, bind_undo=state.bind_undo + ((slot, locator, added),), bind_undo_at=None)
+
+
+def bind_undo_open(state):
+    # The Undo pad would reverse a bind: one is remembered and its window hasn't run out.
+    if not state.bind_undo:
+        return False
+    at, now = state.bind_undo_at, state.bind_undo_now
+    return at is None or now is None or now - at < BIND_UNDO_MS
+
+
+def unbind_last(state):
+    # The Undo pad: the newest bind or removal reversed, without Live's Undo. Its window
+    # starts again for the next.
+    (slot, locator, added), rest = state.bind_undo[-1], state.bind_undo[:-1]
+    state = replace(state, bind_undo=rest, bind_undo_at=None)
+    stored = state.fx_slots[slot]
+    params = stored.params if is_bound(stored) else ()
+    name, param = _name(slot, False), describe(locator)
+    if added:
+        kept = tuple(p for p in params if not _same(p, locator))
+        state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(kept) if kept else None))
+        return state, [save, *buttons.say("slots", "unbound", name=name, param=param)]
+    if stored is not None and not is_bound(stored):
+        return state, []
+    state, save = _save_slots(state, _put(state.fx_slots, slot, BoundSlot(params + (locator,))))
+    return state, [save, *buttons.say("slots", "rebound", name=name, param=param)]
+
+
+def bind_tick(state, now_ms):
+    # On the 10 ms timer while a bind is remembered: stamp it, and forget it once its window
+    # has run out.
+    at = now_ms if state.bind_undo_at is None else state.bind_undo_at
+    if now_ms - at >= BIND_UNDO_MS:
+        return replace(state, bind_undo=(), bind_undo_at=None, bind_undo_now=None)
+    return replace(state, bind_undo_at=at, bind_undo_now=now_ms)
 
 
 def _same(a, b):

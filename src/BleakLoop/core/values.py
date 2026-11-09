@@ -54,3 +54,6 @@ NUDGE_PER_COLUMN = 0.125  # of a step
 # A bound slot's message lists its parameters until it reaches this many characters, then
 # ends "+N" for the rest. To check on the device: how much of Live's status bar shows.
 STATUS_MAX = 80
+# The Undo pad reverses the last bind or removal of a snapshot slot's parameter this long after
+# it, with nothing else pressed since; past it, the pad is Live's Undo again.
+BIND_UNDO_MS = 10000

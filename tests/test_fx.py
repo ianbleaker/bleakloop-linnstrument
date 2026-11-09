@@ -6,6 +6,7 @@ import pytest
 from BleakLoop.core import engine, fx, layout, session
 from BleakLoop.core.leds import BLUE, CYAN, LIME, OFF, ORANGE, PINK, WHITE, YELLOW, Blink, Light
 from BleakLoop.core.model import (
+    Undo,
     BindFaderRow,
     BindSelectedParameter,
     ParameterBound,
@@ -1530,6 +1531,71 @@ def test_a_bind_message_shortens():
     _, actions = bound_answer(state, binding=params[5])
     text = actions[-1].text
     assert text.startswith("Snapshot 3: Device 0 Frequency") and text.endswith(", +3") and len(text) <= STATUS_MAX
+
+
+# Binding: the Undo pad (C6)
+
+UNDO = layout.GLOBAL.undo
+SHIFT = layout.GLOBAL.shift
+CAN_UNDO = replace(SNAP, can_undo=True)
+
+
+def bound_freq(state=FX):
+    state, _ = bound_answer(state)
+    return state
+
+
+def test_the_undo_pad_unbinds_within_the_window_without_lives_undo():
+    state, actions = handle(bound_freq(), UNDO, snapshot=CAN_UNDO)
+    assert state.fx_slots[2] is None and state.bind_undo == ()
+    assert actions == [SaveFxSnapshots(fx.dump(state.fx_slots)), ShowMessage("Unbound Auto Filter Frequency from Snapshot 3")]
+
+
+def test_the_undo_pad_rebinds_a_removal():
+    state, _ = bound_answer(bound_freq())
+    state, actions = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert state.fx_slots[2] == BoundSlot((FREQ,))
+    assert actions[-1] == ShowMessage("Bound Auto Filter Frequency to Snapshot 3 again")
+
+
+def test_several_undos_pop_newest_first_each_restarting_the_window():
+    state, _ = bound_answer(bound_freq(), binding=EQ)
+    state = engine.bind_tick(state, 0.0)
+    state = engine.bind_tick(state, 9000.0)
+    state, actions = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert actions[-1] == ShowMessage("Unbound EQ Frequency from Snapshot 3")
+    assert state.bind_undo_at is None
+    state = engine.bind_tick(state, 9010.0)
+    state = engine.bind_tick(state, 18000.0)
+    state, actions = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert actions[-1] == ShowMessage("Unbound Auto Filter Frequency from Snapshot 3")
+
+
+def test_after_the_window_the_undo_pad_is_lives_undo():
+    state = engine.bind_tick(bound_freq(), 0.0)
+    state = engine.bind_tick(state, 10000.0)
+    assert state.bind_undo == ()
+    state, actions = handle(state, UNDO, snapshot=CAN_UNDO)
+    assert actions == [Undo(), ShowMessage("Undo")] and state.fx_slots[2] == BoundSlot((FREQ,))
+
+
+def test_another_press_ends_the_window():
+    state, _ = engine.handle(bound_freq(), PadPress(13, 2, True), SNAP)
+    assert state.bind_undo == ()
+    assert handle(state, UNDO, snapshot=CAN_UNDO)[1][0] == Undo()
+
+
+def test_shift_and_its_release_keep_the_window():
+    state, _ = engine.handle(bound_freq(), PadPress(*SHIFT, True), SNAP)
+    state, _ = engine.handle(state, PadPress(*SHIFT, False), SNAP)
+    assert state.bind_undo != ()
+
+
+def test_a_binds_own_presses_keep_the_window():
+    state, _ = engine.handle(replace(bound_freq(), shift=True), PadPress(*SLOT_3, True), SNAP)
+    assert state.bind_undo != ()
+    state, _ = engine.handle(state, PadPress(5, 2, True), ROW_VIEWS)
+    assert state.bind_undo != ()
 
 
 # Held slots: the meter (B7)

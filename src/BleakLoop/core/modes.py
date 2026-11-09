@@ -252,6 +252,11 @@ class State:
     fx_slide_undo_open: bool = False  # held slides' shared undo step is open in Live
     fx_slide_count: int = 0  # counts slides as they start, for SlotHold.order
     fx_bind_hold: BindHold | None = None  # Shift + a slot, held
+    # The Undo pad's bind history: (slot, locator, added) per bind or removal, newest last;
+    # the time of the last one, None until the next 10 ms tick stamps it; the last tick's time.
+    bind_undo: tuple = ()
+    bind_undo_at: float | None = None
+    bind_undo_now: float | None = None
     fx_undo_open: bool = False  # a recall's undo step is open in Live
     fx_landed: int | None = None  # the global slot of the last recall that landed
     fx_scenes: tuple = ()  # per scene index: tuple of FxRack, or None when empty
