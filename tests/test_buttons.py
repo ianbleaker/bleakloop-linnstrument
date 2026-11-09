@@ -19,6 +19,10 @@ def test_group_keeps_file_order_and_tuples():
     assert layout.FX.slots[8] == (12, 1)
 
 
+def test_banks_are_column_13s_eight_pads():
+    assert layout.FX.banks == {(13, bank): bank for bank in range(1, 9)}
+
+
 @pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.toml")), ids=lambda path: path.stem)
 def test_invalid_file_raises(path):
     with pytest.raises(ValueError):

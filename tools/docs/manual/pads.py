@@ -257,6 +257,7 @@ _FX = (
         "Press an empty slot to store, a stored one to recall. Shift + an empty slot stores "
         "the selected rack alone, in pink.",
     ),
+    _group("Banks", "fx", "banks"),
     _group("Scene snapshots", "fx", "scene_slots"),
     _group("Bars", "fx", "bars"),
 )

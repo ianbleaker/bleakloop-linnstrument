@@ -309,6 +309,22 @@ def test_other_grid_pads_do_nothing(key):
     assert handle(FX, key, pressed=False) == (FX, [])
 
 
+def test_banks_start_on_bank_1():
+    assert FX.fx_bank == 0
+
+
+def test_a_bank_press_selects_it():
+    state, actions = handle(FX, (13, 3))
+    assert state.fx_bank == 2
+    assert actions == [ShowMessage("Bank 3")]
+    assert handle(state, (13, 3), pressed=False) == (state, [])
+
+
+def test_render_lights_the_selected_bank_orange_and_the_others_dark():
+    frame = fx.render(replace(FX, fx_bank=4), SNAP)
+    assert [frame[(13, pad)] for pad in range(1, 9)] == [Light(OFF)] * 4 + [Light(ORANGE)] + [Light(OFF)] * 3
+
+
 def test_slot_release_does_nothing():
     assert handle(FX, SLOT_3, pressed=False) == (FX, [])
 
@@ -784,7 +800,7 @@ def test_render_slots_and_lengths():
     for key in ((10, 1), (10, 2), (10, 4), (10, 5)):
         assert frame[key] == Light(WHITE)
     lit = {key for key, light in frame.items() if light != Light(OFF)}
-    assert lit == {layout.FX.slots[i] for i in (0, 5, 9)} | set(layout.FX.bars)
+    assert lit == {layout.FX.slots[i] for i in (0, 5, 9)} | set(layout.FX.bars) | {(13, 1)}
 
 
 def test_render_scoped_slots_pink():
@@ -1366,6 +1382,11 @@ def test_a_pending_scene_blinks_yellow():
 
 PANEL = State(split=True, split_snapshots=True)
 MIXER_PANEL = State(mixer=True, mixer_split=True, split_snapshots=True)
+
+
+@pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])
+def test_the_split_panel_selects_banks(state):
+    assert handle(state, (13, 8))[0].fx_bank == 7
 
 
 @pytest.mark.parametrize("state", [PANEL, MIXER_PANEL])

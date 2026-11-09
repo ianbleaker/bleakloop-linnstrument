@@ -118,6 +118,14 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 | 12/6 | slots | `slots` 14 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
 | 12/7 | slots | `slots` 15 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
 | 12/8 | slots | `slots` 16 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note}<br>stored_scoped: {name} stored ({rack}) | no_racks: No racks to store<br>no_rack: Select a rack to store {name}<br>nothing: {name}: nothing to recall{note} | yes |
+| 13/1 | Bank 1 | `banks` 1 |  | selected: Bank {bank} |  | yes |
+| 13/2 | Bank 2 | `banks` 2 |  | selected: Bank {bank} |  | yes |
+| 13/3 | Bank 3 | `banks` 3 |  | selected: Bank {bank} |  | yes |
+| 13/4 | Bank 4 | `banks` 4 |  | selected: Bank {bank} |  | yes |
+| 13/5 | Bank 5 | `banks` 5 |  | selected: Bank {bank} |  | yes |
+| 13/6 | Bank 6 | `banks` 6 |  | selected: Bank {bank} |  | yes |
+| 13/7 | Bank 7 | `banks` 7 |  | selected: Bank {bank} |  | yes |
+| 13/8 | Bank 8 | `banks` 8 |  | selected: Bank {bank} |  | yes |
 | 14/1 | Scene 1 | `scene_slots` 1 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
 | 14/2 | Scene 2 | `scene_slots` 2 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |
 | 14/3 | Scene 3 | `scene_slots` 3 |  | cleared: {name} cleared<br>stored: {name} stored ({racks})<br>recalled: {name} recalled{note}<br>morphing: {name} {timing}{note} | no_racks: No racks to store<br>nothing: {name}: nothing to recall{note} | yes |

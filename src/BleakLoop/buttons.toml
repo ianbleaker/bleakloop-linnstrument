@@ -232,7 +232,8 @@ value = 1
 label = "Device+"
 
 
-# FX Mode: value is the snapshot slot, the scene in the window, or the morph length in bars.
+# FX Mode: value is the snapshot slot, the bank, the scene in the window, or the morph length
+# in bars.
 
 [fx.slot_1]
 pad = [11, 1]
@@ -313,6 +314,54 @@ value = 15
 pad = [12, 8]
 does = "slots"
 value = 16
+
+[fx.bank_1]
+pad = [13, 1]
+does = "banks"
+value = 1
+label = "Bank 1"
+
+[fx.bank_2]
+pad = [13, 2]
+does = "banks"
+value = 2
+label = "Bank 2"
+
+[fx.bank_3]
+pad = [13, 3]
+does = "banks"
+value = 3
+label = "Bank 3"
+
+[fx.bank_4]
+pad = [13, 4]
+does = "banks"
+value = 4
+label = "Bank 4"
+
+[fx.bank_5]
+pad = [13, 5]
+does = "banks"
+value = 5
+label = "Bank 5"
+
+[fx.bank_6]
+pad = [13, 6]
+does = "banks"
+value = 6
+label = "Bank 6"
+
+[fx.bank_7]
+pad = [13, 7]
+does = "banks"
+value = 7
+label = "Bank 7"
+
+[fx.bank_8]
+pad = [13, 8]
+does = "banks"
+value = 8
+label = "Bank 8"
 
 [fx.scene_slot_1]
 pad = [14, 1]
@@ -860,6 +909,11 @@ stored_scoped = "{name} stored ({rack})"
 no_racks = "No racks to store"
 no_rack = "Select a rack to store {name}"
 nothing = "{name}: nothing to recall{note}"
+
+[functions.banks]
+manual = "Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1."
+[functions.banks.outcomes]
+selected = "Bank {bank}"
 
 [functions.scene_slots]
 manual = "A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it."

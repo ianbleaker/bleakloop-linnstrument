@@ -5,7 +5,7 @@ import math
 from dataclasses import replace
 
 from . import buttons, faders, functions, layout, mixer
-from .leds import CYAN, LIME, OFF, PINK, WHITE, Blink, Light
+from .leds import CYAN, LIME, OFF, ORANGE, PINK, WHITE, Blink, Light
 from .model import (
     BeginUndoStep,
     EndUndoStep,
@@ -271,6 +271,15 @@ def press(state, event, snapshot):
 @functions.register("slots", light=lambda state, snapshot, slot: _slot_light(state, slot - 1))
 def _slot(state, snapshot, slot):
     return _slot_press(state, slot - 1, False, snapshot)
+
+
+@functions.register(
+    "banks", light=lambda state, snapshot, bank: Light(ORANGE if bank - 1 == state.fx_bank else OFF)
+)
+def _bank(state, snapshot, bank):
+    # One value for the whole Set, held in memory only: a set_data write would put a dead
+    # step on Live's Undo (#63).
+    return replace(state, fx_bank=bank - 1), buttons.say("banks", "selected", bank=bank)
 
 
 @functions.register(

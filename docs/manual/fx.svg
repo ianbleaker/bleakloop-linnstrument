@@ -115,7 +115,7 @@
 <rect x="522" y="270" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="522" y="316" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="522" y="362" width="40" height="40" rx="4" fill="#2a2a2e"/>
-<rect x="568" y="40" width="40" height="40" rx="4" fill="#2a2a2e"/>
+<rect x="568" y="40" width="40" height="40" rx="4" fill="#ff8a1a"/>
 <rect x="568" y="86" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="568" y="132" width="40" height="40" rx="4" fill="#2a2a2e"/>
 <rect x="568" y="178" width="40" height="40" rx="4" fill="#2a2a2e"/>
@@ -174,6 +174,22 @@
 <text x="450" y="201" font-size="9" fill="#ffffff" text-anchor="middle">8 bars</text>
 <rect x="432" y="237" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="450" y="247" font-size="9" fill="#ffffff" text-anchor="middle">16 bars</text>
+<rect x="570" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Bank 1</text>
+<rect x="570" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="109" font-size="9" fill="#ffffff" text-anchor="middle">Bank 2</text>
+<rect x="570" y="145" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="155" font-size="9" fill="#ffffff" text-anchor="middle">Bank 3</text>
+<rect x="570" y="191" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="201" font-size="9" fill="#ffffff" text-anchor="middle">Bank 4</text>
+<rect x="570" y="237" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="247" font-size="9" fill="#ffffff" text-anchor="middle">Bank 5</text>
+<rect x="570" y="283" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="293" font-size="9" fill="#ffffff" text-anchor="middle">Bank 6</text>
+<rect x="570" y="329" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="339" font-size="9" fill="#ffffff" text-anchor="middle">Bank 7</text>
+<rect x="570" y="375" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
+<text x="588" y="385" font-size="9" fill="#ffffff" text-anchor="middle">Bank 8</text>
 <rect x="616" y="53" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>
 <text x="634" y="63" font-size="9" fill="#ffffff" text-anchor="middle">Scene 1</text>
 <rect x="616" y="99" width="36" height="15" rx="7" fill="#000000" fill-opacity="0.72"/>

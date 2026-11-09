@@ -7,7 +7,7 @@ import string
 
 # A group's buttons are read by index or hold fixed settings: they may move and be relabelled,
 # never be added, removed or given another value.
-FIXED_GROUPS = frozenset({"slots", "scene_slots", "pages", "bars", "rates", "tracks", "devices"})
+FIXED_GROUPS = frozenset({"slots", "banks", "scene_slots", "pages", "bars", "rates", "tracks", "devices"})
 # A group the user may add to, remove from and give new values.
 OPEN_GROUPS = frozenset({"tempo", "window"})
 

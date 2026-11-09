@@ -61,6 +61,7 @@ MODES = {
     "pages": frozenset({SEQUENCER}),
     # FX Mode and the split views' snapshot panel.
     "slots": frozenset({SESSION}),
+    "banks": frozenset({SESSION}),
     "scene_slots": frozenset({SESSION}),
     "bars": frozenset({SESSION}),
     # Unlit and unused until Chord is built.

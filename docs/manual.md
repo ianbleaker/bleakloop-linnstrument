@@ -193,6 +193,7 @@ With the snapshots in the panel, columns 10–14 work as FX Mode's.
 - **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
 - **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
+- **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 
 With **Shift** held:
@@ -258,6 +259,7 @@ With **Shift** held:
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
 - **Snapshots**: Sixteen snapshots of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
+- **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 <!-- /callouts:fx -->
 

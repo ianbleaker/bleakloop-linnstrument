@@ -67,6 +67,27 @@ def test_a_change_outside_the_rules_is_refused_naming_the_user_file(stem, error)
     assert str(raised.value).startswith(f"{path}: ")
 
 
+@pytest.mark.parametrize(
+    "text, error",
+    [
+        ("[fx.bank_8]\nremoved = true\n", "banks buttons can't be removed"),
+        ("[fx.bank_2]\nvalue = 3\n", "banks values can't change"),
+        ('[fx.bank_9]\npad = [14, 8]\ndoes = "banks"\nvalue = 9\n', "banks buttons can't be added"),
+    ],
+)
+def test_banks_are_a_fixed_group(tmp_path, text, error):
+    path = tmp_path / "buttons.toml"
+    path.write_text(text)
+    with pytest.raises(ValueError, match=error):
+        buttons.load(buttons.PATH, path)
+
+
+def test_a_bank_may_move(tmp_path):
+    path = tmp_path / "buttons.toml"
+    path.write_text("[fx.bank_8]\npad = [14, 8]\n")
+    assert buttons.load(buttons.PATH, path).pos("fx.bank_8") == (14, 8)
+
+
 def test_a_full_copy_of_the_shipped_file_loads_unchanged(tmp_path):
     copy = tmp_path / "buttons.toml"
     copy.write_bytes(buttons.PATH.read_bytes())
