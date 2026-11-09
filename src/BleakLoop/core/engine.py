@@ -120,6 +120,13 @@ def slide_tick(state, values):
     return fx.slide_tick(state, values)
 
 
+def return_tick(state, now_ms):
+    # Lifted punches ramping back on the 10 ms timer, in every mode.
+    if not state.fx_returns:
+        return state, []
+    return fx.return_tick(state, now_ms)
+
+
 def launch_tick(state, transport):
     # A pending scene launch on the 10 ms timer, in every mode, and a redraw flag.
     if state.pending_launch is None:

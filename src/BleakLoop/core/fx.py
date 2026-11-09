@@ -32,7 +32,16 @@ from .modes import (
     SlideParam,
     SlotHold,
 )
-from .values import BEAT_EPSILON, BIND_UNDO_MS, FX_TOUCH_TOLERANCE, LOOP_WRAP_TOLERANCE, SLIDE_START, STATUS_MAX, X_COLUMN_WIDTH
+from .values import (
+    BEAT_EPSILON,
+    BIND_UNDO_MS,
+    FX_TOUCH_TOLERANCE,
+    LOOP_WRAP_TOLERANCE,
+    PUNCH_RETURN_MS,
+    SLIDE_START,
+    STATUS_MAX,
+    X_COLUMN_WIDTH,
+)
 
 # A slide's travel to 100%, in columns: four pads to the right of its slot.
 SLIDE_COLUMNS = 4
@@ -925,17 +934,17 @@ def _end_punch(state, hold):
     # press: on/off and choosers at once, the others over PUNCH_RETURN_MS. One a fader or a knob
     # took out of the punch stays where it is. The slides' undo step stays open until the last
     # return lands.
-    quantized = {m.key: m.quantized for m in hold.read}
     handed, snaps, ramps = {}, [], []
-    for key in _keys(hold):
-        param = _param(state, key)
+    for macro in hold.read:
+        key = macro.key
+        param = _param(state, key) if key not in hold.dropped else None
         if param is None:
             continue
         owner = _slide_owner(state, key)
         if owner is not None:
             handed.setdefault(owner.pad, set()).add(key)
         elif param.written != param.origin:
-            back = MorphMacro(key, param.written, param.origin, quantized[key], param.written, param.span)
+            back = MorphMacro(key, param.written, param.origin, macro.quantized, param.written, param.span)
             (snaps if back.quantized else ramps).append(back)
     actions = []
     for pad, keys in handed.items():
@@ -946,6 +955,28 @@ def _end_punch(state, hold):
     if ramps:
         state = replace(state, fx_returns=state.fx_returns + (PunchReturn(tuple(ramps)),))
     state = _rebase(state)
+    return _close_slides(state, actions)
+
+
+def return_tick(state, now_ms):
+    # On the 10 ms timer while punches return: each moves linearly from its lift's values to
+    # its press's over PUNCH_RETURN_MS, timed from its first tick. The last to land closes the
+    # slides' undo step, unless a slide is still held.
+    writes, running = [], []
+    for back in state.fx_returns:
+        started = now_ms if back.started_at is None else back.started_at
+        t = min((now_ms - started) / PUNCH_RETURN_MS, 1.0)
+        macros = []
+        for macro in back.macros:
+            value = macro.start + t * (macro.target - macro.start)
+            if value != macro.written:
+                writes.append((macro.key, value))
+                macro = replace(macro, written=value)
+            macros.append(macro)
+        if t < 1.0:
+            running.append(replace(back, macros=tuple(macros), started_at=started))
+    state = replace(state, fx_returns=tuple(running))
+    actions = [SetMacros(tuple(writes))] if writes else []
     return _close_slides(state, actions)
 
 

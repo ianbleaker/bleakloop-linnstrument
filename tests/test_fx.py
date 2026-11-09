@@ -2833,3 +2833,61 @@ def test_a_punch_slid_back_to_0_has_nothing_to_return():
     state, _, _ = punch_x(punch_holding(), -5)
     state, actions = lift(state)
     assert actions == [EndUndoStep()] and state.fx_returns == ()
+
+
+def returning():
+    state, _ = lift(punch_holding())
+    return state
+
+
+def test_a_return_lands_in_about_5_ticks_linearly():
+    state = returning()
+    state, actions = engine.return_tick(state, 1000.0)
+    assert actions == [] and state.fx_returns[0].started_at == 1000.0
+    key, start = AB_TARGETS[0]
+    seen = []
+    for k in range(1, 6):
+        state, actions = engine.return_tick(state, 1000.0 + 10 * k)
+        seen.append(dict(actions[0].writes)[key])
+        if k < 5:
+            assert actions == [actions[0]] and state.fx_slide_undo_open
+    assert seen == pytest.approx([start * (1 - k / 5) for k in range(1, 6)])
+    assert actions[-1] == EndUndoStep() and actions.count(EndUndoStep()) == 1
+    assert state.fx_returns == () and not state.fx_slide_undo_open
+    assert engine.return_tick(state, 2000.0) == (state, [])
+
+
+def test_two_returns_run_side_by_side_and_close_the_step_once():
+    state = with_slot(PUNCH_AB, 0, (FxRack("B", "R", 0, (50.0,)),))
+    state = replace(state, fx_slots=fx._put(state.fx_slots, 2, (FxRack("A", "R", 0, (10.0, 20.0)),)))
+    state, _ = handle(state, SLOT_3)
+    state, _ = hold_read(state)
+    state, _ = handle(state, OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _ = lift(state)
+    state, _ = engine.return_tick(state, 0.0)
+    state, _ = engine.return_tick(state, 30.0)
+    state, _ = lift(state, OTHER_SLOT)
+    assert len(state.fx_returns) == 2
+    state, actions = engine.return_tick(state, 40.0)
+    # The first lands at 50 ms; the second starts timing at this tick.
+    assert len(state.fx_returns) == 2 and state.fx_returns[1].started_at == 40.0
+    state, actions = engine.return_tick(state, 50.0)
+    assert len(state.fx_returns) == 1 and EndUndoStep() not in actions
+    assert {key for key, _ in actions[0].writes} == {(P0, "R", 0), (P0, "R", 1), (P1, "R", 0)}
+    state, actions = engine.return_tick(state, 90.0)
+    assert actions[-1] == EndUndoStep() and state.fx_returns == ()
+
+
+def test_a_held_slide_keeps_the_step_open_after_a_return_lands():
+    state = with_slot(PUNCH_AB, 0, (FxRack("B", "R", 0, (50.0,)),))
+    state, _ = handle(replace(state, device_clip=False), OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _, _ = x(state, 11, 0, pad=ROW_1)
+    state, _, _ = x(state, 11, at(2), pad=ROW_1)
+    state, _ = handle(replace(state, device_clip=True), SLOT_3)
+    state, _ = hold_read(state)
+    state, _ = lift(state)
+    state, _ = engine.return_tick(state, 0.0)
+    state, actions = engine.return_tick(state, 50.0)
+    assert EndUndoStep() not in actions and state.fx_slide_undo_open
