@@ -2616,3 +2616,65 @@ def test_snapshot_buttons_move_to_free_pads(monkeypatch):
     assert handle(FX, (14, 7)) == (FX, [StoreFxSnapshot(0)])
     assert handle(FX, (11, 1)) == (FX, [])
     assert handle(FX, (10, 6))[0].fx_length == 1
+
+
+# Punch-in: Device/Clip + a slot (#112)
+
+DEV_CLP = layout.NAVIGATION.device_clip
+PUNCHING = replace(with_slot(FX, 2), device_clip=True)
+PUNCH_BOUND = replace(BOUND_AB, device_clip=True)
+
+
+@pytest.mark.parametrize("bars", [None, 4])
+def test_device_clip_and_a_stored_slot_makes_a_punch_hold(bars):
+    state = replace(PUNCHING, fx_length=bars)
+    held, actions = handle(state, SLOT_3)
+    assert held.fx_holds == (SlotHold(SLOT_3[1], SLOT_3[0], 2, punch=True),)
+    assert actions == [RecallFxSnapshot(2, None, hold=True)]
+
+
+def test_device_clip_and_a_bound_slot_reads_its_punch_values():
+    state = with_slot(PUNCH_BOUND, 2, replace(BOUND_AB.fx_slots[2], values=(90.0,)))
+    held, actions = handle(state, SLOT_3)
+    assert held.fx_holds[0].punch and held.fx_holds[0].bound
+    assert actions[0].values == (90.0, None)
+
+
+def test_device_clip_and_an_empty_slot_does_nothing():
+    state = replace(FX, device_clip=True)
+    assert handle(state, SLOT_3) == (state, [])
+
+
+def test_device_clip_and_a_scene_snapshot_does_nothing():
+    state = with_scene(PUNCHING, 1)
+    assert handle(state, SCENE_2, snapshot=SCENES) == (state, [])
+
+
+def test_copy_comes_before_device_clip():
+    state, actions = handle(replace(PUNCHING, copy=True), SLOT_3)
+    assert state.fx_copy_source == (2, False) and state.fx_holds == ()
+
+
+def test_delete_comes_before_device_clip():
+    state, actions = handle(replace(PUNCHING, delete=True), SLOT_3)
+    assert state.fx_slots[2] is None and actions[-1] == ShowMessage("Snapshot 3 cleared")
+
+
+def test_shift_comes_before_device_clip():
+    state, actions = handle(replace(PUNCHING, shift=True), SLOT_3)
+    assert state.fx_bind_hold == BindHold(SLOT_3[1], SLOT_3[0], 2) and state.fx_holds == ()
+
+
+@pytest.mark.parametrize("layer", ["PANEL", "MIXER_PANEL"])
+def test_the_split_panel_punches_too(layer):
+    state = replace(with_slot(globals()[layer], 2), device_clip=True)
+    held, _ = handle(state, SLOT_3)
+    assert held.fx_holds[0].punch
+
+
+def test_letting_go_of_device_clip_after_a_punch_doesnt_flip_the_view():
+    state, _ = engine.handle(with_slot(FX, 2), PadPress(*DEV_CLP, True), SNAP)
+    state, _ = engine.handle(state, PadPress(*SLOT_3, True), SNAP)
+    state, actions = engine.handle(state, PadPress(*DEV_CLP, False), SNAP)
+    assert not state.device_clip and actions == []
+    assert state.fx_holds[0].punch

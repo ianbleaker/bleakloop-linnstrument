@@ -368,6 +368,16 @@ def press(state, event, snapshot):
             hold = BindHold(event.pad, event.column, _global(state, button.value))
             return replace(state, fx_bind_hold=hold), []
         return state, []
+    # Device/Clip + a stored slot punches it in, over a held Bars pad; Copy and Delete come
+    # first. An empty slot or a scene snapshot does nothing.
+    if state.device_clip and not (state.copy or state.delete):
+        if button.function == "slots":
+            slot = _global(state, button.value)
+            if state.fx_slots[slot] is None:
+                return state, []
+            return _hold(state, event, slot, punch=True)
+        if button.function == "scene_slots":
+            return state, []
     if button.function == "slots" and not (state.copy or state.delete):
         slot = _global(state, button.value)
         if state.fx_length and is_bound(state.fx_slots[slot]):
@@ -535,13 +545,13 @@ def _held(state, pad, column=None):
     )
 
 
-def _hold(state, event, slot):
+def _hold(state, event, slot, punch=False):
     # One hold per row. The read is taken now, so a slide's origins are the press's values.
     if _held(state, event.pad) is not None:
         return state, []
     stored = state.fx_slots[slot]
     bound = is_bound(stored)
-    hold = SlotHold(event.pad, event.column, slot, bound=bound)
+    hold = SlotHold(event.pad, event.column, slot, bound=bound, punch=punch)
     locators = stored.params if bound else ()
     values = _values(stored) if bound else ()
     read = RecallFxSnapshot(slot, None, hold=True, locators=locators, values=values)
