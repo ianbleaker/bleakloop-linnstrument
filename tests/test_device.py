@@ -280,6 +280,32 @@ def test_poll_missed_not_when_already_polled():
     assert device.poll_missed({227: 12}, polled, 7, False) is False
 
 
+@pytest.mark.parametrize(
+    ("reads", "offset"),
+    [
+        ({227: 5, 253: 23}, (5, None)),
+        ({227: 12, 253: 23}, (12, 23)),
+        ({227: 13, 253: 23}, (13, None)),
+    ],
+)
+def test_map_offset(reads, offset):
+    assert device.map_offset(reads) == offset
+
+
+@pytest.mark.parametrize(
+    ("sets", "shifts"),
+    [
+        ([], False),
+        ([(device.NRPN_LEFT_MAIN_CHANNEL, 3)], False),
+        ([(device.NRPN_OCTAVE, 5)], True),
+        ([(device.NRPN_TRANSPOSE_PITCH, 7)], True),
+        ([(device.NRPN_TRANSPOSE_LIGHTS, 7)], True),
+    ],
+)
+def test_shifts_notes(sets, shifts):
+    assert device.shifts_notes(sets) is shifts
+
+
 def test_poll_steps():
     assert device.poll_steps([227, 36, 37]) == [queries(227, 36), queries(37)]
 

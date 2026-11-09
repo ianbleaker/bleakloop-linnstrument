@@ -321,6 +321,17 @@ def poll_missed(reads, polled, channel, rescan):
     return not set(poll_numbers(reads, channel, rescan)) <= set(polled)
 
 
+def map_offset(reads):
+    # The Row Offset a note map is built from: 227, plus 253 only when 227 is custom.
+    offset = reads.get(NRPN_ROW_OFFSET)
+    return offset, reads.get(NRPN_CUSTOM_ROW_OFFSET) if offset == ROW_OFFSET_CUSTOM else None
+
+
+def shifts_notes(sets):
+    # Whether a queued set moves the left split's notes: Octave or Transpose.
+    return any(number in (NRPN_OCTAVE, NRPN_TRANSPOSE_PITCH, NRPN_TRANSPOSE_LIGHTS) for number, _ in sets)
+
+
 def poll_steps(numbers):
     return _query_steps(numbers)
 
