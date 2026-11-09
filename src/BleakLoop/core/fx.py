@@ -378,8 +378,14 @@ def bind(state, slot, locator):
     state = _remember(state, slot, locator, True)
     bound_slot = BoundSlot(params + (locator,))
     state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
-    items = [describe(p) for p in bound_slot.params]
+    items = labels([(p.device or p.track, p.name) for p in bound_slot.params])
     return state, [save, *listed(items, lambda text: buttons.say("slots", "bound", name=name, params=text))]
+
+
+def labels(params):
+    # Each (owner, name) as the parameter's name, or "Owner Name" where two share a name.
+    names = [name for _, name in params]
+    return [f"{owner} {name}" if names.count(name) > 1 else name for owner, name in params]
 
 
 def listed(items, say):
@@ -547,8 +553,8 @@ def render_meters(state):
 
 
 def _value_meter(state, hold, column):
-    # A bound slot, held: the 4 pads right of it show where its first parameter sits between
-    # its min (none lit) and max (all 4), in the slot's pink.
+    # A bound slot, held: the 4 pads right of it show where its parameters sit on average
+    # between their mins (none lit) and maxes (all 4), in the slot's pink.
     if not hold.read:
         return {}
     lit = value_meter(state, hold)
@@ -560,11 +566,18 @@ def _value_meter(state, hold, column):
 
 
 def value_meter(state, hold):
-    first = hold.read[0]
-    param = _param(state, first.key)
-    value = param.written if param is not None else first.start
-    position = (value - first.low) / first.span if first.span else 0.0
-    return round(min(max(position, 0.0), 1.0) * SLIDE_COLUMNS)
+    # The lit pads: the mean of each parameter's position in its range, dropped ones and ones
+    # without a range left out.
+    positions = []
+    for read in hold.read:
+        if read.key in hold.dropped or not read.span:
+            continue
+        param = _param(state, read.key)
+        value = param.written if param is not None else read.start
+        positions.append(min(max((value - read.low) / read.span, 0.0), 1.0))
+    if not positions:
+        return 0
+    return round(sum(positions) / len(positions) * SLIDE_COLUMNS)
 
 
 def meter(f):
@@ -615,7 +628,8 @@ def _tap(state, hold):
         return state, buttons.refuse("slots", "nothing", name=name, note=hold.note)
     if hold.bound:
         # Nothing to recall: the tap names the parameters and their values.
-        items = [f"{p.name} {p.text or _number(p.start)}" for p in hold.read]
+        names = labels([(p.owner, p.name) for p in hold.read])
+        items = [f"{label} {p.text or _number(p.start)}" for label, p in zip(names, hold.read)]
         return state, listed(
             items, lambda text: buttons.say("slots", "named", name=name, params=text, note=hold.note)
         )
@@ -668,11 +682,10 @@ def _param(state, key):
 
 def _blend(state, hold, keys=None):
     # The hold's parameters it owns (or just keys) written at its f: continuous ones in
-    # proportion, quantized ones at the slot's value from switch_at on. The first actual write
+    # proportion, quantized ones at the nearest step to that. The first actual write
     # opens the slides' undo step, closing a fader's or a morph's, and cancels a running morph.
     if not hold.read:
         return state, []
-    switch_at = buttons.switch_at()
     later = [
         _keys(h) for h in state.fx_holds if h.slid and h is not hold and h.order > hold.order
     ]
@@ -687,7 +700,7 @@ def _blend(state, hold, keys=None):
         param = params.get(key)
         if param is None:
             param = params[key] = SlideParam(key, macro.start, macro.start, macro.span)
-        value = _slid_value(macro, param.origin, hold.f, switch_at)
+        value = _slid_value(macro, param.origin, hold.f)
         if value != param.written:
             writes.append((key, value))
             params[key] = replace(param, written=value)
@@ -733,7 +746,7 @@ def _end_slide(state, hold):
     name = _name(hold.slot, False)
     if hold.bound:
         message = listed(
-            [p.name for p in hold.read or ()],
+            labels([(p.owner, p.name) for p in hold.read or ()]),
             lambda text: buttons.say(
                 "slots", "slid_bound", name=name, percent=percent, params=text, note=hold.note
             ),
@@ -743,17 +756,18 @@ def _end_slide(state, hold):
     return state, actions + message
 
 
-def _slid_value(entry, origin, f, switch_at):
+def _slid_value(entry, origin, f):
     # A Set-wide slot's macro blends towards its snapshot value. A bound slot's parameter moves
-    # from its origin by f of its range either way, stopping at its ends; quantized ones
-    # switch to an end from switch_at.
+    # from its origin by f of its range either way, stopping at its ends. An on/off or chooser
+    # takes the nearest step, halves away from its origin; anything else is a macro's mapping
+    # in Live.
     if isinstance(entry, BoundRead):
+        move = f * entry.span
         if entry.quantized:
-            return entry.high if f >= switch_at else entry.low if f <= -switch_at else origin
-        return min(max(origin + f * entry.span, entry.low), entry.high)
-    if entry.quantized:
-        return entry.target if f >= switch_at else origin
-    return origin + f * (entry.target - origin)
+            move = faders.round_half(move)
+        return min(max(origin + move, entry.low), entry.high)
+    move = f * (entry.target - origin)
+    return origin + (faders.round_half(move) if entry.quantized else move)
 
 
 def _number(value):

@@ -67,10 +67,6 @@ def test_a_missing_placeholder_shows_the_raw_template():
     assert MESSAGES.system("moved") == "Controls moved to channel {channel}"
 
 
-def test_switch_at_ships_at_a_half():
-    assert buttons.switch_at() == 0.5
-
-
 def test_system_formats():
     assert MESSAGES.system("moved", channel=3) == "Controls moved to channel 3"
 

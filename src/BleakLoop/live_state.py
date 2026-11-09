@@ -454,6 +454,7 @@ def read_bound(song, locators):
                 parameter.max,
                 parameter.is_quantized,
                 _display(parameter),
+                locator.device or locator.track,
             )
         )
     return tuple(result)

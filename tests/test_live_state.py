@@ -514,7 +514,7 @@ def test_read_bound_gives_locator_keys_for_other_parameters_and_none_when_missin
     song = target_song()
     frequency = FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Frequency")
     found = live_state.read_bound(song, (frequency, FaderBinding("Bass", 0, "Auto Filter", 0, 1, "Q")))
-    assert found == (BoundRead(frequency, "Frequency", 40.0, 0.0, 127.0, False), None)
+    assert found == (BoundRead(frequency, "Frequency", 40.0, 0.0, 127.0, False, owner="Auto Filter"), None)
 
 
 def test_read_bound_carries_lives_text_for_the_value():
