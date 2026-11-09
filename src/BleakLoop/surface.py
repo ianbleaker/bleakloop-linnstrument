@@ -324,8 +324,8 @@ class BleakLoop(ControlSurface):
             self.song.appointed_device = device
 
     def _load_fx(self):
-        # At load, and on every display tick: Live's Undo and Redo change the stored text
-        # (each set_data is an Undo entry), so the slots follow it from wherever it came.
+        # At load, and on every display tick, reloading only when the stored text changed.
+        # Live's Undo doesn't revert set_data's text, though each write adds an Undo entry.
         text = live_state.read_fx_store(self.song)
         if text == self._fx_text:
             return
@@ -378,7 +378,7 @@ class BleakLoop(ControlSurface):
         )
 
     def _load_faders(self):
-        # As _load_fx: Undo and Redo of a bind or unbind change the stored text.
+        # As _load_fx, for the fader bindings.
         text = live_state.read_fader_store(self.song)
         if text == self._faders_text:
             return
