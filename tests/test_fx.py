@@ -1179,6 +1179,105 @@ def test_a_bars_morph_mid_slide_takes_its_parameters_and_joins_the_step():
     assert state.fx_holds[0].dropped == {(P1, "R", 0)}
 
 
+# Held slots: several slides, faders and hand turns (B6)
+
+ROW_1 = OTHER_SLOT[1]
+A_ONLY = (FxRack("A", "R", 0, (100.0, 100.0)),)
+
+
+def two_slides(f_a=2, f_b=1):
+    # Slot 3 slides first (to f_a columns), then slot 1, sharing rack A's macros (to f_b).
+    state = sliding(with_slot(AB, 0, A_ONLY))
+    state, _, _ = x(state, 11, at(f_a))
+    state, _ = handle(state, OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _, _ = x(state, 11, 0, pad=ROW_1)
+    state, actions, _ = x(state, 11, at(f_b), pad=ROW_1)
+    return state, actions
+
+
+def test_the_later_slide_owns_the_parameters_it_shares():
+    state, actions = two_slides()
+    f_a, f_b = at(2) / X_COLUMN_WIDTH / 4, at(1) / X_COLUMN_WIDTH / 4
+    # One step for both: slot 1's slide writes from the shared origin, 0, with no Begin.
+    assert actions == [SetMacros((((P0, "R", 0), 100.0 * f_b), ((P0, "R", 1), 100.0 * f_b)))]
+    # Slot 3's X now moves only rack B's macro.
+    state, actions, _ = x(state, 11, at(3))
+    ((key, value),) = actions[0].writes
+    assert len(actions) == 1 and key == (P1, "R", 0)
+    assert value == pytest.approx(30.0 * at(3) / X_COLUMN_WIDTH / 4)
+    assert f_a  # slot 3 had blended rack A first
+
+
+def test_lifting_the_later_slide_hands_back_to_the_earlier_at_its_blend():
+    state, _ = two_slides()
+    f_a = at(2) / X_COLUMN_WIDTH / 4
+    state, actions = lift(state, OTHER_SLOT)
+    assert actions == [
+        SetMacros((((P0, "R", 0), 10.0 * f_a),)),
+        SetMacros((((P0, "R", 1), 20.0 * f_a),)),
+        ShowMessage(f"Snapshot 1 at {round(at(1) / X_COLUMN_WIDTH / 4 * 100)}%"),
+    ]
+    state, actions = lift(state, (11, ROW))
+    assert actions[0] == EndUndoStep() and not state.fx_slide_undo_open
+
+
+def test_lifting_the_earlier_slide_first_leaves_the_later_in_charge():
+    state, _ = two_slides()
+    state, actions = lift(state, (11, ROW))
+    assert actions == [ShowMessage(f"Snapshot 3 at {round(at(2) / X_COLUMN_WIDTH / 4 * 100)}%")]
+    assert state.fx_slide_undo_open
+    state, actions, _ = x(state, 11, at(4), pad=ROW_1)
+    assert actions == [SetMacros((((P0, "R", 0), 100.0 * at(4) / X_COLUMN_WIDTH / 4), ((P0, "R", 1), 100.0 * at(4) / X_COLUMN_WIDTH / 4)))]
+    state, actions = lift(state, OTHER_SLOT)
+    assert actions[0] == EndUndoStep() and state.fx_slide_params == ()
+
+
+def test_a_slide_after_another_lifted_starts_from_where_it_left_the_parameter():
+    # Slot 1 is held first but slides only after slot 3 slid to 60% and lifted.
+    state, _ = handle(with_slot(AB, 0, A_ONLY), OTHER_SLOT)
+    state, _ = hold_read(state, slot=0)
+    state, _, _ = x(state, 11, 0, pad=ROW_1)
+    state, _ = handle(state, SLOT_3)
+    state, _ = hold_read(state)
+    state, _, _ = x(state, 11, 0)
+    state, _, _ = x(state, 11, at(2.4))
+    state, _ = lift(state, (11, ROW))
+    left = {p.key: p.written for p in state.fx_slide_params}
+    assert left[(P0, "R", 0)] == pytest.approx(6.0, abs=0.01)
+    state, actions, _ = x(state, 11, at(2), pad=ROW_1)
+    f = at(2) / X_COLUMN_WIDTH / 4
+    origin = left[(P0, "R", 0)]
+    assert actions[-1].writes[0] == ((P0, "R", 0), origin + f * (100.0 - origin))
+
+
+def test_a_fader_on_a_sliding_macro_takes_it_out_with_no_undo_actions():
+    state, _, _ = x(sliding(), 11, at(2))
+    view = FaderView("Macro 1", 0.0, 0.0, 127.0, macro=(P0, "R", 0))
+    snap = replace(SNAP, faders=(view,) * 8)
+    state, _ = session.handle(state, PadPress(5, 2, True), snap)
+    state, actions, _ = engine.x_axis(state, XAxis(5, 2, round(centre(6))))
+    assert [a for a in actions if isinstance(a, (BeginUndoStep, EndUndoStep))] == []
+    assert state.fx_holds[0].dropped == {(P0, "R", 0)}
+    state, actions, _ = x(state, 11, at(5))
+    assert actions == [SetMacros((((P0, "R", 1), 20.0), ((P1, "R", 0), 30.0)))]
+
+
+def test_a_hand_turned_parameter_leaves_the_slide():
+    state, _, _ = x(sliding(), 11, at(2))
+    values = tuple(p.written for p in state.fx_slide_params)
+    assert engine.slide_tick(state, values) == state
+    turned = (values[0] + 10.0,) + values[1:]
+    state = engine.slide_tick(state, turned)
+    assert state.fx_holds[0].dropped == {(P0, "R", 0)}
+    assert [p.key for p in state.fx_slide_params] == [(P0, "R", 1), (P1, "R", 0)]
+
+
+def test_a_second_slide_on_a_row_is_ignored():
+    state, _, _ = x(sliding(with_slot(AB, 10)), 11, at(2))
+    assert handle(state, layout.FX.slots[10]) == (state, [])
+
+
 # Render
 
 

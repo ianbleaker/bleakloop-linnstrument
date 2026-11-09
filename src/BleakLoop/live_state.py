@@ -450,6 +450,12 @@ def read_macro_values(song, morph):
     return tuple(None if parameter is None else parameter.value for parameter in targets)
 
 
+def read_slide_values(song, params):
+    # The live value per held slide's parameter, or None when it has moved or gone.
+    targets = target_parameters(song, (p.key for p in params))
+    return tuple(None if parameter is None else parameter.value for parameter in targets)
+
+
 def read_launch_triggered(song, morph):
     # Whether a launch morph's scene waits to launch: True, or False once it has stopped
     # waiting with no other scene waiting, which is Live starting it. None for any other

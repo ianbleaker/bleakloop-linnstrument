@@ -375,6 +375,17 @@ def meter(f):
     return sum(f > k / SLIDE_COLUMNS for k in range(SLIDE_COLUMNS))
 
 
+def slide_tick(state, values):
+    # On the 10 ms timer: values holds each slide parameter's live value, None if unreadable.
+    # One turned by hand, or gone, leaves every slide and keeps its value.
+    gone = {
+        p.key
+        for p, value in zip(state.fx_slide_params, values)
+        if value is None or abs(value - p.written) > FX_TOUCH_TOLERANCE * p.span
+    }
+    return faders.leave_slides(state, gone) if gone else state
+
+
 def _hold_read(state, event, snapshot):
     hold = next((h for h in state.fx_holds if h.slot == event.slot and h.read is None), None)
     stored = state.fx_slots[event.slot]
@@ -410,7 +421,7 @@ def _recall_now(state, macros):
     # their undo step; otherwise it is its own step, closing a fader's or a morph's.
     writes = tuple((m.key, m.target) for m in macros)
     if state.fx_slide_undo_open:
-        state = _leave_slides(state, {m.key for m in macros})
+        state = faders.leave_slides(state, {m.key for m in macros})
         actions = [SetMacros(writes)]
         if state.fx_undo_open:
             actions.insert(0, EndUndoStep())
@@ -430,13 +441,6 @@ def _close_steps(state):
         state = replace(state, fx_undo_open=False)
         actions.append(EndUndoStep())
     return state, actions
-
-
-def _leave_slides(state, keys):
-    # These parameters leave every held slide, and stay where they are.
-    holds = tuple(replace(h, dropped=h.dropped | keys) for h in state.fx_holds)
-    params = tuple(p for p in state.fx_slide_params if p.key not in keys)
-    return replace(state, fx_holds=holds, fx_slide_params=params)
 
 
 def _slide_owner(state, key):
@@ -656,7 +660,7 @@ def racks_read(state, event, snapshot):
     if state.fx_slide_undo_open:
         # Slides are held: the morph takes the parameters it shares and joins their step. A
         # morph it replaces closes its own.
-        state = _leave_slides(state, {m.key for m in macros})
+        state = faders.leave_slides(state, {m.key for m in macros})
         actions = [EndUndoStep()] if state.fx_undo_open else []
         return replace(state, morph=morph, fx_undo_open=False), actions + message
     # A recall closes a fader gesture's undo step, and replaces a running morph and its step;

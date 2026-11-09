@@ -543,6 +543,9 @@ class BleakLoop(ControlSurface):
             transport = live_state.read_transport(self.song, Live.Application.get_application())
             if self._state.morph is not None:
                 self._morph_tick(transport)
+            if self._state.fx_slide_params:
+                values = live_state.read_slide_values(self.song, self._state.fx_slide_params)
+                self._state = engine.slide_tick(self._state, values)
             if self._state.pending_launch is not None:
                 self._launch_tick(transport)
             key = phase_key(self._clock(transport))

@@ -88,6 +88,13 @@ def fx_tick(state, transport, values, triggered=None):
     return fx.tick(state, transport, values, triggered)
 
 
+def slide_tick(state, values):
+    # Held snapshot slides on the 10 ms timer, in every mode: values per slide parameter.
+    if not state.fx_slide_params:
+        return state
+    return fx.slide_tick(state, values)
+
+
 def launch_tick(state, transport):
     # A pending scene launch on the 10 ms timer, in every mode, and a redraw flag.
     if state.pending_launch is None:

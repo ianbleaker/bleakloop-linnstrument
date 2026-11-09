@@ -175,15 +175,16 @@ def x_axis(state, event):
     if position == touch.norm:
         return state, [], False
     actions = []
-    if not state.fader_undo_open:
-        # A morph's undo step closes first; the morph carries on.
+    if not state.fader_undo_open and not state.fx_slide_undo_open:
+        # A morph's undo step closes first; the morph carries on. While a snapshot slide is
+        # held, the fader's writes join the slide's step.
         if state.fx_undo_open:
             state = replace(state, fx_undo_open=False)
             actions.append(EndUndoStep())
         state = replace(state, fader_undo_open=True)
         actions.append(BeginUndoStep())
     if touch.norm is None and touch.macro is not None:
-        state = _leave_morph(state, touch.macro)
+        state = leave_slides(_leave_morph(state, touch.macro), {touch.macro})
     actions.append(SetFaderParameter(event.pad - 1, touch.name, value(touch, position)))
     count = touch.last - touch.first + 1
     redraw = touch.norm is None or lit(position, count) != lit(touch.norm, count)
@@ -238,6 +239,15 @@ def render(state, snapshot):
         for column in span[: lit(position, len(span))]:
             frame[(column, pad)] = Light(colour)
     return frame
+
+
+def leave_slides(state, keys):
+    # These parameters leave every held snapshot slide, and stay where they are.
+    if not state.fx_holds:
+        return state
+    holds = tuple(replace(h, dropped=h.dropped | keys) for h in state.fx_holds)
+    params = tuple(p for p in state.fx_slide_params if p.key not in keys)
+    return replace(state, fx_holds=holds, fx_slide_params=params)
 
 
 def _leave_morph(state, macro):
