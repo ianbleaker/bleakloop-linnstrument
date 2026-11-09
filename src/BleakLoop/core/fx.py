@@ -395,8 +395,9 @@ def parameter_bound(state, event):
 
 
 def bind(state, slot, locator, value=None, text=""):
-    # Toggle: a parameter the slot holds is removed with its punch-in value, any other added
-    # with its value now as its punch-in value. A Set-wide slot refuses.
+    # A parameter the slot doesn't hold is added, with its value now as its punch-in value. One
+    # it holds takes its value now as its new punch-in value, or, when that is already its
+    # punch-in value (or there's no value now), is removed with it. A Set-wide slot refuses.
     stored = state.fx_slots[slot]
     name = _name(slot, False)
     if stored is not None and not is_bound(stored):
@@ -405,13 +406,19 @@ def bind(state, slot, locator, value=None, text=""):
     values = _values(stored) if stored is not None else ()
     same = [p for p in params if _same(p, locator)]
     if same:
+        old = next(v for p, v in zip(params, values) if _same(p, locator))
+        if value is not None and value != old:
+            new = [value if _same(p, locator) else v for p, v in zip(params, values)]
+            state, save = _save_slots(state, _put(state.fx_slots, slot, _bound_slot(params, new)))
+            state = _remember(state, slot, same[0], old, UPDATED)
+            param = f"{describe(same[0])} {text or _number(value)}"
+            return state, [save, *buttons.say("slots", "updated", name=name, param=param)]
         kept = [(p, v) for p, v in zip(params, values) if not _same(p, locator)]
         bound_slot = _bound_slot([p for p, _ in kept], [v for _, v in kept])
         state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
-        removed = next(v for p, v in zip(params, values) if _same(p, locator))
-        state = _remember(state, slot, same[0], removed, False)
+        state = _remember(state, slot, same[0], old, REMOVED)
         return state, [save, *buttons.say("slots", "removed", name=name, param=describe(same[0]))]
-    state = _remember(state, slot, locator, value, True)
+    state = _remember(state, slot, locator, value, ADDED)
     bound_slot = _bound_slot(params + (locator,), values + (value,))
     state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))
     items = labels([(p.device or p.track, p.name) for p in bound_slot.params])
@@ -437,10 +444,14 @@ def listed(items, say):
     return message
 
 
-def _remember(state, slot, locator, value, added):
-    # For the Undo pad, with the parameter's punch-in value: the window starts again at the
-    # next tick.
-    entry = (slot, locator, value, added)
+# What a bind did, for the Undo pad.
+ADDED, REMOVED, UPDATED = "added", "removed", "updated"
+
+
+def _remember(state, slot, locator, value, kind):
+    # For the Undo pad, with the parameter's punch-in value (before an update, the old one):
+    # the window starts again at the next tick.
+    entry = (slot, locator, value, kind)
     return replace(state, bind_undo=state.bind_undo + (entry,), bind_undo_at=None)
 
 
@@ -453,15 +464,22 @@ def bind_undo_open(state):
 
 
 def unbind_last(state):
-    # The Undo pad: the newest bind or removal reversed, without Live's Undo; a removed
-    # parameter comes back with its punch-in value. Its window starts again for the next.
-    (slot, locator, value, added), rest = state.bind_undo[-1], state.bind_undo[:-1]
+    # The Undo pad: the newest bind, removal or update reversed, without Live's Undo; a removed
+    # parameter comes back with its punch-in value, an updated one gets its old value back.
+    # Its window starts again for the next.
+    (slot, locator, value, kind), rest = state.bind_undo[-1], state.bind_undo[:-1]
     state = replace(state, bind_undo=rest, bind_undo_at=None)
     stored = state.fx_slots[slot]
     params = stored.params if is_bound(stored) else ()
     values = _values(stored) if is_bound(stored) else ()
     name, param = _name(slot, False), describe(locator)
-    if added:
+    if kind == UPDATED:
+        if not any(_same(p, locator) for p in params):
+            return state, []
+        new = [value if _same(p, locator) else v for p, v in zip(params, values)]
+        state, save = _save_slots(state, _put(state.fx_slots, slot, _bound_slot(params, new)))
+        return state, [save, *buttons.say("slots", "restored", name=name, param=param)]
+    if kind == ADDED:
         kept = [(p, v) for p, v in zip(params, values) if not _same(p, locator)]
         bound_slot = _bound_slot([p for p, _ in kept], [v for _, v in kept])
         state, save = _save_slots(state, _put(state.fx_slots, slot, bound_slot))

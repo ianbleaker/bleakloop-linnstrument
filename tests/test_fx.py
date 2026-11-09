@@ -1583,6 +1583,48 @@ def test_a_removal_drops_its_value():
     assert state.fx_slots[2] == BoundSlot((FREQ,))
 
 
+def test_binding_a_held_parameter_with_a_new_value_updates_it():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, actions = bound_answer(state, value=0.9, text="3.40 kHz")
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.9, 0.2))
+    assert actions == [
+        SaveFxSnapshots(fx.dump(state.fx_slots)),
+        ShowMessage("Snapshot 3 punch value: Auto Filter Frequency 3.40 kHz"),
+    ]
+
+
+def test_binding_a_held_parameter_without_a_punch_value_gives_it_one():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ)))
+    state, actions = bound_answer(state, binding=EQ, value=0.25)
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (None, 0.25))
+    assert actions[-1] == ShowMessage("Snapshot 3 punch value: EQ Frequency 0.25")
+
+
+def test_binding_a_held_parameter_at_its_punch_value_removes_it():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, actions = bound_answer(state, value=0.6, text="1.20 kHz")
+    assert state.fx_slots[2] == BoundSlot((EQ,), (0.2,))
+    assert actions[-1] == ShowMessage("Removed Auto Filter Frequency from Snapshot 3")
+
+
+def test_pressing_twice_updates_then_removes():
+    state = with_slot(FX, 2, BoundSlot((FREQ,), (0.6,)))
+    state, _ = bound_answer(state, value=0.9)
+    state, _ = bound_answer(state, value=0.9)
+    assert state.fx_slots[2] is None
+
+
+def test_the_undo_pad_puts_back_an_updated_punch_value():
+    state = with_slot(FX, 2, BoundSlot((FREQ, EQ), (0.6, 0.2)))
+    state, _ = bound_answer(state, value=0.9, text="3.40 kHz")
+    state, actions = handle(state, layout.GLOBAL.undo, snapshot=replace(SNAP, can_undo=True))
+    assert state.fx_slots[2] == BoundSlot((FREQ, EQ), (0.6, 0.2))
+    assert actions == [
+        SaveFxSnapshots(fx.dump(state.fx_slots)),
+        ShowMessage("Snapshot 3: Auto Filter Frequency's punch value put back"),
+    ]
+
+
 def test_a_renamed_macro_still_toggles_off():
     macro = FaderBinding("A", 0, "R", 0, 1, "Macro 1")
     renamed = replace(macro, name="Cutoff")

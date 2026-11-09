@@ -257,8 +257,8 @@ class State:
     fx_slide_undo_open: bool = False  # held slides' shared undo step is open in Live
     fx_slide_count: int = 0  # counts slides as they start, for SlotHold.order
     fx_bind_hold: BindHold | None = None  # Shift + a slot, held
-    # The Undo pad's bind history: (slot, locator, punch-in value, added) per bind or removal,
-    # newest last;
+    # The Undo pad's bind history: (slot, locator, punch-in value, fx.ADDED/REMOVED/UPDATED)
+    # per bind, removal or update, newest last;
     # the time of the last one, None until the next 10 ms tick stamps it; the last tick's time.
     bind_undo: tuple = ()
     bind_undo_at: float | None = None
