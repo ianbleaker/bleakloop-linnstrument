@@ -131,7 +131,7 @@ def _navigation_shift(section):
     return (
         _group("Window directions", section, "window"),
         _group("Tempo", section, "tempo"),
-        _one("Fader source", section, "fader_source"),
+        _one("Panel", section, "fader_source"),
     )
 
 
@@ -213,8 +213,8 @@ _SPLIT = (
         "Faders",
         layout.SPLIT_FADER_COLUMNS,
         ALL_PADS,
-        "One fader per row, as in FX Mode, from the source Shift + FX picks. Its third "
-        "choice shows the snapshots instead.",
+        "One Device FX fader per row, as in FX Mode. Shift + FX shows the snapshots "
+        "instead.",
     ),
 )
 
