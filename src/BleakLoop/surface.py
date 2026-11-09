@@ -128,6 +128,9 @@ class BleakLoop(ControlSurface):
         self._rescan = False  # the next poll reads every right split channel
         self._clash = False  # the right split uses every channel: controls off
         self._note_map = None  # Global column note -> pad, None while refused
+        self._map_offset = None  # the Row Offset the note map was built from
+        self._check = device.PressCheck()
+        self._held_controls = {}  # Global column note -> the pad its accepted press fired
         self._refusal = None
         self._right_split_unread = False
         self._sent = {}  # BleakLoop's last left split Octave/Transpose
@@ -434,6 +437,7 @@ class BleakLoop(ControlSurface):
 
     def _compute_settings(self):
         settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
+        self._map_offset = device.map_offset(self._reads)
         self._control_channel = channel
         self._right_split_unread = self._refusal == buttons.system("refuse_right_split")
         self._sent = {
@@ -484,6 +488,7 @@ class BleakLoop(ControlSurface):
         note_map, refusal, settings, player_changed = device.realign(self._reads, self._sent)
         self._pending_sets = settings
         self._sent = {number: self._reads.get(number) for number in self._sent} | dict(settings)
+        self._map_offset = device.map_offset(self._reads)
         if self._right_split_unread:
             # No channel is known to be free: the controls stay off for the session.
             return
@@ -591,6 +596,7 @@ class BleakLoop(ControlSurface):
 
     def enter_mode(self, mode):
         self._poll, self._pending_sets, self._poll_wait = [], [], False
+        self._check.reset()
         if mode is Mode.LINNSTRUMENT:
             self._poll_due = 0  # re-check at once
         if mode is not Mode.SEQUENCER and self._seq_timing.longest_ms:
@@ -683,6 +689,8 @@ class BleakLoop(ControlSurface):
         self._remove_listeners()
         # A release may now reach another listener, or none: a held pad can't block a reload.
         self._held_pads.clear()
+        self._check.reset()
+        self._held_controls.clear()
         if mode in (Mode.SESSION, Mode.SEQUENCER):
             for row in range(layout.ROWS):
                 for column in range(layout.COLUMNS):
