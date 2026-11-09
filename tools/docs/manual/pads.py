@@ -256,7 +256,7 @@ _FX = (
         f"Sixteen snapshots per bank of every rack's macros: slots {positions.runs('fx.slots')}. "
         "Press an empty slot to store. Tap a stored one to recall it, or slide right from it "
         "to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in "
-        "pink.",
+        "pink. Device/Clip + a slot punches it in.",
     ),
     _group("Banks", "fx", "banks"),
     _group("Scene snapshots", "fx", "scene_slots"),

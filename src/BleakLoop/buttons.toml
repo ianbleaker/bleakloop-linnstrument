@@ -826,7 +826,7 @@ manual = "Back to the controls without launching."
 [functions.device_clip]
 label = "DevClip"
 message = "Device/Clip: tracks and devices"
-manual = "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices."
+manual = "Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices. Hold and press a snapshot slot to punch it in."
 [functions.device_clip.outcomes]
 device = "Device view"
 clip = "Clip view"
