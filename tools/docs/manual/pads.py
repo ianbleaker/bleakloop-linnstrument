@@ -254,7 +254,8 @@ _FX = (
         range(layout.FX.slots[0][0], layout.FX.slots[-1][0] + 1),
         ALL_PADS,
         f"Sixteen snapshots per bank of every rack's macros: slots {positions.runs('fx.slots')}. "
-        "Press an empty slot to store, a stored one to recall. Shift + an empty slot stores "
+        "Press an empty slot to store. Tap a stored one to recall it, or slide right from it "
+        "to blend towards it. Shift + an empty slot stores "
         "the selected rack alone, in pink.",
     ),
     _group("Banks", "fx", "banks"),

@@ -39,6 +39,13 @@ Your changes are saved in `User Library/BleakLoop/buttons.toml`, beside the Remo
   port = 47128
   ```
 
+- To change where a snapshot slide switches on/off and chooser parameters (see Snapshots and morphs), add this, with any number above 0 up to 1. The editor keeps it when it saves:
+
+  ```toml
+  [morph]
+  switch_at = 0.5
+  ```
+
 To check a file by hand, from the repo: `PYTHONPATH=src python3 -m tools.check_buttons --user PATH`.
 
 ## 2. Function Reference
@@ -192,7 +199,7 @@ With the snapshots in the panel, columns 10–14 work as FX Mode's.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
-- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
+- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + an empty slot stores the selected rack alone, in pink.
 - **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 
@@ -258,7 +265,7 @@ With **Shift** held:
 <!-- callouts:fx -->
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
-- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store, a stored one to recall. Shift + an empty slot stores the selected rack alone, in pink.
+- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + an empty slot stores the selected rack alone, in pink.
 - **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 <!-- /callouts:fx -->
@@ -425,9 +432,9 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - In Device FX, a rack's rows are its macros 1–8; any other device's are its first eight parameters. Rows past the last parameter are dark, and with no device selected every row is dark.
 - Touch a row and the value jumps to your finger: the centre of column 2 is the minimum, the centre of column 9 the maximum. Slide along the row to move it.
 - The lit pads, counted from the left, show the value. Rows alternate magenta and blue so you can count them. The bar follows the parameter, so automation, a morph or a turn of the knob in Live move it too.
-- Slide past either end and the value stays at that end. Your finger can go on over the Global column or the snapshots without pressing them, until you lift it.
+- Slide past either end and the value stays at that end. Your finger can go on over the Global column, Bars or the snapshots without pressing them, until you lift it.
 - One touch is one undo, however many rows you move at once.
-- A fader on a macro that's morphing takes that macro out of the morph; the rest of the morph carries on.
+- A fader on a macro that's morphing takes that macro out of the morph; the rest of the morph carries on. On a macro a held snapshot slide is moving, it takes it out of the slide the same way, and its moves join the slide's undo.
 - Holding Stop or Copy, a fader does nothing. Holding Shift, it works as without it.
 
 **Mapped FX** gives each row a parameter of your choice, from anywhere in the Set.
@@ -445,8 +452,8 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 
 - A snapshot holds the visible macros of every rack on the Set's tracks, groups, returns and master. Racks inside other racks aren't included.
 - Press an empty (dark) slot to store a snapshot. Hold Copy and press any slot to store over it.
-- Press a stored (cyan) slot to recall it at once.
-- Hold a Bars pad, then press a stored slot to morph to it. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
+- Tap a stored (cyan) slot to recall it at once. The recall happens as you lift your finger: until then the slot can't tell a tap from a slide.
+- Hold a Bars pad, then press a stored slot to morph to it. This one starts on the press. The macros start moving at once and land exactly on a bar line: pressed at bar 1 beat 2 with 4 bars held, the morph lands at bar 5. On/off and chooser macros switch when the morph lands.
 - While the transport is stopped, a recall always happens at once.
 - Hold Delete and press a stored slot to clear it.
 - A rack is found again by its track's name, its own name and its order among racks with both names. A rack that has been renamed or deleted is skipped, with a message.
@@ -458,6 +465,19 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Every Set opens on bank 1, as does Live starting: the selected bank isn't saved, so switching banks never adds a step to Live's Undo.
 - Past bank 1 the status bar names the bank too, such as "Snapshot 3, bank 2 recalled".
 - A morph and the last-landed blink belong to their slot's bank: switch away and the morph carries on, but its slot blinks only while its bank shows.
+
+**Slides:**
+
+- Press a stored slot and slide right: the macros blend from where they were towards the snapshot. Four pads of travel is 100%, so a slot in column 11 reaches it at column 15, and one in column 12 at column 16. Sliding back left blends back, down to 0%.
+- A quarter of a pad's movement either way makes it a slide; less is still a tap. A slide never recalls on the lift.
+- On/off and chooser macros switch to the snapshot's value at half way, and back below it. Set `switch_at` in your buttons file (see Changing the buttons) to move that point.
+- Lift your finger and the macros stay where the slide left them, even at 0%. The status bar says how far it got, such as "Snapshot 3 at 60%".
+- While you slide, the four pads from the slot to its 100% pad fill in the slot's colour, one per 25%, over whatever they normally show, and the slot blinks fast. Nothing your finger crosses is pressed: not the other slots, banks, scene snapshots, scenes or Navigation, and not Bars or column 11's slots on the way back.
+- A scoped (pink) slot slides its one rack; a Set-wide (cyan) slot slides every rack it holds.
+- Slide several slots at once, one per row; a second slot pressed on a row that's already holding one does nothing. Where two slides share a macro, the one started last moves it. Lift it and the macro goes back to the earlier slide, at that slide's position; lift the earlier one first and nothing moves.
+- A fader, or a turn of the knob in Live, on a macro that's sliding takes it out of every slide. Tapping another slot, or starting a Bars morph, while you slide does the same for the macros it moves.
+- A slide's first move stops a running morph. Holding Bars, a press morphs instead of sliding, and scene snapshots don't slide.
+- One slide is one undo, from its first move to its lift. Slides held at the same time, and any tap, morph or fader you use during them, share it.
 
 **Scoped snapshots:**
 
@@ -496,7 +516,7 @@ With Exclusive Arm on, Live arms the selected MIDI track by itself. BleakLoop ca
 - Live's Arrangement loop coming round isn't a jump: the morph keeps going until it has played its bars, even when it's longer than the loop. Once the loop has come round, a scene's snapshot lands as Live actually starts the scene.
 - The morph carries on when you leave FX Mode.
 
-A recall overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A morph starts from wherever the automation has each macro. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot: store it again, or clear it again.
+A recall or a slide overrides any automation on the macros, as turning the knob would: Live's Re-Enable Automation button lights up. A morph starts from wherever the automation has each macro. A recall is one undo, and so is a whole morph. Undo doesn't bring back a stored or cleared snapshot: store it again, or clear it again.
 
 ### Sequencer
 
