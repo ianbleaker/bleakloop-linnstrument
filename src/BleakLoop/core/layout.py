@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from . import buttons
+from . import buttons, views
 
 ROWS = 8
 COLUMNS = 17  # column 0 is the device's hardware buttons
@@ -41,47 +41,32 @@ SEQ_NOTE_COLUMNS = range(11, 15)
 # bars, in Fixed Length's cycle order
 FIXED_LENGTHS = (1, 2, 4, 8)
 
-# Buttons, from buttons.toml: one namespace per section, each button's (column, pad) by name
-# and each group as {(column, pad): value} by its function. A mode's section falls back to
-# its Session one (buttons.FALLBACK). The fixed regions above come first, because the
-# registry checks no button sits on them.
-GLOBAL = buttons.Section("global", {}, {})
-GLOBAL_SHIFT = buttons.Section("global-shift", {}, {})
-LINNSTRUMENT = buttons.Section("linnstrument", {}, {}, GLOBAL)
-LINNSTRUMENT_SHIFT = buttons.Section("linnstrument-shift", {}, {}, GLOBAL_SHIFT)
-LINNSTRUMENT_SCENES = buttons.Section("linnstrument-scenes", {}, {})
-SEQUENCER_GLOBAL = buttons.Section("sequencer-global", {}, {}, GLOBAL)
-SEQUENCER_GLOBAL_SHIFT = buttons.Section("sequencer-global-shift", {}, {}, GLOBAL_SHIFT)
-NAVIGATION = buttons.Section("navigation", {}, {})
-NAVIGATION_SHIFT = buttons.Section("navigation-shift", {}, {})
-SEQUENCER_NAV = buttons.Section("sequencer-nav", {}, {}, NAVIGATION)
-SEQUENCER_NAV_SHIFT = buttons.Section("sequencer-nav-shift", {}, {}, NAVIGATION_SHIFT)
-VIEW = buttons.Section("view", {}, {})
-VIEW_SHIFT = buttons.Section("view-shift", {}, {})
-DEVICE_CLIP = buttons.Section("device-clip", {}, {})
-SEQUENCER_GRID = buttons.Section("sequencer-grid", {}, {})
-SEQUENCER_SETTINGS = buttons.Section("sequencer-settings", {}, {})
-FX = buttons.Section("fx", {}, {})
+# Buttons, from buttons.toml: one namespace per section (core/views.py lists them), each
+# button's (column, pad) by name and each group as {(column, pad): value} by its function. A
+# mode's section falls back to its Session one (buttons.FALLBACK).
+_SECTIONS = {}
+for _name in views.button_sections():
+    _base = buttons.FALLBACK.get(_name)
+    _SECTIONS[_name] = buttons.Section(_name, {}, {}, _base and _SECTIONS[_base])
+SECTIONS = tuple(_SECTIONS.values())
 
-SECTIONS = (
-    GLOBAL,
-    GLOBAL_SHIFT,
-    LINNSTRUMENT,
-    LINNSTRUMENT_SHIFT,
-    LINNSTRUMENT_SCENES,
-    SEQUENCER_GLOBAL,
-    SEQUENCER_GLOBAL_SHIFT,
-    NAVIGATION,
-    NAVIGATION_SHIFT,
-    SEQUENCER_NAV,
-    SEQUENCER_NAV_SHIFT,
-    VIEW,
-    VIEW_SHIFT,
-    DEVICE_CLIP,
-    SEQUENCER_GRID,
-    SEQUENCER_SETTINGS,
-    FX,
-)
+GLOBAL = _SECTIONS["global"]
+GLOBAL_SHIFT = _SECTIONS["global-shift"]
+LINNSTRUMENT = _SECTIONS["linnstrument"]
+LINNSTRUMENT_SHIFT = _SECTIONS["linnstrument-shift"]
+LINNSTRUMENT_SCENES = _SECTIONS["linnstrument-scenes"]
+SEQUENCER_GLOBAL = _SECTIONS["sequencer-global"]
+SEQUENCER_GLOBAL_SHIFT = _SECTIONS["sequencer-global-shift"]
+NAVIGATION = _SECTIONS["navigation"]
+NAVIGATION_SHIFT = _SECTIONS["navigation-shift"]
+SEQUENCER_NAV = _SECTIONS["sequencer-nav"]
+SEQUENCER_NAV_SHIFT = _SECTIONS["sequencer-nav-shift"]
+VIEW = _SECTIONS["view"]
+VIEW_SHIFT = _SECTIONS["view-shift"]
+DEVICE_CLIP = _SECTIONS["device-clip"]
+SEQUENCER_GRID = _SECTIONS["sequencer-grid"]
+SEQUENCER_SETTINGS = _SECTIONS["sequencer-settings"]
+FX = _SECTIONS["fx"]
 
 
 def refresh():

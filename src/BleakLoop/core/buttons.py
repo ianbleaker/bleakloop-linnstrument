@@ -5,8 +5,8 @@ import tomllib
 from pathlib import Path
 from typing import NamedTuple
 
-from . import userfile
-from .catalogue import LINNSTRUMENT, MESSAGE_ONLY, MODES, SEQUENCER, SESSION
+from . import userfile, views
+from .catalogue import MESSAGE_ONLY, MODES
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
@@ -65,39 +65,8 @@ SECTIONS = frozenset(
 )
 
 # The sections live together, by layer: no two of a layer's buttons may share a pad, and none
-# may sit on a fixed region of any of its sections. The first thirteen are the manual's maps
-# (tools/docs/manual/pads.py LAYERS, kept equal by a test); the rest have no map.
-LAYERS = {
-    "SESSION": ("global", "view", "navigation", "session"),
-    "SESSION_SHIFT": ("global-shift", "view-shift", "navigation-shift", "session-shift"),
-    "SPLIT": ("global", "view", "navigation", "split"),
-    "SPLIT_SNAPSHOTS": ("global", "view", "navigation", "split-snapshots"),
-    "MIXER": ("global", "view", "navigation", "mixer"),
-    "MIXER_SPLIT": ("global", "view", "navigation", "mixer-split"),
-    "MIXER_SHIFT": ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
-    "FX": ("global", "view", "navigation", "fx"),
-    "FX_SHIFT": ("global-shift", "view-shift", "navigation-shift", "fx-shift"),
-    "SEQUENCER": ("sequencer-global", "sequencer-nav", "sequencer"),
-    "SEQUENCER_SETTINGS": ("sequencer-global", "sequencer-nav", "sequencer-grid", "sequencer-settings"),
-    "SEQUENCER_SHIFT": ("sequencer-global-shift", "sequencer-nav-shift", "sequencer"),
-    "SEQUENCER_DRUMS": ("sequencer-global", "sequencer-nav", "sequencer"),
-    "SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "split-shift"),
-    "MIXER_SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "mixer-split-shift"),
-    # Sequencer Mode's column 15 is live on both layers, beside its own columns.
-    "SEQUENCER_BUTTONS": ("sequencer-global", "sequencer-nav", "sequencer-grid", "sequencer"),
-    "SEQUENCER_SHIFT_BUTTONS": (
-        "sequencer-global-shift",
-        "sequencer-nav-shift",
-        "sequencer-grid",
-        "sequencer",
-    ),
-    "LINNSTRUMENT": ("linnstrument",),
-    "LINNSTRUMENT_SHIFT": ("linnstrument-shift",),
-    "LINNSTRUMENT_SCENES": ("linnstrument-scenes",),
-}
-
-# In Linnstrument Mode only the device's left split, column 1, reaches BleakLoop.
-LEFT_SPLIT_SECTIONS = ("linnstrument", "linnstrument-shift", "linnstrument-scenes")
+# may sit on a fixed region of any of its sections.
+LAYERS = views.layers()
 
 # A mode's section falls back to its base: the base's buttons it doesn't override on the same
 # pad still work there, if their function runs in that mode, and are dark otherwise.
@@ -109,19 +78,6 @@ FALLBACK = {
     "sequencer-nav": "navigation",
     "sequencer-nav-shift": "navigation-shift",
 }
-
-
-def section_modes(section):
-    # The modes a section's buttons work in.
-    if section == "linnstrument-scenes":
-        return frozenset({LINNSTRUMENT, SEQUENCER})
-    if section.startswith("linnstrument"):
-        return frozenset({LINNSTRUMENT})
-    if section.startswith("sequencer"):
-        return frozenset({SEQUENCER})
-    if section == "device-clip":
-        return frozenset({SESSION, SEQUENCER})
-    return frozenset({SESSION})
 
 
 MAX_LABEL = 7
@@ -179,21 +135,23 @@ class Section:
         self.__dict__["_name"] = name
         self.__dict__["_does"] = does
         self.__dict__["_base"] = base
-        self.__dict__["_modes"] = section_modes(name)
+        self.__dict__["_modes"] = views.modes(name)
         self.__dict__["_built"] = frozenset(buttons)
+        self.__dict__["_names"] = list(buttons)
 
     def _refill(self, buttons, does):
         # A reload: new buttons in the same object, so whatever holds it (a fallback, a module
         # attribute) sees them. Name, fallback and modes stay.
-        for key in [key for key in self.__dict__ if not key.startswith("_")]:
-            del self.__dict__[key]
+        for key in self._names:
+            self.__dict__.pop(key, None)
         self.__dict__.update(buttons)
         self.__dict__["_does"] = dict(does)
         self.__dict__["_built"] = frozenset(buttons)
+        self.__dict__["_names"] = list(buttons)
 
     def __getattr__(self, attr):
         base = self.__dict__.get("_base")
-        if attr.startswith("_") or base is None:
+        if base is None or attr not in base._does:
             raise AttributeError(attr)
         value = getattr(base, attr)
         if not MODES[base._does[attr]] & self._modes:
@@ -212,13 +170,22 @@ class Section:
         if base is not None and attr not in built and attr in base._does:
             if value == getattr(base, attr, None):
                 self.__dict__.pop(attr, None)
+                if attr in self._names:
+                    self._names.remove(attr)
                 return
             self._does[attr] = base._does[attr]
         self._does.setdefault(attr, attr)
         self.__dict__[attr] = value
+        if attr not in self._names:
+            self._names.append(attr)
+
+    def __delattr__(self, attr):
+        object.__delattr__(self, attr)
+        if attr in self._names:
+            self._names.remove(attr)
 
     def _own(self):
-        return {key: value for key, value in self.__dict__.items() if not key.startswith("_")}
+        return {key: self.__dict__[key] for key in self._names}
 
     def _own_pads(self):
         return {key for _, _, key, _ in _expand(self._own(), self._does)}
@@ -372,9 +339,6 @@ def _walk(table):
 
 
 def _validate(data, items):
-    # Imported here: layout reads its positions from this module.
-    from . import layout
-
     for key, kind in TOP_LEVEL.items():
         if key in data and not isinstance(data[key], kind):
             raise ValueError(f"{key}: wrong type")
@@ -396,7 +360,7 @@ def _validate(data, items):
             if section not in SECTIONS:
                 raise ValueError(f"functions.{name}.manual_in: unknown section {section!r}")
     seen = {}
-    regions = _regions()
+    regions = views.REGIONS
     for id, item in items.items():
         section = item["section"]
         for field, value in item.items():
@@ -411,15 +375,15 @@ def _validate(data, items):
         function = _does(id, item)
         if function not in MODES:
             raise ValueError(f"{id}: no such function {function!r}")
-        if not MODES[function] & section_modes(section):
+        if not MODES[function] & views.modes(section):
             modes = ", ".join(sorted(MODES[function]))
             raise ValueError(f"{id}: {function} doesn't run in {section}, only in {modes}")
         if len(item.get("label", "")) > MAX_LABEL:
             raise ValueError(f"{id}: label longer than {MAX_LABEL} characters")
         column, pad = item["pad"]
-        if column not in range(1, layout.COLUMNS) or pad not in range(1, layout.ROWS + 1):
+        if column not in views.COLUMNS or pad not in views.ROWS:
             raise ValueError(f"{id}: pad {item['pad']} is off the surface")
-        if section in LEFT_SPLIT_SECTIONS and column != layout.GLOBAL_COLUMN:
+        if column not in views.columns(section):
             raise ValueError(f"{id}: in Linnstrument Mode only column 1 reaches BleakLoop")
         if (section, column, pad) in seen:
             raise ValueError(f"{id}: pad {item['pad']} is taken by {seen[section, column, pad]}")
@@ -437,7 +401,7 @@ def _live(items, section):
     base = FALLBACK.get(section)
     if base is None:
         return own
-    modes = section_modes(section)
+    modes = views.modes(section)
     inherited = [
         (id, key)
         for id, key in _live(items, base)
@@ -461,39 +425,6 @@ def _check_layers(items, regions):
                         raise ValueError(f"{id}: pad {list(key)} is in a fixed region of the {layer} layer")
 
 
-def _regions():
-    # The fixed regions (clip grid, scene pads, faders, steps) live in each section: no button
-    # may sit on them. Imported here: layout reads its positions from this module.
-    from . import layout
-
-    every = range(1, layout.ROWS + 1)
-    scenes = range(1, layout.WINDOW_SCENES + 1)
-    grid = ((layout.GRID_COLUMNS, every),)
-    split_tracks = range(layout.GRID_COLUMNS[0], layout.GRID_COLUMNS[0] + layout.SPLIT_TRACKS)
-    split = ((split_tracks, every), (layout.SPLIT_FADER_COLUMNS, every))
-    steps = ((layout.SEQ_STEP_COLUMNS, every),)
-    sequencer = (*steps, (layout.SEQ_NOTE_COLUMNS, every))
-    return {
-        "view": ((range(layout.SCENE_COLUMN, layout.SCENE_COLUMN + 1), scenes),),
-        "view-shift": ((range(layout.SCENE_COLUMN, layout.SCENE_COLUMN + 1), scenes),),
-        "session": grid,
-        "session-shift": grid,
-        "split": split,
-        "split-shift": ((split_tracks, every),),
-        "split-snapshots": ((split_tracks, every),),
-        "mixer": grid,
-        "mixer-shift": grid,
-        "mixer-split": split,
-        "mixer-split-shift": ((split_tracks, every),),
-        "fx": ((layout.FX_FADER_COLUMNS, every),),
-        "linnstrument-scenes": ((range(layout.GLOBAL_COLUMN, layout.GLOBAL_COLUMN + 1), scenes),),
-        "sequencer-grid": steps,
-        "sequencer": sequencer,
-        "sequencer-functions": sequencer,
-        "sequencer-settings": steps,
-    }
-
-
 def _read(path):
     with open(path, "rb") as file:
         return tomllib.load(file)
@@ -505,15 +436,17 @@ def load(path, user_path=None):
     overlay, editor = {}, dict(userfile.EDITOR)
     if user_path is not None and Path(user_path).exists():
         try:
-            try:
-                overlay = _read(user_path)
-            except OSError as error:
-                raise ValueError(f"couldn't read it: {error.strerror}") from None
-            data, editor = userfile.merge(data, overlay, str(user_path))
+            overlay = _read(user_path)
+        except OSError as error:
+            raise ValueError(f"{user_path}: couldn't read it: {error.strerror}") from None
+        except ValueError as error:  # TOML syntax
+            raise ValueError(f"{user_path}: {error}") from None
+        # merge names the file in its own errors.
+        data, editor = userfile.merge(data, overlay, str(user_path))
+        try:
             registry = Registry(data)
         except ValueError as error:
-            text = str(error)
-            raise ValueError(text if text.startswith(str(user_path)) else f"{user_path}: {text}") from None
+            raise ValueError(f"{user_path}: {error}") from None
     else:
         registry = Registry(data)
     registry.overlay, registry.editor = overlay, editor
@@ -579,12 +512,12 @@ def describe(registry=None):
 
     registry = registry or _get()
     overlay = getattr(registry, "overlay", {})
-    regions = _regions()
+    regions = views.REGIONS
     sections = []
     for live in layout.SECTIONS:
         name = live._name
         key = name.replace("-", "_")
-        modes = section_modes(name)
+        modes = views.modes(name)
         own = []
         for id, item in registry.items.items():
             if item["section"] != name:
@@ -626,7 +559,7 @@ def describe(registry=None):
                 "key": key,
                 "modes": sorted(modes),
                 "fallback": FALLBACK.get(name),
-                "left_split": name in LEFT_SPLIT_SECTIONS,
+                "left_split": views.columns(name) == {layout.GLOBAL_COLUMN},
                 "entries": own + inherited,
                 "regions": _pads(regions.get(name, ())),
                 # Fixed or taken in a layer this section shares: a button can't go there.

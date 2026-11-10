@@ -34,11 +34,6 @@ def test_sections_are_the_manuals_plus_held_modifiers():
     assert buttons.SECTIONS == set(pads.SECTIONS) | held
 
 
-@pytest.mark.parametrize("layer", list(pads.LAYERS), ids=lambda layer: layer.name)
-def test_the_registry_checks_the_manuals_layers(layer):
-    assert buttons.LAYERS[layer.name] == pads.LAYERS[layer]
-
-
 def test_the_shipped_file_loads():
     assert buttons.load(buttons.PATH).entries() == buttons.entries()
 

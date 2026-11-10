@@ -214,6 +214,7 @@ flowchart TD
     core_session["session"]
     core_userfile["userfile"]
     core_values["values"]
+    core_views["views"]
   end
   subgraph External
     Live["Live"]
@@ -224,6 +225,7 @@ flowchart TD
   core_buttons -.->|lazy| core_layout
   core_buttons --> core_model
   core_buttons --> core_userfile
+  core_buttons --> core_views
   core_controls --> core_buttons
   core_controls --> core_faders
   core_controls --> core_functions
@@ -271,6 +273,7 @@ flowchart TD
   core_global_column --> core_model
   core_global_column --> core_modes
   core_layout --> core_buttons
+  core_layout --> core_views
   core_leds --> core_values
   core_linnstrument_mode --> core_global_column
   core_linnstrument_mode --> core_layout
