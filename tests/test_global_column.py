@@ -535,9 +535,15 @@ def test_any_song_level_function_works_in_column_1(monkeypatch):
     assert handle(SESSION, layout.GLOBAL.fixed_length)[0].fixed_length == 1
 
 
-def test_every_function_runs_in_all_its_modes():
+def test_every_function_is_registered_once():
     # engine imports every module that registers functions, as Live does.
     from BleakLoop.core import catalogue, engine, functions  # noqa: F401
 
-    expected = {(name, mode) for name, modes in catalogue.MODES.items() for mode in modes}
-    assert functions.registered() == expected
+    assert functions.registered() == set(catalogue.REQUIREMENTS)
+
+
+def test_every_requirement_has_its_reason():
+    from BleakLoop.core import buttons, catalogue
+
+    for requirement in catalogue.MET_IN:
+        assert buttons.system(f"unavailable_{requirement}")

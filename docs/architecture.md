@@ -251,7 +251,6 @@ flowchart TD
   core_faders --> core_values
   core_functions --> core_catalogue
   core_functions --> core_leds
-  core_functions --> core_modes
   core_fx --> core_buttons
   core_fx --> core_faders
   core_fx --> core_functions
@@ -262,7 +261,6 @@ flowchart TD
   core_fx --> core_modes
   core_fx --> core_values
   core_global_column --> core_buttons
-  core_global_column --> core_catalogue
   core_global_column --> core_controls
   core_global_column --> core_faders
   core_global_column --> core_functions
@@ -288,7 +286,6 @@ flowchart TD
   core_modes --> core_layout
   core_modes --> core_values
   core_sequencer --> core_buttons
-  core_sequencer --> core_catalogue
   core_sequencer --> core_controls
   core_sequencer --> core_faders
   core_sequencer --> core_functions
@@ -301,7 +298,6 @@ flowchart TD
   core_sequencer --> core_modes
   core_sequencer --> core_values
   core_session --> core_buttons
-  core_session --> core_catalogue
   core_session --> core_controls
   core_session --> core_faders
   core_session --> core_functions

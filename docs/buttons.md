@@ -276,7 +276,7 @@ The faders' and timed scene launches' wording.
 
 ## System messages
 
-The device setup, and Device/Clip's track and device names. These always show.
+The device setup, Device/Clip's track and device names, and why the button editor shows a function dark. These always show.
 
 | Key | Message |
 |---|---|
@@ -291,3 +291,9 @@ The device setup, and Device/Clip's track and device names. These always show.
 | `no_more_tracks` | No more tracks |
 | `device` | {device} |
 | `no_more_devices` | No more devices |
+| `unavailable_leaves_mode` | Use Back to leave Linnstrument Mode |
+| `unavailable_edits_surface` | Needs Session, Mixer, FX or Sequencer Mode |
+| `unavailable_clip_grid` | Needs Session, Mixer or FX Mode |
+| `unavailable_came_from` | Only Linnstrument Mode has a mode to go back to |
+| `unavailable_scene_page` | The scene page opens in Linnstrument and Sequencer Mode |
+| `unavailable_sequencer` | Needs a sequencer clip |

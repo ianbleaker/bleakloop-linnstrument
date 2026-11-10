@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from BleakLoop.core import buttons, layout, session
+from BleakLoop.core import buttons, catalogue, layout, session
 from BleakLoop.core.leds import OFF, WHITE, Light
 from BleakLoop.core.model import PadPress, ShowMessage, Undo
 from BleakLoop.core.modes import State
@@ -131,4 +131,6 @@ def test_every_message_is_used_and_defined():
     defined, defined_system = _defined()
     assert sorted(used - defined, key=str) == []
     assert sorted(defined - used, key=str) == []
+    # The editor reads each requirement's reason (buttons.describe).
+    used_system |= {f"unavailable_{requirement}" for requirement in catalogue.MET_IN}
     assert used_system == defined_system

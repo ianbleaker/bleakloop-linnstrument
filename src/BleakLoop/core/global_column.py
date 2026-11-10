@@ -6,7 +6,7 @@ and Shift + Play/Stop act on it.
 
 from dataclasses import replace
 
-from . import buttons, catalogue, controls, faders, functions, fx, layout, mixer, modes
+from . import buttons, controls, faders, functions, fx, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -152,19 +152,16 @@ def _back_press(state, snapshot, value):
     return _back(state)
 
 
-@functions.register("linnstrument_mode", [catalogue.SEQUENCER], light=_lit(MAGENTA))
-def _linnstrument_from_sequencer(state, snapshot, value):
-    # The arm stays: the player plays the track they were sequencing.
-    actions = []
-    if state.seq_undo_open:
-        state = replace(state, seq_undo_open=False)
-        actions.append(EndUndoStep())
-    actions += [EnterMode(Mode.LINNSTRUMENT), *buttons.say("linnstrument_mode")]
-    return modes.enter(state, Mode.LINNSTRUMENT), actions
-
-
-@functions.register("linnstrument_mode", [catalogue.SESSION], light=_lit(MAGENTA))
-def _linnstrument_from_session(state, snapshot, value):
+@functions.register("linnstrument_mode", light=_lit(MAGENTA))
+def _linnstrument_mode(state, snapshot, value):
+    if state.mode is Mode.SEQUENCER:
+        # The arm stays: the player plays the track they were sequencing.
+        actions = []
+        if state.seq_undo_open:
+            state = replace(state, seq_undo_open=False)
+            actions.append(EndUndoStep())
+        actions += [EnterMode(Mode.LINNSTRUMENT), *buttons.say("linnstrument_mode")]
+        return modes.enter(state, Mode.LINNSTRUMENT), actions
     state, actions = mixer.reset(state)
     state, more = faders.reset(state)
     entered = [EnterMode(Mode.LINNSTRUMENT), *buttons.say("linnstrument_mode")]

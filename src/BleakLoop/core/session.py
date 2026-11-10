@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import buttons, catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, sequencer
+from . import buttons, controls, faders, functions, fx, global_column, layout, mixer, modes, sequencer
 from .leds import (
     BLUE,
     CYAN,
@@ -165,18 +165,21 @@ def _current(state):
 
 
 def _mode_light(name):
-    # Modes are cyan, the current one blue, or pink in its split view.
+    # Modes are cyan, the current one blue, or pink in its split view. In Sequencer Mode, each
+    # leaves it: all cyan.
     def light(state, snapshot, value):
-        if _current(state) != name:
+        if state.mode is Mode.SEQUENCER or _current(state) != name:
             return Light(CYAN)
         return Light(PINK if faders.split_view(state) else BLUE)
 
     return light
 
 
-@functions.register("session", [catalogue.SESSION], light=_mode_light("session"))
+@functions.register("session", light=_mode_light("session"))
 def _session_press(state, snapshot, value):
     # The current mode's pad goes back to Session.
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.leave_to_session(state, snapshot)
     if state.mixer:
         return _widen(state, mixer.toggle, snapshot)
     if state.fx:
@@ -184,15 +187,19 @@ def _session_press(state, snapshot, value):
     return _toggle_split(state, snapshot)
 
 
-@functions.register("mixer", [catalogue.SESSION], light=_mode_light("mixer"))
+@functions.register("mixer", light=_mode_light("mixer"))
 def _mixer_press(state, snapshot, value):
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.leave_to_mixer(state, snapshot)
     if state.mixer:
         return _toggle_split(state, snapshot)
     return _widen(state, mixer.toggle, snapshot)
 
 
-@functions.register("fx", [catalogue.SESSION], light=_mode_light("fx"))
+@functions.register("fx", light=_mode_light("fx"))
 def _fx_press(state, snapshot, value):
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.leave_to_fx(state, snapshot)
     return _widen(state, fx.toggle, snapshot)
 
 
@@ -201,19 +208,26 @@ def _reserved(state, snapshot, value):
     return state, []
 
 
-functions.register_hold(
-    "seq",
-    [catalogue.SESSION],
-    light=lambda state, snapshot, value: Light(CYAN, Blink.FAST) if state.seq_held else Light(CYAN),
-)
+def _seq_light(state, snapshot, value):
+    if state.mode is Mode.SEQUENCER:
+        return Light(BLUE)
+    return Light(CYAN, Blink.FAST) if state.seq_held else Light(CYAN)
+
+
+@functions.register("seq", light=_seq_light)
+def _seq_tap(state, snapshot, value):
+    # A hold in Session Mode, which handle() runs; in Sequencer Mode a tap leaves it.
+    if state.mode is Mode.SEQUENCER:
+        return sequencer.leave_by_seq(state, snapshot)
+    return state, []
+
+
 functions.register_hold(
     "copy",
-    [catalogue.SESSION],
     light=lambda state, snapshot, value: Light(RED, Blink.FAST) if state.copy else Light(MAGENTA),
 )
 functions.register_hold(
     "delete",
-    [catalogue.SESSION],
     light=lambda state, snapshot, value: Light(RED, Blink.FAST if state.delete else Blink.STEADY),
 )
 functions.register_hold(

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from . import userfile, views
-from .catalogue import MESSAGE_ONLY, MODES
+from .catalogue import MESSAGE_ONLY, REQUIREMENTS, runs_in
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
@@ -154,7 +154,7 @@ class Section:
         if base is None or attr not in base._does:
             raise AttributeError(attr)
         value = getattr(base, attr)
-        if not MODES[base._does[attr]] & self._modes:
+        if not runs_in(base._does[attr], self._modes):
             raise AttributeError(f"{attr} doesn't run in {self._name}")
         mine = self._own_pads()
         if isinstance(value, dict):
@@ -199,7 +199,7 @@ class Section:
             inherited = [
                 button
                 for button in self._base.buttons()
-                if button.key not in taken and MODES[button.function] & self._modes
+                if button.key not in taken and runs_in(button.function, self._modes)
             ]
         return mine + inherited
 
@@ -345,7 +345,7 @@ def _validate(data, items):
     if not _is_messages(data.get("system", {})):
         raise ValueError("system: every message must be a string")
     for name, function in data.get("functions", {}).items():
-        if name not in MODES and name not in MESSAGE_ONLY:
+        if name not in REQUIREMENTS and name not in MESSAGE_ONLY:
             raise ValueError(f"functions.{name}: no such function")
         if not isinstance(function, dict):
             raise ValueError(f"functions.{name}: not a table")
@@ -373,11 +373,8 @@ def _validate(data, items):
         if "pad" not in item:
             raise ValueError(f"{id}: no pad")
         function = _does(id, item)
-        if function not in MODES:
+        if function not in REQUIREMENTS:
             raise ValueError(f"{id}: no such function {function!r}")
-        if not MODES[function] & views.modes(section):
-            modes = ", ".join(sorted(MODES[function]))
-            raise ValueError(f"{id}: {function} doesn't run in {section}, only in {modes}")
         if len(item.get("label", "")) > MAX_LABEL:
             raise ValueError(f"{id}: label longer than {MAX_LABEL} characters")
         column, pad = item["pad"]
@@ -405,7 +402,7 @@ def _live(items, section):
     inherited = [
         (id, key)
         for id, key in _live(items, base)
-        if key not in taken and MODES[_does(id, items[id])] & modes
+        if key not in taken and runs_in(_does(id, items[id]), modes)
     ]
     return own + inherited
 
@@ -541,7 +538,7 @@ def describe(registry=None):
         if name in FALLBACK:
             for id, pad in _live(registry.items, FALLBACK[name]):
                 item = registry.items[id]
-                if pad not in taken and MODES[_does(id, item)] & modes:
+                if pad not in taken and runs_in(_does(id, item), modes):
                     entry = {
                         "id": id,
                         "function": _does(id, item),
@@ -557,7 +554,7 @@ def describe(registry=None):
             {
                 "name": name,
                 "key": key,
-                "modes": sorted(modes),
+                "modes": sorted(mode.lower() for mode in modes),
                 "fallback": FALLBACK.get(name),
                 "left_split": views.columns(name) == {layout.GLOBAL_COLUMN},
                 "entries": own + inherited,
@@ -577,11 +574,11 @@ def describe(registry=None):
                     for id, pad in _live(registry.items, other)
                     if registry.items[id]["section"] == other
                 ],
-                "functions": sorted(function for function, runs in MODES.items() if runs & modes),
+                "functions": sorted(function for function in REQUIREMENTS if runs_in(function, modes)),
             }
         )
     functions = {}
-    for name in sorted(set(MODES) | set(registry.functions)):
+    for name in sorted(set(REQUIREMENTS) | set(registry.functions)):
         item = registry.function(name)
         described = {key: item[key] for key in userfile.FUNCTION_FIELDS if key in item}
         described.setdefault("label", name)

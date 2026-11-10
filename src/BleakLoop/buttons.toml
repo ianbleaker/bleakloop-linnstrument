@@ -574,6 +574,14 @@ track = "{track}"
 no_more_tracks = "No more tracks"
 device = "{device}"
 no_more_devices = "No more devices"
+# Why a function is dark where it can't work, for the button editor: one per requirement
+# (src/BleakLoop/core/catalogue.py).
+unavailable_leaves_mode = "Use Back to leave Linnstrument Mode"
+unavailable_edits_surface = "Needs Session, Mixer, FX or Sequencer Mode"
+unavailable_clip_grid = "Needs Session, Mixer or FX Mode"
+unavailable_came_from = "Only Linnstrument Mode has a mode to go back to"
+unavailable_scene_page = "The scene page opens in Linnstrument and Sequencer Mode"
+unavailable_sequencer = "Needs a sequencer clip"
 
 
 # Functions: each one's label, at most 7 characters, its message, and its outcomes and

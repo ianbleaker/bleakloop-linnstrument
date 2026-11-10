@@ -7,7 +7,7 @@ Steps are counted from clip time 0. Step s of the page in view is at column 3 + 
 import math
 from dataclasses import replace
 
-from . import buttons, catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, values
+from . import buttons, controls, faders, functions, fx, global_column, layout, mixer, modes, values
 from .leds import (
     BLUE,
     CYAN,
@@ -340,7 +340,7 @@ def _view_of(snapshot):
 
 
 def _leave_for(toggle):
-    def press(state, snapshot, value):
+    def press(state, snapshot, value=None):
         state, actions = leave(state, snapshot)
         state, more = toggle(state)
         # The new mode's width can be wider than Session's split view.
@@ -357,34 +357,21 @@ def _leave_for(toggle):
     return press
 
 
-def _cyan(state, snapshot, value):
-    return Light(CYAN)
+# The mode pads in Sequencer Mode: session.py registers them for every mode.
 
 
-@functions.register("session", [catalogue.SEQUENCER], light=_cyan)
-def _session(state, snapshot, value):
+def leave_to_session(state, snapshot):
     state, actions = leave(state, snapshot)
     return state, actions + buttons.say("session")
 
 
-@functions.register("seq", [catalogue.SEQUENCER], light=lambda state, snapshot, value: Light(BLUE))
-def _seq(state, snapshot, value):
+def leave_by_seq(state, snapshot):
     state, actions = leave(state, snapshot)
     return state, actions + buttons.say("seq", "left")
 
 
-functions.register("mixer", [catalogue.SEQUENCER], light=_cyan)(_leave_for(mixer.toggle))
-functions.register("fx", [catalogue.SEQUENCER], light=_cyan)(_leave_for(fx.toggle))
-functions.register_hold(
-    "copy",
-    [catalogue.SEQUENCER],
-    light=lambda state, snapshot, value: Light(RED, Blink.FAST) if state.copy else Light(MAGENTA),
-)
-functions.register_hold(
-    "delete",
-    [catalogue.SEQUENCER],
-    light=lambda state, snapshot, value: Light(RED, Blink.FAST if state.delete else Blink.STEADY),
-)
+leave_to_mixer = _leave_for(mixer.toggle)
+leave_to_fx = _leave_for(fx.toggle)
 
 
 @functions.register(

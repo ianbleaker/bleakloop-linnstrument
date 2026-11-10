@@ -74,6 +74,19 @@ def test_check_command(capsys):
     assert "navigation.delete" in capsys.readouterr().err
 
 
+def test_a_function_whose_requirement_isnt_met_loads_dark_and_inert():
+    from BleakLoop.core import engine, functions  # noqa: F401  registers every function
+    from BleakLoop.core.modes import Mode, State
+
+    registry = buttons.load(Path(__file__).parent / "fixtures" / "unmet_requirement.toml")
+    button = registry.section("linnstrument").at((1, 5))
+    state = State(mode=Mode.LINNSTRUMENT)
+    assert button.function == "copy"
+    assert functions.get("copy", state) is None
+    assert functions.press(button, state, None) == (state, [])
+    assert functions.light(button, state, None) == functions.Light(functions.OFF)
+
+
 def test_a_fallback_that_cant_run_in_a_mode_is_dark_there():
     registry = buttons.load(Path(__file__).parent / "fixtures" / "dark_fallback.toml")
     session = registry.section("global")

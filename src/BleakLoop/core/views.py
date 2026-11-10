@@ -234,8 +234,8 @@ def views_showing(section):
 
 
 def modes(section):
-    # The modes, lower-case, whose views show a section.
-    return frozenset(view.mode.lower() for view in views_showing(section))
+    # The modes, by modes.Mode member name, whose views show a section.
+    return frozenset(view.mode for view in views_showing(section))
 
 
 def columns(section):
