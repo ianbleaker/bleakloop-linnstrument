@@ -29,8 +29,11 @@ While Live runs, open **http://127.0.0.1:47128** in your browser: BleakLoop's bu
 Your changes are saved in `User Library/BleakLoop/buttons.toml`, beside the Remote Scripts folder, so installing a new BleakLoop keeps them. The file lists only what you changed: everything else, including buttons and messages a new version adds, comes from the shipped `src/BleakLoop/buttons.toml`. Deleting the file resets everything. You can also edit it in a text editor: BleakLoop applies each save within about a second, or, if the file has a mistake, keeps the current layout and shows the error. While your file has a mistake, the editor says what it is and shows the layout without your file. Saving or resetting then keeps a copy of the old file as `buttons.toml.bak` first. The editor rewrites the whole file on each save, so comments you add by hand are lost.
 
 - A full copy of the shipped file works as a starting point: the `manual` fields it carries are accepted while they match the shipped ones. Changing them does nothing for the device, so it's refused. Everything in a copy overrides the shipped file, so a button a new version moves stays where your copy has it.
-- FX snapshot slots, scene slots, Sequencer pages, Bars, rates, tracks and devices can be moved and relabelled, but not added, removed or given another value. Tempo and window buttons can be added, removed and given any step.
-- A section that falls back to another one, such as Linnstrument Mode's Global column, shows the fallback's buttons where it has none of its own. Removing its own button brings the fallback's back on that pad.
+- Each section shows exactly its own buttons: Linnstrument and Sequencer Mode's Global column list theirs, so a change to Session Mode's column 1 doesn't move them. To use a button in more views, select it and press **Place in other views too…**: it lists the other sections with that pad free and adds the button, with its value, label and options, to the ones you tick.
+- Every function is offered in every section. One that can't work there, such as a mode pad in Linnstrument Mode, is drawn dark: hover it for why. It can still be placed, and stays dark and does nothing there.
+- A function with options shows a checkbox for each on a selected button. Tracks has **Arm the track** and **Give its first rack the blue hand**, both on: untick one to step without it.
+- FX snapshot slots, scene slots, Sequencer pages, Bars and rates can be moved and relabelled, but not added, removed or given another value. Tempo, window, track and device buttons can be added, removed and given any step.
+- A file from before sections listed their own buttons is converted the first time BleakLoop loads it, so nothing on the device moves. The original is kept beside it as `buttons.toml.v1.bak`.
 - To turn the editor off, or move it to another port, add this to your file. BleakLoop applies it on the next save, and says so if the port is taken:
 
   ```toml
@@ -135,7 +138,7 @@ With **Device/Clip** held:
 
 <!-- callouts:device-clip -->
 - **Devices**: Select the previous or next device on the selected track.
-- **Tracks**: Select the previous or next track, through the returns and master, and give its first rack the blue hand.
+- **Tracks**: Select the previous or next track, through the returns and master, give its first rack the blue hand and arm it alone. A return or master is only selected.
 - **Device/Clip**: Hold it for this layer. A tap, pressing nothing else, flips Live between Device and Clip view instead.
 <!-- /callouts:device-clip -->
 
@@ -350,7 +353,7 @@ The reserved pad, pad 4, is dark and does nothing: it's kept for a Chord mode st
 - A tap flips Live's Detail view: to Clip view if it shows anything else or is hidden, and to Device view if it shows Clip view. It follows what you last clicked in Live. A press counts as a tap only if you press nothing else while holding it.
 - Held, like Shift, its pad blinks fast and column 16 shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual, except that a stored snapshot slot punches in, or slides if it's bound (see Snapshots and morphs).
 - It works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
-- Tracks steps through every track, then the returns and master. Devices are the ones directly on the track; with a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
+- Tracks steps through every track, then the returns and master. It selects the track, gives its first rack the blue hand and arms it alone, as the Select and arm row does; a return, the master or a group track is only selected, and the arms stay. In Sequencer Mode the arm always follows the selected track by itself (see Sequencer). Devices are the ones directly on the track; with a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
 - The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.
 - With Shift's layer showing, its pad is Left, a window move, and never flips the view.
 
@@ -386,7 +389,7 @@ Recording on a MIDI track switches to Linnstrument Mode, so you can play straigh
 - Press a track to select it and arm it. Every other track is disarmed, whatever Live's Exclusive Arm preference says.
 - Pressing the selected, armed track leaves it armed. Disarm it with Shift, below.
 - A track that can't be armed, such as a group track, is only selected.
-- The blue hand moves to the track's first Instrument, Drum or Audio Effect Rack with a mapped macro, or its first such rack if none has one, so Device FX shows its macros. Only racks directly on the track count, and a track without one keeps Live's selection. Device/Clip + Tracks does the same.
+- The blue hand moves to the track's first Instrument, Drum or Audio Effect Rack with a mapped macro, or its first such rack if none has one, so Device FX shows its macros. Only racks directly on the track count, and a track without one keeps Live's selection. Device/Clip + Tracks does the same, arm included.
 - Hold Shift and press a track to arm or disarm it alone. The selection and the other tracks stay as they are, so you can arm several tracks.
 - Red while armed, white while selected, lime otherwise. A track that can't be armed is dark unless it's selected.
 

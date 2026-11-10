@@ -7,18 +7,24 @@
 # repo: PYTHONPATH=src python3 -m tools.check_buttons
 #
 # [<section>.<name>] is a button. Fields:
-#   pad    [column, pad]; column 1 is the Global column, pad 1 the far row
-#   does   the function it runs (src/BleakLoop/core/catalogue.py); default: the button's name
-#   value  the function's setting for this pad, as a tempo step or a snapshot slot
-#   label  this pad's label on the manual's pad map, at most 7 characters, over the function's
+#   pad      [column, pad]; column 1 is the Global column, pad 1 the far row
+#   does     the function it runs (src/BleakLoop/core/catalogue.py); default: the button's name
+#   value    the function's setting for this pad: a tempo, track or device step, a window move
+#            or a snapshot slot
+#   label    this pad's label on the manual's pad map, at most 7 characters, over the function's
+#   options  on/off settings its function offers (catalogue.OPTIONS), each over its default, as
+#            options = { arm = false } on a Track-/+ button
 #
 # [functions.<name>] is a function, wherever its buttons sit: its label, at most 7
 # characters, and later its manual text and messages.
 #
 # A section shows exactly the buttons listed in it: Linnstrument and Sequencer Mode list their
-# own. Every button moves alone, Shift functions included. Fixed regions (clip grid, scene pads,
-# faders, steps, Mute/Select rows) aren't movable, and no two buttons live at once may share
-# a pad. In Linnstrument Mode only column 1 reaches BleakLoop, so its own sections stay there.
+# own. Any function may sit on any pad of any section; one whose requirement isn't met there
+# (catalogue.REQUIREMENTS: a mode switch in Linnstrument Mode, say) loads, but is dark and does
+# nothing, and the button editor shows why. Every button moves alone, Shift functions included.
+# Fixed regions (clip grid, scene pads, faders, steps, Mute/Select rows) aren't movable, and no
+# two buttons live at once may share a pad. In Linnstrument Mode only column 1 reaches
+# BleakLoop, so its own sections stay there.
 
 manual_format = "{label}."
 
@@ -321,7 +327,8 @@ pad = [15, 7]
 pad = [15, 8]
 
 
-# Device/Clip held, in every mode but Linnstrument Mode: value is the track or device step.
+# Device/Clip held, in every mode but Linnstrument Mode, whose layer is linnstrument_device_clip
+# (empty as shipped): value is the track or device step.
 
 [device_clip.track_previous]
 pad = [16, 7]
@@ -957,7 +964,7 @@ device = "Device view"
 clip = "Clip view"
 
 [functions.tracks]
-manual = "Select the previous or next track, through the returns and master, and give its first rack the blue hand."
+manual = "Select the previous or next track, through the returns and master, give its first rack the blue hand and arm it alone. A return or master is only selected."
 
 [functions.devices]
 manual = "Select the previous or next device on the selected track."

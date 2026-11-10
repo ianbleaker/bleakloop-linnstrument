@@ -43,8 +43,10 @@ flowchart LR
 | Geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping | `core/layout.py` |
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
 | Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers | `core/modes.py` |
-| Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights | `core/controls.py` |
-| Clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table | `core/session.py` |
+| The views: each mode's button sections, its hold layers and what they replace, its fixed regions | `core/views.py` |
+| The current view's buttons: holds and their precedence, layers, button lookup and lights | `core/dispatch.py` |
+| Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps, Device/Clip and scene lights | `core/controls.py` |
+| Clip slots, copy and delete rules, mute and select rows, the mode pads and the Seq, Copy, Delete and Stop holds | `core/session.py` |
 | The Global column in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/global_column.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
 | FX Mode: snapshot storage format, rack identity, store, recall, morph timing and tick, scene snapshots and their launch and reordering, FX lights | `core/fx.py` |
@@ -144,8 +146,10 @@ src/BleakLoop/
     layout.py          geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers
-    controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights
-    session.py         clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table
+    views.py           the views: each mode's button sections, its hold layers and what they replace, its fixed regions
+    dispatch.py        the current view's buttons: holds and their precedence, layers, button lookup and lights
+    controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps, Device/Clip and scene lights
+    session.py         clip slots, copy and delete rules, mute and select rows, the mode pads and the Seq, Copy, Delete and Stop holds
     global_column.py   the Global column in every mode: its controls, Shift, and Linnstrument Mode's scene page
     mixer.py           Mixer toggle, coarse steps, bands, smoothing
     fx.py              FX Mode: snapshot storage, rack identity, store, recall, morph timing and tick, scene snapshots, FX lights
