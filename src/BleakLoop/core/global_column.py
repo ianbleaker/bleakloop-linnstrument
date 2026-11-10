@@ -61,30 +61,12 @@ DEFAULT_QUANTIZATION = 4  # 1 Bar
 FIXED_LENGTH_COLOURS = {None: OFF, 1: CYAN, 2: BLUE, 4: MAGENTA, 8: PINK}
 
 
-def layers(state):
-    # The mode's Global column: its normal layer and its Shift layer, each its own buttons.
-    if state.mode is Mode.LINNSTRUMENT:
-        return layout.LINNSTRUMENT, layout.LINNSTRUMENT_SHIFT
-    if state.mode is Mode.SEQUENCER:
-        return layout.SEQUENCER_GLOBAL, layout.SEQUENCER_GLOBAL_SHIFT
-    return layout.GLOBAL, layout.GLOBAL_SHIFT
-
-
 def handle(state, event, snapshot):
-    # A Global column PadPress, pressed or released.
-    key = (event.column, event.pad)
+    # A Global column PadPress, pressed or released, in any mode.
     if state.scene_page:
         return scene_page(state, event, snapshot)
-    normal, shift = layers(state)
-    if key in _shift_pads(normal):
-        return replace(state, shift=event.pressed), shift_message(event)
-    if not event.pressed:
-        return state, []
-    # Pads the layer has no button on do nothing.
-    button = (shift if state.shift else normal).at(key)
-    if button is None:
-        return state, []
-    return functions.press(button, state, snapshot)
+    result = dispatch.handle_button(state, event, snapshot)
+    return (state, []) if result is None else result
 
 
 def _shift(state, event, snapshot):
@@ -350,23 +332,13 @@ def render_scene_page(state, snapshot):
 
 
 def render(state, snapshot):
-    # The Global column only. Copy and Delete hide the Shift layer.
+    # The Global column only, in any mode: the pads its buttons use in any layer.
     if state.scene_page:
         return render_scene_page(state, snapshot)
-    normal, shift = layers(state)
-    shift_held = Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
-    # Every pad the column's layers use goes dark, then the live layer lights its own.
-    frame = {button.key: Light(OFF) for button in normal.buttons() + shift.buttons()}
-    live = shift if state.shift and not state.copy and not state.delete else normal
-    functions.paint(frame, live.buttons(), state, snapshot)
-    frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
-    return frame
+    frame = {}
+    dispatch.paint(frame, state, snapshot)
+    return {key: light for key, light in frame.items() if key[0] == layout.GLOBAL_COLUMN}
 
 
 def shift_message(event):
     return buttons.say("shift") if event.pressed else []
-
-
-def _shift_pads(section):
-    # Shift lights and works on both layers.
-    return {button.key for button in section.buttons() if button.function == "shift"}
