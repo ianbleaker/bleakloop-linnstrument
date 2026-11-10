@@ -535,17 +535,17 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 **Opening it** with Seq (column 16, pad 5), which is cyan in Session, Mixer and FX Mode:
 
 - Tap Seq to open Sequencer Mode on the highlighted slot. If that slot is empty, it moves first to the clip in Live's Detail view, if that's a Session clip on a MIDI track, or else to the selected track's playing clip.
-- In Session Mode, hold Seq (it blinks fast) and press a clip slot to open Sequencer Mode on that slot. The clip doesn't launch, and an empty slot works too. In Mixer and FX Mode the grid ignores presses while Seq is held.
+- In Session Mode, hold Seq (it blinks fast) and press a clip slot to open Sequencer Mode on that slot. A clip doesn't launch, and an empty slot works too. In Mixer and FX Mode the grid ignores presses while Seq is held.
 - On an audio or group track, Seq says "Sequencer needs a MIDI track".
 - In Sequencer Mode, Seq or Session goes back to Session Mode, and Mixer or FX to that mode.
 
 **The arm.** Opening Sequencer Mode arms the track alone, so the note pads play it. Selecting another MIDI track, with Device/Clip + Tracks or by clicking it in Live, moves the arm with it. Leaving for Session, Mixer or FX puts every track's arm back as it was, except a track you armed or disarmed yourself in the meantime, and so does closing the Set or Live while in Sequencer Mode. Linnstrument Mode (column 1, pad 7) keeps the arm, so you play the track you were sequencing, and its Back returns to Sequencer Mode. Selecting an audio track, a return or master leaves the arm where it is, and the steps and note pads go dark.
 
-**An empty slot** gets a new MIDI clip when you add its first note, Fixed Length long, or 1 bar while Fixed Length is off.
+**An empty slot** gets a new MIDI clip as you open Sequencer Mode on it, by either way in, Fixed Length long, or 1 bar while Fixed Length is off. The new clip launches at once, starting the transport if it's stopped, so the playhead shows where you are. It is one undo.
 
 **Steps** (columns 3–10): 64 steps, row by row from the top, of the page in view.
 
-- A step is orange if the selected note starts in it, blue if it only holds other notes, and dark if it's empty. The playhead is white. Steps past the loop end are dark and do nothing.
+- A step is orange if the selected note starts in it, blue if it only holds other notes, and dark if it's empty, except an empty step on a beat, which is white. The playhead is green. Steps past the loop end are dark and do nothing.
 - Tap a step to add a one-step note of the selected note, at the strength you struck the pad. Tap it again to remove it. The tap acts when you lift your finger.
 - Hold a step and press a later one for one note spanning both. It replaces the selected note's notes between them.
 - Hold steps and press a note pad to add or remove that note on each of them, at the strength you struck the note pad.
@@ -611,5 +611,5 @@ The LinnStrument is your instrument again. The Global column keeps the controls 
 <!-- lights:scenes -->
 - **Scenes:** yellow and blinking with the beat while a held Bars pad holds their launch back to its bar line; lime and blinking fast once launched, until they start at the next quantization boundary; lime while all their clips play; magenta while some of their clips play; white if they hold clips.
 <!-- /lights:scenes -->
-- **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, and the playhead is white. A note pad lights yellow while its note plays, and the selected note blinks green.
+- **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, white steps are empty beats, and the playhead is green. A note pad lights yellow while its note plays, and the selected note blinks green.
 - On the LinnStrument, lime looks yellow and green looks lime.

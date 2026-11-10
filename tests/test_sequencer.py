@@ -827,9 +827,23 @@ def test_a_step_holding_the_pitch_and_others_is_orange():
     assert frame[(4, 1)] == Light(ORANGE)
 
 
-def test_the_playhead_is_white_over_a_lit_step():
+def test_the_playhead_is_green_over_a_lit_step():
     frame = render(notes=(note(2.0),), is_playing=True, position=2.1)
+    assert frame[(3, 2)] == Light(GREEN)
+
+
+def test_empty_steps_on_a_beat_are_white_under_any_notes():
+    # 1/16 steps: every 4th starts a beat.
+    frame = render(notes=(note(1.0),))
+    assert frame[(3, 1)] == Light(WHITE)
+    assert frame[(4, 1)] == Light(OFF)
+    assert frame[(7, 1)] == Light(ORANGE)
     assert frame[(3, 2)] == Light(WHITE)
+
+
+def test_a_triplet_rates_beats_are_every_third_step():
+    frame = render(replace(ENTERED, seq_rate=0.5, seq_triplet=True))
+    assert [frame[(c, 1)] for c in range(3, 7)] == [Light(WHITE), Light(OFF), Light(OFF), Light(WHITE)]
 
 
 def test_the_copy_source_blinks_red_over_the_playhead():

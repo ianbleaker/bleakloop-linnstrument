@@ -24,6 +24,7 @@ from .leds import (
 )
 from .model import (
     BeginUndoStep,
+    CreateClip,
     DuplicateLoop,
     EditNotes,
     EndUndoStep,
@@ -137,7 +138,10 @@ def enter_on_slot(state, track, scene, snapshot):
     if not track.has_midi_input or track.is_foldable or track.set_index is None:
         return state, buttons.refuse("seq", "needs_midi")
     state, actions = _enter(state, snapshot, track.set_index)
-    return state, [HighlightSlot(track.set_index, scene)] + actions
+    row = scene - state.window.scene
+    empty = row < len(track.slots) and not track.slots[row].has_clip
+    create = [CreateClip(track.set_index, scene, _create_length(state, snapshot))] if empty else []
+    return state, [HighlightSlot(track.set_index, scene)] + actions + create
 
 
 def enter_by_tap(state, snapshot):
@@ -145,15 +149,17 @@ def enter_by_tap(state, snapshot):
     entry = snapshot.seq_entry
     if entry is None or entry.selected is None or not entry.selected_midi:
         return state, buttons.refuse("seq", "needs_midi")
-    track, highlight = entry.selected, []
+    track, highlight, create = entry.selected, [], []
     if not entry.has_clip:
         if entry.detail is not None:
             track = entry.detail[0]
             highlight = [HighlightSlot(*entry.detail)]
         elif entry.playing_scene is not None:
             highlight = [HighlightSlot(entry.selected, entry.playing_scene)]
+        else:
+            create = [CreateClip(track, entry.scene, _create_length(state, snapshot))]
     state, actions = _enter(state, snapshot, track)
-    return state, highlight + actions
+    return state, highlight + actions + create
 
 
 def _enter(state, snapshot, track):
@@ -764,12 +770,20 @@ def _render_steps(frame, state, view, snapshot):
         if g == source:
             light = Light(RED, Blink.FAST)
         elif g == playing:
-            light = Light(WHITE)
+            light = Light(GREEN)
         elif g in held:
             light = Light(ORANGE if held[g] else BLUE)
+        elif _on_beat(g, length):
+            light = Light(WHITE)
         else:
             continue
         frame[step_key(s)] = light
+
+
+def _on_beat(g, length):
+    # Whether step g starts on a beat.
+    start = g * length
+    return abs(start - round(start)) < values.BEAT_EPSILON
 
 
 def _render_meters(frame, state, view):

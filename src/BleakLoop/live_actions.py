@@ -25,6 +25,7 @@ from .core.model import (
     DeleteGroupClips,
     DeleteScene,
     DuplicateLoop,
+    CreateClip,
     EditNotes,
     EndUndoStep,
     EnterMode,
@@ -103,6 +104,16 @@ def _set_clip(song, action):
         logger.info("SEQ: skipped %s, no clip at %d/%d", name, action.track, action.scene)
         return None
     return slot.clip
+
+
+def _create_clip(song, action):
+    slot = _set_slot(song, action.track, action.scene)
+    if slot is None or slot.has_clip:
+        logger.info("SEQ: skipped CreateClip at %d/%d", action.track, action.scene)
+        return
+    with _undo_step(song):
+        slot.create_clip(action.length)
+    slot.fire()
 
 
 def _edit_notes(song, action):
@@ -470,6 +481,8 @@ def apply(action, song, surface):
             track = _set_track(song, index)
             if track is not None and track.can_be_armed:
                 track.arm = arm
+    elif isinstance(action, CreateClip):
+        _create_clip(song, action)
     elif isinstance(action, EditNotes):
         _edit_notes(song, action)
     elif isinstance(action, RemovePitch):
