@@ -44,7 +44,7 @@ flowchart LR
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
 | Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers | `core/modes.py` |
 | The button registry from `buttons.toml` and the user's file: sections, labels, messages, checks, the editor's description | `core/buttons.py` |
-| The user's buttons file: merging it over the shipped file, its rules, its format 1 conversion and its writer | `core/userfile.py` |
+| The user's buttons file: merging it over the shipped file, its rules and its writer | `core/userfile.py` |
 | Every function and its requirement and options (data only) | `core/catalogue.py` |
 | The functions by name: each one's press, light and hold | `core/functions.py` |
 | The views: each mode's button sections, its hold layers and what they replace, its fixed regions | `core/views.py` |
@@ -152,7 +152,7 @@ src/BleakLoop/
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers
     buttons.py         the button registry from buttons.toml and the user's file: sections, labels, messages, checks
-    userfile.py        the user's buttons file: merge, rules, format 1 conversion, writer
+    userfile.py        the user's buttons file: merge, rules, writer
     catalogue.py       every function, its requirement and options (data only)
     functions.py       the functions by name: press, light and hold
     views.py           the views: each mode's button sections, its hold layers and what they replace, its fixed regions
@@ -330,7 +330,6 @@ flowchart TD
   core_session --> core_model
   core_session --> core_modes
   core_session --> core_sequencer
-  core_userfile --> core_catalogue
   device --> core_buttons
   device --> core_layout
   device --> core_leds

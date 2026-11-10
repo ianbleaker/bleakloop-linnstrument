@@ -197,86 +197,10 @@ def test_check_buttons_takes_a_user_file():
     assert check_buttons.main(["--user", str(FIXTURES / "missing.toml")]) == 1
 
 
-# Format 1 files: converted so nothing on the device moves.
-
-SWAP_PLAY_METRONOME = "[global.play_stop]\npad = [1, 4]\n\n[global.metronome]\npad = [1, 1]\n"
-
-
-def _v1(tmp_path, text):
+def _write(tmp_path, text):
     path = tmp_path / "buttons.toml"
     path.write_text(text, encoding="utf-8")
     return path
-
-
-def _function(section, key):
-    button = section.at(key)
-    return None if button is None else button.function
-
-
-def test_a_moved_global_button_moves_in_the_former_fallbacks_too(tmp_path, shipped):
-    buttons.reload(buttons.PATH, _v1(tmp_path, SWAP_PLAY_METRONOME))
-    for section in (layout.GLOBAL, layout.LINNSTRUMENT, layout.SEQUENCER_GLOBAL):
-        assert _function(section, (1, 4)) == "play_stop"
-        assert _function(section, (1, 1)) == "metronome"
-
-
-def test_a_moved_navigation_button_moves_in_sequencer_mode_too(tmp_path, shipped):
-    text = "[navigation.copy]\npad = [16, 4]\n\n[navigation.reserved]\npad = [16, 7]\n"
-    buttons.reload(buttons.PATH, _v1(tmp_path, text))
-    assert _function(layout.SEQUENCER_NAV, (16, 4)) == "copy"
-    # Reserved never ran in Sequencer Mode, so it wasn't there to inherit.
-    assert _function(layout.SEQUENCER_NAV, (16, 7)) is None
-
-
-def test_a_linnstrument_override_wins_over_the_global_move(tmp_path, shipped):
-    own = '\n[linnstrument.tempo_up]\npad = [1, 4]\ndoes = "tempo"\nvalue = 1\n'
-    buttons.reload(buttons.PATH, _v1(tmp_path, SWAP_PLAY_METRONOME + own))
-    assert _function(layout.LINNSTRUMENT, (1, 4)) == "tempo"
-    assert _function(layout.LINNSTRUMENT, (1, 1)) == "metronome"
-    assert "play_stop" not in {button.function for button in layout.LINNSTRUMENT.buttons()}
-    assert _function(layout.SEQUENCER_GLOBAL, (1, 4)) == "play_stop"
-
-
-def test_a_removed_global_button_goes_from_the_former_fallbacks_unless_overridden(tmp_path, shipped):
-    text = "[global.undo]\nremoved = true\n\n[global.linnstrument_mode]\nremoved = true\n"
-    buttons.reload(buttons.PATH, _v1(tmp_path, text))
-    assert _function(layout.LINNSTRUMENT, (1, 6)) is None
-    assert _function(layout.SEQUENCER_GLOBAL, (1, 6)) is None
-    assert _function(layout.LINNSTRUMENT, (1, 7)) == "back"
-    assert _function(layout.SEQUENCER_GLOBAL, (1, 7)) is None
-
-
-def test_the_converted_file_is_written_with_a_backup(tmp_path, shipped):
-    path = _v1(tmp_path, SWAP_PLAY_METRONOME)
-    buttons.reload(buttons.PATH, path)
-    assert (tmp_path / "buttons.toml.v1.bak").read_text(encoding="utf-8") == SWAP_PLAY_METRONOME
-    converted = buttons._read(path)
-    assert converted["format"] == 2
-    assert converted["linnstrument"] == {"play_stop": {"pad": [1, 4]}, "metronome": {"pad": [1, 1]}}
-    # Read again, it needs nothing more.
-    buttons.reload(buttons.PATH, path)
-    assert buttons._read(path) == converted
-
-
-def test_a_file_with_nothing_to_convert_isnt_rewritten(tmp_path, shipped):
-    text = '[functions.undo]\nmessage = "Undone"\n'
-    path = _v1(tmp_path, text)
-    buttons.reload(buttons.PATH, path)
-    assert path.read_text(encoding="utf-8") == text
-    assert not (tmp_path / "buttons.toml.v1.bak").exists()
-
-
-def test_a_failed_conversion_leaves_the_file_and_reports_it(tmp_path, shipped, monkeypatch):
-    # A conversion that couldn't keep a section's buttons where they were.
-    path = _v1(tmp_path, SWAP_PLAY_METRONOME)
-    monkeypatch.setattr(userfile, "_section_overlay", lambda section, shipped, wanted: {})
-    monkeypatch.setattr(buttons, "USER_PATH", path)
-    monkeypatch.setattr(buttons, "_registry", None)
-    monkeypatch.setattr(buttons, "user_error", None)
-    buttons._get()
-    assert "couldn't keep its buttons" in buttons.user_error
-    assert path.read_text(encoding="utf-8") == SWAP_PLAY_METRONOME
-    assert not (tmp_path / "buttons.toml.v1.bak").exists()
 
 
 def test_a_user_adds_track_and_device_steps_anywhere(tmp_path, shipped):
@@ -287,7 +211,7 @@ def test_a_user_adds_track_and_device_steps_anywhere(tmp_path, shipped):
         '[linnstrument_device_clip.device_next]\npad = [1, 2]\ndoes = "devices"\nvalue = 1\n\n'
         "[device_clip.track_next]\nremoved = true\n"
     )
-    buttons.reload(buttons.PATH, _v1(tmp_path, text))
+    buttons.reload(buttons.PATH, _write(tmp_path, text))
     assert layout.LINNSTRUMENT_DEVICE_CLIP.tracks == {(1, 1): 2}
     assert layout.LINNSTRUMENT_DEVICE_CLIP.at((1, 1)).options == {"rack": False}
     assert layout.LINNSTRUMENT_DEVICE_CLIP.devices == {(1, 2): 1}
@@ -298,4 +222,4 @@ def test_a_user_adds_track_and_device_steps_anywhere(tmp_path, shipped):
 def test_a_step_of_0_is_refused(tmp_path, function):
     text = f'format = 2\n\n[device_clip.step]\npad = [16, 3]\ndoes = "{function}"\nvalue = 0\n'
     with pytest.raises(ValueError, match="step is a whole number other than 0"):
-        buttons.load(buttons.PATH, _v1(tmp_path, text))
+        buttons.load(buttons.PATH, _write(tmp_path, text))
