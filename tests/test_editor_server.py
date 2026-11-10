@@ -187,3 +187,26 @@ def test_a_failing_handler_answers_500():
         assert _exchange(instance, b"GET / HTTP/1.1\r\n\r\n")[0] == 500
     finally:
         instance.close()
+
+
+def test_a_save_writes_a_buttons_options(editor):
+    overlay = {"device_clip": {"track_next": {"options": {"arm": False}}}}
+    status, _, body = _save(editor, overlay)
+    assert status == 200
+    written = tomllib.loads(editor.user.read_text(encoding="utf-8"))
+    assert written["device_clip"]["track_next"]["options"] == {"arm": False}
+    assert layout.DEVICE_CLIP.at((16, 6)).options == {"arm": False}
+    entry = next(
+        e
+        for s in json.loads(body)["sections"]
+        if s["name"] == "device-clip"
+        for e in s["entries"]
+        if e["name"] == "track_next"
+    )
+    assert entry["options"] == {"arm": False}
+
+
+def test_a_save_with_an_unknown_option_is_refused(editor):
+    status, _, body = _save(editor, {"device_clip": {"track_next": {"options": {"solo": True}}}})
+    assert status == 400 and "has no option 'solo'" in json.loads(body)["error"]
+    assert not editor.user.exists()

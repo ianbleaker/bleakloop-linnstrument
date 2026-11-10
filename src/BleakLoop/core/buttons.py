@@ -473,9 +473,9 @@ def _pads(regions):
 
 
 def describe(registry=None):
-    """The layout as plain data, for the editor: each live section's buttons, whether each is
-    shipped or the user's, its fixed regions, every function's messages, the system messages and the user's
-    changes."""
+    """The layout as plain data, for the editor: each section's buttons, whether each is
+    shipped or the user's, its fixed regions and usable pads, why a function would be dark in
+    it, every function's messages and options, the system messages and the user's changes."""
     from . import layout
 
     registry = registry or _get()
@@ -503,14 +503,17 @@ def describe(registry=None):
                 entry["own_label"] = item["label"]
             if "value" in item:
                 entry["value"] = item["value"]
+            if "options" in item:
+                entry["options"] = dict(item["options"])
             own.append(entry)
         sections.append(
             {
                 "name": name,
                 "key": key,
                 "modes": sorted(mode.lower() for mode in modes),
-                "left_split": views.columns(name) == {layout.GLOBAL_COLUMN},
                 "entries": own,
+                # The pads that reach BleakLoop in every view showing it.
+                "usable": [[column, pad] for column in sorted(views.columns(name)) for pad in views.ROWS],
                 "regions": _pads(regions.get(name, ())),
                 # Fixed or taken in a layer this section shares: a button can't go there.
                 "locked": sorted(
@@ -527,7 +530,13 @@ def describe(registry=None):
                     for id, pad in _live(registry.items, other)
                     if registry.items[id]["section"] == other
                 ],
-                "functions": sorted(function for function in REQUIREMENTS if runs_in(function, modes)),
+                "functions": sorted(REQUIREMENTS),
+                # Each function no view showing it can run, with why: placed there, it's dark.
+                "unavailable": {
+                    function: registry.system(f"unavailable_{REQUIREMENTS[function]}")
+                    for function in sorted(REQUIREMENTS)
+                    if not runs_in(function, modes)
+                },
             }
         )
     functions = {}
@@ -535,6 +544,11 @@ def describe(registry=None):
         item = registry.function(name)
         described = {key: item[key] for key in userfile.FUNCTION_FIELDS if key in item}
         described.setdefault("label", name)
+        if name in OPTIONS:
+            described["options"] = {
+                option: {"default": default, "label": label, "note": note}
+                for option, (default, label, note) in OPTIONS[name].items()
+            }
         functions[name] = described
     system = dict(registry.data.get("system", {}))
     return {

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from BleakLoop.core import buttons, layout
+from BleakLoop.core import buttons, catalogue, layout
 from BleakLoop.core.model import ShowMessage
 from tools.docs.manual import pads
 
@@ -87,3 +87,39 @@ def test_a_function_whose_requirement_isnt_met_loads_dark_and_inert():
     assert functions.light(button, state, None) == functions.Light(functions.OFF)
 
 
+
+
+def _described(name):
+    return next(section for section in buttons.describe()["sections"] if section["name"] == name)
+
+
+def test_the_editor_lists_every_function_in_every_section_and_why_one_is_dark():
+    linnstrument = _described("linnstrument")
+    assert linnstrument["functions"] == sorted(catalogue.REQUIREMENTS)
+    assert linnstrument["unavailable"]["session"] == "Use Back to leave Linnstrument Mode"
+    assert linnstrument["unavailable"]["double"] == "Needs a sequencer clip"
+    assert "tracks" not in linnstrument["unavailable"]
+    assert "back" in _described("global")["unavailable"]
+    # The scene page shows in Linnstrument and Sequencer Mode: Back works in one of them.
+    assert "back" not in _described("linnstrument-scenes")["unavailable"]
+
+
+def test_the_editor_knows_each_sections_usable_pads():
+    assert _described("linnstrument-device-clip")["usable"] == [[1, pad] for pad in range(1, 9)]
+    assert len(_described("global")["usable"]) == 16 * 8
+
+
+def test_the_editor_gets_each_functions_options():
+    options = buttons.describe()["functions"]["tracks"]["options"]
+    assert options["arm"] == {
+        "default": True,
+        "label": "Arm the track",
+        "note": "Sequencer Mode always moves the arm to the selected track",
+    }
+    assert "options" not in buttons.describe()["functions"]["undo"]
+
+
+def test_the_editor_has_no_fallbacks():
+    for section in buttons.describe()["sections"]:
+        assert "fallback" not in section
+        assert all(entry["source"] in ("shipped", "user") for entry in section["entries"])
