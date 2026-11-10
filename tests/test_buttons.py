@@ -30,7 +30,7 @@ def test_invalid_file_raises(path):
 
 
 def test_sections_are_the_manuals_plus_held_modifiers():
-    held = {"copy", "delete", "stop", "sequencer-copy", "sequencer-delete"}
+    held = {"copy", "delete", "stop", "sequencer-copy", "sequencer-delete", "linnstrument-device-clip"}
     assert buttons.SECTIONS == set(pads.SECTIONS) | held
 
 

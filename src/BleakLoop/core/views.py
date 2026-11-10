@@ -137,6 +137,7 @@ VIEWS = (
         columns=GLOBAL_COLUMN,
         layers={
             "shift": Layer(("linnstrument-shift",), ("linnstrument",)),
+            "device_clip": Layer(("linnstrument-device-clip",), ("linnstrument", "linnstrument-shift")),
             "scene_page": Layer(("linnstrument-scenes",), ("linnstrument", "linnstrument-shift")),
         },
     ),

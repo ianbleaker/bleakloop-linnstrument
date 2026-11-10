@@ -23,8 +23,9 @@ def user_path(script):
 
 USER_PATH = user_path(Path(__file__).parent.parent)
 
-# The manual's section keys (tools/docs/manual/pads.py SECTIONS), plus the held-modifier
-# sections that have combos but no manual section of their own.
+# The manual's section keys (tools/docs/manual/pads.py SECTIONS), plus those with no manual
+# section of their own: the held modifiers' combos and Linnstrument Mode's Device/Clip layer,
+# which ships empty.
 SECTIONS = frozenset(
     {
         "global",
@@ -48,6 +49,7 @@ SECTIONS = frozenset(
         "linnstrument",
         "linnstrument-shift",
         "linnstrument-scenes",
+        "linnstrument-device-clip",
         "sequencer-global",
         "sequencer-nav",
         "sequencer-global-shift",
