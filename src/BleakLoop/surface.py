@@ -333,7 +333,7 @@ class BleakLoop(ControlSurface):
             return
         self._fx_text = text
         slots = fx.parse(text)
-        # v1 and v2 stores both read; one with every slot cleared is valid too.
+        # One with every slot cleared is valid too.
         if text and not fx.readable(text):
             logger.warning("FX: stored snapshots unreadable, starting empty")
         self._state = replace(self._state, fx_slots=slots)
