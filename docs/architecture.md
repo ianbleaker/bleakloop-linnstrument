@@ -309,6 +309,7 @@ flowchart TD
   core_session --> core_model
   core_session --> core_modes
   core_session --> core_sequencer
+  core_userfile --> core_catalogue
   device --> core_buttons
   device --> core_layout
   device --> core_leds

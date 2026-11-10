@@ -1,3 +1,5 @@
+format = 2
+
 [global_shift.tempo_5]
 pad = [1, 2]
 does = "tempo"

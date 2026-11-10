@@ -106,9 +106,9 @@ def test_a_valid_save_writes_the_file_and_moves_the_button(editor):
     overlay = {"global": {"metronome": {"pad": [1, 5]}, "fixed_length": {"pad": [1, 4]}}}
     status, _, body = _save(editor, overlay)
     assert status == 200
-    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == overlay
+    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == {**overlay, "format": 2}
     assert layout.GLOBAL.metronome == (1, 5)
-    assert json.loads(body)["overlay"] == overlay
+    assert json.loads(body)["overlay"] == {**overlay, "format": 2}
 
 
 def test_an_invalid_save_returns_the_error_and_writes_nothing(editor):
@@ -137,7 +137,7 @@ def test_a_save_over_a_user_file_that_doesnt_load_keeps_a_backup(editor):
     backup = editor.user.with_name("buttons.toml.bak")
     assert status == 200 and json.loads(body)["backup"] == str(backup)
     assert backup.read_text(encoding="utf-8") == '[global.metronome]\npad = [1, 1]\n'
-    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == overlay
+    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == {**overlay, "format": 2}
 
 
 def test_a_save_over_a_user_file_that_loads_makes_no_backup(editor):

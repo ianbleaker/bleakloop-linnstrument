@@ -1,3 +1,5 @@
+format = 2
+
 # Metronome and Fixed Length swap pads.
 [global.metronome]
 pad = [1, 5]

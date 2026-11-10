@@ -1,3 +1,5 @@
+format = 2
+
 [sequencer_settings.rate_extra]
 pad = [12, 1]
 does = "rates"

@@ -3,7 +3,11 @@ so an upgrade keeps them. It lists only what differs; anything it leaves out com
 shipped file."""
 
 import copy
+import os
 import string
+from pathlib import Path
+
+from .catalogue import REQUIREMENTS, met_in
 
 # A group's buttons are read by index or hold fixed settings: they may move and be relabelled,
 # never be added, removed or given another value.
@@ -16,8 +20,11 @@ FUNCTION_FIELDS = frozenset({"label", "message", "show", "outcomes", "refusals"}
 # Fields that only feed the repo's generated docs: a user file may repeat them unchanged.
 DOCS_FIELDS = frozenset({"manual", "manual_in"})
 EDITOR = {"enabled": True, "port": 47128}
-# Top-level tables that aren't button sections.
-RESERVED = ("editor", "functions", "system", "manual_format")
+# Top-level keys that aren't button sections.
+RESERVED = ("editor", "functions", "system", "manual_format", "format")
+# The user file's format: 2 since sections stopped falling back to Session Mode's. A file
+# without it was written for format 1, and convert_v1 converts it.
+FORMAT = 2
 
 
 def _is_int(value):
@@ -182,6 +189,9 @@ def merge(shipped, user, name="user buttons file"):
             elif key == "manual_format":
                 if value != shipped.get("manual_format"):
                     raise ValueError("manual_format feeds the repo's manual and can't be changed here")
+            elif key == "format":
+                if value != FORMAT:
+                    raise ValueError(f"format: {value!r} isn't a format BleakLoop reads; it reads {FORMAT}")
             elif not isinstance(value, dict):
                 raise ValueError(f"{key}: not allowed in the user file")
         sections = {key: value for key, value in user.items() if key not in RESERVED}
@@ -268,8 +278,10 @@ def prune(value):
 def to_toml(overlay):
     """The user file's text for an overlay: editor, system, functions, then the buttons."""
     lines = [HEADER.rstrip("\n")]
+    if "format" in overlay:
+        lines += ["", f"format = {_value(overlay['format'])}"]
     order = [key for key in ("editor", "system", "functions") if key in overlay]
-    order += [key for key in overlay if key not in ("editor", "system", "functions")]
+    order += [key for key in overlay if key not in ("editor", "system", "functions", "format")]
     for key in order:
         value = overlay[key]
         if not isinstance(value, dict):
@@ -284,3 +296,126 @@ def to_toml(overlay):
             lines.append("")
             _table(lines, f"{_key(key)}.{_key(name)}", item)
     return "\n".join(lines) + "\n"
+
+
+def write_atomic(path, text):
+    # A temporary file in the same folder, then a rename: a reader sees the old file or the
+    # new one, never half of one.
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with open(temporary, "w", encoding="utf-8") as file:
+            file.write(text)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+# Format 1: these sections fell back to their base, by its key, in the mode they show in. A
+# base's button on a pad the section didn't use worked there too, if it ran in that mode.
+_V1_FALLBACK = {
+    "linnstrument": ("global", "LINNSTRUMENT"),
+    "linnstrument_shift": ("global_shift", "LINNSTRUMENT"),
+    "sequencer_global": ("global", "SEQUENCER"),
+    "sequencer_global_shift": ("global_shift", "SEQUENCER"),
+    "sequencer_nav": ("navigation", "SEQUENCER"),
+    "sequencer_nav_shift": ("navigation_shift", "SEQUENCER"),
+}
+# Format 1 ran these in Session and Sequencer Mode only; they now run everywhere.
+_V1_SESSION_AND_SEQUENCER = frozenset({"tracks", "devices", "device_clip", "window"})
+
+
+def _v1_runs(function, mode):
+    if function in _V1_SESSION_AND_SEQUENCER:
+        return mode in ("SESSION", "SEQUENCER")
+    return function in REQUIREMENTS and met_in(function, mode)
+
+
+def _v1_live(merged, section, base, mode):
+    # {name: item} for each button live in a format 1 section: its own, then its base's on the
+    # pads it leaves free. A base's name the section already has gets a number.
+    live = dict(merged.get(section, {}))
+    taken = {tuple(item["pad"]) for item in live.values()}
+    for name, item in merged.get(base, {}).items():
+        if tuple(item["pad"]) in taken or not _v1_runs(_does(f"{base}.{name}", item), mode):
+            continue
+        live[_free(name, live)] = dict(item)
+    return live
+
+
+def _free(name, *taken):
+    # name, or name_2, name_3, ...: the first that none of the tables has.
+    candidate, n = name, 1
+    while any(candidate in table for table in taken):
+        n += 1
+        candidate = f"{name}_{n}"
+    return candidate
+
+
+def _layout(section, items):
+    # What a section's buttons do, whatever their names: (pad, function, value, label) each.
+    def key(name, item):
+        value = item.get("value")
+        return (tuple(item["pad"]), _does(f"{section}.{name}", item), repr(value), item.get("label"))
+
+    return sorted(key(name, item) for name, item in items.items())
+
+
+def _section_overlay(section, shipped, wanted):
+    # The user entries that turn the shipped section into wanted. A shipped button wanted as
+    # something else, or without a field it has, is removed and wanted under a new name.
+    out, extra = {}, {}
+    for name, item in shipped.items():
+        want = wanted.get(name)
+        if want is None:
+            out[name] = {"removed": True}
+            continue
+        same_function = _does(f"{section}.{name}", want) == _does(f"{section}.{name}", item)
+        if not same_function or set(item) - set(want):
+            out[name] = {"removed": True}
+            extra[name] = want
+            continue
+        changes = {field: value for field, value in want.items() if item.get(field) != value}
+        if changes:
+            out[name] = changes
+    for name, want in wanted.items():
+        if name not in shipped:
+            out[name] = dict(want)
+    for name, want in extra.items():
+        out[_free(name, shipped, wanted, out)] = dict(want)
+    return out
+
+
+def convert_v1(shipped, v1, user, name="user buttons file"):
+    """The user file converted to format 2, or None when it needs nothing: written for format
+    1 (no format key), its buttons over v1 (the frozen format 1 shipped file) gave each former
+    fallback section a layout, and the converted file gives each the same over shipped. Raises
+    ValueError naming the file when it can't be converted."""
+    if "format" in user or not any(key not in RESERVED for key in user):
+        return None
+    try:
+        old, _ = merge(v1, user, name)
+    except ValueError:
+        return None  # not written for format 1: read as it is
+    new, _ = merge(shipped, user, name)
+    out = copy.deepcopy(user)
+    changed = False
+    for section, (base, mode) in _V1_FALLBACK.items():
+        wanted = _v1_live(old, section, base, mode)
+        if _layout(section, wanted) == _layout(section, new.get(section, {})):
+            continue
+        changed = True
+        out[section] = _section_overlay(section, shipped.get(section, {}), wanted)
+        if not out[section]:
+            del out[section]
+    if not changed:
+        return None
+    out["format"] = FORMAT
+    converted, _ = merge(shipped, out, name)
+    for section, (base, mode) in _V1_FALLBACK.items():
+        wanted = _v1_live(old, section, base, mode)
+        if _layout(section, wanted) != _layout(section, converted.get(section, {})):
+            raise ValueError(f"{name}: converting it from format 1, {section} couldn't keep its buttons")
+    return out

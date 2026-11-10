@@ -1,2 +1,4 @@
+format = 2
+
 [global.metronome
 pad = [1, 1]
