@@ -72,6 +72,15 @@ REQUIREMENTS = {
     "pages": "sequencer",
 }
 
+# Each function's per-button options, by name: (default, the editor's label, its hover note or
+# None). A button sets them in buttons.toml with options = { <name> = true or false }.
+OPTIONS = {
+    "tracks": {
+        "arm": (True, "Arm the track", "Sequencer Mode always moves the arm to the selected track"),
+        "rack": (True, "Give its first rack the blue hand", None),
+    },
+}
+
 # Messages with no button behind them: [functions.<name>] holds their wording, but no button
 # can name them with does.
 MESSAGE_ONLY = frozenset({"scenes"})

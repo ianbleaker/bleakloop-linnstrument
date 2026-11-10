@@ -8,7 +8,7 @@ what each needs: unmet, the function is dark and does nothing. A button's sectio
 
 from dataclasses import dataclass
 
-from .catalogue import REQUIREMENTS, requirement_met
+from .catalogue import OPTIONS, REQUIREMENTS, requirement_met
 from .leds import OFF, Light
 
 
@@ -90,7 +90,15 @@ def press(button, state, snapshot):
     function = get(button.function, state)
     if function is None or function.press is None:
         return state, []
+    if button.function in OPTIONS:
+        return function.press(state, snapshot, button.value, options(button))
     return function.press(state, snapshot, button.value)
+
+
+def options(button):
+    # The button's options over its function's defaults.
+    defaults = {name: default for name, (default, _, _) in OPTIONS.get(button.function, {}).items()}
+    return {**defaults, **(button.options or {})}
 
 
 def light(button, state, snapshot):

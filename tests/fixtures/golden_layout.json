@@ -1265,7 +1265,7 @@
 "fx_bind_undo|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -1281,7 +1281,7 @@
 "fx_bind_undo|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -6694,7 +6694,7 @@
 "fx|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -6710,7 +6710,7 @@
 "fx|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -12505,7 +12505,7 @@
 "mixer_split_snapshots|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -12521,7 +12521,7 @@
 "mixer_split_snapshots|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -17932,7 +17932,7 @@
 "mixer_split|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -17948,7 +17948,7 @@
 "mixer_split|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -23335,7 +23335,7 @@
 "mixer|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -23351,7 +23351,7 @@
 "mixer|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -28666,7 +28666,7 @@
 "sequencer_drums|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=False, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -28682,7 +28682,7 @@
 "sequencer_drums|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=False, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -32570,7 +32570,7 @@
 "sequencer_settings|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=False, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -32586,7 +32586,7 @@
 "sequencer_settings|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=False, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -36484,7 +36484,7 @@
 "sequencer|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=False, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -36500,7 +36500,7 @@
 "sequencer|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=False, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -40513,7 +40513,7 @@
 },
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -43039,7 +43039,7 @@
 },
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -44504,7 +44504,7 @@
 },
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=False, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -47388,7 +47388,7 @@
 },
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -50809,7 +50809,7 @@
 "session_split_snapshots|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -50825,7 +50825,7 @@
 "session_split_snapshots|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -56121,7 +56121,7 @@
 "session_split|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -56137,7 +56137,7 @@
 "session_split|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {
@@ -61433,7 +61433,7 @@
 "session|device_clip|16,6": [
 {
 "actions": [
-"StepTrack(step=1)"
+"StepTrack(step=1, arm=True, rack=True)"
 ],
 "event": "16,6 press",
 "state": {
@@ -61449,7 +61449,7 @@
 "session|device_clip|16,7": [
 {
 "actions": [
-"StepTrack(step=-1)"
+"StepTrack(step=-1, arm=True, rack=True)"
 ],
 "event": "16,7 press",
 "state": {

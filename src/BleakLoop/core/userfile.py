@@ -11,11 +11,11 @@ from .catalogue import REQUIREMENTS, met_in
 
 # A group's buttons are read by index or hold fixed settings: they may move and be relabelled,
 # never be added, removed or given another value.
-FIXED_GROUPS = frozenset({"slots", "banks", "scene_slots", "pages", "bars", "rates", "tracks", "devices"})
+FIXED_GROUPS = frozenset({"slots", "banks", "scene_slots", "pages", "bars", "rates"})
 # A group the user may add to, remove from and give new values.
-OPEN_GROUPS = frozenset({"tempo", "window"})
+OPEN_GROUPS = frozenset({"tempo", "window", "tracks", "devices"})
 
-BUTTON_FIELDS = frozenset({"pad", "does", "value", "label", "removed"})
+BUTTON_FIELDS = frozenset({"pad", "does", "value", "label", "removed", "options"})
 FUNCTION_FIELDS = frozenset({"label", "message", "show", "outcomes", "refusals"})
 # Fields that only feed the repo's generated docs: a user file may repeat them unchanged.
 DOCS_FIELDS = frozenset({"manual", "manual_in"})
@@ -58,9 +58,12 @@ def _check_template(where, template, shipped):
         raise ValueError(f"{where}: unknown placeholder {unknown}; it may use {allowed}")
 
 
+_STEP_NAMES = {"tempo": "tempo", "tracks": "track", "devices": "device"}
+
+
 def _check_value(id, function, value):
-    if function == "tempo" and not (_is_int(value) and value != 0):
-        raise ValueError(f"{id}: a tempo step is a whole number other than 0")
+    if function in ("tempo", "tracks", "devices") and not (_is_int(value) and value != 0):
+        raise ValueError(f"{id}: a {_STEP_NAMES[function]} step is a whole number other than 0")
     if function == "window" and not (
         isinstance(value, list) and len(value) == 2 and all(map(_is_int, value)) and any(value)
     ):
@@ -111,7 +114,7 @@ def _merge_buttons(merged, shipped, user):
             elif "value" in new:
                 if was in OPEN_GROUPS:
                     raise ValueError(f"{id}: remove it and add a new button to run {function}")
-                raise ValueError(f"{id}: only tempo and window buttons take a value")
+                raise ValueError(f"{id}: only tempo, window, track and device buttons take a value")
             section[name] = new
 
 

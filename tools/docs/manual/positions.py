@@ -60,7 +60,7 @@ def runs(ref):
 
 def section_column(section):
     # A heading's "Column N", when every button of the section is in one column.
-    keys = [key for _, _, key, _ in section.buttons()]
+    keys = [button.key for button in section.buttons()]
     return f"Column {_one_column(keys, (section._name,))}"
 
 

@@ -67,8 +67,8 @@ def test_a_reload_moves_a_button_in_its_own_section(tmp_path, shipped):
     assert frame[(1, 5)] == Light(WHITE)
     assert frame[(1, 6)] == Light(OFF)
     # Sequencer Mode's Global column lists its own buttons: they stay.
-    assert layout.SEQUENCER_GLOBAL.at((1, 5)) == ("fixed_length", "fixed_length", (1, 5), None)
-    assert layout.SEQUENCER_GLOBAL.at((1, 6)) == ("undo", "undo", (1, 6), None)
+    assert layout.SEQUENCER_GLOBAL.at((1, 5))[:4] == ("fixed_length", "fixed_length", (1, 5), None)
+    assert layout.SEQUENCER_GLOBAL.at((1, 6))[:4] == ("undo", "undo", (1, 6), None)
 
 
 def test_a_failed_reload_keeps_the_current_layout(tmp_path, shipped):

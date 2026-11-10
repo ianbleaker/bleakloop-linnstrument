@@ -145,8 +145,11 @@ functions.register_hold(
 
 
 @functions.register("tracks", light=lambda state, snapshot, step: Light(LIME))
-def _track_step(state, snapshot, step):
-    return state, [StepTrack(step)]
+def _track_step(state, snapshot, step, options):
+    # Sequencer Mode's sync moves the arm to the selected track itself, and puts back what it
+    # changed on leaving: the step never arms there.
+    arm = options["arm"] and state.mode is not Mode.SEQUENCER
+    return state, [StepTrack(step, arm=arm, rack=options["rack"])]
 
 
 @functions.register("devices", light=lambda state, snapshot, step: Light(MAGENTA))

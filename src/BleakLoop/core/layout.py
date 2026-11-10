@@ -76,7 +76,7 @@ def refresh():
     # them. buttons.reload calls this again after a change.
     for section in SECTIONS:
         fresh = buttons.section(section._name)
-        section._refill(fresh._own(), fresh._does)
+        section._refill(fresh._own(), fresh._does, fresh._options)
     # Read by index: slot N is FX.slots[N - 1], window scene N is FX.scene_slots[N - 1] and
     # page N is SEQUENCER_SETTINGS.pages[N].
     FX.slots = tuple(FX.slots)

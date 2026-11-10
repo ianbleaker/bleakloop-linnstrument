@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from . import userfile, views
-from .catalogue import MESSAGE_ONLY, REQUIREMENTS, runs_in
+from .catalogue import MESSAGE_ONLY, OPTIONS, REQUIREMENTS, runs_in
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
@@ -95,11 +95,16 @@ def _is_text(value):
     return isinstance(value, str)
 
 
+def _is_options(value):
+    return isinstance(value, dict) and all(isinstance(on, bool) for on in value.values())
+
+
 ENTRY_FIELDS = {
     "pad": _is_pad,
     "does": _is_text,
     "value": _is_value,
     "label": _is_text,
+    "options": _is_options,
 }
 
 FUNCTION_FIELDS = {
@@ -119,13 +124,14 @@ class Section:
     """One section's buttons: each by name as its (column, pad), each group by its function
     as {(column, pad): value}. Mutable, so a test or a mockup can move one button."""
 
-    def __init__(self, name, buttons, does):
+    def __init__(self, name, buttons, does, options=None):
         self.__dict__.update(buttons)
         self.__dict__["_name"] = name
         self.__dict__["_does"] = does
         self.__dict__["_names"] = list(buttons)
+        self.__dict__["_options"] = dict(options or {})  # (column, pad) -> the button's options
 
-    def _refill(self, buttons, does):
+    def _refill(self, buttons, does, options=None):
         # A reload: new buttons in the same object, so whatever holds it (a module attribute)
         # sees them. The name stays.
         for key in self._names:
@@ -133,6 +139,7 @@ class Section:
         self.__dict__.update(buttons)
         self.__dict__["_does"] = dict(does)
         self.__dict__["_names"] = list(buttons)
+        self.__dict__["_options"] = dict(options or {})
 
     def __setattr__(self, attr, value):
         self._does.setdefault(attr, attr)
@@ -150,7 +157,7 @@ class Section:
 
     def buttons(self):
         # A Button for every button in this section.
-        return list(_expand(self._own(), self._does))
+        return [button._replace(options=self._options.get(button.key)) for button in _expand(self._own(), self._does)]
 
     def at(self, key):
         # The button live on a pad, or None.
@@ -164,6 +171,7 @@ class Button(NamedTuple):
     function: str
     key: tuple  # (column, pad)
     value: object  # the step value, or None
+    options: dict | None = None  # the options it sets, over its function's defaults
 
 
 def _expand(own, does):
@@ -229,10 +237,12 @@ class Registry:
 
     def section(self, name):
         prefix = name.replace("-", "_")
-        buttons, does = {}, {}
+        buttons, does, options = {}, {}, {}
         for id, item in self.items.items():
             if item["section"] != name:
                 continue
+            if "options" in item:
+                options[tuple(item["pad"])] = dict(item["options"])
             short = id[len(prefix) + 1 :]
             function = _does(id, item)
             if "value" in item:
@@ -242,7 +252,7 @@ class Registry:
             else:
                 buttons[short] = tuple(item["pad"])
                 does[short] = function
-        return Section(name, buttons, does)
+        return Section(name, buttons, does, options)
 
     def group(self, section, function):
         return {
@@ -324,6 +334,10 @@ def _validate(data, items):
             raise ValueError(f"{id}: no such function {function!r}")
         if len(item.get("label", "")) > MAX_LABEL:
             raise ValueError(f"{id}: label longer than {MAX_LABEL} characters")
+        for option in item.get("options", {}):
+            if option not in OPTIONS.get(function, {}):
+                names = ", ".join(sorted(OPTIONS.get(function, {}))) or "none"
+                raise ValueError(f"{id}: {function} has no option {option!r}; its options: {names}")
         column, pad = item["pad"]
         if column not in views.COLUMNS or pad not in views.ROWS:
             raise ValueError(f"{id}: pad {item['pad']} is off the surface")

@@ -532,6 +532,8 @@ class BindFaderRow:
 @dataclass(frozen=True)
 class StepTrack:
     step: int  # -1 previous, 1 next
+    arm: bool = True  # arms it exclusively, if it can be armed
+    rack: bool = True  # gives its first rack the blue hand
 
 
 @dataclass(frozen=True)

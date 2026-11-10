@@ -277,3 +277,25 @@ def test_a_failed_conversion_leaves_the_file_and_reports_it(tmp_path, shipped, m
     assert "couldn't keep its buttons" in buttons.user_error
     assert path.read_text(encoding="utf-8") == SWAP_PLAY_METRONOME
     assert not (tmp_path / "buttons.toml.v1.bak").exists()
+
+
+def test_a_user_adds_track_and_device_steps_anywhere(tmp_path, shipped):
+    text = (
+        "format = 2\n\n"
+        '[linnstrument_device_clip.track_jump]\npad = [1, 1]\ndoes = "tracks"\nvalue = 2\n'
+        "options = { rack = false }\n\n"
+        '[linnstrument_device_clip.device_next]\npad = [1, 2]\ndoes = "devices"\nvalue = 1\n\n'
+        "[device_clip.track_next]\nremoved = true\n"
+    )
+    buttons.reload(buttons.PATH, _v1(tmp_path, text))
+    assert layout.LINNSTRUMENT_DEVICE_CLIP.tracks == {(1, 1): 2}
+    assert layout.LINNSTRUMENT_DEVICE_CLIP.at((1, 1)).options == {"rack": False}
+    assert layout.LINNSTRUMENT_DEVICE_CLIP.devices == {(1, 2): 1}
+    assert layout.DEVICE_CLIP.tracks == {(16, 7): -1}
+
+
+@pytest.mark.parametrize("function", ["tracks", "devices"])
+def test_a_step_of_0_is_refused(tmp_path, function):
+    text = f'format = 2\n\n[device_clip.step]\npad = [16, 3]\ndoes = "{function}"\nvalue = 0\n'
+    with pytest.raises(ValueError, match="step is a whole number other than 0"):
+        buttons.load(buttons.PATH, _v1(tmp_path, text))
