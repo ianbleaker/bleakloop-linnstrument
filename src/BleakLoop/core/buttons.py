@@ -511,6 +511,8 @@ def describe(registry=None):
                 "name": name,
                 "key": key,
                 "modes": sorted(mode.lower() for mode in modes),
+                # The section Shift's layer puts in its place, or None.
+                "shift": views.shift_section(name),
                 "entries": own,
                 # The pads that reach BleakLoop in every view showing it.
                 "usable": [[column, pad] for column in sorted(views.columns(name)) for pad in views.ROWS],

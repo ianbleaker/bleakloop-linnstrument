@@ -220,6 +220,21 @@ def maps():
     return {name: layer_sections(view, held) for view in VIEWS for name, held in view.maps.items()}
 
 
+def shift_section(section):
+    # The section Shift's layer puts in a section's place, its grid's included, or None.
+    for view in VIEWS:
+        layer = view.layers.get("shift")
+        if layer is None:
+            continue
+        if section == view.grid and layer.grid is not None:
+            return layer.grid
+        if section in layer.replaces:
+            index = layer.replaces.index(section)
+            if index < len(layer.sections):
+                return layer.sections[index]
+    return None
+
+
 def button_sections():
     # Every section that holds buttons, in the views' order.
     out = []

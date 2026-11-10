@@ -419,23 +419,24 @@ SCENE_LIGHTS = {
     "clips": "if they hold clips",
 }
 
-# The sections the manual lists, each with the section holding its Shift layer.
-LISTS = {
-    "global": "global-shift",
-    "view": "view-shift",
-    "navigation": "navigation-shift",
-    "session": "session-shift",
-    "split": "split-shift",
-    "split-snapshots": "split-shift",
-    "mixer": "mixer-shift",
-    "mixer-split": "mixer-split-shift",
-    "fx": None,
-    "device-clip": None,
-    "linnstrument": "linnstrument-shift",
-    "linnstrument-scenes": None,
-    "sequencer-functions": None,
-    "sequencer-settings": None,
-}
+# The sections the manual lists, each with the section holding its Shift layer (core/views.py).
+_LISTED = (
+    "global",
+    "view",
+    "navigation",
+    "session",
+    "split",
+    "split-snapshots",
+    "mixer",
+    "mixer-split",
+    "fx",
+    "device-clip",
+    "linnstrument",
+    "linnstrument-scenes",
+    "sequencer-functions",
+    "sequencer-settings",
+)
+LISTS = {section: views.shift_section(section) for section in _LISTED}
 
 # The sections each map is drawn from: the views' (core/views.py).
 LAYERS = {Layer[name]: sections for name, sections in views.maps().items()}

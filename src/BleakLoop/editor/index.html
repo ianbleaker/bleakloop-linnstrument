@@ -110,6 +110,8 @@ function canonical(x) {
 const same = (a, b) => canonical(a) === canonical(b);
 const pk = (pad) => pad[0] + "," + pad[1];
 const keyOf = (name) => name.replace(/-/g, "_");
+// The section whose Shift layer a section is, or the section itself.
+const baseOf = (name) => (L.sections.find((s) => s.shift === name) || { name }).name;
 
 function el(tag, props, ...children) {
   const node = document.createElement(tag);
@@ -312,13 +314,14 @@ function renderNav() {
     ["Sequencer Mode", (s) => s.modes.length === 1 && s.modes[0] === "sequencer"],
     ["Session and Sequencer Mode", (s) => s.modes.length === 2 && s.modes.includes("session") && s.modes.includes("sequencer") && !s.modes.includes("linnstrument")],
   ];
-  const current = view.kind === "section" ? view.name.replace(/-shift$/, "") : null;
+  const current = view.kind === "section" ? baseOf(view.name) : null;
+  const shifts = new Set(L.sections.map((s) => s.shift).filter(Boolean));
   for (const [title, test] of groups) {
-    const items = L.sections.filter((s) => test(s) && !s.name.endsWith("-shift"));
+    const items = L.sections.filter((s) => test(s) && !shifts.has(s.name));
     if (!items.length) continue;
     nav.append(el("h2", { text: title }));
     for (const s of items) {
-      const changedHere = overlay[s.key] || overlay[s.key + "_shift"];
+      const changedHere = overlay[s.key] || (s.shift && overlay[keyOf(s.shift)]);
       nav.append(el("button", {
         class: (s.name === current ? "current" : "") + (changedHere ? " user" : ""),
         onclick: () => { view = { kind: "section", name: s.name }; selected = null; render(); },
@@ -335,9 +338,9 @@ function renderSection() {
   const s = section(name);
   const centre = $("#centre");
   centre.replaceChildren();
-  const base = name.replace(/-shift$/, "");
-  const shift = base + "-shift";
-  if (section(shift)) {
+  const base = baseOf(name);
+  const shift = section(base).shift;
+  if (shift && section(shift)) {
     centre.append(el("div", { class: "layers" },
       el("button", { class: name === base ? "current" : "", onclick: () => { view = { kind: "section", name: base }; selected = null; render(); } }, "Base"),
       el("button", { class: name === shift ? "current" : "", onclick: () => { view = { kind: "section", name: shift }; selected = null; render(); } }, "Shift held"),
