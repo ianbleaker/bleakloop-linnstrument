@@ -22,6 +22,7 @@ from BleakLoop.core.leds import (
 from BleakLoop.core.model import (
     ToggleDetailView,
     ArmExclusive,
+    CreateClip,
     CaptureAndInsertScene,
     ClearBackToArrangement,
     ClipTarget,
@@ -1823,11 +1824,11 @@ def test_seq_tap_on_an_empty_slot_moves_to_the_playing_clip():
     assert actions == [HighlightSlot(0, 1)] + ENTERED
 
 
-def test_seq_tap_on_an_empty_slot_with_no_other_clip_stays():
+def test_seq_tap_on_an_empty_slot_with_no_other_clip_creates_and_launches_one():
     entry = SeqEntry(selected=0, selected_midi=True, scene=2)
     state, actions = tap(SESSION, seq_snapshot(entry))
     assert state.mode is Mode.SEQUENCER
-    assert actions == ENTERED
+    assert actions == ENTERED + [CreateClip(0, 2, 4.0)]
 
 
 @pytest.mark.parametrize("entry", [None, SeqEntry(), SeqEntry(selected=1, has_clip=True)])
@@ -1839,12 +1840,19 @@ def test_seq_tap_needs_a_midi_track(entry):
 
 @pytest.mark.parametrize("pad", [1, 4])
 def test_seq_and_a_slot_enters_on_it(pad):
-    # A clip or an empty slot alike; the clip doesn't launch.
+    # A clip doesn't launch; an empty slot gets a clip, launched.
     snapshot = seq_snapshot()
     snapshot = with_track(snapshot, 2, slots=tuple(SlotView(has_clip=p == 0) for p in range(6)))
     state, actions = handle(SEQ_HELD, (2, pad), snapshot)
     assert state.mode is Mode.SEQUENCER
-    assert actions == [HighlightSlot(0, pad - 1)] + ENTERED
+    create = [] if pad == 1 else [CreateClip(0, pad - 1, 4.0)]
+    assert actions == [HighlightSlot(0, pad - 1)] + ENTERED + create
+
+
+def test_seq_and_an_empty_slot_creates_a_fixed_length_clip():
+    snapshot = with_track(seq_snapshot(), 2, slots=(SlotView(),) * 6)
+    _, actions = handle(replace(SEQ_HELD, fixed_length=2), (2, 1), snapshot)
+    assert actions[-1] == CreateClip(0, 0, 8.0)
 
 
 def test_seq_and_a_slot_uses_the_window():

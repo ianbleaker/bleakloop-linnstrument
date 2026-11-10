@@ -18,6 +18,7 @@ from BleakLoop.core.model import (  # noqa: E402
     CopyScene,
     DeleteGroupClips,
     DuplicateLoop,
+    CreateClip,
     EditNotes,
     FireSlot,
     HighlightSlot,
@@ -450,6 +451,9 @@ class SeqSlot(FakeSlot):
         self.clip = FakeClip(loop_end=length, end_marker=length)
         self.has_clip = True
 
+    def fire(self):
+        self.fired = True
+
 
 def seq_song(clip=None, armable=(True, True, False)):
     tracks = [fake_track() for _ in armable]
@@ -536,6 +540,22 @@ def test_edit_notes_creates_the_clip(note_specs):
     assert slot.has_clip and slot.clip.loop_end == 6.0
     assert slot.clip.calls[-1][0] == "add"
     assert song.undo == ["begin", "end"]
+
+
+def test_create_clip_creates_and_launches_it_in_one_undo_step():
+    song = seq_song()
+    apply(CreateClip(1, 0, 4.0), song)
+    slot = song.tracks[1].clip_slots[0]
+    assert slot.has_clip and slot.clip.loop_end == 4.0 and slot.fired
+    assert song.undo == ["begin", "end"]
+
+
+def test_create_clip_leaves_a_slot_with_a_clip_alone():
+    song = seq_song(FakeClip(loop_end=8.0, end_marker=8.0))
+    apply(CreateClip(1, 1, 4.0), song)
+    slot = song.tracks[1].clip_slots[1]
+    assert slot.clip.loop_end == 8.0 and not hasattr(slot, "fired")
+    assert song.undo == []
 
 
 def test_edit_notes_skips_an_empty_slot_without_a_length():

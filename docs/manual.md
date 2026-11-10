@@ -122,7 +122,7 @@ The outer edge, column 16, holds the mode pads, then Delete and Copy. **Device/C
 - **Seq**: Hold and press a clip, or tap, for Sequencer Mode.
 - **Delete**: Hold, then press a clip or scene to delete it.
 - **Copy**: Hold, press a clip, then an empty slot.
-- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices. Hold and press a snapshot slot to punch it in.
+- **Device/Clip**: Tap to flip Live between Device and Clip view. Hold for the Device/Clip layer: tracks and devices. Hold and press a Set-wide snapshot slot to punch it in, or a bound one to slide it.
 
 With **Shift** held:
 
@@ -192,7 +192,7 @@ With the snapshots in the panel, columns 10–14 work as FX Mode's.
 - **Mute**: Mute or unmute the track: pink while audible, orange while muted.
 - **Select and arm**: Select the track, arm it alone and give its first rack the blue hand.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
-- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in pink. Device/Clip + a slot punches it in.
+- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in pink: press it to punch it in, or Device/Clip + it to slide. Device/Clip + a Set-wide slot punches it in.
 - **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 
@@ -258,7 +258,7 @@ With **Shift** held:
 <!-- callouts:fx -->
 - **Faders**: One fader per row: touch or slide along a row to set the selected device's macro or parameter.
 - **Bars**: Hold one, then press a snapshot to morph to it over 1, 2, 4, 8 or 16 bars, or a scene to launch it on that bar line.
-- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in pink. Device/Clip + a slot punches it in.
+- **Snapshots**: Sixteen snapshots per bank of every rack's macros: slots 1–8 in column 11, 9–16 in column 12. Press an empty slot to store. Tap a stored one to recall it, or slide right from it to blend towards it. Shift + a slot binds the parameter clicked in Live to it, in pink: press it to punch it in, or Device/Clip + it to slide. Device/Clip + a Set-wide slot punches it in.
 - **Banks**: Eight banks of sixteen snapshots: press one to show its slots. The selected bank is orange. Every Set opens on bank 1.
 - **Scene snapshots**: A snapshot per scene, scrolling with the scene pads. Press an empty one to store, a stored one to recall. Launching the scene morphs to it.
 <!-- /callouts:fx -->
@@ -348,7 +348,7 @@ The reserved pad, pad 4, is dark and does nothing: it's kept for a Chord mode st
 **Device/Clip** (column 16, pad 8, orange):
 
 - A tap flips Live's Detail view: to Clip view if it shows anything else or is hidden, and to Device view if it shows Clip view. It follows what you last clicked in Live. A press counts as a tap only if you press nothing else while holding it.
-- Held, like Shift, its pad blinks fast and column 16 shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual, except that a stored snapshot slot punches in (see Snapshots and morphs).
+- Held, like Shift, its pad blinks fast and column 16 shows the Device/Clip layer, over Shift's layer too. Columns 1 and 15 and the grid work as usual, except that a stored snapshot slot punches in, or slides if it's bound (see Snapshots and morphs).
 - It works in Session, Mixer, FX and Sequencer Mode. In Sequencer Mode, a track that isn't a MIDI track darkens the steps and note pads until you step on to one.
 - Tracks steps through every track, then the returns and master. Devices are the ones directly on the track; with a device inside a rack selected, they step from that rack. The FX faders follow the selected device.
 - The status bar shows the track or device stepped to, or "No more tracks" / "No more devices" at either end.
@@ -460,7 +460,7 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 - A slide moves each macro smoothly. Where an on/off or chooser mapped to it switches is up to that mapping in Live, so set it there, for example to bring an effect on at the first move.
 - Lift your finger and the macros stay where the slide left them, even at 0%. The status bar says how far it got, such as "Snapshot 3 at 60%".
 - While you slide, the four pads from the slot to its 100% pad fill in the slot's colour, one per 25%, over whatever they normally show, and the slot blinks fast. Nothing your finger crosses is pressed: not the other slots, banks, scene snapshots, scenes or Navigation, and not Bars or column 11's slots on the way back.
-- A Set-wide (cyan) slot slides every rack it holds towards the snapshot. A bound (pink) slot slides both ways instead (see Bound snapshots).
+- A Set-wide (cyan) slot slides every rack it holds towards the snapshot. A bound (pink) slot punches in instead, and slides both ways with Device/Clip held (see Bound snapshots).
 - Slide several slots at once, one per row; a second slot pressed on a row that's already holding one does nothing. Where two slides share a macro, the one started last moves it. Lift it and the macro goes back to the earlier slide, at that slide's position; lift the earlier one first and nothing moves.
 - A fader, or a turn of the knob in Live, on a macro that's sliding takes it out of every slide. Tapping another slot, or starting a Bars morph, while you slide does the same for the macros it moves.
 - A slide's first move stops a running morph. Holding Bars, a press morphs instead of sliding, and scene snapshots don't slide.
@@ -468,12 +468,12 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 
 **Punch-in:**
 
-- Hold Device/Clip (column 16, pad 8) and press a stored slot to punch it in: it lands at once, at 100%. A Set-wide (cyan) slot jumps to its snapshot, a bound (pink) one to each parameter's punch-in value (see Bound snapshots). The status bar says "Snapshot 3 punched in".
+- Press a bound (pink) slot, or hold Device/Clip (column 16, pad 8) and press a Set-wide (cyan) one, to punch it in: it lands at once, at 100%. A Set-wide (cyan) slot jumps to its snapshot, a bound (pink) one to each parameter's punch-in value (see Bound snapshots). The status bar says "Snapshot 3 punched in".
 - Keep holding the slot and slide left to blend back towards the values at the press: four pads left is 0%. Sliding right of the press does nothing more. On/off and chooser parameters switch back halfway.
 - Lift and the parameters return to their values at the press, smoothly over 50 ms; on/off and chooser parameters switch back at once.
 - While you hold a punch, the 4 pads left of the slot fill in red, one per 25% from the slot out, over whatever they show: Bars and the faders in FX Mode, the panel and tracks in the split view. The slot keeps its colour and blinks fast.
-- Device/Clip only matters at the press: let go of it and the punch carries on until you lift the slot. Its release doesn't flip Live's view.
-- Shift, then Copy, then Delete come first: with one held, the press binds, copies or clears as usual. Device/Clip wins over a held Bars pad: the press punches rather than morphs. Device/Clip + an empty slot or a scene snapshot does nothing.
+- Device/Clip only matters at the press: let go of it and the punch or slide carries on until you lift the slot. Its release doesn't flip Live's view.
+- Shift, then Copy, then Delete come first: with one held, the press binds, copies or clears as usual. A bound slot punches over a held Bars pad, and Device/Clip wins over one: the press punches or slides rather than morphs. Device/Clip + an empty slot or a scene snapshot does nothing.
 - As with slides, a fader or a knob turned in Live takes that parameter out of the punch, and it stays where you left it: it doesn't return. Where a punch shares parameters with other slides or punches, the one started last moves them. Its lift hands them back to the earlier one, at that one's position, and only the rest return. A punch stops a running morph.
 - A punch is one undo, from the press to the end of its return, shared with any slides held at the same time. Pressing a slot, a recall, a Bars morph or a fader touch during the return lands it at once.
 
@@ -486,10 +486,10 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 - Binding a parameter the slot already holds saves its value now as its new punch-in value, such as "Snapshot 3 punch value: Auto Filter Frequency 3.40 kHz". If that is already its punch-in value, the bind removes it instead, so pressing twice always removes. Removing the last one empties the slot. The status bar names what the slot holds after a bind, the new parameter first with its saved value, such as "Snapshot 3: Auto Filter Frequency 1.20 kHz, Macro 2", or what was removed, such as "Removed Auto Filter Frequency from Snapshot 3".
 - With nothing clicked in Live, the status bar says "Click a parameter in Live first". A Set-wide (cyan) slot refuses with "Delete Snapshot N to bind to it". A parameter that can't be bound says "Snapshot N can't hold" and its name. A Device FX row with no parameter does nothing.
 - With Shift held, a slot never recalls, stores or slides.
-- Slide a bound slot right to raise its parameters, left to lower them, below where they started too. Every pad moves each parameter by a quarter of its range, and it stops at its minimum or maximum. Sliding back returns exactly to where it started. On/off and chooser parameters step to the nearest value: an on/off flips at 2 pads either way, and a chooser steps through its options in order as you slide. To switch somewhere else, map it to a rack macro, set that mapping in Live, and bind the macro.
-- Device/Clip + a bound slot punches its parameters to their punch-in values. A parameter without one is skipped, with "no punch value for" and its name; with none at all, the press refuses, such as "Snapshot 3: no punch value for Frequency, Shift + slot to store". A punch shows its red fill, not the pink meter below.
-- While you hold a bound slot, the 4 pads to its right show where its parameters sit on average, in pink: none lit with all at their minimum, all 4 with all at their maximum. They follow the slide, over whatever those pads normally show.
-- A tap changes nothing: the status bar names the slot's parameters, their values now and their punch-in values, such as "Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, Macro 2 0.5" (Macro 2 has no punch-in value). A Bars pad doesn't morph a bound slot. Lists of a slot's parameters give their names only, adding the device's or track's name where two share a name, such as "Auto Filter Frequency, EQ Frequency, Volume". When a list is too long for the status bar it ends with "+N" for the rest.
+- Hold Device/Clip and slide a bound slot right to raise its parameters, left to lower them, below where they started too. Every pad moves each parameter by a quarter of its range, and it stops at its minimum or maximum. Sliding back returns exactly to where it started. On/off and chooser parameters step to the nearest value: an on/off flips at 2 pads either way, and a chooser steps through its options in order as you slide. To switch somewhere else, map it to a rack macro, set that mapping in Live, and bind the macro.
+- Pressing a bound slot punches its parameters to their punch-in values. A parameter without one is skipped, with "no punch value for" and its name; with none at all, the press refuses, such as "Snapshot 3: no punch value for Frequency, Shift + slot to store". A punch shows its red fill, not the pink meter below.
+- While you hold a bound slot with Device/Clip, the 4 pads to its right show where its parameters sit on average, in pink: none lit with all at their minimum, all 4 with all at their maximum. They follow the slide, over whatever those pads normally show.
+- Device/Clip + a tap changes nothing: the status bar names the slot's parameters, their values now and their punch-in values, such as "Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, Macro 2 0.5" (Macro 2 has no punch-in value). A Bars pad doesn't morph a bound slot. Lists of a slot's parameters give their names only, adding the device's or track's name where two share a name, such as "Auto Filter Frequency, EQ Frequency, Volume". When a list is too long for the status bar it ends with "+N" for the rest.
 - A rack macro is found again by its rack and its number, so renaming or mapping the macro doesn't lose it. Anything else is found by the track's, device's and parameter's names, counting same-named tracks and devices in order; one that can't be found is skipped, with a message.
 - Delete + a bound slot clears it; press the empty slot to store a Set-wide snapshot there.
 - Copy copies a bound slot to an empty slot, punch-in values included. It can't be pasted onto a scene snapshot.
@@ -535,17 +535,17 @@ Sequencer Mode is a 64-step sequencer on a MIDI clip, with note pads to pick and
 **Opening it** with Seq (column 16, pad 5), which is cyan in Session, Mixer and FX Mode:
 
 - Tap Seq to open Sequencer Mode on the highlighted slot. If that slot is empty, it moves first to the clip in Live's Detail view, if that's a Session clip on a MIDI track, or else to the selected track's playing clip.
-- In Session Mode, hold Seq (it blinks fast) and press a clip slot to open Sequencer Mode on that slot. The clip doesn't launch, and an empty slot works too. In Mixer and FX Mode the grid ignores presses while Seq is held.
+- In Session Mode, hold Seq (it blinks fast) and press a clip slot to open Sequencer Mode on that slot. A clip doesn't launch, and an empty slot works too. In Mixer and FX Mode the grid ignores presses while Seq is held.
 - On an audio or group track, Seq says "Sequencer needs a MIDI track".
 - In Sequencer Mode, Seq or Session goes back to Session Mode, and Mixer or FX to that mode.
 
 **The arm.** Opening Sequencer Mode arms the track alone, so the note pads play it. Selecting another MIDI track, with Device/Clip + Tracks or by clicking it in Live, moves the arm with it. Leaving for Session, Mixer or FX puts every track's arm back as it was, except a track you armed or disarmed yourself in the meantime, and so does closing the Set or Live while in Sequencer Mode. Linnstrument Mode (column 1, pad 7) keeps the arm, so you play the track you were sequencing, and its Back returns to Sequencer Mode. Selecting an audio track, a return or master leaves the arm where it is, and the steps and note pads go dark.
 
-**An empty slot** gets a new MIDI clip when you add its first note, Fixed Length long, or 1 bar while Fixed Length is off.
+**An empty slot** gets a new MIDI clip as you open Sequencer Mode on it, by either way in, Fixed Length long, or 1 bar while Fixed Length is off. The new clip launches at once, starting the transport if it's stopped, so the playhead shows where you are. It is one undo.
 
 **Steps** (columns 3–10): 64 steps, row by row from the top, of the page in view.
 
-- A step is orange if the selected note starts in it, blue if it only holds other notes, and dark if it's empty. The playhead is white. Steps past the loop end are dark and do nothing.
+- A step is orange if the selected note starts in it, blue if it only holds other notes, and dark if it's empty, except an empty step on a beat, which is white. The playhead is green. Steps past the loop end are dark and do nothing.
 - Tap a step to add a one-step note of the selected note, at the strength you struck the pad. Tap it again to remove it. The tap acts when you lift your finger.
 - Hold a step and press a later one for one note spanning both. It replaces the selected note's notes between them.
 - Hold steps and press a note pad to add or remove that note on each of them, at the strength you struck the note pad.
@@ -611,5 +611,5 @@ The LinnStrument is your instrument again. The Global column keeps the controls 
 <!-- lights:scenes -->
 - **Scenes:** yellow and blinking with the beat while a held Bars pad holds their launch back to its bar line; lime and blinking fast once launched, until they start at the next quantization boundary; lime while all their clips play; magenta while some of their clips play; white if they hold clips.
 <!-- /lights:scenes -->
-- **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, and the playhead is white. A note pad lights yellow while its note plays, and the selected note blinks green.
+- **Sequencer Mode** has its own colours: orange steps hold the selected note, blue steps other notes, white steps are empty beats, and the playhead is green. A note pad lights yellow while its note plays, and the selected note blinks green.
 - On the LinnStrument, lime looks yellow and green looks lime.

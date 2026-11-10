@@ -560,6 +560,15 @@ class ToggleDetailView:
 
 
 @dataclass(frozen=True)
+class CreateClip:
+    # Entering Sequencer Mode on an empty slot: one undo step creates the clip, then it's
+    # launched, so the playhead shows. A slot that has a clip by then is left alone.
+    track: int
+    scene: int
+    length: float  # beats
+
+
+@dataclass(frozen=True)
 class EditNotes:
     # One undo step: create the clip if the slot is empty, remove, then add.
     track: int

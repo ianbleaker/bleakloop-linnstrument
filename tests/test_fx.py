@@ -289,6 +289,12 @@ def handle(state, key, pressed=True, snapshot=SNAP):
     return session.handle(state, press(key, pressed), snapshot)
 
 
+def slide_hold(state, key, snapshot=SNAP):
+    # Device/Clip + a bound slot: a tap or a slide, not a punch.
+    state, actions = handle(replace(state, device_clip=True), key, snapshot=snapshot)
+    return replace(state, device_clip=False), actions
+
+
 def with_slot(state, slot, value=STORED):
     return replace(state, fx_slots=fx._put(state.fx_slots, slot, value))
 
@@ -1366,14 +1372,14 @@ def bound_read(state, params=(FREQ_READ, SWITCH_READ)):
 
 
 def bound_sliding(params=(FREQ_READ, SWITCH_READ)):
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state, params)
     state, _, _ = x(state, 11, 0)
     return state
 
 
 def test_a_bound_slot_press_reads_its_locators():
-    state, actions = handle(BOUND_AB, SLOT_3)
+    state, actions = slide_hold(BOUND_AB, SLOT_3)
     expected = RecallFxSnapshot(2, None, hold=True, locators=BOUND_AB.fx_slots[2].params, values=(None, None))
     assert actions == [expected]
     assert state.fx_holds[0].bound
@@ -1385,13 +1391,25 @@ def test_a_bound_slot_press_reads_its_punch_in_values():
     assert actions[0].values == (90.0, None)
 
 
-def test_bars_and_a_bound_slot_does_nothing():
-    state = replace(BOUND_AB, fx_length=4)
-    assert handle(state, SLOT_3) == (state, [])
+def test_a_bound_slot_press_punches_in():
+    held, _ = handle(BOUND_AB, SLOT_3)
+    assert held.fx_holds[0].punch and held.fx_holds[0].bound
+
+
+def test_device_clip_and_a_bound_slot_slides_instead():
+    held, _ = slide_hold(BOUND_AB, SLOT_3)
+    assert not held.fx_holds[0].punch and held.fx_holds[0].bound
+
+
+@pytest.mark.parametrize("device_clip, punch", [(False, True), (True, False)])
+def test_bars_and_a_bound_slot_punches_or_with_device_clip_slides(device_clip, punch):
+    state = replace(BOUND_AB, fx_length=4, device_clip=device_clip)
+    held, _ = handle(state, SLOT_3)
+    assert held.fx_holds[0].punch == punch
 
 
 def test_a_bound_tap_names_its_parameters_and_writes_nothing():
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state, (FREQ_READ, None))
     state, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Frequency 100, 1 parameter not found")]
@@ -1465,7 +1483,7 @@ def test_a_bound_and_a_set_wide_slide_share_a_rack_macro():
 
 
 def test_a_held_bound_slot_shows_its_parameters_value_right_of_it():
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     assert fx.render_meters(state) == {}  # no read yet
     state, _ = bound_read(state, (FREQ_READ,))
     frame = session.render(state, SNAP)
@@ -1476,7 +1494,7 @@ def test_a_held_bound_slot_shows_its_parameters_value_right_of_it():
 
 def test_the_value_meter_shows_the_average_of_several_parameters():
     # Frequency at 100 of 127 and On at 0 of 1: about 39%, 2 of 4 pads.
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state)
     frame = fx.render_meters(state)
     assert [frame[(c, ROW)] for c in (12, 13, 14, 15)] == [Light(PINK)] * 2 + [Light(OFF)] * 2
@@ -1484,7 +1502,7 @@ def test_the_value_meter_shows_the_average_of_several_parameters():
 
 def test_the_value_meter_leaves_out_dropped_parameters_and_ones_without_a_range():
     flat = replace(SWITCH_READ, key="flat", high=0.0)
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state, (FREQ_READ, SWITCH_READ, flat))
     hold = replace(state.fx_holds[0], dropped=frozenset({MACRO_KEY}))
     assert fx.value_meter(state, hold) == 3
@@ -1820,7 +1838,7 @@ def test_two_rows_in_one_bind_hold_both_undo():
 
 
 def test_a_bound_tap_shows_lives_text_for_the_value():
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state, (replace(FREQ_READ, text="1.20 kHz"),))
     _, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz")]
@@ -1829,14 +1847,14 @@ def test_a_bound_tap_shows_lives_text_for_the_value():
 def test_a_bound_tap_shows_the_punch_in_value_where_there_is_one():
     freq = replace(FREQ_READ, text="1.20 kHz", target=90.0, target_text="3.40 kHz")
     macro = replace(SWITCH_READ, start=0.5, quantized=False)
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state, (freq, macro))
     _, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Frequency 1.20 kHz → 3.40 kHz, On 0.5")]
 
 
 def test_a_bound_tap_shows_a_punch_in_value_without_text_as_a_number():
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state, (replace(FREQ_READ, target=90.25),))
     _, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Frequency 100 → 90.25")]
@@ -1845,7 +1863,7 @@ def test_a_bound_tap_shows_a_punch_in_value_without_text_as_a_number():
 def test_a_bound_tap_and_lift_name_the_device_where_two_share_a_name():
     eq = replace(FREQ_READ, key=FaderBinding("Bass", 0, "EQ", 0, 1, "Frequency"), owner="EQ")
     reads = (replace(FREQ_READ, owner="Auto Filter"), eq, replace(SWITCH_READ, owner="R"))
-    state, _ = handle(BOUND_AB, SLOT_3)
+    state, _ = slide_hold(BOUND_AB, SLOT_3)
     state, _ = bound_read(state, reads)
     _, actions = lift(state)
     assert actions == [ShowMessage("Snapshot 3: Auto Filter Frequency 100, EQ Frequency 100, On 0")]
@@ -2625,11 +2643,11 @@ def test_snapshot_buttons_move_to_free_pads(monkeypatch):
     assert handle(FX, (10, 6))[0].fx_length == 1
 
 
-# Punch-in: Device/Clip + a slot (#112)
+# Punch-in: a bound slot, or Device/Clip + a Set-wide one (#112)
 
 DEV_CLP = layout.NAVIGATION.device_clip
 PUNCHING = replace(with_slot(FX, 2), device_clip=True)
-PUNCH_BOUND = replace(BOUND_AB, device_clip=True)
+PUNCH_BOUND = BOUND_AB
 
 
 @pytest.mark.parametrize("bars", [None, 4])
@@ -2640,7 +2658,7 @@ def test_device_clip_and_a_stored_slot_makes_a_punch_hold(bars):
     assert actions == [RecallFxSnapshot(2, None, hold=True)]
 
 
-def test_device_clip_and_a_bound_slot_reads_its_punch_values():
+def test_a_bound_slot_punch_reads_its_punch_values():
     state = with_slot(PUNCH_BOUND, 2, replace(BOUND_AB.fx_slots[2], values=(90.0,)))
     held, actions = handle(state, SLOT_3)
     assert held.fx_holds[0].punch and held.fx_holds[0].bound
