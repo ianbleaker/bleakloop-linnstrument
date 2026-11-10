@@ -70,10 +70,6 @@ def capture(racks):
     )
 
 
-# The slot count each store version holds: v1 is bank 1 alone, from before banks.
-STORE_SLOTS = {1: layout.FX_SLOTS, 2: layout.FX_SNAPSHOTS}
-
-
 def dump(slots):
     # v2: every bank's slots by global index; a bound slot as {"bound": [locator, ...]}.
     data = {"v": 2, "slots": [_encode_slot(slot) for slot in slots]}
@@ -81,42 +77,14 @@ def dump(slots):
 
 
 def parse(text):
-    # The slots. Anything unreadable gives empty slots: a bad store never stops the script
-    # loading. A v1 store loads as bank 1, with banks 2-8 empty. #104's "scoped" slots, one
-    # rack's macros with values, become bound slots of those macros, without the values.
-    return _parse(text) or (None,) * layout.FX_SNAPSHOTS
-
-
-def readable(text):
-    # The store parses as a whole: v1 or v2, with every slot decoding.
-    return _parse(text) is not None
-
-
-def _parse(text):
+    # The slots, or None when the store is unreadable as a whole or a slot doesn't decode.
     try:
         data = json.loads(text)
-        count = STORE_SLOTS.get(data.get("v"))
-        if count is None or len(data["slots"]) != count:
+        if data.get("v") != 2 or len(data["slots"]) != layout.FX_SNAPSHOTS:
             return None
-        slots = list(_decode_slot(slot) for slot in data["slots"])
+        return tuple(_decode_slot(slot) for slot in data["slots"])
     except (ValueError, TypeError, KeyError, AttributeError):
         return None
-    scoped = data.get("scoped")
-    for i in scoped if isinstance(scoped, list) else ():
-        if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < count:
-            if isinstance(slots[i], tuple):
-                slots[i] = bind_racks(slots[i])
-    return tuple(slots) + (None,) * (layout.FX_SNAPSHOTS - count)
-
-
-def bind_racks(racks):
-    # A bound slot of every macro of these racks, matched by index: #104's scoped snapshot.
-    params = tuple(
-        FaderBinding(rack.track, 0, rack.rack, rack.n, index + 1, f"Macro {index + 1}")
-        for rack in racks
-        for index in range(len(rack.values))
-    )
-    return _bound_slot(params, ())
 
 
 def _bound_slot(params, values):
@@ -338,8 +306,8 @@ def _name(slot, scene):
 
 
 def _landed(state, slot, scene):
-    # Only the last Set-wide snapshot to land blinks, global or scene. A scoped one moves a
-    # single rack, so it leaves the blink where it was.
+    # Only the last Set-wide snapshot to land blinks, global or scene. A bound one moves
+    # chosen parameters alone, so it leaves the blink where it was.
     if not scene and is_bound(state.fx_slots[slot]):
         return state
     if scene:

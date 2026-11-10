@@ -66,12 +66,8 @@ def test_capture():
     )
 
 
-V1_RACK = [{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]
+RACK_JSON = [{"track": "A", "rack": "R", "n": 0, "macros": [0.5]}]
 ONE = (FxRack("A", "R", 0, (0.5,)),)
-
-
-def _v1(slots, **more):
-    return json.dumps({"v": 1, "slots": slots, **more})
 
 
 BOUND = BoundSlot(
@@ -95,44 +91,6 @@ def test_dump_parse_round_trip():
     assert json.loads(text)["v"] == 2
     assert json.loads(text)["slots"][104] == BOUND_JSON
     assert fx.parse(text) == slots
-    assert fx.readable(text)
-
-
-def test_a_v1_store_loads_as_bank_1():
-    text = _v1([V1_RACK] + [None] * 14 + [V1_RACK])
-    assert fx.parse(text) == (ONE,) + (None,) * 14 + (ONE,) + (None,) * 112
-    assert fx.readable(text)
-
-
-def test_a_scoped_slot_converts_to_a_bound_slot_of_its_racks_macros():
-    rack = [{"track": "Drums", "rack": "FX", "n": 1, "macros": [0.5, 0.25]}]
-    text = _v1([None, rack] + [None] * 14, scoped=[1])
-    expected = BoundSlot(
-        (
-            FaderBinding("Drums", 0, "FX", 1, 1, "Macro 1"),
-            FaderBinding("Drums", 0, "FX", 1, 2, "Macro 2"),
-        )
-    )
-    assert fx.parse(text)[1] == expected
-    assert json.loads(fx.dump(fx.parse(text)))["slots"][1]["bound"][1]["param"] == 2
-
-
-def test_a_v1_store_saves_as_v2_without_scoped():
-    slots = fx.parse(_v1([V1_RACK] + [None] * 15, scoped=[0]))
-    data = json.loads(fx.dump(slots))
-    assert data["v"] == 2 and len(data["slots"]) == 128 and "scoped" not in data
-    assert "bound" in data["slots"][0]
-
-
-@pytest.mark.parametrize("scoped", ['"x"', "null", "{}", '[1, "0", true, -1, 128, 0.0]', "[3]"])
-def test_bad_scoped_entries_are_ignored(scoped):
-    slots = "[" + json.dumps(V1_RACK) + ",null" * 127 + "]"
-    assert fx.parse(f'{{"v": 2, "slots": {slots}, "scoped": {scoped}}}')[0] == ONE
-
-
-def test_a_v1_scoped_entry_past_bank_1_is_ignored():
-    text = _v1([V1_RACK] + [None] * 15, scoped=[16])
-    assert fx.parse(text)[0] == ONE
 
 
 @pytest.mark.parametrize(
@@ -183,12 +141,6 @@ def test_a_dropped_entry_takes_its_value_with_it():
     assert fx.parse(text)[0] == BoundSlot((BOUND.params[1],), (0.9,))
 
 
-def test_a_scoped_slot_converts_without_values():
-    rack = [{"track": "Drums", "rack": "FX", "n": 1, "macros": [0.5, 0.25]}]
-    slot = fx.parse(_v1([None, rack] + [None] * 14, scoped=[1]))[1]
-    assert slot.values == () and fx._values(slot) == (None, None)
-
-
 def test_an_all_empty_store_round_trips():
     text = fx.dump(EMPTY_SLOTS)
     assert fx.dump(fx.parse(text)) == text
@@ -196,7 +148,7 @@ def test_an_all_empty_store_round_trips():
 
 def test_dump_format():
     slots = (ONE,) + (None,) * 127
-    assert json.loads(fx.dump(slots)) == {"v": 2, "slots": [V1_RACK] + [None] * 127}
+    assert json.loads(fx.dump(slots)) == {"v": 2, "slots": [RACK_JSON] + [None] * 127}
 
 
 @pytest.mark.parametrize(
@@ -210,6 +162,7 @@ def test_dump_format():
         '{"v": 2, "slots": [' + ",".join(["null"] * 16) + "]}",
         '{"v": 2, "slots": [' + ",".join(["null"] * 127) + "]}",
         '{"v": 1, "slots": [' + ",".join(["null"] * 15) + "]}",
+        '{"v": 1, "slots": [' + ",".join(["null"] * 16) + "]}",
         '{"v": 1, "slots": [' + ",".join(["null"] * 128) + "]}",
         '{"v": 1}',
         '{"v": 1, "slots": [[{"track": "A"}]' + ",null" * 15 + "]}",
@@ -218,9 +171,8 @@ def test_dump_format():
         + "]}",
     ],
 )
-def test_invalid_store_gives_empty_slots(text):
-    assert fx.parse(text) == EMPTY_SLOTS
-    assert not fx.readable(text)
+def test_an_invalid_store_is_unreadable(text):
+    assert fx.parse(text) is None
 
 
 def test_scene_store_round_trip():
@@ -1901,7 +1853,7 @@ def test_a_held_slot_before_it_slides_shows_no_meter():
     assert session.render(state, SNAP)[SLOT_3] == Light(CYAN)
 
 
-def test_a_scoped_slots_meter_is_pink():
+def test_a_bound_slots_meter_is_pink():
     state = held(holding_read(), x0=0, slid=True, f=0.3, order=1)
     state = with_slot(state, 2, BOUND)
     assert fx.render_meters(state)[(12, ROW)] == Light(PINK)
@@ -1940,7 +1892,7 @@ def test_render_slots_and_lengths():
     assert lit == {layout.FX.slots[i] for i in (0, 5, 9)} | set(layout.FX.bars) | {(13, 1)}
 
 
-def test_render_scoped_slots_pink():
+def test_render_bound_slots_pink():
     state = with_slot(with_slot(with_slot(FX, 0, BOUND), 9, BOUND), 5, BOUND)
     state = replace(state, fx_landed=9, morph=Morph(5, 0.0, 16.0, 0.0))
     frame = fx.render(state, SNAP)

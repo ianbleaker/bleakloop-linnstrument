@@ -377,10 +377,8 @@ def _read(path):
         return tomllib.load(file)
 
 
-def load(path, user_path=None, write=False):
-    # The shipped file, with the user's file over it when there is one. A user file written
-    # for format 1 is converted; with write, the converted file replaces it on disk, the
-    # original kept beside it as buttons.toml.v1.bak.
+def load(path, user_path=None):
+    # The shipped file, with the user's file over it when there is one.
     data = _read(path)
     overlay, editor = {}, dict(userfile.EDITOR)
     if user_path is not None and Path(user_path).exists():
@@ -390,35 +388,16 @@ def load(path, user_path=None, write=False):
             raise ValueError(f"{user_path}: couldn't read it: {error.strerror}") from None
         except ValueError as error:  # TOML syntax
             raise ValueError(f"{user_path}: {error}") from None
-        # Both name the file in their own errors.
-        converted = userfile.convert_v1(data, _read(V1_PATH), overlay, str(user_path))
-        data, editor = userfile.merge(data, converted or overlay, str(user_path))
+        # Names the file in its own errors.
+        data, editor = userfile.merge(data, overlay, str(user_path))
         try:
             registry = Registry(data)
         except ValueError as error:
             raise ValueError(f"{user_path}: {error}") from None
-        if converted is not None:
-            if write:
-                _write_converted(user_path, converted)
-            overlay = converted
     else:
         registry = Registry(data)
     registry.overlay, registry.editor = overlay, editor
     return registry
-
-
-V1_PATH = Path(__file__).parent / "buttons_v1.toml"
-
-
-def _write_converted(user_path, converted):
-    # The original first: a failed write leaves it in place.
-    user_path = Path(user_path)
-    backup = user_path.with_name(user_path.name + ".v1.bak")
-    try:
-        backup.write_bytes(user_path.read_bytes())
-        userfile.write_atomic(user_path, userfile.to_toml(converted))
-    except OSError as error:
-        raise ValueError(f"{user_path}: couldn't write it converted from format 1: {error.strerror}") from None
 
 
 # Loaded on first use: layout's fixed regions must exist before the registry validates.
@@ -431,7 +410,7 @@ def _get():
     global _registry, user_error
     if _registry is None:
         try:
-            _registry = load(PATH, USER_PATH, write=True)
+            _registry = load(PATH, USER_PATH)
         except ValueError as error:
             user_error = str(error)
             _registry = load(PATH)
@@ -456,7 +435,7 @@ def reload(path=None, user_path=None):
     # Loads the files again and refills layout's sections in place. A file that fails its
     # checks raises and leaves the current layout as it was.
     global _registry, user_error
-    registry = load(path or PATH, user_path or USER_PATH, write=True)
+    registry = load(path or PATH, user_path or USER_PATH)
     _registry, user_error = registry, None
     from . import layout
 

@@ -35,7 +35,6 @@ Your changes are saved in `User Library/BleakLoop/buttons.toml`, beside the Remo
 - Every function is offered in every section. One that can't work there, such as a mode pad in Linnstrument Mode, is drawn dark: hover it for why. It can still be placed, and stays dark and does nothing there.
 - A function with options shows a checkbox for each on a selected button. Tracks has **Arm the track** and **Give its first rack the blue hand**, both on: untick one to step without it.
 - FX snapshot slots, scene slots, Sequencer pages, Bars and rates can be moved and relabelled, but not added, removed or given another value. Tempo, window, track and device buttons can be added, removed and given any step.
-- A file from before sections listed their own buttons is converted the first time BleakLoop loads it, so nothing on the device moves. The original is kept beside it as `buttons.toml.v1.bak`.
 - To turn the editor off, or move it to another port, add this to your file. BleakLoop applies it on the next save, and says so if the port is taken:
 
   ```toml
