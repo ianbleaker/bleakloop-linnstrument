@@ -284,6 +284,7 @@ The device setup, and Device/Clip's track and device names. These always show.
 | `refuse_row_offset` | Couldn't read Row Offset: controls off |
 | `refuse_right_split` | Couldn't read the right split: controls off |
 | `refuse_channels` | The right split uses every channel: controls off |
+| `no_reply` | LinnStrument isn't answering: unplug it, plug it back in, then restart Live |
 | `controls_on` | Global column controls on |
 | `controls_moved` | The right split took the Global column's channel: controls moved to channel {channel} |
 | `octave_reset` | Left split Octave/Transpose reset: select the right split to change yours |
