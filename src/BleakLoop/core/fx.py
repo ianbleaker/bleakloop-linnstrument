@@ -390,23 +390,14 @@ def press(state, event, snapshot):
             hold = BindHold(event.pad, event.column, _global(state, button.value))
             return replace(state, fx_bind_hold=hold), []
         return state, []
-    # Device/Clip + a stored slot punches it in, over a held Bars pad; Copy and Delete come
-    # first. An empty slot or a scene snapshot does nothing.
-    if state.device_clip and not (state.copy or state.delete):
-        if button.function == "slots":
-            slot = _global(state, button.value)
-            if state.fx_slots[slot] is None:
-                return state, []
-            return _hold(state, event, slot, punch=True)
-        if button.function == "scene_slots":
-            return state, []
     if button.function == "slots" and not (state.copy or state.delete):
         slot = _global(state, button.value)
         if state.fx_length and is_bound(state.fx_slots[slot]):
             # A bound slot holds no values to morph to.
             return state, []
         if not state.fx_length and state.fx_slots[slot] is not None:
-            return _hold(state, event, slot)
+            # A stored slot punches in; with Device/Clip held it taps or slides instead.
+            return _hold(state, event, slot, punch=not state.device_clip)
     return functions.press(button, state, snapshot)
 
 
