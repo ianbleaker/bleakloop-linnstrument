@@ -239,7 +239,7 @@ flowchart TD
   core_dispatch --> core_layout
   core_dispatch --> core_leds
   core_dispatch --> core_views
-  core_engine --> core_controls
+  core_engine --> core_dispatch
   core_engine --> core_faders
   core_engine --> core_fx
   core_engine --> core_layout

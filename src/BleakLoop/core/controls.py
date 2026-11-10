@@ -1,6 +1,6 @@
 """Behaviour shared by Session and Linnstrument Mode: undo, metronome, Play/Stop, record, Fixed Length
 and scene lights; shared by Session and Sequencer Mode: the window moves, the tempo steps and the
-Device/Clip layer."""
+Device/Clip hold and its Track and Device steps."""
 
 from dataclasses import replace
 
@@ -122,36 +122,6 @@ def _fader_source(state, snapshot, value):
 
 
 
-def sections(state, shift=False):
-    # The mode's button sections, normal or Shift layer, in lookup order. Fixed regions and
-    # Device/Clip's layer aren't sections here.
-    if state.mode is Mode.LINNSTRUMENT:
-        return (layout.LINNSTRUMENT_SHIFT,) if shift else (layout.LINNSTRUMENT,)
-    if state.mode is Mode.SEQUENCER:
-        # Column 15 and the settings work on both layers.
-        own = (layout.SEQUENCER_GRID, *((layout.SEQUENCER_SETTINGS,) if state.seq_settings else ()))
-        if shift:
-            return (layout.SEQUENCER_GLOBAL_SHIFT, layout.SEQUENCER_NAV_SHIFT, *own)
-        return (layout.SEQUENCER_GLOBAL, layout.SEQUENCER_NAV, *own)
-    if shift:
-        return (layout.GLOBAL_SHIFT, layout.VIEW_SHIFT, layout.NAVIGATION_SHIFT)
-    return (layout.GLOBAL, layout.VIEW, layout.NAVIGATION)
-
-
-def at(sections, key):
-    # The button live on a pad in the first section that has one, or None.
-    for section in sections:
-        button = section.at(key)
-        if button is not None:
-            return button
-    return None
-
-
-def pads(state, name):
-    # The pads of a function's buttons on the mode's normal layer.
-    return {button.key for section in sections(state) for button in section.buttons() if button.function == name}
-
-
 def device_clip(state, event, snapshot):
     # A hold pad: held, the Device/Clip layer; a tap with no other press during it flips
     # Live's Detail view, and names the view it flips to.
@@ -172,23 +142,6 @@ functions.register_hold(
     layer="device_clip",
     takes=True,
 )
-
-
-def navigation_pads(state):
-    # The pads Device/Clip's layer takes over: the Navigation column's, both layers, and its own.
-    if state.mode is Mode.SEQUENCER:
-        sections = (layout.SEQUENCER_NAV, layout.SEQUENCER_NAV_SHIFT, layout.DEVICE_CLIP)
-    else:
-        sections = (layout.NAVIGATION, layout.NAVIGATION_SHIFT, layout.DEVICE_CLIP)
-    return {button.key for section in sections for button in section.buttons()}
-
-
-def device_clip_layer(state, key):
-    # Device/Clip held + a press on a pad its layer takes.
-    button = layout.DEVICE_CLIP.at(key)
-    if button is None:
-        return state, []
-    return functions.press(button, state, snapshot=None)
 
 
 @functions.register("tracks", light=lambda state, snapshot, step: Light(LIME))
@@ -212,13 +165,6 @@ def toggle_fader_source(state):
         state = replace(state, split_snapshots=False, fx_length=None)
         return state, actions + buttons.say("fader_source", "device")
     return replace(state, split_snapshots=True), actions + buttons.say("fader_source", "snapshots")
-
-
-def render_device_clip_layer(frame, state, snapshot=None):
-    # Over either layer: the Navigation pads go dark, then the layer's own light.
-    frame.update(dict.fromkeys(navigation_pads(state), Light(OFF)))
-    functions.paint(frame, layout.DEVICE_CLIP.buttons(), state, snapshot)
-    frame.update(dict.fromkeys(pads(state, "device_clip"), Light(ORANGE, Blink.FAST)))
 
 
 def record_length(bars, snapshot):
