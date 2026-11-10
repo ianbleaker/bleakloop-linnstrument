@@ -120,7 +120,6 @@ def _fader_source(state, snapshot, value):
     return toggle_fader_source(state)
 
 
-functions.register_hold("device_clip", light=lambda state, snapshot, value: Light(ORANGE))
 
 
 def sections(state, shift=False):
@@ -163,6 +162,16 @@ def device_clip(state, event, snapshot):
     if not tapped:
         return state, []
     return state, [ToggleDetailView(), *buttons.say("device_clip", "device" if snapshot.clip_view else "clip")]
+
+
+functions.register_hold(
+    "device_clip",
+    light=lambda state, snapshot, value: Light(ORANGE, Blink.FAST if state.device_clip else Blink.STEADY),
+    handle=device_clip,
+    down=lambda state: state.device_clip,
+    layer="device_clip",
+    takes=True,
+)
 
 
 def navigation_pads(state):

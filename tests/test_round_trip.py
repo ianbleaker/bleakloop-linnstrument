@@ -32,7 +32,7 @@ def test_a_moved_button_works_and_lights_on_its_new_pad(tmp_path, monkeypatch):
     text = text.replace("[global.undo]\npad = [1, 6]", "[global.undo]\npad = [1, 5]")
     path = tmp_path / "buttons.toml"
     path.write_text(text, encoding="utf-8")
-    monkeypatch.setattr(layout, "GLOBAL", buttons.load(path).section("global"))
+    monkeypatch.setitem(layout._SECTIONS, "global", buttons.load(path).section("global"))
     snapshot = replace(SNAP, can_undo=True)
     pressed = session.handle(State(), PadPress(1, 5, True), snapshot)
     assert pressed == (State(), [Undo(), ShowMessage("Undo")])

@@ -13,37 +13,53 @@ from .leds import OFF, Light
 
 
 @dataclass(frozen=True)
+class Hold:
+    """A function pressed and released, which core/dispatch.py runs in its precedence."""
+
+    # (state, event, snapshot) -> (state, actions): its own pad's press and release. None
+    # when a mode's own code runs it (Bars, in the snapshot panel).
+    handle: object = None
+    down: object = None  # state -> whether it's held
+    layer: str | None = None  # the views.py layer it shows while held
+    # While held, its layer takes every press on the pads of the sections it replaces.
+    takes: bool = False
+    # Under the Shift layer, its press gives way to a Shift layer button on its pad.
+    yields: bool = True
+    hides: tuple = ()  # the layers hidden while it's held (Copy and Delete hide Shift's)
+    # While held, the pads of the other held holds keep their light over its layer.
+    shows_holds: bool = False
+    # (state, event, snapshot) -> (state, actions): every other press while it's held.
+    capture: object = None
+
+
+@dataclass(frozen=True)
 class Function:
     press: object  # (state, snapshot, value) -> (state, actions); None for a hold
     light: object  # (state, snapshot, value) -> Light
-
-
-# Holds: pressed and released, in an order each mode's handle() keeps itself. A mode may run
-# one as a tap instead (Sequencer Mode's Seq leaves it), through its press.
-HOLDS = frozenset({"shift", "device_clip", "seq", "copy", "delete", "stop", "bars"})
+    hold: Hold | None = None
 
 
 _FUNCTIONS = {}  # name -> Function
 
 
-def register(name, light=None):
-    # A decorator: the function's press handler.
+def register(name, light=None, hold=None):
+    # A decorator: the function's press handler, None for a hold.
     if name not in REQUIREMENTS:
         raise ValueError(f"{name}: no such function in catalogue.REQUIREMENTS")
 
     def add(press):
-        if press is None and name not in HOLDS:
+        if press is None and hold is None:
             raise ValueError(f"{name}: only a hold registers without a press")
         if name in _FUNCTIONS:
             raise ValueError(f"{name} is registered twice")
-        _FUNCTIONS[name] = Function(press, light or _dark)
+        _FUNCTIONS[name] = Function(press, light or _dark, hold)
         return press
 
     return add
 
 
-def register_hold(name, light=None):
-    register(name, light)(None)
+def register_hold(name, light=None, **hold):
+    register(name, light, Hold(**hold))(None)
 
 
 def _dark(state, snapshot, value):
@@ -55,6 +71,18 @@ def get(name, state):
     if not requirement_met(name, state):
         return None
     return _FUNCTIONS.get(name)
+
+
+def hold(name, state):
+    # The function's Hold, or None: not a hold, or its requirement isn't met.
+    function = get(name, state)
+    return None if function is None else function.hold
+
+
+def holds(state):
+    # {name: Hold} for every hold whose requirement is met, in registration order.
+    found = {name: get(name, state) for name in _FUNCTIONS}
+    return {name: function.hold for name, function in found.items() if function and function.hold}
 
 
 def press(button, state, snapshot):

@@ -370,6 +370,18 @@ def leave_by_seq(state, snapshot):
     return state, actions + buttons.say("seq", "left")
 
 
+def copy_hold(state, event):
+    if not event.pressed:
+        return replace(state, copy=False, seq_copy_source=None), []
+    return replace(state, copy=True), buttons.say("copy", "held_steps")
+
+
+def delete_hold(state, event):
+    if not event.pressed:
+        return replace(state, delete=False), []
+    return replace(state, delete=True), buttons.say("delete", "held_steps")
+
+
 leave_to_mixer = _leave_for(mixer.toggle)
 leave_to_fx = _leave_for(fx.toggle)
 

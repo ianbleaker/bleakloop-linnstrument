@@ -87,8 +87,20 @@ def handle(state, event, snapshot):
     return functions.press(button, state, snapshot)
 
 
+def _shift(state, event, snapshot):
+    return replace(state, shift=event.pressed), shift_message(event)
+
+
+# Shift lights and works on both layers, and never gives way. While it's held, a held Stop
+# stays lit.
 functions.register_hold(
-    "shift", light=lambda state, snapshot, value: Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
+    "shift",
+    light=lambda state, snapshot, value: Light(WHITE, Blink.FAST if state.shift else Blink.STEADY),
+    handle=_shift,
+    down=lambda state: state.shift,
+    layer="shift",
+    yields=False,
+    shows_holds=True,
 )
 
 

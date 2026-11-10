@@ -199,6 +199,7 @@ flowchart TD
     core_buttons["buttons"]
     core_catalogue["catalogue"]
     core_controls["controls"]
+    core_dispatch["dispatch"]
     core_engine["engine"]
     core_faders["faders"]
     core_functions["functions"]
@@ -234,6 +235,10 @@ flowchart TD
   core_controls --> core_model
   core_controls --> core_modes
   core_controls --> core_values
+  core_dispatch --> core_functions
+  core_dispatch --> core_layout
+  core_dispatch --> core_leds
+  core_dispatch --> core_views
   core_engine --> core_controls
   core_engine --> core_faders
   core_engine --> core_fx
@@ -299,10 +304,10 @@ flowchart TD
   core_sequencer --> core_values
   core_session --> core_buttons
   core_session --> core_controls
+  core_session --> core_dispatch
   core_session --> core_faders
   core_session --> core_functions
   core_session --> core_fx
-  core_session --> core_global_column
   core_session --> core_layout
   core_session --> core_leds
   core_session --> core_mixer

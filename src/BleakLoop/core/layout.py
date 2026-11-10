@@ -46,6 +46,11 @@ FIXED_LENGTHS = (1, 2, 4, 8)
 _SECTIONS = {name: buttons.Section(name, {}, {}) for name in views.button_sections()}
 SECTIONS = tuple(_SECTIONS.values())
 
+
+def section(name):
+    return _SECTIONS[name]
+
+
 GLOBAL = _SECTIONS["global"]
 GLOBAL_SHIFT = _SECTIONS["global-shift"]
 LINNSTRUMENT = _SECTIONS["linnstrument"]
