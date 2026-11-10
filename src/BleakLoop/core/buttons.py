@@ -68,18 +68,6 @@ SECTIONS = frozenset(
 # may sit on a fixed region of any of its sections.
 LAYERS = views.layers()
 
-# A mode's section falls back to its base: the base's buttons it doesn't override on the same
-# pad still work there, if their function runs in that mode, and are dark otherwise.
-FALLBACK = {
-    "linnstrument": "global",
-    "linnstrument-shift": "global-shift",
-    "sequencer-global": "global",
-    "sequencer-global-shift": "global-shift",
-    "sequencer-nav": "navigation",
-    "sequencer-nav-shift": "navigation-shift",
-}
-
-
 MAX_LABEL = 7
 
 
@@ -127,53 +115,24 @@ TOP_LEVEL = {"manual_format": str, "system": dict, "functions": dict}
 
 class Section:
     """One section's buttons: each by name as its (column, pad), each group by its function
-    as {(column, pad): value}. Mutable, so a test or a mockup can move one button. A name the
-    section doesn't have comes from its fallback, unless overridden there or unable to run."""
+    as {(column, pad): value}. Mutable, so a test or a mockup can move one button."""
 
-    def __init__(self, name, buttons, does, base=None):
+    def __init__(self, name, buttons, does):
         self.__dict__.update(buttons)
         self.__dict__["_name"] = name
         self.__dict__["_does"] = does
-        self.__dict__["_base"] = base
-        self.__dict__["_modes"] = views.modes(name)
-        self.__dict__["_built"] = frozenset(buttons)
         self.__dict__["_names"] = list(buttons)
 
     def _refill(self, buttons, does):
-        # A reload: new buttons in the same object, so whatever holds it (a fallback, a module
-        # attribute) sees them. Name, fallback and modes stay.
+        # A reload: new buttons in the same object, so whatever holds it (a module attribute)
+        # sees them. The name stays.
         for key in self._names:
             self.__dict__.pop(key, None)
         self.__dict__.update(buttons)
         self.__dict__["_does"] = dict(does)
-        self.__dict__["_built"] = frozenset(buttons)
         self.__dict__["_names"] = list(buttons)
 
-    def __getattr__(self, attr):
-        base = self.__dict__.get("_base")
-        if base is None or attr not in base._does:
-            raise AttributeError(attr)
-        value = getattr(base, attr)
-        if not runs_in(base._does[attr], self._modes):
-            raise AttributeError(f"{attr} doesn't run in {self._name}")
-        mine = self._own_pads()
-        if isinstance(value, dict):
-            return {key: step for key, step in value.items() if key not in mine}
-        if value in mine:
-            raise AttributeError(f"{attr} is overridden in {self._name}")
-        return value
-
     def __setattr__(self, attr, value):
-        # Moving a fallback's button here overrides it; moving it back to the fallback's own
-        # pad drops the override, so the section follows its fallback again.
-        base, built = self._base, self._built
-        if base is not None and attr not in built and attr in base._does:
-            if value == getattr(base, attr, None):
-                self.__dict__.pop(attr, None)
-                if attr in self._names:
-                    self._names.remove(attr)
-                return
-            self._does[attr] = base._does[attr]
         self._does.setdefault(attr, attr)
         self.__dict__[attr] = value
         if attr not in self._names:
@@ -187,21 +146,9 @@ class Section:
     def _own(self):
         return {key: self.__dict__[key] for key in self._names}
 
-    def _own_pads(self):
-        return {key for _, _, key, _ in _expand(self._own(), self._does)}
-
     def buttons(self):
-        # A Button for every button live in this section.
-        mine = list(_expand(self._own(), self._does))
-        taken = {key for _, _, key, _ in mine}
-        inherited = []
-        if self._base is not None:
-            inherited = [
-                button
-                for button in self._base.buttons()
-                if button.key not in taken and runs_in(button.function, self._modes)
-            ]
-        return mine + inherited
+        # A Button for every button in this section.
+        return list(_expand(self._own(), self._does))
 
     def at(self, key):
         # The button live on a pad, or None.
@@ -247,12 +194,10 @@ class Registry:
 
     def label(self, name, section, value=None):
         # A pad's label: its own button's, for a group's pad, else its function's.
-        while section is not None:
-            for id, item in self.items.items():
-                if item["section"] == section and _does(id, item) == name and "label" in item:
-                    if value is None or _freeze(item.get("value")) == value:
-                        return item["label"]
-            section = FALLBACK.get(section)
+        for id, item in self.items.items():
+            if item["section"] == section and _does(id, item) == name and "label" in item:
+                if value is None or _freeze(item.get("value")) == value:
+                    return item["label"]
         return self.function(name).get("label", name)
 
     def manual(self, name, section, label):
@@ -280,7 +225,7 @@ class Registry:
     def system(self, key, /, **values):
         return _format(self.data["system"][key], values)[0]
 
-    def section(self, name, base=None):
+    def section(self, name):
         prefix = name.replace("-", "_")
         buttons, does = {}, {}
         for id, item in self.items.items():
@@ -295,7 +240,7 @@ class Registry:
             else:
                 buttons[short] = tuple(item["pad"])
                 does[short] = function
-        return Section(name, buttons, does, base)
+        return Section(name, buttons, does)
 
     def group(self, section, function):
         return {
@@ -392,19 +337,8 @@ def _validate(data, items):
 
 
 def _live(items, section):
-    # (id, (column, pad)) for each button live in a section, its fallback's included.
-    own = [(id, tuple(item["pad"])) for id, item in items.items() if item["section"] == section]
-    taken = {key for _, key in own}
-    base = FALLBACK.get(section)
-    if base is None:
-        return own
-    modes = views.modes(section)
-    inherited = [
-        (id, key)
-        for id, key in _live(items, base)
-        if key not in taken and runs_in(_does(id, items[id]), modes)
-    ]
-    return own + inherited
+    # (id, (column, pad)) for each button in a section.
+    return [(id, tuple(item["pad"])) for id, item in items.items() if item["section"] == section]
 
 
 def _check_layers(items, regions):
@@ -502,8 +436,8 @@ def _pads(regions):
 
 
 def describe(registry=None):
-    """The layout as plain data, for the editor: each live section's buttons, where each comes
-    from and its fixed regions, every function's messages, the system messages and the user's
+    """The layout as plain data, for the editor: each live section's buttons, whether each is
+    shipped or the user's, its fixed regions, every function's messages, the system messages and the user's
     changes."""
     from . import layout
 
@@ -533,31 +467,13 @@ def describe(registry=None):
             if "value" in item:
                 entry["value"] = item["value"]
             own.append(entry)
-        taken = {tuple(entry["pad"]) for entry in own}
-        inherited = []
-        if name in FALLBACK:
-            for id, pad in _live(registry.items, FALLBACK[name]):
-                item = registry.items[id]
-                if pad not in taken and runs_in(_does(id, item), modes):
-                    entry = {
-                        "id": id,
-                        "function": _does(id, item),
-                        "pad": list(pad),
-                        "label": registry.label(_does(id, item), item["section"], _freeze(item.get("value"))),
-                        "source": "inherited",
-                        "from": item["section"],
-                    }
-                    if "value" in item:
-                        entry["value"] = item["value"]
-                    inherited.append(entry)
         sections.append(
             {
                 "name": name,
                 "key": key,
                 "modes": sorted(mode.lower() for mode in modes),
-                "fallback": FALLBACK.get(name),
                 "left_split": views.columns(name) == {layout.GLOBAL_COLUMN},
-                "entries": own + inherited,
+                "entries": own,
                 "regions": _pads(regions.get(name, ())),
                 # Fixed or taken in a layer this section shares: a button can't go there.
                 "locked": sorted(
@@ -661,8 +577,8 @@ def group(section, function):
     return _get().group(section, function)
 
 
-def section(name, base=None):
-    return _get().section(name, base)
+def section(name):
+    return _get().section(name)
 
 
 def say(name, outcome=None, /, **values):

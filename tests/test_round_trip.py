@@ -58,7 +58,7 @@ def _moved_undo(tmp_path):
     return path
 
 
-def test_a_reload_moves_a_button_everywhere_it_is_held(tmp_path, shipped):
+def test_a_reload_moves_a_button_in_its_own_section(tmp_path, shipped):
     buttons.reload(_moved_undo(tmp_path))
     snapshot = replace(SNAP, can_undo=True)
     pressed = session.handle(State(), PadPress(1, 5, True), snapshot)
@@ -66,9 +66,9 @@ def test_a_reload_moves_a_button_everywhere_it_is_held(tmp_path, shipped):
     frame = session.render(State(), snapshot)
     assert frame[(1, 5)] == Light(WHITE)
     assert frame[(1, 6)] == Light(OFF)
-    # Sequencer Mode's Global column falls back to the same object, so it moves too.
-    assert layout.SEQUENCER_GLOBAL.at((1, 5)) == ("undo", "undo", (1, 5), None)
-    assert layout.SEQUENCER_GLOBAL.at((1, 6)) is None
+    # Sequencer Mode's Global column lists its own buttons: they stay.
+    assert layout.SEQUENCER_GLOBAL.at((1, 5)) == ("fixed_length", "fixed_length", (1, 5), None)
+    assert layout.SEQUENCER_GLOBAL.at((1, 6)) == ("undo", "undo", (1, 6), None)
 
 
 def test_a_failed_reload_keeps_the_current_layout(tmp_path, shipped):

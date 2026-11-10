@@ -87,11 +87,3 @@ def test_a_function_whose_requirement_isnt_met_loads_dark_and_inert():
     assert functions.light(button, state, None) == functions.Light(functions.OFF)
 
 
-def test_a_fallback_that_cant_run_in_a_mode_is_dark_there():
-    registry = buttons.load(Path(__file__).parent / "fixtures" / "dark_fallback.toml")
-    session = registry.section("global")
-    linnstrument = registry.section("linnstrument", session)
-    assert session.at((1, 5))[1] == "fader_source"
-    assert linnstrument.at((1, 5)) is None
-    assert linnstrument.at((1, 6))[1] == "undo"
-    assert linnstrument.at((1, 7))[1] == "back"

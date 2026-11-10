@@ -42,12 +42,8 @@ SEQ_NOTE_COLUMNS = range(11, 15)
 FIXED_LENGTHS = (1, 2, 4, 8)
 
 # Buttons, from buttons.toml: one namespace per section (core/views.py lists them), each
-# button's (column, pad) by name and each group as {(column, pad): value} by its function. A
-# mode's section falls back to its Session one (buttons.FALLBACK).
-_SECTIONS = {}
-for _name in views.button_sections():
-    _base = buttons.FALLBACK.get(_name)
-    _SECTIONS[_name] = buttons.Section(_name, {}, {}, _base and _SECTIONS[_base])
+# button's (column, pad) by name and each group as {(column, pad): value} by its function.
+_SECTIONS = {name: buttons.Section(name, {}, {}) for name in views.button_sections()}
 SECTIONS = tuple(_SECTIONS.values())
 
 GLOBAL = _SECTIONS["global"]

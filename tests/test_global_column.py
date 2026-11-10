@@ -514,7 +514,6 @@ def test_copy_or_delete_hides_the_shift_layer(held):
 
 def test_a_mode_moves_its_own_buttons_alone(monkeypatch):
     # Sequencer Mode's Play and Undo swap pads; Session Mode's stay put.
-    # Each is a fallback until moved, and the first move hides the other's fallback.
     undo, play = layout.GLOBAL.undo, layout.GLOBAL.play_stop
     monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "play_stop", undo, raising=False)
     monkeypatch.setattr(layout.SEQUENCER_GLOBAL, "undo", play, raising=False)
@@ -526,7 +525,8 @@ def test_a_mode_moves_its_own_buttons_alone(monkeypatch):
 
 
 def test_any_song_level_function_works_in_column_1(monkeypatch):
-    # Tempo +1 on Linnstrument Mode's Fixed Length pad: it overrides the fallback there only.
+    # Tempo +1 in place of Linnstrument Mode's Fixed Length: Session Mode's stays.
+    monkeypatch.delattr(layout.LINNSTRUMENT, "fixed_length")
     monkeypatch.setattr(layout.LINNSTRUMENT, "tempo", {layout.GLOBAL.fixed_length: 1}, raising=False)
     snapshot = replace(BASE, tempo=120.0)
     _, actions = handle(LINNSTRUMENT, layout.GLOBAL.fixed_length, snapshot)

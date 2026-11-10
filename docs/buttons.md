@@ -3,8 +3,7 @@
 <!-- Generated from src/BleakLoop/buttons.toml by PYTHONPATH=src python3 -m tools.docs. Edit that file, not this one. -->
 
 Where every button is, and what it says in Live's status bar. Pads are column/pad: column 1 is
-the Global column, pad 1 the far row. A section's rows "from" another are its fallback's: that
-mode keeps them unless it puts its own button on the pad. Refusals always show; a function with
+the Global column, pad 1 the far row. Refusals always show; a function with
 `show = false` keeps its other messages quiet.
 
 ## Global column: Session, Mixer and FX Mode
@@ -139,14 +138,14 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 
 | Pad | Label | Function | Message | Outcomes | Refusals | Shown |
 |---|---|---|---|---|---|---|
-| 1/1 (from global) | Play | `play_stop` |  | play: Play<br>stop: Stop |  | yes |
+| 1/1 | Play | `play_stop` |  | play: Play<br>stop: Stop |  | yes |
 | 1/2 | RecClip | `record_clip` | Record Clip | new_scene: Record Clip: new scene | no_track: No selected track<br>group_track: Cannot record on a group track<br>not_armed: Track not armed | yes |
 | 1/3 | CapMIDI | `capture_midi` | Capture MIDI |  | nothing: Nothing to capture | yes |
-| 1/4 (from global) | Metro | `metronome` |  | on: Metronome: ON<br>off: Metronome: OFF |  | yes |
-| 1/5 (from global) | Length | `fixed_length` | Fixed Length: {bars} {unit} | off: Fixed Length: OFF |  | yes |
-| 1/6 (from global) | Undo | `undo` | Undo |  | nothing: Nothing to undo | yes |
+| 1/4 | Metro | `metronome` |  | on: Metronome: ON<br>off: Metronome: OFF |  | yes |
+| 1/5 | Length | `fixed_length` | Fixed Length: {bars} {unit} | off: Fixed Length: OFF |  | yes |
+| 1/6 | Undo | `undo` | Undo |  | nothing: Nothing to undo | yes |
 | 1/7 | Back | `back` |  | session: Back: Session Mode<br>mixer: Back: Mixer Mode<br>fx: Back: FX Mode<br>sequencer: Back: Sequencer |  | yes |
-| 1/8 (from global) | Shift | `shift` | Shift |  |  | yes |
+| 1/8 | Shift | `shift` | Shift |  |  | yes |
 
 ## Global column with Shift: Linnstrument Mode
 
@@ -156,9 +155,9 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 |---|---|---|---|---|---|---|
 | 1/1 | StopTrk | `stop_track` | Stop clips: {track} |  | no_track: No selected track | yes |
 | 1/2 | Record | `record` |  | session_on: Session Record: ON<br>session_off: Session Record: OFF<br>arrangement_on: Arrangement Record: ON<br>arrangement_off: Arrangement Record: OFF |  | yes |
-| 1/3 (from global-shift) | Quant | `quantize` | Quantize: 1/16 |  | no_clip: No clip to quantize<br>audio: Cannot quantize an audio clip | yes |
-| 1/4 (from global-shift) | LaunchQ | `launch_quantization` | Launch Quantization: {name} |  |  | yes |
-| 1/6 (from global-shift) | Redo | `redo` | Redo |  | nothing: Nothing to redo | yes |
+| 1/3 | Quant | `quantize` | Quantize: 1/16 |  | no_clip: No clip to quantize<br>audio: Cannot quantize an audio clip | yes |
+| 1/4 | LaunchQ | `launch_quantization` | Launch Quantization: {name} |  |  | yes |
+| 1/6 | Redo | `redo` | Redo |  | nothing: Nothing to redo | yes |
 | 1/7 | Scenes | `scene_page` | Scene page: pick a scene |  |  | yes |
 
 ## Scene page: Linnstrument and Sequencer Mode
@@ -175,14 +174,14 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 
 | Pad | Label | Function | Message | Outcomes | Refusals | Shown |
 |---|---|---|---|---|---|---|
-| 1/1 (from global) | Play | `play_stop` |  | play: Play<br>stop: Stop |  | yes |
+| 1/1 | Play | `play_stop` |  | play: Play<br>stop: Stop |  | yes |
 | 1/2 | RecClip | `record_clip` | Record Clip | new_scene: Record Clip: new scene | no_track: No selected track<br>group_track: Cannot record on a group track<br>not_armed: Track not armed | yes |
 | 1/3 | CapMIDI | `capture_midi` | Capture MIDI |  | nothing: Nothing to capture | yes |
-| 1/4 (from global) | Metro | `metronome` |  | on: Metronome: ON<br>off: Metronome: OFF |  | yes |
-| 1/5 (from global) | Length | `fixed_length` | Fixed Length: {bars} {unit} | off: Fixed Length: OFF |  | yes |
-| 1/6 (from global) | Undo | `undo` | Undo |  | nothing: Nothing to undo | yes |
-| 1/7 (from global) | Linn | `linnstrument_mode` | Linnstrument Mode |  |  | yes |
-| 1/8 (from global) | Shift | `shift` | Shift |  |  | yes |
+| 1/4 | Metro | `metronome` |  | on: Metronome: ON<br>off: Metronome: OFF |  | yes |
+| 1/5 | Length | `fixed_length` | Fixed Length: {bars} {unit} | off: Fixed Length: OFF |  | yes |
+| 1/6 | Undo | `undo` | Undo |  | nothing: Nothing to undo | yes |
+| 1/7 | Linn | `linnstrument_mode` | Linnstrument Mode |  |  | yes |
+| 1/8 | Shift | `shift` | Shift |  |  | yes |
 
 ## Global column with Shift: Sequencer Mode
 
@@ -192,9 +191,9 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 |---|---|---|---|---|---|---|
 | 1/1 | StopTrk | `stop_track` | Stop clips: {track} |  | no_track: No selected track | yes |
 | 1/2 | Record | `record` |  | session_on: Session Record: ON<br>session_off: Session Record: OFF<br>arrangement_on: Arrangement Record: ON<br>arrangement_off: Arrangement Record: OFF |  | yes |
-| 1/3 (from global-shift) | Quant | `quantize` | Quantize: 1/16 |  | no_clip: No clip to quantize<br>audio: Cannot quantize an audio clip | yes |
-| 1/4 (from global-shift) | LaunchQ | `launch_quantization` | Launch Quantization: {name} |  |  | yes |
-| 1/6 (from global-shift) | Redo | `redo` | Redo |  | nothing: Nothing to redo | yes |
+| 1/3 | Quant | `quantize` | Quantize: 1/16 |  | no_clip: No clip to quantize<br>audio: Cannot quantize an audio clip | yes |
+| 1/4 | LaunchQ | `launch_quantization` | Launch Quantization: {name} |  |  | yes |
+| 1/6 | Redo | `redo` | Redo |  | nothing: Nothing to redo | yes |
 | 1/7 | Scenes | `scene_page` | Scene page: pick a scene |  |  | yes |
 
 ## Navigation column: Sequencer Mode
@@ -203,13 +202,13 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 
 | Pad | Label | Function | Message | Outcomes | Refusals | Shown |
 |---|---|---|---|---|---|---|
-| 16/1 (from navigation) | Session | `session` | Session Mode | split_on: Split view: ON<br>split_off: Split view: OFF |  | yes |
-| 16/2 (from navigation) | Mixer | `mixer` |  | split_on: Split view: ON<br>split_off: Split view: OFF<br>on: Mixer Mode: ON<br>off: Mixer Mode: OFF |  | yes |
-| 16/3 (from navigation) | FX | `fx` |  | on: FX Mode: ON<br>off: FX Mode: OFF |  | yes |
-| 16/5 (from navigation) | Seq | `seq` | Seq: tap for Sequencer, or press a clip | entered: Sequencer<br>left: Session Mode | needs_midi: Sequencer needs a MIDI track | yes |
-| 16/6 (from navigation) | Delete | `delete` |  | held: Delete: pick a clip or scene<br>held_steps: Delete: pick a step or note pad | last_scene: Cannot delete last scene | yes |
-| 16/7 (from navigation) | Copy | `copy` |  | held: Copy: pick a clip or scene<br>held_slots: Copy: pick a snapshot<br>picked_snapshot: Copy: pick an empty slot<br>snapshot_copied: {source} copied to {target}<br>picked_clip: Copy: pick an empty slot<br>clip_copied: Clip copied<br>clips_copied: Clips copied<br>picked_scene: Copy: pick an empty scene<br>scene_copied: Scene copied<br>held_steps: Copy: pick a step<br>picked_step: Copy: pick steps | empty_slot: Copy: pick a clip or scene<br>scene_source: Pick a scene target<br>target_full: Target not empty<br>group_target: Cannot copy into a group track<br>kinds: Cannot copy between MIDI and audio tracks<br>other_group: Pick a slot in the same group<br>empty_scene: Scene is empty<br>clip_source: Pick a clip target<br>scene_full: Target scene not empty<br>empty_step: Step is empty<br>empty_snapshot: Copy: pick a snapshot<br>bound_scene: Scene snapshots can't be bound | yes |
-| 16/8 (from navigation) | DevClip | `device_clip` | Device/Clip: tracks and devices | device: Device view<br>clip: Clip view |  | yes |
+| 16/1 | Session | `session` | Session Mode | split_on: Split view: ON<br>split_off: Split view: OFF |  | yes |
+| 16/2 | Mixer | `mixer` |  | split_on: Split view: ON<br>split_off: Split view: OFF<br>on: Mixer Mode: ON<br>off: Mixer Mode: OFF |  | yes |
+| 16/3 | FX | `fx` |  | on: FX Mode: ON<br>off: FX Mode: OFF |  | yes |
+| 16/5 | Seq | `seq` | Seq: tap for Sequencer, or press a clip | entered: Sequencer<br>left: Session Mode | needs_midi: Sequencer needs a MIDI track | yes |
+| 16/6 | Delete | `delete` |  | held: Delete: pick a clip or scene<br>held_steps: Delete: pick a step or note pad | last_scene: Cannot delete last scene | yes |
+| 16/7 | Copy | `copy` |  | held: Copy: pick a clip or scene<br>held_slots: Copy: pick a snapshot<br>picked_snapshot: Copy: pick an empty slot<br>snapshot_copied: {source} copied to {target}<br>picked_clip: Copy: pick an empty slot<br>clip_copied: Clip copied<br>clips_copied: Clips copied<br>picked_scene: Copy: pick an empty scene<br>scene_copied: Scene copied<br>held_steps: Copy: pick a step<br>picked_step: Copy: pick steps | empty_slot: Copy: pick a clip or scene<br>scene_source: Pick a scene target<br>target_full: Target not empty<br>group_target: Cannot copy into a group track<br>kinds: Cannot copy between MIDI and audio tracks<br>other_group: Pick a slot in the same group<br>empty_scene: Scene is empty<br>clip_source: Pick a clip target<br>scene_full: Target scene not empty<br>empty_step: Step is empty<br>empty_snapshot: Copy: pick a snapshot<br>bound_scene: Scene snapshots can't be bound | yes |
+| 16/8 | DevClip | `device_clip` | Device/Clip: tracks and devices | device: Device view<br>clip: Clip view |  | yes |
 
 ## Navigation column with Shift: Sequencer Mode
 
@@ -217,13 +216,13 @@ mode keeps them unless it puts its own button on the pad. Refusals always show; 
 
 | Pad | Label | Function | Message | Outcomes | Refusals | Shown |
 |---|---|---|---|---|---|---|
-| 16/1 (from navigation-shift) | Tempo+ | `tempo` 1 | Tempo: {bpm:.1f} BPM |  |  | yes |
-| 16/2 (from navigation-shift) | Tempo- | `tempo` -1 | Tempo: {bpm:.1f} BPM |  |  | yes |
-| 16/3 (from navigation-shift) | Panel | `fader_source` |  | device: Faders: Device FX<br>snapshots: Faders: FX snapshots |  | yes |
-| 16/5 (from navigation-shift) | Up | `window` (0, -1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
-| 16/6 (from navigation-shift) | Down | `window` (0, 1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
-| 16/7 (from navigation-shift) | Right | `window` (1, 0) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
-| 16/8 (from navigation-shift) | Left | `window` (-1, 0) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
+| 16/1 | Tempo+ | `tempo` 1 | Tempo: {bpm:.1f} BPM |  |  | yes |
+| 16/2 | Tempo- | `tempo` -1 | Tempo: {bpm:.1f} BPM |  |  | yes |
+| 16/3 | Panel | `fader_source` |  | device: Faders: Device FX<br>snapshots: Faders: FX snapshots |  | yes |
+| 16/5 | Up | `window` (0, -1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
+| 16/6 | Down | `window` (0, 1) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
+| 16/7 | Right | `window` (1, 0) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
+| 16/8 | Left | `window` (-1, 0) | Tracks {first_track}–{last_track}, Scenes {first_scene}–{last_scene} |  |  | yes |
 
 ## Column 15: Sequencer Mode
 

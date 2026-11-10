@@ -41,10 +41,11 @@ def test_a_removed_button_is_gone():
     assert "navigation_shift.fader_source" not in registry.entries()
 
 
-def test_removing_a_linnstrument_button_brings_back_the_global_one(shipped):
+def test_removing_a_linnstrument_button_leaves_its_pad_empty(shipped):
     assert layout.LINNSTRUMENT.at((1, 2))[1] == "record_clip"
     buttons.reload(buttons.PATH, FIXTURES / "removed_linnstrument.toml")
-    assert layout.LINNSTRUMENT.at((1, 2))[1] == "record"
+    assert layout.LINNSTRUMENT.at((1, 2)) is None
+    assert layout.GLOBAL.at((1, 2))[1] == "record"
 
 
 @pytest.mark.parametrize(
