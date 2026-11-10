@@ -106,9 +106,9 @@ def test_a_valid_save_writes_the_file_and_moves_the_button(editor):
     overlay = {"global": {"metronome": {"pad": [1, 5]}, "fixed_length": {"pad": [1, 4]}}}
     status, _, body = _save(editor, overlay)
     assert status == 200
-    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == overlay
+    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == {**overlay, "format": 2}
     assert layout.GLOBAL.metronome == (1, 5)
-    assert json.loads(body)["overlay"] == overlay
+    assert json.loads(body)["overlay"] == {**overlay, "format": 2}
 
 
 def test_an_invalid_save_returns_the_error_and_writes_nothing(editor):
@@ -137,7 +137,7 @@ def test_a_save_over_a_user_file_that_doesnt_load_keeps_a_backup(editor):
     backup = editor.user.with_name("buttons.toml.bak")
     assert status == 200 and json.loads(body)["backup"] == str(backup)
     assert backup.read_text(encoding="utf-8") == '[global.metronome]\npad = [1, 1]\n'
-    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == overlay
+    assert tomllib.loads(editor.user.read_text(encoding="utf-8")) == {**overlay, "format": 2}
 
 
 def test_a_save_over_a_user_file_that_loads_makes_no_backup(editor):
@@ -187,3 +187,26 @@ def test_a_failing_handler_answers_500():
         assert _exchange(instance, b"GET / HTTP/1.1\r\n\r\n")[0] == 500
     finally:
         instance.close()
+
+
+def test_a_save_writes_a_buttons_options(editor):
+    overlay = {"device_clip": {"track_next": {"options": {"arm": False}}}}
+    status, _, body = _save(editor, overlay)
+    assert status == 200
+    written = tomllib.loads(editor.user.read_text(encoding="utf-8"))
+    assert written["device_clip"]["track_next"]["options"] == {"arm": False}
+    assert layout.DEVICE_CLIP.at((16, 6)).options == {"arm": False}
+    entry = next(
+        e
+        for s in json.loads(body)["sections"]
+        if s["name"] == "device-clip"
+        for e in s["entries"]
+        if e["name"] == "track_next"
+    )
+    assert entry["options"] == {"arm": False}
+
+
+def test_a_save_with_an_unknown_option_is_refused(editor):
+    status, _, body = _save(editor, {"device_clip": {"track_next": {"options": {"solo": True}}}})
+    assert status == 400 and "has no option 'solo'" in json.loads(body)["error"]
+    assert not editor.user.exists()

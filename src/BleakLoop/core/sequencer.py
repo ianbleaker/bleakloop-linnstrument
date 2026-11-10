@@ -7,7 +7,7 @@ Steps are counted from clip time 0. Step s of the page in view is at column 3 + 
 import math
 from dataclasses import replace
 
-from . import buttons, catalogue, controls, faders, functions, fx, global_column, layout, mixer, modes, values
+from . import buttons, controls, dispatch, faders, functions, fx, global_column, layout, mixer, modes, values
 from .leds import (
     BLUE,
     CYAN,
@@ -282,26 +282,12 @@ def handle(state, event, snapshot):
     if not event.pressed and any((h.column, h.pad) == key for h in state.seq_holds):
         # A held step ends on its cell's release, wherever the finger slid to.
         return _release_step(state, event, view, snapshot)
-    normal = controls.at(controls.sections(state), key)
-    held = normal.function if normal is not None else None
-    if held == "shift":
-        return global_column.handle(state, event, snapshot)
-    # Under Shift, a hold's press gives way to the Shift layer's button on its pad.
-    shift_layer = state.shift and not state.copy and not state.delete
-    shifted = shift_layer and event.pressed and layout.SEQUENCER_NAV_SHIFT.at(key) is not None
-    if held == "device_clip" and not shifted:
-        return controls.device_clip(state, event, snapshot)
-    if state.device_clip and event.pressed and key in controls.navigation_pads(state):
-        # Device/Clip's layer replaces the Navigation column's normal and Shift layers.
-        return controls.device_clip_layer(state, key)
-    if held == "copy" and not shifted:
-        if not event.pressed:
-            return replace(state, copy=False, seq_copy_source=None), []
-        return replace(state, copy=True), buttons.say("copy", "held_steps")
-    if held == "delete" and not shifted:
-        if not event.pressed:
-            return replace(state, delete=False), []
-        return replace(state, delete=True), buttons.say("delete", "held_steps")
+    if state.scene_page and event.column == layout.GLOBAL_COLUMN:
+        return global_column.scene_page(state, event, snapshot)
+    # The buttons and holds, before the steps, note pads and settings.
+    result = dispatch.handle_button(state, event, snapshot)
+    if result is not None:
+        return result
     if event.column in layout.SEQ_STEP_COLUMNS:
         return _step(state, event, view, snapshot)
     if event.column in layout.SEQ_NOTE_COLUMNS and not state.seq_settings:
@@ -312,21 +298,7 @@ def handle(state, event, snapshot):
         if not event.pressed:
             return _page_release(state, setting), []
         return functions.press(setting, state, snapshot)
-    if not event.pressed:
-        return state, []
-    if key in controls.navigation_pads(state):
-        # Navigation's buttons work under Copy and Delete too.
-        button = (layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV).at(key)
-        return functions.press(button, state, snapshot) if button else (state, [])
-    # Copy over Delete over Shift.
-    if state.copy or state.delete:
-        return state, []
-    if state.scene_page and event.column == layout.GLOBAL_COLUMN:
-        return global_column.handle(state, event, snapshot)
-    button = controls.at(controls.sections(state, shift=state.shift), key)
-    if button is None:
-        return state, []
-    return functions.press(button, state, snapshot)
+    return state, []
 
 
 def _page_release(state, button):
@@ -340,7 +312,7 @@ def _view_of(snapshot):
 
 
 def _leave_for(toggle):
-    def press(state, snapshot, value):
+    def press(state, snapshot, value=None):
         state, actions = leave(state, snapshot)
         state, more = toggle(state)
         # The new mode's width can be wider than Session's split view.
@@ -357,34 +329,33 @@ def _leave_for(toggle):
     return press
 
 
-def _cyan(state, snapshot, value):
-    return Light(CYAN)
+# The mode pads in Sequencer Mode: session.py registers them for every mode.
 
 
-@functions.register("session", [catalogue.SEQUENCER], light=_cyan)
-def _session(state, snapshot, value):
+def leave_to_session(state, snapshot):
     state, actions = leave(state, snapshot)
     return state, actions + buttons.say("session")
 
 
-@functions.register("seq", [catalogue.SEQUENCER], light=lambda state, snapshot, value: Light(BLUE))
-def _seq(state, snapshot, value):
+def leave_by_seq(state, snapshot):
     state, actions = leave(state, snapshot)
     return state, actions + buttons.say("seq", "left")
 
 
-functions.register("mixer", [catalogue.SEQUENCER], light=_cyan)(_leave_for(mixer.toggle))
-functions.register("fx", [catalogue.SEQUENCER], light=_cyan)(_leave_for(fx.toggle))
-functions.register_hold(
-    "copy",
-    [catalogue.SEQUENCER],
-    light=lambda state, snapshot, value: Light(RED, Blink.FAST) if state.copy else Light(MAGENTA),
-)
-functions.register_hold(
-    "delete",
-    [catalogue.SEQUENCER],
-    light=lambda state, snapshot, value: Light(RED, Blink.FAST if state.delete else Blink.STEADY),
-)
+def copy_hold(state, event):
+    if not event.pressed:
+        return replace(state, copy=False, seq_copy_source=None), []
+    return replace(state, copy=True), buttons.say("copy", "held_steps")
+
+
+def delete_hold(state, event):
+    if not event.pressed:
+        return replace(state, delete=False), []
+    return replace(state, delete=True), buttons.say("delete", "held_steps")
+
+
+leave_to_mixer = _leave_for(mixer.toggle)
+leave_to_fx = _leave_for(fx.toggle)
 
 
 @functions.register(
@@ -742,13 +713,16 @@ def render(state, snapshot):
         for column in range(1, layout.COLUMNS)
         for pad in range(1, layout.ROWS + 1)
     }
-    frame.update(global_column.render(state, snapshot))
     if view.track is not None and view.is_midi:
         _render_steps(frame, state, view, snapshot)
         _render_meters(frame, state, view)
         if not state.seq_settings:
             _render_note_pads(frame, state, view)
-    _render_buttons(frame, state, snapshot)
+    dispatch.paint(frame, state, snapshot)
+    if state.seq_settings:
+        functions.paint(frame, layout.SEQUENCER_SETTINGS.buttons(), state, snapshot)
+    if state.scene_page:
+        frame.update(global_column.render_scene_page(state, snapshot))
     return frame
 
 
@@ -839,12 +813,3 @@ def _note_colour(view, note, pad):
     return WHITE if note % 12 in NATURALS else MAGENTA
 
 
-def _render_buttons(frame, state, snapshot):
-    # Column 15 and the settings on both layers; the Navigation column's live layer.
-    shift_layer = state.shift and not state.copy and not state.delete
-    own = controls.sections(state)[2:]
-    navigation = layout.SEQUENCER_NAV_SHIFT if shift_layer else layout.SEQUENCER_NAV
-    buttons = (button for section in (*own, navigation) for button in section.buttons())
-    functions.paint(frame, buttons, state, snapshot)
-    if state.device_clip:
-        controls.render_device_clip_layer(frame, state, snapshot)

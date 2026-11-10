@@ -39,8 +39,7 @@ HEADER = """# Buttons
 <!-- Generated from src/BleakLoop/buttons.toml by PYTHONPATH=src python3 -m tools.docs. Edit that file, not this one. -->
 
 Where every button is, and what it says in Live's status bar. Pads are column/pad: column 1 is
-the Global column, pad 1 the far row. A section's rows "from" another are its fallback's: that
-mode keeps them unless it puts its own button on the pad. Refusals always show; a function with
+the Global column, pad 1 the far row. Refusals always show; a function with
 `show = false` keeps its other messages quiet.
 """
 
@@ -72,15 +71,13 @@ def _messages(table):
 
 def _section(section, heading):
     namespace = getattr(layout, section.upper().replace("-", "_"))
-    own = namespace._own_pads()
-    base = buttons.FALLBACK.get(section)
     rows = [
         "| Pad | Label | Function | Message | Outcomes | Refusals | Shown |",
         "|---|---|---|---|---|---|---|",
     ]
-    for name, function, key, value in sorted(namespace.buttons(), key=lambda button: button.key):
+    for name, function, key, value, _ in sorted(namespace.buttons(), key=lambda button: button.key):
         entry = buttons.function(function)
-        pad = f"{key[0]}/{key[1]}" + ("" if key in own or base is None else f" (from {base})")
+        pad = f"{key[0]}/{key[1]}"
         rows.append(
             "| "
             + " | ".join(
@@ -117,6 +114,6 @@ def _system():
     for key, message in buttons.systems().items():
         rows.append(f"| `{key}` | {_cell(message)} |")
     return (
-        "## System messages\n\nThe device setup, and Device/Clip's track and device names. These "
+        "## System messages\n\nThe device setup, Device/Clip's track and device names, and why the button editor shows a function dark. These "
         "always show.\n\n" + "\n".join(rows) + "\n"
     )

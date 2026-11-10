@@ -7,13 +7,13 @@
 <style>
 :root {
   --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #77756f; --line: #dcd9d2;
-  --button: #2f5d8a; --button-ink: #ffffff; --user: #c2621d; --inherited: #b9c5d1;
+  --button: #2f5d8a; --button-ink: #ffffff; --user: #c2621d; --dark: #5d6670;
   --locked: #e4e1da; --other: #ece9e3; --error: #b3261e; --ok: #2e7d32; --focus: #f0b429;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #161615; --panel: #1f1f1e; --ink: #ecebe7; --muted: #9a978f; --line: #3a3936;
-    --button: #4d82b8; --button-ink: #ffffff; --user: #e07b30; --inherited: #3a4654;
+    --button: #4d82b8; --button-ink: #ffffff; --user: #e07b30; --dark: #3a4654;
     --locked: #2a2927; --other: #262524; --error: #ef6b62; --ok: #6cc070; --focus: #f0b429;
   }
 }
@@ -41,7 +41,7 @@ nav button.current { border-color: var(--button); box-shadow: inset 3px 0 0 var(
 .pad small { display: block; font-size: 9px; opacity: .8; }
 .pad.button { background: var(--button); color: var(--button-ink); border-color: var(--button); cursor: grab; }
 .pad.button.user { box-shadow: inset 0 0 0 3px var(--user); }
-.pad.inherited { background: var(--inherited); color: var(--ink); border-style: dashed; }
+.pad.button.dark { background: var(--dark); border-color: var(--dark); color: var(--button-ink); opacity: .7; }
 .pad.locked { background: repeating-linear-gradient(45deg, var(--locked), var(--locked) 4px, var(--panel) 4px, var(--panel) 8px); cursor: not-allowed; }
 .pad.other { background: var(--other); color: var(--muted); cursor: not-allowed; }
 .pad.off { background: transparent; border-style: dotted; cursor: not-allowed; opacity: .5; }
@@ -71,6 +71,9 @@ textarea { min-height: 44px; resize: vertical; }
 .field { margin-bottom: 12px; }
 .field.user textarea, .field.user input { border-color: var(--user); }
 .panel-wide { grid-column: 2 / 4; }
+.check { display: flex; gap: 6px; align-items: center; font-weight: normal; }
+.check input { margin: 0; }
+.places { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-top: 8px; }
 @media (max-width: 1100px) { .panel-wide { grid-column: auto; } }
 </style>
 </head>
@@ -95,6 +98,7 @@ let L = null;          // the layout, as the server last described it
 let overlay = {};      // the user's changes, edited here until Save
 let view = { kind: "section", name: "global" };
 let selected = null;   // the selected pad key, "c,p", or a function name
+let placing = null;    // the pad key whose "Place in other views too" list is open
 
 const $ = (sel) => document.querySelector(sel);
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -106,6 +110,8 @@ function canonical(x) {
 const same = (a, b) => canonical(a) === canonical(b);
 const pk = (pad) => pad[0] + "," + pad[1];
 const keyOf = (name) => name.replace(/-/g, "_");
+// The section whose Shift layer a section is, or the section itself.
+const baseOf = (name) => (L.sections.find((s) => s.shift === name) || { name }).name;
 
 function el(tag, props, ...children) {
   const node = document.createElement(tag);
@@ -141,16 +147,13 @@ function own(name) {
   return [...out.values()].map((e) => ({ ...e, fn: e.does || e.name, section: name, key }));
 }
 
-function live(name) {
-  const s = section(name);
-  const mine = own(name);
-  if (!s || !s.fallback) return mine;
-  const taken = new Set(mine.map((e) => pk(e.pad)));
-  const inherited = live(s.fallback)
-    .filter((e) => !taken.has(pk(e.pad)) && s.functions.includes(e.fn))
-    .map((e) => ({ ...e, inherited: true }));
-  return mine.concat(inherited);
-}
+const live = (name) => own(name);
+// Why a function is dark in a section, or undefined where it runs.
+const darkWhy = (name, fn) => section(name).unavailable[fn];
+const fnChoice = (name, fn, selected) => {
+  const why = darkWhy(name, fn);
+  return el("option", { value: fn, selected, title: why, text: `${fnLabel(fn)} (${fn})` + (why ? " (dark here)" : "") });
+};
 
 function neighbours(name) {
   const out = new Set();
@@ -225,7 +228,7 @@ function addButton(name, pad, fn) {
   const id = newName(key, fn);
   const item = { pad };
   if (id !== fn) item.does = fn;
-  if (fn === "tempo") item.value = 1;
+  if (fn === "tempo" || fn === "tracks" || fn === "devices") item.value = 1;
   if (fn === "window") item.value = [0, 1];
   overlay[key] = overlay[key] || {};
   overlay[key][id] = item;
@@ -262,10 +265,10 @@ const dirty = () => !same(overlay, L.overlay);
 
 function padState(name, pad) {
   const s = section(name);
-  if (s.left_split && pad[0] !== 1) return { kind: "off", why: "Only column 1 reaches BleakLoop in Linnstrument Mode" };
+  if (!s.usable.some((p) => same(p, pad))) return { kind: "off", why: "Only column 1 reaches BleakLoop in Linnstrument Mode" };
   if (s.locked.some((p) => same(p, pad))) return { kind: "locked", why: "A fixed region: clip grid, scene pads, faders or steps" };
   const mine = live(name).find((e) => same(e.pad, pad));
-  if (mine) return { kind: mine.inherited ? "inherited" : "button", entry: mine };
+  if (mine) return { kind: "button", entry: mine };
   const other = others(name).get(pk(pad));
   if (other) return { kind: "other", entry: other, why: `Taken by ${other.section}.${other.name} in a shared layer` };
   return { kind: "free" };
@@ -278,7 +281,7 @@ function drop(name, dragged, pad) {
     const from = dragged.pad;
     move(dragged, pad);
     move(target.entry, from);
-  } else if (target.kind === "free" || target.kind === "inherited") {
+  } else if (target.kind === "free") {
     move(dragged, pad);
   } else {
     flash(target.why, true);
@@ -311,13 +314,14 @@ function renderNav() {
     ["Sequencer Mode", (s) => s.modes.length === 1 && s.modes[0] === "sequencer"],
     ["Session and Sequencer Mode", (s) => s.modes.length === 2 && s.modes.includes("session") && s.modes.includes("sequencer") && !s.modes.includes("linnstrument")],
   ];
-  const current = view.kind === "section" ? view.name.replace(/-shift$/, "") : null;
+  const current = view.kind === "section" ? baseOf(view.name) : null;
+  const shifts = new Set(L.sections.map((s) => s.shift).filter(Boolean));
   for (const [title, test] of groups) {
-    const items = L.sections.filter((s) => test(s) && !s.name.endsWith("-shift"));
+    const items = L.sections.filter((s) => test(s) && !shifts.has(s.name));
     if (!items.length) continue;
     nav.append(el("h2", { text: title }));
     for (const s of items) {
-      const changedHere = overlay[s.key] || overlay[s.key + "_shift"];
+      const changedHere = overlay[s.key] || (s.shift && overlay[keyOf(s.shift)]);
       nav.append(el("button", {
         class: (s.name === current ? "current" : "") + (changedHere ? " user" : ""),
         onclick: () => { view = { kind: "section", name: s.name }; selected = null; render(); },
@@ -334,17 +338,17 @@ function renderSection() {
   const s = section(name);
   const centre = $("#centre");
   centre.replaceChildren();
-  const base = name.replace(/-shift$/, "");
-  const shift = base + "-shift";
-  if (section(shift)) {
+  const base = baseOf(name);
+  const shift = section(base).shift;
+  if (shift && section(shift)) {
     centre.append(el("div", { class: "layers" },
       el("button", { class: name === base ? "current" : "", onclick: () => { view = { kind: "section", name: base }; selected = null; render(); } }, "Base"),
       el("button", { class: name === shift ? "current" : "", onclick: () => { view = { kind: "section", name: shift }; selected = null; render(); } }, "Shift held"),
     ));
   }
   const notes = [];
-  if (s.fallback) notes.push(`Falls back to ${s.fallback}: its buttons show dashed here, unless one of this section's own sits on the pad.`);
-  if (s.left_split) notes.push("Only column 1 reaches BleakLoop in Linnstrument Mode.");
+  if (s.usable.length <= 8) notes.push("Only column 1 reaches BleakLoop in Linnstrument Mode.");
+  notes.push("A section shows exactly its own buttons. One whose function can't run here is drawn dark: hover it for why.");
   notes.push("Drag a button to a free pad to move it, or onto another button to swap them. Click a pad to edit it.");
   centre.append(el("p", { class: "note", text: notes.join(" ") }));
 
@@ -357,18 +361,19 @@ function renderSection() {
       const pad = [c, p];
       const st = padState(name, pad);
       const classes = ["pad", st.kind];
-      if (st.entry && st.entry.source === "user" && !st.entry.inherited && st.kind === "button") classes.push("user");
+      if (st.entry && st.entry.source === "user" && st.kind === "button") classes.push("user");
+      const why = st.kind === "button" ? darkWhy(name, st.entry.fn) : undefined;
+      if (why) classes.push("dark");
       if (selected === pk(pad)) classes.push("selected");
       let content = [];
       let title = st.why || "";
-      if (st.kind === "button" || st.kind === "inherited") {
+      if (st.kind === "button") {
         content = [entryLabel(st.entry)];
-        if (st.kind === "inherited") content.push(el("small", { text: "from " + st.entry.section }));
-        title = `${st.entry.key}.${st.entry.name}: ${st.entry.fn}` + (st.entry.value !== undefined ? ` ${JSON.stringify(st.entry.value)}` : "");
+        title = `${st.entry.key}.${st.entry.name}: ${st.entry.fn}` + (st.entry.value !== undefined ? ` ${JSON.stringify(st.entry.value)}` : "") + (why ? ` (dark here: ${why})` : "");
       } else if (st.kind === "other") {
         content = [el("small", { text: entryLabel(st.entry) })];
       }
-      const cell = el("div", { class: classes.join(" "), title, onclick: () => { selected = pk(pad); render(); } }, ...content);
+      const cell = el("div", { class: classes.join(" "), title, onclick: () => { selected = pk(pad); placing = null; render(); } }, ...content);
       if (st.kind === "button") {
         cell.draggable = true;
         cell.addEventListener("dragstart", (ev) => { ev.dataTransfer.setData("text/plain", st.entry.name); ev.dataTransfer.effectAllowed = "move"; });
@@ -393,7 +398,7 @@ function renderSection() {
   centre.append(el("div", { class: "legend" },
     el("span", { style: "--swatch: var(--button)", text: "This section's button" }),
     el("span", { style: "--swatch: var(--user)", text: "Changed by you" }),
-    el("span", { style: "--swatch: var(--inherited)", text: "From the fallback" }),
+    el("span", { style: "--swatch: var(--dark)", text: "Dark here: its function can't run in this section" }),
     el("span", { style: "--swatch: var(--other)", text: "Another section in the same layer" }),
     el("span", { style: "--swatch: var(--locked)", text: "Fixed region" }),
   ));
@@ -425,12 +430,9 @@ function renderPadPanel() {
     side.append(el("p", { class: "note", text: st.why }));
     return;
   }
-  if (st.kind === "free" || st.kind === "inherited") {
-    if (st.kind === "inherited") {
-      side.append(el("p", { class: "note", text: `${fnLabel(st.entry.fn)} comes from ${st.entry.section}; edit it there, or put one of this section's own buttons here over it.` }));
-    }
+  if (st.kind === "free") {
     const choices = s.functions.filter((fn) => !isFixed(fn));
-    const select = el("select", {}, choices.map((fn) => el("option", { value: fn, text: `${fnLabel(fn)} (${fn})` })));
+    const select = el("select", {}, choices.map((fn) => fnChoice(name, fn, false)));
     side.append(el("label", { text: "Add a button running" }), select,
       el("div", { class: "actions" }, el("button", { class: "primary", onclick: () => { addButton(name, pad, select.value); changed(); } }, "Add button")));
     return;
@@ -441,9 +443,10 @@ function renderPadPanel() {
 
   const grouped = e.value !== undefined;
   const fnSelect = el("select", { disabled: grouped }, s.functions.filter((fn) => !isFixed(fn) && !isOpen(fn) || fn === e.fn)
-    .map((fn) => el("option", { value: fn, selected: fn === e.fn, text: `${fnLabel(fn)} (${fn})` })));
+    .map((fn) => fnChoice(name, fn, fn === e.fn)));
   fnSelect.addEventListener("change", () => { setButton(e, "does", fnSelect.value); changed(); });
   side.append(el("label", { text: "Function" }), fnSelect);
+  if (darkWhy(name, e.fn)) side.append(el("p", { class: "note", text: `Dark here: ${darkWhy(name, e.fn)}.` }));
   if (grouped) side.append(el("p", { class: "note", text: isFixed(e.fn) ? "This group's buttons can move and be relabelled, but not be added, removed or change value." : "To run another function, remove this button and add a new one." }));
 
   const label = el("input", { type: "text", value: e.label ?? "", placeholder: fnLabel(e.fn) });
@@ -457,10 +460,11 @@ function renderPadPanel() {
   side.append(labelRow, label);
 
   if (isOpen(e.fn)) {
-    if (e.fn === "tempo") {
+    if (e.fn !== "window") {
       const input = el("input", { type: "number", step: 1, value: e.value });
       input.addEventListener("change", () => { setButton(e, "value", parseInt(input.value, 10)); changed(); });
-      side.append(el("label", { text: "BPM step (not 0)" }), input);
+      const unit = { tempo: "BPM", tracks: "Track", devices: "Device" }[e.fn];
+      side.append(el("label", { text: `${unit} step (not 0)` }), input);
     } else {
       const a = el("input", { type: "number", step: 1, value: e.value[0] });
       const b = el("input", { type: "number", step: 1, value: e.value[1] });
@@ -470,11 +474,68 @@ function renderPadPanel() {
     }
   }
 
+  renderOptions(side, e);
+
   const actions = el("div", { class: "actions" });
   if (!isFixed(e.fn)) actions.append(el("button", { class: "danger", onclick: () => { removeButton(e); selected = null; changed(); } }, "Remove"));
+  if (!isFixed(e.fn)) actions.append(el("button", { onclick: () => { placing = placing ? null : pk(e.pad); render(); } }, "Place in other views too…"));
   if (e.source === "user") actions.append(el("button", { onclick: () => { revertButton(e); changed(); } }, e.added ? "Discard new button" : "Revert to shipped"));
   actions.append(el("button", { onclick: () => { view = { kind: "functions" }; selected = e.fn; render(); } }, "Edit messages"));
   side.append(actions);
+  if (placing === pk(e.pad)) renderPlaces(side, e);
+}
+
+function renderOptions(side, e) {
+  // A checkbox per option the function has: checked is on, the default unless the button sets it.
+  const declared = (L.functions[e.fn] || {}).options;
+  if (!declared) return;
+  side.append(el("label", { text: "Options" }));
+  for (const [option, spec] of Object.entries(declared)) {
+    const on = (e.options || {})[option] ?? spec.default;
+    const box = el("input", { type: "checkbox", checked: on });
+    box.addEventListener("change", () => {
+      const options = { ...(e.options || {}), [option]: box.checked };
+      // Only what differs from the defaults is written.
+      for (const [k, v] of Object.entries(options)) if (v === declared[k].default) delete options[k];
+      setButton(e, "options", Object.keys(options).length ? options : undefined);
+      changed();
+    });
+    side.append(el("label", { class: "check", title: spec.note || undefined }, box, spec.label));
+  }
+}
+
+function places(e) {
+  // The other sections where this pad reaches BleakLoop and is free in every layer they share.
+  return L.sections.filter((s) => s.name !== e.section && padState(s.name, e.pad).kind === "free");
+}
+
+function renderPlaces(side, e) {
+  const box = el("div", { class: "places" });
+  const found = places(e);
+  if (!found.length) {
+    box.append(el("p", { class: "note", text: "No other section has this pad free." }));
+    side.append(box);
+    return;
+  }
+  box.append(el("p", { class: "note", text: "Add this button, with its value, label and options, on the same pad in:" }));
+  const picks = found.map((s) => {
+    const why = darkWhy(s.name, e.fn);
+    const check = el("input", { type: "checkbox" });
+    box.append(el("label", { class: "check", title: why }, check, s.name + (why ? " (dark there)" : "")));
+    return [s, check];
+  });
+  box.append(el("div", { class: "actions" }, el("button", { class: "primary", onclick: () => {
+    const chosen = picks.filter(([, check]) => check.checked).map(([s]) => s);
+    for (const s of chosen) {
+      const id = addButton(s.name, e.pad, e.fn);
+      const item = overlay[keyOf(s.name)][id];
+      for (const field of ["value", "label", "options"]) if (e[field] !== undefined) item[field] = clone(e[field]);
+    }
+    placing = null;
+    changed();
+    if (chosen.length) flash(`Placed in ${chosen.map((s) => s.name).join(", ")}`, false);
+  } }, "Add")));
+  side.append(box);
 }
 
 function chips(names) {

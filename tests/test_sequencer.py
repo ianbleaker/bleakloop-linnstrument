@@ -323,7 +323,8 @@ def test_chord_does_nothing(key):
 def test_device_clip_layer_steps_tracks_and_devices():
     held, actions = handle(ENTERED, layout.NAVIGATION.device_clip)
     assert held.device_clip and actions == [ShowMessage("Device/Clip: tracks and devices")]
-    assert handle(held, TRACK_PREV) == (held, [StepTrack(-1)])
+    # Sequencer Mode moves the arm itself: the step never arms.
+    assert handle(held, TRACK_PREV) == (held, [StepTrack(-1, arm=False)])
     assert handle(held, DEVICE_NEXT) == (held, [StepDevice(1)])
     # Not Seq: on Device/Clip's layer Seq's pad is Device-.
     assert handle(held, layout.NAVIGATION.seq) == (held, [StepDevice(-1)])

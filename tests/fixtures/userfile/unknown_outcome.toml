@@ -1,2 +1,4 @@
+format = 2
+
 [functions.metronome.outcomes]
 maybe = "Metronome: maybe"

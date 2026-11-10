@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from . import controls, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
+from . import dispatch, faders, fx, layout, mixer, linnstrument_mode, sequencer, session
 from .model import BindFaderRow, PadPress, ParameterBound, RacksRead, ScenesChanged
 from .modes import Mode
 
@@ -13,7 +13,7 @@ def handle(state, event, snapshot):
     if before.bind_undo and isinstance(event, PadPress) and event.pressed:
         # Any other press ends the Undo pad's bind window: Shift, the Undo pad and a bind's own
         # presses keep it.
-        normal = controls.at(controls.sections(before), (event.column, event.pad))
+        normal = dispatch.button_at(before, (event.column, event.pad))
         keeps = (
             (normal is not None and normal.function == "shift")
             or state.bind_undo != before.bind_undo
@@ -45,7 +45,7 @@ def _handle(state, event, snapshot):
         state.device_clip
         and isinstance(event, PadPress)
         and event.pressed
-        and (event.column, event.pad) not in controls.pads(state, "device_clip")
+        and (event.column, event.pad) not in dispatch.held_pads(state, "device_clip")
     ):
         # Any other press during a Device/Clip hold makes it a hold, not a tap.
         state = replace(state, device_clip_used=True)

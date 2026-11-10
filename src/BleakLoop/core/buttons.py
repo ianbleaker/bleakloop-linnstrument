@@ -5,8 +5,8 @@ import tomllib
 from pathlib import Path
 from typing import NamedTuple
 
-from . import userfile
-from .catalogue import LINNSTRUMENT, MESSAGE_ONLY, MODES, SEQUENCER, SESSION
+from . import userfile, views
+from .catalogue import MESSAGE_ONLY, OPTIONS, REQUIREMENTS, runs_in
 from .model import ShowMessage
 
 PATH = Path(__file__).parent.parent / "buttons.toml"
@@ -23,8 +23,9 @@ def user_path(script):
 
 USER_PATH = user_path(Path(__file__).parent.parent)
 
-# The manual's section keys (tools/docs/manual/pads.py SECTIONS), plus the held-modifier
-# sections that have combos but no manual section of their own.
+# The manual's section keys (tools/docs/manual/pads.py SECTIONS), plus those with no manual
+# section of their own: the held modifiers' combos and Linnstrument Mode's Device/Clip layer,
+# which ships empty.
 SECTIONS = frozenset(
     {
         "global",
@@ -48,6 +49,7 @@ SECTIONS = frozenset(
         "linnstrument",
         "linnstrument-shift",
         "linnstrument-scenes",
+        "linnstrument-device-clip",
         "sequencer-global",
         "sequencer-nav",
         "sequencer-global-shift",
@@ -65,64 +67,8 @@ SECTIONS = frozenset(
 )
 
 # The sections live together, by layer: no two of a layer's buttons may share a pad, and none
-# may sit on a fixed region of any of its sections. The first thirteen are the manual's maps
-# (tools/docs/manual/pads.py LAYERS, kept equal by a test); the rest have no map.
-LAYERS = {
-    "SESSION": ("global", "view", "navigation", "session"),
-    "SESSION_SHIFT": ("global-shift", "view-shift", "navigation-shift", "session-shift"),
-    "SPLIT": ("global", "view", "navigation", "split"),
-    "SPLIT_SNAPSHOTS": ("global", "view", "navigation", "split-snapshots"),
-    "MIXER": ("global", "view", "navigation", "mixer"),
-    "MIXER_SPLIT": ("global", "view", "navigation", "mixer-split"),
-    "MIXER_SHIFT": ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
-    "FX": ("global", "view", "navigation", "fx"),
-    "FX_SHIFT": ("global-shift", "view-shift", "navigation-shift", "fx-shift"),
-    "SEQUENCER": ("sequencer-global", "sequencer-nav", "sequencer"),
-    "SEQUENCER_SETTINGS": ("sequencer-global", "sequencer-nav", "sequencer-grid", "sequencer-settings"),
-    "SEQUENCER_SHIFT": ("sequencer-global-shift", "sequencer-nav-shift", "sequencer"),
-    "SEQUENCER_DRUMS": ("sequencer-global", "sequencer-nav", "sequencer"),
-    "SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "split-shift"),
-    "MIXER_SPLIT_SHIFT": ("global-shift", "view-shift", "navigation-shift", "mixer-split-shift"),
-    # Sequencer Mode's column 15 is live on both layers, beside its own columns.
-    "SEQUENCER_BUTTONS": ("sequencer-global", "sequencer-nav", "sequencer-grid", "sequencer"),
-    "SEQUENCER_SHIFT_BUTTONS": (
-        "sequencer-global-shift",
-        "sequencer-nav-shift",
-        "sequencer-grid",
-        "sequencer",
-    ),
-    "LINNSTRUMENT": ("linnstrument",),
-    "LINNSTRUMENT_SHIFT": ("linnstrument-shift",),
-    "LINNSTRUMENT_SCENES": ("linnstrument-scenes",),
-}
-
-# In Linnstrument Mode only the device's left split, column 1, reaches BleakLoop.
-LEFT_SPLIT_SECTIONS = ("linnstrument", "linnstrument-shift", "linnstrument-scenes")
-
-# A mode's section falls back to its base: the base's buttons it doesn't override on the same
-# pad still work there, if their function runs in that mode, and are dark otherwise.
-FALLBACK = {
-    "linnstrument": "global",
-    "linnstrument-shift": "global-shift",
-    "sequencer-global": "global",
-    "sequencer-global-shift": "global-shift",
-    "sequencer-nav": "navigation",
-    "sequencer-nav-shift": "navigation-shift",
-}
-
-
-def section_modes(section):
-    # The modes a section's buttons work in.
-    if section == "linnstrument-scenes":
-        return frozenset({LINNSTRUMENT, SEQUENCER})
-    if section.startswith("linnstrument"):
-        return frozenset({LINNSTRUMENT})
-    if section.startswith("sequencer"):
-        return frozenset({SEQUENCER})
-    if section == "device-clip":
-        return frozenset({SESSION, SEQUENCER})
-    return frozenset({SESSION})
-
+# may sit on a fixed region of any of its sections.
+LAYERS = views.layers()
 
 MAX_LABEL = 7
 
@@ -149,11 +95,16 @@ def _is_text(value):
     return isinstance(value, str)
 
 
+def _is_options(value):
+    return isinstance(value, dict) and all(isinstance(on, bool) for on in value.values())
+
+
 ENTRY_FIELDS = {
     "pad": _is_pad,
     "does": _is_text,
     "value": _is_value,
     "label": _is_text,
+    "options": _is_options,
 }
 
 FUNCTION_FIELDS = {
@@ -166,75 +117,47 @@ FUNCTION_FIELDS = {
     "refusals": _is_messages,
 }
 
-TOP_LEVEL = {"manual_format": str, "system": dict, "functions": dict}
+TOP_LEVEL = {"manual_format": str, "system": dict, "functions": dict, "format": int}
 
 
 class Section:
     """One section's buttons: each by name as its (column, pad), each group by its function
-    as {(column, pad): value}. Mutable, so a test or a mockup can move one button. A name the
-    section doesn't have comes from its fallback, unless overridden there or unable to run."""
+    as {(column, pad): value}. Mutable, so a test or a mockup can move one button."""
 
-    def __init__(self, name, buttons, does, base=None):
+    def __init__(self, name, buttons, does, options=None):
         self.__dict__.update(buttons)
         self.__dict__["_name"] = name
         self.__dict__["_does"] = does
-        self.__dict__["_base"] = base
-        self.__dict__["_modes"] = section_modes(name)
-        self.__dict__["_built"] = frozenset(buttons)
+        self.__dict__["_names"] = list(buttons)
+        self.__dict__["_options"] = dict(options or {})  # (column, pad) -> the button's options
 
-    def _refill(self, buttons, does):
-        # A reload: new buttons in the same object, so whatever holds it (a fallback, a module
-        # attribute) sees them. Name, fallback and modes stay.
-        for key in [key for key in self.__dict__ if not key.startswith("_")]:
-            del self.__dict__[key]
+    def _refill(self, buttons, does, options=None):
+        # A reload: new buttons in the same object, so whatever holds it (a module attribute)
+        # sees them. The name stays.
+        for key in self._names:
+            self.__dict__.pop(key, None)
         self.__dict__.update(buttons)
         self.__dict__["_does"] = dict(does)
-        self.__dict__["_built"] = frozenset(buttons)
-
-    def __getattr__(self, attr):
-        base = self.__dict__.get("_base")
-        if attr.startswith("_") or base is None:
-            raise AttributeError(attr)
-        value = getattr(base, attr)
-        if not MODES[base._does[attr]] & self._modes:
-            raise AttributeError(f"{attr} doesn't run in {self._name}")
-        mine = self._own_pads()
-        if isinstance(value, dict):
-            return {key: step for key, step in value.items() if key not in mine}
-        if value in mine:
-            raise AttributeError(f"{attr} is overridden in {self._name}")
-        return value
+        self.__dict__["_names"] = list(buttons)
+        self.__dict__["_options"] = dict(options or {})
 
     def __setattr__(self, attr, value):
-        # Moving a fallback's button here overrides it; moving it back to the fallback's own
-        # pad drops the override, so the section follows its fallback again.
-        base, built = self._base, self._built
-        if base is not None and attr not in built and attr in base._does:
-            if value == getattr(base, attr, None):
-                self.__dict__.pop(attr, None)
-                return
-            self._does[attr] = base._does[attr]
         self._does.setdefault(attr, attr)
         self.__dict__[attr] = value
+        if attr not in self._names:
+            self._names.append(attr)
+
+    def __delattr__(self, attr):
+        object.__delattr__(self, attr)
+        if attr in self._names:
+            self._names.remove(attr)
 
     def _own(self):
-        return {key: value for key, value in self.__dict__.items() if not key.startswith("_")}
-
-    def _own_pads(self):
-        return {key for _, _, key, _ in _expand(self._own(), self._does)}
+        return {key: self.__dict__[key] for key in self._names}
 
     def buttons(self):
-        # A Button for every button live in this section.
-        mine = list(_expand(self._own(), self._does))
-        taken = {key for _, _, key, _ in mine}
-        inherited = []
-        if self._base is not None:
-            inherited = [
-                button
-                for button in self._base.buttons()
-                if button.key not in taken and MODES[button.function] & self._modes
-            ]
-        return mine + inherited
+        # A Button for every button in this section.
+        return [button._replace(options=self._options.get(button.key)) for button in _expand(self._own(), self._does)]
 
     def at(self, key):
         # The button live on a pad, or None.
@@ -248,6 +171,7 @@ class Button(NamedTuple):
     function: str
     key: tuple  # (column, pad)
     value: object  # the step value, or None
+    options: dict | None = None  # the options it sets, over its function's defaults
 
 
 def _expand(own, does):
@@ -280,12 +204,10 @@ class Registry:
 
     def label(self, name, section, value=None):
         # A pad's label: its own button's, for a group's pad, else its function's.
-        while section is not None:
-            for id, item in self.items.items():
-                if item["section"] == section and _does(id, item) == name and "label" in item:
-                    if value is None or _freeze(item.get("value")) == value:
-                        return item["label"]
-            section = FALLBACK.get(section)
+        for id, item in self.items.items():
+            if item["section"] == section and _does(id, item) == name and "label" in item:
+                if value is None or _freeze(item.get("value")) == value:
+                    return item["label"]
         return self.function(name).get("label", name)
 
     def manual(self, name, section, label):
@@ -313,12 +235,14 @@ class Registry:
     def system(self, key, /, **values):
         return _format(self.data["system"][key], values)[0]
 
-    def section(self, name, base=None):
+    def section(self, name):
         prefix = name.replace("-", "_")
-        buttons, does = {}, {}
+        buttons, does, options = {}, {}, {}
         for id, item in self.items.items():
             if item["section"] != name:
                 continue
+            if "options" in item:
+                options[tuple(item["pad"])] = dict(item["options"])
             short = id[len(prefix) + 1 :]
             function = _does(id, item)
             if "value" in item:
@@ -328,7 +252,7 @@ class Registry:
             else:
                 buttons[short] = tuple(item["pad"])
                 does[short] = function
-        return Section(name, buttons, does, base)
+        return Section(name, buttons, does, options)
 
     def group(self, section, function):
         return {
@@ -372,16 +296,13 @@ def _walk(table):
 
 
 def _validate(data, items):
-    # Imported here: layout reads its positions from this module.
-    from . import layout
-
     for key, kind in TOP_LEVEL.items():
         if key in data and not isinstance(data[key], kind):
             raise ValueError(f"{key}: wrong type")
     if not _is_messages(data.get("system", {})):
         raise ValueError("system: every message must be a string")
     for name, function in data.get("functions", {}).items():
-        if name not in MODES and name not in MESSAGE_ONLY:
+        if name not in REQUIREMENTS and name not in MESSAGE_ONLY:
             raise ValueError(f"functions.{name}: no such function")
         if not isinstance(function, dict):
             raise ValueError(f"functions.{name}: not a table")
@@ -396,7 +317,7 @@ def _validate(data, items):
             if section not in SECTIONS:
                 raise ValueError(f"functions.{name}.manual_in: unknown section {section!r}")
     seen = {}
-    regions = _regions()
+    regions = views.REGIONS
     for id, item in items.items():
         section = item["section"]
         for field, value in item.items():
@@ -409,17 +330,18 @@ def _validate(data, items):
         if "pad" not in item:
             raise ValueError(f"{id}: no pad")
         function = _does(id, item)
-        if function not in MODES:
+        if function not in REQUIREMENTS:
             raise ValueError(f"{id}: no such function {function!r}")
-        if not MODES[function] & section_modes(section):
-            modes = ", ".join(sorted(MODES[function]))
-            raise ValueError(f"{id}: {function} doesn't run in {section}, only in {modes}")
         if len(item.get("label", "")) > MAX_LABEL:
             raise ValueError(f"{id}: label longer than {MAX_LABEL} characters")
+        for option in item.get("options", {}):
+            if option not in OPTIONS.get(function, {}):
+                names = ", ".join(sorted(OPTIONS.get(function, {}))) or "none"
+                raise ValueError(f"{id}: {function} has no option {option!r}; its options: {names}")
         column, pad = item["pad"]
-        if column not in range(1, layout.COLUMNS) or pad not in range(1, layout.ROWS + 1):
+        if column not in views.COLUMNS or pad not in views.ROWS:
             raise ValueError(f"{id}: pad {item['pad']} is off the surface")
-        if section in LEFT_SPLIT_SECTIONS and column != layout.GLOBAL_COLUMN:
+        if column not in views.columns(section):
             raise ValueError(f"{id}: in Linnstrument Mode only column 1 reaches BleakLoop")
         if (section, column, pad) in seen:
             raise ValueError(f"{id}: pad {item['pad']} is taken by {seen[section, column, pad]}")
@@ -431,19 +353,8 @@ def _validate(data, items):
 
 
 def _live(items, section):
-    # (id, (column, pad)) for each button live in a section, its fallback's included.
-    own = [(id, tuple(item["pad"])) for id, item in items.items() if item["section"] == section]
-    taken = {key for _, key in own}
-    base = FALLBACK.get(section)
-    if base is None:
-        return own
-    modes = section_modes(section)
-    inherited = [
-        (id, key)
-        for id, key in _live(items, base)
-        if key not in taken and MODES[_does(id, items[id])] & modes
-    ]
-    return own + inherited
+    # (id, (column, pad)) for each button in a section.
+    return [(id, tuple(item["pad"])) for id, item in items.items() if item["section"] == section]
 
 
 def _check_layers(items, regions):
@@ -461,63 +372,53 @@ def _check_layers(items, regions):
                         raise ValueError(f"{id}: pad {list(key)} is in a fixed region of the {layer} layer")
 
 
-def _regions():
-    # The fixed regions (clip grid, scene pads, faders, steps) live in each section: no button
-    # may sit on them. Imported here: layout reads its positions from this module.
-    from . import layout
-
-    every = range(1, layout.ROWS + 1)
-    scenes = range(1, layout.WINDOW_SCENES + 1)
-    grid = ((layout.GRID_COLUMNS, every),)
-    split_tracks = range(layout.GRID_COLUMNS[0], layout.GRID_COLUMNS[0] + layout.SPLIT_TRACKS)
-    split = ((split_tracks, every), (layout.SPLIT_FADER_COLUMNS, every))
-    steps = ((layout.SEQ_STEP_COLUMNS, every),)
-    sequencer = (*steps, (layout.SEQ_NOTE_COLUMNS, every))
-    return {
-        "view": ((range(layout.SCENE_COLUMN, layout.SCENE_COLUMN + 1), scenes),),
-        "view-shift": ((range(layout.SCENE_COLUMN, layout.SCENE_COLUMN + 1), scenes),),
-        "session": grid,
-        "session-shift": grid,
-        "split": split,
-        "split-shift": ((split_tracks, every),),
-        "split-snapshots": ((split_tracks, every),),
-        "mixer": grid,
-        "mixer-shift": grid,
-        "mixer-split": split,
-        "mixer-split-shift": ((split_tracks, every),),
-        "fx": ((layout.FX_FADER_COLUMNS, every),),
-        "linnstrument-scenes": ((range(layout.GLOBAL_COLUMN, layout.GLOBAL_COLUMN + 1), scenes),),
-        "sequencer-grid": steps,
-        "sequencer": sequencer,
-        "sequencer-functions": sequencer,
-        "sequencer-settings": steps,
-    }
-
-
 def _read(path):
     with open(path, "rb") as file:
         return tomllib.load(file)
 
 
-def load(path, user_path=None):
-    # The shipped file, with the user's file over it when there is one.
+def load(path, user_path=None, write=False):
+    # The shipped file, with the user's file over it when there is one. A user file written
+    # for format 1 is converted; with write, the converted file replaces it on disk, the
+    # original kept beside it as buttons.toml.v1.bak.
     data = _read(path)
     overlay, editor = {}, dict(userfile.EDITOR)
     if user_path is not None and Path(user_path).exists():
         try:
-            try:
-                overlay = _read(user_path)
-            except OSError as error:
-                raise ValueError(f"couldn't read it: {error.strerror}") from None
-            data, editor = userfile.merge(data, overlay, str(user_path))
+            overlay = _read(user_path)
+        except OSError as error:
+            raise ValueError(f"{user_path}: couldn't read it: {error.strerror}") from None
+        except ValueError as error:  # TOML syntax
+            raise ValueError(f"{user_path}: {error}") from None
+        # Both name the file in their own errors.
+        converted = userfile.convert_v1(data, _read(V1_PATH), overlay, str(user_path))
+        data, editor = userfile.merge(data, converted or overlay, str(user_path))
+        try:
             registry = Registry(data)
         except ValueError as error:
-            text = str(error)
-            raise ValueError(text if text.startswith(str(user_path)) else f"{user_path}: {text}") from None
+            raise ValueError(f"{user_path}: {error}") from None
+        if converted is not None:
+            if write:
+                _write_converted(user_path, converted)
+            overlay = converted
     else:
         registry = Registry(data)
     registry.overlay, registry.editor = overlay, editor
     return registry
+
+
+V1_PATH = Path(__file__).parent / "buttons_v1.toml"
+
+
+def _write_converted(user_path, converted):
+    # The original first: a failed write leaves it in place.
+    user_path = Path(user_path)
+    backup = user_path.with_name(user_path.name + ".v1.bak")
+    try:
+        backup.write_bytes(user_path.read_bytes())
+        userfile.write_atomic(user_path, userfile.to_toml(converted))
+    except OSError as error:
+        raise ValueError(f"{user_path}: couldn't write it converted from format 1: {error.strerror}") from None
 
 
 # Loaded on first use: layout's fixed regions must exist before the registry validates.
@@ -530,7 +431,7 @@ def _get():
     global _registry, user_error
     if _registry is None:
         try:
-            _registry = load(PATH, USER_PATH)
+            _registry = load(PATH, USER_PATH, write=True)
         except ValueError as error:
             user_error = str(error)
             _registry = load(PATH)
@@ -555,7 +456,7 @@ def reload(path=None, user_path=None):
     # Loads the files again and refills layout's sections in place. A file that fails its
     # checks raises and leaves the current layout as it was.
     global _registry, user_error
-    registry = load(path or PATH, user_path or USER_PATH)
+    registry = load(path or PATH, user_path or USER_PATH, write=True)
     _registry, user_error = registry, None
     from . import layout
 
@@ -572,19 +473,19 @@ def _pads(regions):
 
 
 def describe(registry=None):
-    """The layout as plain data, for the editor: each live section's buttons, where each comes
-    from and its fixed regions, every function's messages, the system messages and the user's
-    changes."""
+    """The layout as plain data, for the editor: each section's buttons, whether each is
+    shipped or the user's, its fixed regions and usable pads, why a function would be dark in
+    it, every function's messages and options, the system messages and the user's changes."""
     from . import layout
 
     registry = registry or _get()
     overlay = getattr(registry, "overlay", {})
-    regions = _regions()
+    regions = views.REGIONS
     sections = []
     for live in layout.SECTIONS:
         name = live._name
         key = name.replace("-", "_")
-        modes = section_modes(name)
+        modes = views.modes(name)
         own = []
         for id, item in registry.items.items():
             if item["section"] != name:
@@ -602,32 +503,19 @@ def describe(registry=None):
                 entry["own_label"] = item["label"]
             if "value" in item:
                 entry["value"] = item["value"]
+            if "options" in item:
+                entry["options"] = dict(item["options"])
             own.append(entry)
-        taken = {tuple(entry["pad"]) for entry in own}
-        inherited = []
-        if name in FALLBACK:
-            for id, pad in _live(registry.items, FALLBACK[name]):
-                item = registry.items[id]
-                if pad not in taken and MODES[_does(id, item)] & modes:
-                    entry = {
-                        "id": id,
-                        "function": _does(id, item),
-                        "pad": list(pad),
-                        "label": registry.label(_does(id, item), item["section"], _freeze(item.get("value"))),
-                        "source": "inherited",
-                        "from": item["section"],
-                    }
-                    if "value" in item:
-                        entry["value"] = item["value"]
-                    inherited.append(entry)
         sections.append(
             {
                 "name": name,
                 "key": key,
-                "modes": sorted(modes),
-                "fallback": FALLBACK.get(name),
-                "left_split": name in LEFT_SPLIT_SECTIONS,
-                "entries": own + inherited,
+                "modes": sorted(mode.lower() for mode in modes),
+                # The section Shift's layer puts in its place, or None.
+                "shift": views.shift_section(name),
+                "entries": own,
+                # The pads that reach BleakLoop in every view showing it.
+                "usable": [[column, pad] for column in sorted(views.columns(name)) for pad in views.ROWS],
                 "regions": _pads(regions.get(name, ())),
                 # Fixed or taken in a layer this section shares: a button can't go there.
                 "locked": sorted(
@@ -644,14 +532,25 @@ def describe(registry=None):
                     for id, pad in _live(registry.items, other)
                     if registry.items[id]["section"] == other
                 ],
-                "functions": sorted(function for function, runs in MODES.items() if runs & modes),
+                "functions": sorted(REQUIREMENTS),
+                # Each function no view showing it can run, with why: placed there, it's dark.
+                "unavailable": {
+                    function: registry.system(f"unavailable_{REQUIREMENTS[function]}")
+                    for function in sorted(REQUIREMENTS)
+                    if not runs_in(function, modes)
+                },
             }
         )
     functions = {}
-    for name in sorted(set(MODES) | set(registry.functions)):
+    for name in sorted(set(REQUIREMENTS) | set(registry.functions)):
         item = registry.function(name)
         described = {key: item[key] for key in userfile.FUNCTION_FIELDS if key in item}
         described.setdefault("label", name)
+        if name in OPTIONS:
+            described["options"] = {
+                option: {"default": default, "label": label, "note": note}
+                for option, (default, label, note) in OPTIONS[name].items()
+            }
         functions[name] = described
     system = dict(registry.data.get("system", {}))
     return {
@@ -731,8 +630,8 @@ def group(section, function):
     return _get().group(section, function)
 
 
-def section(name, base=None):
-    return _get().section(name, base)
+def section(name):
+    return _get().section(name)
 
 
 def say(name, outcome=None, /, **values):

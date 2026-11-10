@@ -43,8 +43,14 @@ flowchart LR
 | Geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping | `core/layout.py` |
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
 | Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers | `core/modes.py` |
-| Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights | `core/controls.py` |
-| Clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table | `core/session.py` |
+| The button registry from `buttons.toml` and the user's file: sections, labels, messages, checks, the editor's description | `core/buttons.py` |
+| The user's buttons file: merging it over the shipped file, its rules, its format 1 conversion and its writer | `core/userfile.py` |
+| Every function and its requirement and options (data only) | `core/catalogue.py` |
+| The functions by name: each one's press, light and hold | `core/functions.py` |
+| The views: each mode's button sections, its hold layers and what they replace, its fixed regions | `core/views.py` |
+| The current view's buttons: holds and their precedence, layers, button lookup and lights | `core/dispatch.py` |
+| Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps, Device/Clip and scene lights | `core/controls.py` |
+| Clip slots, copy and delete rules, mute and select rows, the mode pads and the Seq, Copy, Delete and Stop holds | `core/session.py` |
 | The Global column in every mode: its controls, Shift, and Linnstrument Mode's scene page | `core/global_column.py` |
 | Mixer toggle, coarse steps, bands, smoothing | `core/mixer.py` |
 | FX Mode: snapshot storage format, rack identity, store, recall, morph timing and tick, scene snapshots and their launch and reordering, FX lights | `core/fx.py` |
@@ -54,6 +60,7 @@ flowchart LR
 | Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
 | Tuned numbers: every value in section 8, by name | `core/values.py` |
 | `handle()` and `render()`, composing the core modules | `core/engine.py` |
+| The button editor's local HTTP server and page | `editor/` |
 | The generated manual pad maps and architecture figures | `tools/docs/` |
 
 Read sections 2–4 for structure, 5–7 for device and Live details, and 8 for numbers.
@@ -144,8 +151,14 @@ src/BleakLoop/
     layout.py          geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers
-    controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps and scene lights
-    session.py         clip slots, copy and delete rules, mute and select rows, columns 15, 16, Shift layer table
+    buttons.py         the button registry from buttons.toml and the user's file: sections, labels, messages, checks
+    userfile.py        the user's buttons file: merge, rules, format 1 conversion, writer
+    catalogue.py       every function, its requirement and options (data only)
+    functions.py       the functions by name: press, light and hold
+    views.py           the views: each mode's button sections, its hold layers and what they replace, its fixed regions
+    dispatch.py        the current view's buttons: holds and their precedence, layers, button lookup and lights
+    controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps, Device/Clip and scene lights
+    session.py         clip slots, copy and delete rules, mute and select rows, the mode pads and the Seq, Copy, Delete and Stop holds
     global_column.py   the Global column in every mode: its controls, Shift, and Linnstrument Mode's scene page
     mixer.py           Mixer toggle, coarse steps, bands, smoothing
     fx.py              FX Mode: snapshot storage, rack identity, store, recall, morph timing and tick, scene snapshots, FX lights
@@ -155,6 +168,7 @@ src/BleakLoop/
     leds.py            device colours, track colour matching, tempo and fast blink
     values.py          every value in section 8, by name
     engine.py          handle() and render(), composing the modules above
+  editor/              the button editor: local HTTP server (server.py) and page (index.html)
 tests/                 pytest: the core, the docs generators and the layering
   test_manual.py       every lit pad in the manual's example Sets is labelled
   test_architecture.py core imports only core; adapters import no plumbing
@@ -199,6 +213,7 @@ flowchart TD
     core_buttons["buttons"]
     core_catalogue["catalogue"]
     core_controls["controls"]
+    core_dispatch["dispatch"]
     core_engine["engine"]
     core_faders["faders"]
     core_functions["functions"]
@@ -214,6 +229,7 @@ flowchart TD
     core_session["session"]
     core_userfile["userfile"]
     core_values["values"]
+    core_views["views"]
   end
   subgraph External
     Live["Live"]
@@ -224,6 +240,7 @@ flowchart TD
   core_buttons -.->|lazy| core_layout
   core_buttons --> core_model
   core_buttons --> core_userfile
+  core_buttons --> core_views
   core_controls --> core_buttons
   core_controls --> core_faders
   core_controls --> core_functions
@@ -232,7 +249,11 @@ flowchart TD
   core_controls --> core_model
   core_controls --> core_modes
   core_controls --> core_values
-  core_engine --> core_controls
+  core_dispatch --> core_functions
+  core_dispatch --> core_layout
+  core_dispatch --> core_leds
+  core_dispatch --> core_views
+  core_engine --> core_dispatch
   core_engine --> core_faders
   core_engine --> core_fx
   core_engine --> core_layout
@@ -249,7 +270,6 @@ flowchart TD
   core_faders --> core_values
   core_functions --> core_catalogue
   core_functions --> core_leds
-  core_functions --> core_modes
   core_fx --> core_buttons
   core_fx --> core_faders
   core_fx --> core_functions
@@ -260,8 +280,8 @@ flowchart TD
   core_fx --> core_modes
   core_fx --> core_values
   core_global_column --> core_buttons
-  core_global_column --> core_catalogue
   core_global_column --> core_controls
+  core_global_column --> core_dispatch
   core_global_column --> core_faders
   core_global_column --> core_functions
   core_global_column --> core_fx
@@ -271,6 +291,7 @@ flowchart TD
   core_global_column --> core_model
   core_global_column --> core_modes
   core_layout --> core_buttons
+  core_layout --> core_views
   core_leds --> core_values
   core_linnstrument_mode --> core_global_column
   core_linnstrument_mode --> core_layout
@@ -285,8 +306,8 @@ flowchart TD
   core_modes --> core_layout
   core_modes --> core_values
   core_sequencer --> core_buttons
-  core_sequencer --> core_catalogue
   core_sequencer --> core_controls
+  core_sequencer --> core_dispatch
   core_sequencer --> core_faders
   core_sequencer --> core_functions
   core_sequencer --> core_fx
@@ -298,18 +319,18 @@ flowchart TD
   core_sequencer --> core_modes
   core_sequencer --> core_values
   core_session --> core_buttons
-  core_session --> core_catalogue
   core_session --> core_controls
+  core_session --> core_dispatch
   core_session --> core_faders
   core_session --> core_functions
   core_session --> core_fx
-  core_session --> core_global_column
   core_session --> core_layout
   core_session --> core_leds
   core_session --> core_mixer
   core_session --> core_model
   core_session --> core_modes
   core_session --> core_sequencer
+  core_userfile --> core_catalogue
   device --> core_buttons
   device --> core_layout
   device --> core_leds

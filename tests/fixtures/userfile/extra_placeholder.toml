@@ -1,2 +1,4 @@
+format = 2
+
 [functions.tempo]
 message = "Tempo: {bpm} at {time}"

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from BleakLoop.core import buttons, layout
+from BleakLoop.core import buttons, catalogue, layout
 from BleakLoop.core.model import ShowMessage
 from tools.docs.manual import pads
 
@@ -30,13 +30,8 @@ def test_invalid_file_raises(path):
 
 
 def test_sections_are_the_manuals_plus_held_modifiers():
-    held = {"copy", "delete", "stop", "sequencer-copy", "sequencer-delete"}
+    held = {"copy", "delete", "stop", "sequencer-copy", "sequencer-delete", "linnstrument-device-clip"}
     assert buttons.SECTIONS == set(pads.SECTIONS) | held
-
-
-@pytest.mark.parametrize("layer", list(pads.LAYERS), ids=lambda layer: layer.name)
-def test_the_registry_checks_the_manuals_layers(layer):
-    assert buttons.LAYERS[layer.name] == pads.LAYERS[layer]
 
 
 def test_the_shipped_file_loads():
@@ -79,11 +74,52 @@ def test_check_command(capsys):
     assert "navigation.delete" in capsys.readouterr().err
 
 
-def test_a_fallback_that_cant_run_in_a_mode_is_dark_there():
-    registry = buttons.load(Path(__file__).parent / "fixtures" / "dark_fallback.toml")
-    session = registry.section("global")
-    linnstrument = registry.section("linnstrument", session)
-    assert session.at((1, 5))[1] == "fader_source"
-    assert linnstrument.at((1, 5)) is None
-    assert linnstrument.at((1, 6))[1] == "undo"
-    assert linnstrument.at((1, 7))[1] == "back"
+def test_a_function_whose_requirement_isnt_met_loads_dark_and_inert():
+    from BleakLoop.core import engine, functions  # noqa: F401  registers every function
+    from BleakLoop.core.modes import Mode, State
+
+    registry = buttons.load(Path(__file__).parent / "fixtures" / "unmet_requirement.toml")
+    button = registry.section("linnstrument").at((1, 5))
+    state = State(mode=Mode.LINNSTRUMENT)
+    assert button.function == "copy"
+    assert functions.get("copy", state) is None
+    assert functions.press(button, state, None) == (state, [])
+    assert functions.light(button, state, None) == functions.Light(functions.OFF)
+
+
+
+
+def _described(name):
+    return next(section for section in buttons.describe()["sections"] if section["name"] == name)
+
+
+def test_the_editor_lists_every_function_in_every_section_and_why_one_is_dark():
+    linnstrument = _described("linnstrument")
+    assert linnstrument["functions"] == sorted(catalogue.REQUIREMENTS)
+    assert linnstrument["unavailable"]["session"] == "Use Back to leave Linnstrument Mode"
+    assert linnstrument["unavailable"]["double"] == "Needs a sequencer clip"
+    assert "tracks" not in linnstrument["unavailable"]
+    assert "back" in _described("global")["unavailable"]
+    # The scene page shows in Linnstrument and Sequencer Mode: Back works in one of them.
+    assert "back" not in _described("linnstrument-scenes")["unavailable"]
+
+
+def test_the_editor_knows_each_sections_usable_pads():
+    assert _described("linnstrument-device-clip")["usable"] == [[1, pad] for pad in range(1, 9)]
+    assert len(_described("global")["usable"]) == 16 * 8
+
+
+def test_the_editor_gets_each_functions_options():
+    options = buttons.describe()["functions"]["tracks"]["options"]
+    assert options["arm"] == {
+        "default": True,
+        "label": "Arm the track",
+        "note": "Sequencer Mode always moves the arm to the selected track",
+    }
+    assert "options" not in buttons.describe()["functions"]["undo"]
+
+
+def test_the_editor_has_no_fallbacks():
+    for section in buttons.describe()["sections"]:
+        assert "fallback" not in section
+        assert all(entry["source"] in ("shipped", "user") for entry in section["entries"])

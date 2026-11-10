@@ -242,6 +242,59 @@ def test_step_track_stops_at_the_ends(selected, step):
     assert surface.shown == ["No more tracks"]
 
 
+def arm_song(selected):
+    # A and B can be armed, B is; G is a group, then a return and the master: none of those
+    # can be.
+    def track(name, armable, arm=False):
+        return SimpleNamespace(name=name, devices=[], can_be_armed=armable, arm=arm)
+
+    a, b, g = track("A", True), track("B", True, arm=True), track("G", False)
+    ret, master = track("Reverb", False), track("Master", False)
+    named = {t.name: t for t in (a, b, g, ret, master)}
+    return SimpleNamespace(
+        visible_tracks=[a, b, g],
+        tracks=[a, b, g],
+        return_tracks=[ret],
+        master_track=master,
+        view=SimpleNamespace(selected_track=named[selected], select_device=lambda device: None),
+    )
+
+
+def _arms(song):
+    return {t.name: t.arm for t in (*song.tracks, *song.return_tracks, song.master_track)}
+
+
+def test_a_track_step_arms_the_track_alone():
+    song = arm_song("B")
+    live_actions.apply(StepTrack(-1), song, Messages())
+    assert song.view.selected_track.name == "A"
+    assert _arms(song) == {"A": True, "B": False, "G": False, "Reverb": False, "Master": False}
+
+
+@pytest.mark.parametrize("selected, step, expected", [("B", 1, "G"), ("G", 1, "Reverb"), ("Reverb", 1, "Master")])
+def test_a_track_that_cant_be_armed_is_only_selected(selected, step, expected):
+    song = arm_song(selected)
+    live_actions.apply(StepTrack(step), song, Messages())
+    assert song.view.selected_track.name == expected
+    assert _arms(song)["B"] is True
+
+
+def test_a_track_step_with_arm_off_leaves_the_arms():
+    song = arm_song("B")
+    live_actions.apply(StepTrack(-1, arm=False), song, Messages())
+    assert song.view.selected_track.name == "A"
+    assert _arms(song)["A"] is False and _arms(song)["B"] is True
+
+
+def test_a_track_step_with_rack_off_leaves_the_blue_hand():
+    song = dev_song("A")
+    song.visible_tracks[1].devices = [rack_device("Keys", "InstrumentGroupDevice", mapped=True)]
+    chosen = []
+    song.view.select_device = chosen.append
+    live_actions.apply(StepTrack(1, rack=False), song, Messages())
+    assert song.view.selected_track.name == "B" and chosen == []
+
+
 def rack_device(name, class_name, mapped=False):
     return SimpleNamespace(name=name, class_name=class_name, has_macro_mappings=mapped)
 

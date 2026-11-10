@@ -242,14 +242,27 @@ def _step(items, current, step):
     return items[index] if 0 <= index < len(items) else None
 
 
-def _step_track(song, step):
+def _step_track(song, step, arm=True, rack=True):
+    # Select, then the blue hand, then the arm. A track that can't be armed (a return, the
+    # master, a group) is only selected: no arm changes.
     tracks = list(song.visible_tracks) + list(song.return_tracks) + [song.master_track]
     track = _step(tracks, song.view.selected_track, step)
     if track is None:
         return buttons.system("no_more_tracks")
     song.view.selected_track = track
-    _focus_rack(song, track)
+    if rack:
+        _focus_rack(song, track)
+    if arm and getattr(track, "can_be_armed", False):
+        _arm_exclusive(song, track)
     return buttons.system("track", track=track.name)
+
+
+def _arm_exclusive(song, target, arm=True):
+    # Every other armed track disarms, whatever Live's Exclusive Arm preference says.
+    for track in song.tracks:
+        if track != target and track.can_be_armed and track.arm:
+            track.arm = False
+    target.arm = arm
 
 
 # The racks a track change hands the blue hand to. A MIDI Effect Rack sits in front of the
@@ -344,11 +357,7 @@ def apply(action, song, surface):
         song.view.selected_track = track
         _focus_rack(song, track)
     elif isinstance(action, ArmExclusive):
-        target = song.visible_tracks[action.track]
-        for track in song.tracks:
-            if track != target and track.can_be_armed and track.arm:
-                track.arm = False
-        target.arm = action.arm
+        _arm_exclusive(song, song.visible_tracks[action.track], action.arm)
     elif isinstance(action, SetArm):
         song.visible_tracks[action.track].arm = action.arm
     elif isinstance(action, UnmuteAll):
@@ -463,7 +472,7 @@ def apply(action, song, surface):
             return None
         return _bind(action.slot, song, target[0])
     elif isinstance(action, StepTrack):
-        surface.show_message(_step_track(song, action.step))
+        surface.show_message(_step_track(song, action.step, action.arm, action.rack))
     elif isinstance(action, StepDevice):
         surface.show_message(_step_device(song, action.step))
     elif isinstance(action, SaveFxSnapshots):

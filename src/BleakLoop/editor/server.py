@@ -4,7 +4,6 @@ response goes out over the following ticks. Every response closes the connection
 
 import json
 import logging
-import os
 import shutil
 import socket
 import time
@@ -179,19 +178,8 @@ def _error(status, message):
     return _json(status, {"error": message})
 
 
-def write_atomic(path, text):
-    # A temporary file in the same folder, then a rename: a reader sees the old file or the
-    # new one, never half of one.
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    try:
-        with open(temporary, "w", encoding="utf-8") as file:
-            file.write(text)
-        os.replace(temporary, path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
+# The writer the core's user file conversion uses too.
+write_atomic = userfile.write_atomic
 
 
 class Editor:
@@ -242,7 +230,8 @@ class Editor:
             overlay = json.loads(body.decode("utf-8"))["overlay"]
             if not isinstance(overlay, dict):
                 raise ValueError("overlay: not an object")
-            overlay = userfile.prune(overlay)
+            # The editor writes the current format.
+            overlay = {**userfile.prune(overlay), "format": userfile.FORMAT}
             text = userfile.to_toml(overlay)
             if tomllib.loads(text) != overlay:
                 raise ValueError("the overlay doesn't survive being written as TOML")

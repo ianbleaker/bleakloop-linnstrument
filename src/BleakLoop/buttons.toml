@@ -7,19 +7,24 @@
 # repo: PYTHONPATH=src python3 -m tools.check_buttons
 #
 # [<section>.<name>] is a button. Fields:
-#   pad    [column, pad]; column 1 is the Global column, pad 1 the far row
-#   does   the function it runs (src/BleakLoop/core/catalogue.py); default: the button's name
-#   value  the function's setting for this pad, as a tempo step or a snapshot slot
-#   label  this pad's label on the manual's pad map, at most 7 characters, over the function's
+#   pad      [column, pad]; column 1 is the Global column, pad 1 the far row
+#   does     the function it runs (src/BleakLoop/core/catalogue.py); default: the button's name
+#   value    the function's setting for this pad: a tempo, track or device step, a window move
+#            or a snapshot slot
+#   label    this pad's label on the manual's pad map, at most 7 characters, over the function's
+#   options  on/off settings its function offers (catalogue.OPTIONS), each over its default, as
+#            options = { arm = false } on a Track-/+ button
 #
 # [functions.<name>] is a function, wherever its buttons sit: its label, at most 7
 # characters, and later its manual text and messages.
 #
-# Linnstrument and Sequencer Mode's sections fall back to the Session ones: a pad they don't
-# list does what it does in Session Mode, and is dark if that function can't run there.
-# Every button moves alone, Shift functions included. Fixed regions (clip grid, scene pads,
-# faders, steps, Mute/Select rows) aren't movable, and no two buttons live at once may share
-# a pad. In Linnstrument Mode only column 1 reaches BleakLoop, so its own sections stay there.
+# A section shows exactly the buttons listed in it: Linnstrument and Sequencer Mode list their
+# own. Any function may sit on any pad of any section; one whose requirement isn't met there
+# (catalogue.REQUIREMENTS: a mode switch in Linnstrument Mode, say) loads, but is dark and does
+# nothing, and the button editor shows why. Every button moves alone, Shift functions included.
+# Fixed regions (clip grid, scene pads, faders, steps, Mute/Select rows) aren't movable, and no
+# two buttons live at once may share a pad. In Linnstrument Mode only column 1 reaches
+# BleakLoop, so its own sections stay there.
 
 manual_format = "{label}."
 
@@ -66,7 +71,10 @@ pad = [1, 4]
 pad = [1, 6]
 
 
-# Linnstrument Mode's Global column: only what differs from Session Mode's. Column 1 only.
+# Linnstrument Mode's Global column. Column 1 only.
+
+[linnstrument.play_stop]
+pad = [1, 1]
 
 [linnstrument.record_clip]
 pad = [1, 2]
@@ -74,17 +82,38 @@ pad = [1, 2]
 [linnstrument.capture_midi]
 pad = [1, 3]
 
+[linnstrument.metronome]
+pad = [1, 4]
+
+[linnstrument.fixed_length]
+pad = [1, 5]
+
+[linnstrument.undo]
+pad = [1, 6]
+
 [linnstrument.back]
 pad = [1, 7]
 
+[linnstrument.shift]
+pad = [1, 8]
 
-# Shift held, in Linnstrument Mode: only what differs. Column 1 only.
+
+# Shift held, in Linnstrument Mode. Column 1 only.
 
 [linnstrument_shift.stop_track]
 pad = [1, 1]
 
 [linnstrument_shift.record]
 pad = [1, 2]
+
+[linnstrument_shift.quantize]
+pad = [1, 3]
+
+[linnstrument_shift.launch_quantization]
+pad = [1, 4]
+
+[linnstrument_shift.redo]
+pad = [1, 6]
 
 [linnstrument_shift.scene_page]
 pad = [1, 7]
@@ -97,7 +126,10 @@ pad = [1, 8]
 does = "close_scenes"
 
 
-# Sequencer Mode's Global column: only what differs from Session Mode's.
+# Sequencer Mode's Global column.
+
+[sequencer_global.play_stop]
+pad = [1, 1]
 
 [sequencer_global.record_clip]
 pad = [1, 2]
@@ -105,14 +137,38 @@ pad = [1, 2]
 [sequencer_global.capture_midi]
 pad = [1, 3]
 
+[sequencer_global.metronome]
+pad = [1, 4]
 
-# Shift held, in Sequencer Mode: only what differs.
+[sequencer_global.fixed_length]
+pad = [1, 5]
+
+[sequencer_global.undo]
+pad = [1, 6]
+
+[sequencer_global.linnstrument_mode]
+pad = [1, 7]
+
+[sequencer_global.shift]
+pad = [1, 8]
+
+
+# Shift held, in Sequencer Mode.
 
 [sequencer_global_shift.stop_track]
 pad = [1, 1]
 
 [sequencer_global_shift.record]
 pad = [1, 2]
+
+[sequencer_global_shift.quantize]
+pad = [1, 3]
+
+[sequencer_global_shift.launch_quantization]
+pad = [1, 4]
+
+[sequencer_global_shift.redo]
+pad = [1, 6]
 
 [sequencer_global_shift.scene_page]
 pad = [1, 7]
@@ -187,6 +243,72 @@ value = [-1, 0]
 label = "Left"
 
 
+# The Navigation column in Sequencer Mode.
+
+[sequencer_nav.session]
+pad = [16, 1]
+
+[sequencer_nav.mixer]
+pad = [16, 2]
+
+[sequencer_nav.fx]
+pad = [16, 3]
+
+[sequencer_nav.seq]
+pad = [16, 5]
+
+[sequencer_nav.delete]
+pad = [16, 6]
+
+[sequencer_nav.copy]
+pad = [16, 7]
+
+[sequencer_nav.device_clip]
+pad = [16, 8]
+
+
+# Shift held, in Sequencer Mode.
+
+[sequencer_nav_shift.tempo_up]
+pad = [16, 1]
+does = "tempo"
+value = 1
+label = "Tempo+"
+
+[sequencer_nav_shift.tempo_down]
+pad = [16, 2]
+does = "tempo"
+value = -1
+label = "Tempo-"
+
+[sequencer_nav_shift.fader_source]
+pad = [16, 3]
+
+[sequencer_nav_shift.window_up]
+pad = [16, 5]
+does = "window"
+value = [0, -1]
+label = "Up"
+
+[sequencer_nav_shift.window_down]
+pad = [16, 6]
+does = "window"
+value = [0, 1]
+label = "Down"
+
+[sequencer_nav_shift.window_right]
+pad = [16, 7]
+does = "window"
+value = [1, 0]
+label = "Right"
+
+[sequencer_nav_shift.window_left]
+pad = [16, 8]
+does = "window"
+value = [-1, 0]
+label = "Left"
+
+
 # Column 15 in Session, Mixer and FX Mode: pads 1-6 are the scenes.
 
 [view.unmute_all]
@@ -205,7 +327,8 @@ pad = [15, 7]
 pad = [15, 8]
 
 
-# Device/Clip held, in every mode but Linnstrument Mode: value is the track or device step.
+# Device/Clip held, in every mode but Linnstrument Mode, whose layer is linnstrument_device_clip
+# (empty as shipped): value is the track or device step.
 
 [device_clip.track_previous]
 pad = [16, 7]
@@ -560,6 +683,7 @@ pad = [13, 8]
 does = "pages"
 value = 16
 
+
 # Messages not tied to a button: the device setup, and the track and device names Device/Clip's
 # steps show.
 [system]
@@ -574,6 +698,14 @@ track = "{track}"
 no_more_tracks = "No more tracks"
 device = "{device}"
 no_more_devices = "No more devices"
+# Why a function is dark where it can't work, for the button editor: one per requirement
+# (src/BleakLoop/core/catalogue.py).
+unavailable_leaves_mode = "Use Back to leave Linnstrument Mode"
+unavailable_edits_surface = "Needs Session, Mixer, FX or Sequencer Mode"
+unavailable_clip_grid = "Needs Session, Mixer or FX Mode"
+unavailable_came_from = "Only Linnstrument Mode has a mode to go back to"
+unavailable_scene_page = "The scene page opens in Linnstrument and Sequencer Mode"
+unavailable_sequencer = "Needs a sequencer clip"
 
 
 # Functions: each one's label, at most 7 characters, its message, and its outcomes and
@@ -832,7 +964,7 @@ device = "Device view"
 clip = "Clip view"
 
 [functions.tracks]
-manual = "Select the previous or next track, through the returns and master, and give its first rack the blue hand."
+manual = "Select the previous or next track, through the returns and master, give its first rack the blue hand and arm it alone. A return or master is only selected."
 
 [functions.devices]
 manual = "Select the previous or next device on the selected track."

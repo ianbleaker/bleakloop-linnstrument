@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, replace
 
-from BleakLoop.core import buttons, layout
+from BleakLoop.core import buttons, layout, views
 
 from . import positions
 from .scenes import Layer
@@ -339,8 +339,8 @@ _SEQUENCER_GRID = (
     _one("View", "sequencer-grid", "view"),
 )
 
+# Beside the Steps and column 15 (sequencer-grid) in Sequencer Mode's map.
 _SEQUENCER = (
-    *_SEQUENCER_GRID,
     Block(
         "Notes",
         layout.SEQ_NOTE_COLUMNS,
@@ -395,6 +395,7 @@ SECTIONS = {
     # Listed, not drawn: Sequencer Mode's own pads, after its first map. Column 16's mode
     # pads are in the Navigation column's list.
     "sequencer-functions": (
+        *_SEQUENCER_GRID,
         *_SEQUENCER,
         SEQ_COPY,
         SEQ_DELETE,
@@ -418,45 +419,27 @@ SCENE_LIGHTS = {
     "clips": "if they hold clips",
 }
 
-# The sections the manual lists, each with the section holding its Shift layer.
-LISTS = {
-    "global": "global-shift",
-    "view": "view-shift",
-    "navigation": "navigation-shift",
-    "session": "session-shift",
-    "split": "split-shift",
-    "split-snapshots": "split-shift",
-    "mixer": "mixer-shift",
-    "mixer-split": "mixer-split-shift",
-    "fx": None,
-    "device-clip": None,
-    "linnstrument": "linnstrument-shift",
-    "linnstrument-scenes": None,
-    "sequencer-functions": None,
-    "sequencer-settings": None,
-}
+# The sections the manual lists, each with the section holding its Shift layer (core/views.py).
+_LISTED = (
+    "global",
+    "view",
+    "navigation",
+    "session",
+    "split",
+    "split-snapshots",
+    "mixer",
+    "mixer-split",
+    "fx",
+    "device-clip",
+    "linnstrument",
+    "linnstrument-scenes",
+    "sequencer-functions",
+    "sequencer-settings",
+)
+LISTS = {section: views.shift_section(section) for section in _LISTED}
 
-# The sections each map is drawn from.
-LAYERS = {
-    Layer.SESSION: ("global", "view", "navigation", "session"),
-    Layer.SESSION_SHIFT: ("global-shift", "view-shift", "navigation-shift", "session-shift"),
-    Layer.SPLIT: ("global", "view", "navigation", "split"),
-    Layer.SPLIT_SNAPSHOTS: ("global", "view", "navigation", "split-snapshots"),
-    Layer.MIXER: ("global", "view", "navigation", "mixer"),
-    Layer.MIXER_SPLIT: ("global", "view", "navigation", "mixer-split"),
-    Layer.MIXER_SHIFT: ("global-shift", "view-shift", "navigation-shift", "mixer-shift"),
-    Layer.FX: ("global", "view", "navigation", "fx"),
-    Layer.FX_SHIFT: ("global-shift", "view-shift", "navigation-shift", "fx-shift"),
-    Layer.SEQUENCER: ("sequencer-global", "sequencer-nav", "sequencer"),
-    Layer.SEQUENCER_SETTINGS: (
-        "sequencer-global",
-        "sequencer-nav",
-        "sequencer-grid",
-        "sequencer-settings",
-    ),
-    Layer.SEQUENCER_SHIFT: ("sequencer-global-shift", "sequencer-nav-shift", "sequencer"),
-    Layer.SEQUENCER_DRUMS: ("sequencer-global", "sequencer-nav", "sequencer"),
-}
+# The sections each map is drawn from: the views' (core/views.py).
+LAYERS = {Layer[name]: sections for name, sections in views.maps().items()}
 
 # Columns a map shows dimmed and unlabelled, per layer: none at present.
 DIMMED = {}
