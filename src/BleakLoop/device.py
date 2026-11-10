@@ -287,11 +287,40 @@ def fixed_steps():
     return _set_steps(FIXED_SETTINGS)
 
 
+def needed_reads(reads):
+    # The read numbers computed_settings needs, given the replies so far: the right split's
+    # per-note or per-row channels and a custom or Guitar Row Offset only once their mode is in.
+    numbers = [NRPN_ROW_OFFSET, NRPN_RIGHT_MIDI_MODE, NRPN_RIGHT_MAIN_CHANNEL]
+    offset = reads.get(NRPN_ROW_OFFSET)
+    if offset == ROW_OFFSET_CUSTOM:
+        numbers.append(NRPN_CUSTOM_ROW_OFFSET)
+    elif offset == ROW_OFFSET_GUITAR:
+        numbers += NRPN_GUITAR_TUNING
+    mode = reads.get(NRPN_RIGHT_MIDI_MODE)
+    if mode == MIDI_MODE_PER_NOTE:
+        numbers += NRPN_RIGHT_PER_NOTE
+    elif mode == MIDI_MODE_PER_ROW:
+        numbers.append(NRPN_RIGHT_PER_ROW_LOWEST)
+    return numbers
+
+
+def missing_reads(reads):
+    # The needed read numbers no reply has come in for.
+    return [number for number in needed_reads(reads) if number not in reads]
+
+
+def retry_steps(numbers):
+    return _query_steps(numbers)
+
+
 def computed_settings(reads):
     # (settings, 0-based channel, note -> pad, refusal), from the read replies.
     channel, changes = control_channel(reads)
     note_to_pad, octave, refusal = control_map(reads)
-    if right_split_channels(reads) is None:
+    if not reads:
+        # Not one reply: the device isn't answering, and only a replug brings it back.
+        note_to_pad, refusal = None, buttons.system("no_reply")
+    elif right_split_channels(reads) is None:
         note_to_pad, refusal = None, buttons.system("refuse_right_split")
     settings = [(NRPN_LEFT_MAIN_CHANNEL, channel + 1), (NRPN_OCTAVE, octave)] + changes
     return settings, channel, note_to_pad, refusal

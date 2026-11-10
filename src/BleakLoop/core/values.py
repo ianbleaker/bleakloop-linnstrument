@@ -2,6 +2,7 @@
 
 RESTORE_GAP_MS = 20  # before each unload restore NRPN: the device drops the end of a burst
 POLL_MS = 1000  # Linnstrument Mode re-check of Row Offset, left split Octave/Transpose, right split
+READ_RETRIES = 3  # rounds of asking again, at load, for the reads that got no reply
 PRESS_CHECK_TIMEOUT_MS = 250  # a column-1 press's Row Offset check: no reply by then drops the press and repolls (#44)
 BUTTONS_POLL_TICKS = 10  # display ticks between checks of the buttons files for a save
 

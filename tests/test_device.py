@@ -472,3 +472,31 @@ def test_release_global_column():
         m for pad in range(1, 9) for m in device.light(layout.GLOBAL_COLUMN, pad, DEVICE_DEFAULT)
     ]
     assert driver.release_global_column() == expected
+
+
+def test_a_silent_device_is_named_not_the_right_split():
+    settings, channel, note_to_pad, refusal = device.computed_settings({})
+    assert (channel, note_to_pad, refusal) == (15, None, buttons.system("no_reply"))
+
+
+def test_missing_reads_start_with_row_offset_and_the_right_splits_mode():
+    assert device.missing_reads({}) == [227, 100, 101]
+    assert device.missing_reads({227: 5, 101: 1}) == [100]
+
+
+def test_missing_reads_follow_the_modes_once_known():
+    # Per-note: all 16 switches; per-row: its lowest channel; custom and Guitar Row Offset.
+    reads = {227: 5, 100: device.MIDI_MODE_PER_NOTE, 101: 1, 102: 1}
+    assert device.missing_reads(reads) == list(range(103, 118))
+    assert device.missing_reads({227: 5, 100: device.MIDI_MODE_PER_ROW, 101: 1}) == [118]
+    assert device.missing_reads({227: device.ROW_OFFSET_CUSTOM, 100: 0, 101: 1}) == [253]
+    assert device.missing_reads({227: device.ROW_OFFSET_GUITAR, 100: 0, 101: 1}) == list(range(263, 271))
+
+
+def test_nothing_is_missing_once_every_needed_read_is_in():
+    assert device.missing_reads({227: 5, **FACTORY}) == []
+
+
+def test_a_retry_asks_two_numbers_a_step():
+    steps = device.retry_steps([103, 104, 105])
+    assert steps == [device.query(103) + device.query(104), device.query(105)]

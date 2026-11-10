@@ -134,6 +134,7 @@ class BleakLoop(ControlSurface):
         self._held_controls = {}  # Global column note -> the pad its accepted press fired
         self._refusal = None
         self._right_split_unread = False
+        self._read_retries = 0  # rounds of asking again for missing reads at load
         self._sent = {}  # BleakLoop's last left split Octave/Transpose
         self._poll = []  # Linnstrument Mode query steps still to send
         self._polled = []  # the numbers the current poll queries
@@ -223,7 +224,7 @@ class BleakLoop(ControlSurface):
             # One step per tick: the device drops a block from the middle of a burst (#18).
             self._setup_step()
         elif not self._computed:
-            self._compute_settings()
+            self._compute_or_ask_again()
         else:
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
@@ -422,11 +423,27 @@ class BleakLoop(ControlSurface):
         except Exception:
             logger.exception("SEQ: restoring the arms on unload failed")
 
+    def _compute_or_ask_again(self):
+        # A reply the device dropped is asked for again, a few rounds, before the settings are
+        # computed without it. One round per tick after the last, as the reads are.
+        missing = device.missing_reads(self._reads)
+        if missing and self._read_retries < values.READ_RETRIES:
+            self._read_retries += 1
+            logger.info("BleakLoop: no reply for NRPN %s, asking again", ", ".join(map(str, missing)))
+            self._setup = device.retry_steps(missing)
+            self._setup_step()
+            return
+        if not self._reads:
+            logger.warning("BleakLoop: the LinnStrument isn't answering: unplug it, plug it back in, then restart Live")
+        elif missing:
+            logger.warning("BleakLoop: no reply for NRPN %s", ", ".join(map(str, missing)))
+        self._compute_settings()
+
     def _compute_settings(self):
         settings, channel, self._note_map, self._refusal = device.computed_settings(self._reads)
         self._map_offset = device.map_offset(self._reads)
         self._control_channel = channel
-        self._right_split_unread = self._refusal == buttons.system("refuse_right_split")
+        self._right_split_unread = device.right_split_channels(self._reads) is None
         self._sent = {
             device.NRPN_OCTAVE: dict(settings)[device.NRPN_OCTAVE],
             device.NRPN_TRANSPOSE_PITCH: device.TRANSPOSE_ZERO,
