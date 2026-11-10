@@ -146,8 +146,6 @@ class BleakLoop(ControlSurface):
         self._timer = None
         self._phase = None
         self._morph_timing = _Timing()  # ticks of the running morph
-        self._fx_text = None  # the stored FX snapshots as last read
-        self._fx_scenes_text = None  # the stored scene snapshots as last read
         self._scenes = []  # song.scenes at the last display tick
         self._ring = None  # the last session highlight sent
         self._pending_clip = None  # the clip slot to show in the Detail view
@@ -194,8 +192,6 @@ class BleakLoop(ControlSurface):
         if self._started:
             self._watch_buttons()
             self._check_pending_clip()
-            self._load_fx()
-            self._load_fx_scenes()
             self._follow_scenes()
             self._follow_selected_device()
             if self._state.mode is Mode.LINNSTRUMENT:
@@ -229,7 +225,6 @@ class BleakLoop(ControlSurface):
             # One tick after the last NRPN: the device drops what follows it at once.
             self._started = True
             self._load_fx()
-            self._load_fx_scenes()
             self._scenes = list(self.song.scenes)
             self.enter_mode(Mode.SESSION)
             if self._refusal is not None:
@@ -326,28 +321,20 @@ class BleakLoop(ControlSurface):
             self.song.appointed_device = device
 
     def _load_fx(self):
-        # At load, and on every display tick, reloading only when the stored text changed.
-        # Live's Undo doesn't revert set_data's text, though each write adds an Undo entry.
+        # Once, at start: the surface is rebuilt for each Set opened, and Live's Undo leaves
+        # set_data's text as it was. Anything unreadable, a bad store never stopping the script
+        # loading, starts empty with a warning.
         text = live_state.read_fx_store(self.song)
-        if text == self._fx_text:
-            return
-        self._fx_text = text
         slots = fx.parse(text)
-        # One with every slot cleared is valid too.
-        if text and not fx.readable(text):
-            logger.warning("FX: stored snapshots unreadable, starting empty")
-        self._state = replace(self._state, fx_slots=slots)
-
-    def _load_fx_scenes(self):
-        # As _load_fx, for the scene snapshots.
+        if slots is None:
+            if text:
+                logger.warning("FX: stored snapshots unreadable, starting empty")
+            slots = (None,) * layout.FX_SNAPSHOTS
         text = live_state.read_fx_scenes_store(self.song)
-        if text == self._fx_scenes_text:
-            return
-        self._fx_scenes_text = text
         scenes = fx.parse_scenes(text)
         if text and fx.dump_scenes(scenes) != text:
             logger.warning("FX: stored scene snapshots unreadable, starting empty")
-        self._state = replace(self._state, fx_scenes=scenes)
+        self._state = replace(self._state, fx_slots=slots, fx_scenes=scenes)
 
     def _follow_scenes(self):
         # After _load_fx_scenes, so a remap works on the loaded store. Scenes compare equal

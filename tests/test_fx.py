@@ -91,7 +91,6 @@ def test_dump_parse_round_trip():
     assert json.loads(text)["v"] == 2
     assert json.loads(text)["slots"][104] == BOUND_JSON
     assert fx.parse(text) == slots
-    assert fx.readable(text)
 
 
 @pytest.mark.parametrize(
@@ -163,6 +162,7 @@ def test_dump_format():
         '{"v": 2, "slots": [' + ",".join(["null"] * 16) + "]}",
         '{"v": 2, "slots": [' + ",".join(["null"] * 127) + "]}",
         '{"v": 1, "slots": [' + ",".join(["null"] * 15) + "]}",
+        '{"v": 1, "slots": [' + ",".join(["null"] * 16) + "]}",
         '{"v": 1, "slots": [' + ",".join(["null"] * 128) + "]}",
         '{"v": 1}',
         '{"v": 1, "slots": [[{"track": "A"}]' + ",null" * 15 + "]}",
@@ -171,9 +171,8 @@ def test_dump_format():
         + "]}",
     ],
 )
-def test_invalid_store_gives_empty_slots(text):
-    assert fx.parse(text) == EMPTY_SLOTS
-    assert not fx.readable(text)
+def test_an_invalid_store_is_unreadable(text):
+    assert fx.parse(text) is None
 
 
 def test_scene_store_round_trip():

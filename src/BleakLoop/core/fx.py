@@ -77,17 +77,7 @@ def dump(slots):
 
 
 def parse(text):
-    # The slots. Anything unreadable gives empty slots: a bad store never stops the script
-    # loading.
-    return _parse(text) or (None,) * layout.FX_SNAPSHOTS
-
-
-def readable(text):
-    # The store parses as a whole, with every slot decoding.
-    return _parse(text) is not None
-
-
-def _parse(text):
+    # The slots, or None when the store is unreadable as a whole or a slot doesn't decode.
     try:
         data = json.loads(text)
         if data.get("v") != 2 or len(data["slots"]) != layout.FX_SNAPSHOTS:
