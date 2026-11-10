@@ -6,7 +6,7 @@ and Shift + Play/Stop act on it.
 
 from dataclasses import replace
 
-from . import buttons, controls, faders, functions, fx, layout, mixer, modes
+from . import buttons, controls, dispatch, faders, functions, fx, layout, mixer, modes
 from .leds import (
     BLUE,
     CYAN,
@@ -74,7 +74,7 @@ def handle(state, event, snapshot):
     # A Global column PadPress, pressed or released.
     key = (event.column, event.pad)
     if state.scene_page:
-        return _scene_page(state, key, event.pressed, snapshot)
+        return scene_page(state, event, snapshot)
     normal, shift = layers(state)
     if key in _shift_pads(normal):
         return replace(state, shift=event.pressed), shift_message(event)
@@ -231,12 +231,16 @@ def _back(state):
     return state, actions + more + back
 
 
-def _scene_page(state, key, pressed, snapshot):
-    # Opened while Shift is held: that hold's release mustn't close it, Back's press does.
-    shift = _shift_pads(layers(state)[0])
+def scene_page(state, event, snapshot):
+    # A Global column press or release while the scene page shows. Opened while Shift is held:
+    # that hold's release mustn't close it, Back's press does. Copy and Delete leave it alone.
+    key, pressed = (event.column, event.pad), event.pressed
+    shift = dispatch.held_pads(state, "shift")
     if not pressed:
         if key in shift:
             return replace(state, shift=False), []
+        return state, []
+    if (state.copy or state.delete) and key not in shift:
         return state, []
     button = layout.LINNSTRUMENT_SCENES.at(key)
     if button is not None:
@@ -331,19 +335,26 @@ def _launch_quantization(state, snapshot):
     ]
 
 
+def render_scene_page(state, snapshot):
+    # The Global column while the scene page shows: the window's scenes, its own buttons and
+    # the Shift pad, which still lights.
+    frame = {(layout.GLOBAL_COLUMN, pad): Light(OFF) for pad in range(1, layout.ROWS + 1)}
+    for pad in range(1, layout.WINDOW_SCENES + 1):
+        frame[layout.GLOBAL_COLUMN, pad] = controls.scene_light(
+            snapshot, state.window.scene, pad - 1, controls.waiting_scene(state)
+        )
+    functions.paint(frame, layout.LINNSTRUMENT_SCENES.buttons(), state, snapshot)
+    shift_held = Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
+    frame.update(dict.fromkeys(dispatch.held_pads(state, "shift"), shift_held))
+    return frame
+
+
 def render(state, snapshot):
     # The Global column only. Copy and Delete hide the Shift layer.
+    if state.scene_page:
+        return render_scene_page(state, snapshot)
     normal, shift = layers(state)
     shift_held = Light(WHITE, Blink.FAST if state.shift else Blink.STEADY)
-    if state.scene_page:
-        frame = {(layout.GLOBAL_COLUMN, pad): Light(OFF) for pad in range(1, layout.ROWS + 1)}
-        for pad in range(1, layout.WINDOW_SCENES + 1):
-            frame[layout.GLOBAL_COLUMN, pad] = controls.scene_light(
-                snapshot, state.window.scene, pad - 1, controls.waiting_scene(state)
-            )
-        functions.paint(frame, layout.LINNSTRUMENT_SCENES.buttons(), state, snapshot)
-        frame.update(dict.fromkeys(_shift_pads(normal), shift_held))
-        return frame
     # Every pad the column's layers use goes dark, then the live layer lights its own.
     frame = {button.key: Light(OFF) for button in normal.buttons() + shift.buttons()}
     live = shift if state.shift and not state.copy and not state.delete else normal

@@ -202,18 +202,13 @@ def _delete_hold(state, event, snapshot):
     return replace(state, delete=True), buttons.say("delete", "held")
 
 
-@functions.register(
+functions.register_hold(
     "seq",
     light=_seq_light,
-    hold=functions.Hold(
-        handle=_seq_hold,
-        down=lambda state: state.seq_held,
-        capture=lambda state, event, snapshot: _seq_press(state, event, snapshot),
-    ),
+    handle=_seq_hold,
+    down=lambda state: state.seq_held,
+    capture=lambda state, event, snapshot: _seq_press(state, event, snapshot),
 )
-def _seq_tap(state, snapshot, value):
-    # Sequencer Mode's handle() presses it as a button. TODO(116 step 6b): dispatch's hold.
-    return sequencer.leave_by_seq(state, snapshot)
 # Copy and Delete hide the Shift layer.
 functions.register_hold(
     "copy",
