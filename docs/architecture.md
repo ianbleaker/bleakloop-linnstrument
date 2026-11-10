@@ -43,6 +43,10 @@ flowchart LR
 | Geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping | `core/layout.py` |
 | Snapshot, Action and Frame types (plain dataclasses) | `core/model.py` |
 | Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers | `core/modes.py` |
+| The button registry from `buttons.toml` and the user's file: sections, labels, messages, checks, the editor's description | `core/buttons.py` |
+| The user's buttons file: merging it over the shipped file, its rules, its format 1 conversion and its writer | `core/userfile.py` |
+| Every function and its requirement and options (data only) | `core/catalogue.py` |
+| The functions by name: each one's press, light and hold | `core/functions.py` |
 | The views: each mode's button sections, its hold layers and what they replace, its fixed regions | `core/views.py` |
 | The current view's buttons: holds and their precedence, layers, button lookup and lights | `core/dispatch.py` |
 | Shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps, Device/Clip and scene lights | `core/controls.py` |
@@ -56,6 +60,7 @@ flowchart LR
 | Device colours, track colour matching, tempo and fast blink | `core/leds.py` |
 | Tuned numbers: every value in section 8, by name | `core/values.py` |
 | `handle()` and `render()`, composing the core modules | `core/engine.py` |
+| The button editor's local HTTP server and page | `editor/` |
 | The generated manual pad maps and architecture figures | `tools/docs/` |
 
 Read sections 2–4 for structure, 5–7 for device and Live details, and 8 for numbers.
@@ -146,6 +151,10 @@ src/BleakLoop/
     layout.py          geometry: pad <-> device row, column roles, 13 x 6 window (8 wide in the split view), window movement and clamping
     model.py           Snapshot, Action and Frame types (plain dataclasses)
     modes.py           Session / Mixer / Linnstrument / Sequencer, Linnstrument Mode pages, modifiers
+    buttons.py         the button registry from buttons.toml and the user's file: sections, labels, messages, checks
+    userfile.py        the user's buttons file: merge, rules, format 1 conversion, writer
+    catalogue.py       every function, its requirement and options (data only)
+    functions.py       the functions by name: press, light and hold
     views.py           the views: each mode's button sections, its hold layers and what they replace, its fixed regions
     dispatch.py        the current view's buttons: holds and their precedence, layers, button lookup and lights
     controls.py        shared Session and Linnstrument Mode behaviour: undo, metronome, Play/Stop, record, Fixed Length, tempo steps, Device/Clip and scene lights
@@ -159,6 +168,7 @@ src/BleakLoop/
     leds.py            device colours, track colour matching, tempo and fast blink
     values.py          every value in section 8, by name
     engine.py          handle() and render(), composing the modules above
+  editor/              the button editor: local HTTP server (server.py) and page (index.html)
 tests/                 pytest: the core, the docs generators and the layering
   test_manual.py       every lit pad in the manual's example Sets is labelled
   test_architecture.py core imports only core; adapters import no plumbing
