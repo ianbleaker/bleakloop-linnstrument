@@ -178,7 +178,6 @@ def _error(status, message):
     return _json(status, {"error": message})
 
 
-# The writer the core's user file conversion uses too.
 write_atomic = userfile.write_atomic
 
 
