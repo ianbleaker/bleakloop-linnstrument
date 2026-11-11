@@ -498,7 +498,6 @@ To put any parameter of the Set on a pad, bind it to a snapshot slot (see Bound 
 - Delete + a bound slot clears it; press the empty slot to store a Set-wide snapshot there.
 - Copy copies a bound slot to an empty slot, punch-in values included. It can't be pasted onto a scene snapshot.
 - **Undo:** within 10 seconds of a bind, a removal or an update, with nothing else pressed since, the Undo pad (column 1, pad 6) reverses it, newest first, saying "Unbound …" or "Bound … again"; a parameter bound again gets its punch-in value back, and an updated one its old value. Each reversal gives you another 10 seconds. After that, or once you've pressed anything else, the pad is Live's Undo again. Live's own Undo (Cmd-Z) never touches binds. Shift doesn't end the window, but let go of it first: Shift + Undo is Redo.
-- Pink slots from older versions, which held one rack's macros, load as that rack's macros bound, without their stored values. They, and slots bound before punch-in values existed, have no punch-in values until you bind each parameter again.
 - Scene snapshots can't be bound.
 
 **Scene snapshots** (column 14, pads 1–6):
